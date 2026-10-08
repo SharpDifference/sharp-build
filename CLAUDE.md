@@ -19,6 +19,7 @@ A local, single-player, AI-driven dating sim in visual-novel form: an Electron d
 - If anything is unclear, ask clarifying questions before finalizing your plan.
 - Don't assume that I know better than you. If you have suggestions for a better way to do things, raise them as questions.
 - Quality is more important than speed. Always spend some time considering edge cases and interaction with other parts of the code to find bugs before they happen.
+- I will often queue agent work while you are planning. Ignore the working tree and only raise a concern if you are instructed to implement with files in the working tree.
 
 ## Finishing
 

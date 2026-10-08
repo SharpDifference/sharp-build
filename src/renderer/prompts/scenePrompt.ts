@@ -48,6 +48,7 @@ import {
   type ClassEntry,
   type ClassSlot,
   type CustomCgSlot,
+  type GameHistory,
   type JobState,
   MEMORY_TYPES,
   type MemoryBudgets,
@@ -76,6 +77,8 @@ import {
   ambientLoreCharacters,
   characterLore,
   characterLoreForIds,
+  classLore,
+  type ClassRoster,
   keyPattern,
   lorebookBlock,
   type LoreRumor,
@@ -87,6 +90,7 @@ import { moodLine } from './moods'
 import { springBreakLines } from './springBreak'
 import { bestFriendLines, npcBehaviorLines, npcPairLines } from './npcRelationship'
 import { occasionLoreLines } from './occasions'
+import { recapLore } from './recaps'
 import { milestoneLine, relationshipLines } from './relationship'
 import {
   PLANS_INSTRUCTIONS,
@@ -188,6 +192,8 @@ export interface PromptState {
   classes: Record<string, ClassEntry>
   /** The reader's own timetable, sparse slot → class code. */
   playerSchedule: Record<number, string>
+  /** Who sits in each class of the catalog, by class code. */
+  classRosters: Readonly<Record<string, ClassRoster>>
   /**
    * Classes the reader dropped that his former classmates have not been told about yet
    * — resolved by the loop and spent at the boundary of the scene that carries them.
@@ -317,6 +323,8 @@ export interface PromptState {
   scenePersona?: string
   /** How many memories per character the cast block carries, by cast size. */
   memoryBudgets: Required<MemoryBudgets>
+  /** The playthrough log, read for the lorebook's dated recaps. */
+  history: GameHistory
   /**
    * Set only for a scene from the Scene Creator, played outside any playthrough: no mood line,
    * and no line holding romance back on the reader's stats.
@@ -662,6 +670,7 @@ function castBlock(cast: readonly Character[], state: PromptState): string[] {
         flags,
         info?.nameKnown ?? false,
         affection,
+        info,
         state.stats ?? DEFAULT_PLAYER_STATS,
         // In the room, so this only says whether they have met on the phone first.
         { texting: false, texted: state.textedWith?.includes(character.charId) ?? false },
@@ -690,7 +699,8 @@ function castBlock(cast: readonly Character[], state: PromptState): string[] {
         info?.schedule ?? {},
         classes,
         info?.job,
-        state.date
+        state.date,
+        herClassmates(character.charId, state.classRosters, state.playerSchedule)
       )
     )
     // What she and the reader have planned for later.
@@ -804,18 +814,26 @@ export function profileLines(character: Character, flags: CharFlags, castSize = 
   return lines
 }
 
-/** One week under one heading — classes and shifts interleaved in slot order. */
+/**
+ * One week under one heading — classes and shifts interleaved in slot order, each class followed
+ * by whoever `withWhom` names in it.
+ */
 export function scheduleLines(
   heading: string,
   schedule: Record<number, string>,
   classes: Record<string, ClassEntry>,
   job?: { jobId: string; shifts: readonly ShiftSlot[]; startsOn?: number } | null,
-  date?: number
+  date?: number,
+  withWhom?: (code: string) => readonly string[]
 ): string[] {
   const rows: (readonly [number, string])[] = Object.entries(schedule)
     .map(([slot, code]) => [Number(slot) as ClassSlot, classes[code]] as const)
     .filter(([, entry]) => Boolean(entry))
-    .map(([slot, entry]) => [slot as number, `${slotFullLabel(slot)}: ${entry.name}`] as const)
+    .map(([slot, entry]) => {
+      const names = withWhom?.(entry.code) ?? []
+      const company = names.length > 0 ? ` (With ${andList(names)})` : ''
+      return [slot as number, `${slotFullLabel(slot)}: ${entry.name}${company}`] as const
+    })
 
   const employer = job && job.shifts.length > 0 ? jobDefOf(job.jobId)?.employer : undefined
   const started = !job || job.startsOn === undefined || (date !== undefined && date >= job.startsOn)
@@ -828,6 +846,36 @@ export function scheduleLines(
   if (rows.length === 0) return []
   rows.sort(([a], [b]) => a - b)
   return [heading, ...rows.map(([, line]) => line)]
+}
+
+/**
+ * Who the reader's own timetable names beside a class: the classmates he knows sit there, save
+ * in the class the scene is sitting in, whose girls are in the room.
+ */
+export function readerClassmates(
+  rosters: Readonly<Record<string, ClassRoster>>,
+  sitting?: string | null
+): (code: string) => string[] {
+  return (code) =>
+    code === sitting ? [] : (rosters[code]?.known ?? []).map((classmate) => classmate.firstName)
+}
+
+/**
+ * Who a girl's timetable names beside a class: the other roster girls in it, and only where the
+ * reader does not take it, his own timetable naming them where he does.
+ */
+export function herClassmates(
+  charId: string,
+  rosters: Readonly<Record<string, ClassRoster>>,
+  playerSchedule: Readonly<Record<number, string>>
+): (code: string) => string[] {
+  const his = new Set(Object.values(playerSchedule))
+  return (code) =>
+    his.has(code)
+      ? []
+      : (rosters[code]?.enrolled ?? [])
+          .filter((classmate) => classmate.charId !== charId)
+          .map((classmate) => classmate.firstName)
 }
 
 /**
@@ -1071,7 +1119,8 @@ function whoBlock(cast: readonly Character[], state: PromptState, reader: string
       state.playerSchedule,
       state.classes,
       state.playerJob,
-      state.date
+      state.date,
+      readerClassmates(state.classRosters, state.classCode)
     ),
     '',
     ...castBlock(cast, state),
@@ -1390,6 +1439,19 @@ function characterLoreFor(
 }
 
 /**
+ * The lorebook's class entries for this turn, save the class being sat and the project being
+ * worked, which the `CLASS` block and `projectLore` already describe.
+ */
+function classLoreFor(scanned: string, state: PromptState): string[] {
+  return classLore(scanned, {
+    classes: state.classes,
+    rosters: state.classRosters,
+    playerSchedule: state.playerSchedule,
+    skip: [state.classCode, state.projectClass].filter((code): code is string => Boolean(code))
+  })
+}
+
+/**
  * What the lorebook is matched against: the turn's own words, plus the place the classifier
  * said the scene is set in.
  */
@@ -1424,7 +1486,11 @@ function castScenePrompt(
   const lore = lorebookBlock(
     scanned,
     alwaysLore(state),
-    characterLoreFor(scanned, state, cast),
+    [
+      ...classLoreFor(scanned, state),
+      ...characterLoreFor(scanned, state, cast),
+      ...recapLore(scanned, state.date, state.time, state.history)
+    ],
     rumor
   )
 
@@ -1559,13 +1625,17 @@ export function buildSoloPrompt(
   const lore = lorebookBlock(
     scanned,
     alwaysLore(state),
-    characterLoreForIds(
-      state.mentions ?? [],
-      state.charInfo,
-      state.date,
-      undefined,
-      state.upcomingPlans
-    ),
+    [
+      ...classLoreFor(scanned, state),
+      ...characterLoreForIds(
+        state.mentions ?? [],
+        state.charInfo,
+        state.date,
+        undefined,
+        state.upcomingPlans
+      ),
+      ...recapLore(scanned, state.date, state.time, state.history)
+    ],
     // A solo scene is an opening too, and the only one it has.
     state.slotRumor
   )

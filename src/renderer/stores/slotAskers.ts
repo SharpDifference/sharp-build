@@ -1,14 +1,16 @@
 /**
- * Who texts the reader an invitation, as odds and one draw: her chance by disposition, the
- * slot's modulation of it, the cooldowns an unanswered ask serves, and the weighted draw
- * that turns a slate of chances into names. Pure and randomised; the caller reads the store.
+ * Who texts the reader as a slot opens, as odds and draws: an invitation's chance by disposition
+ * and the slot's modulation of it, a reach-out's chance and what it is about, the waits an
+ * unanswered text serves, and the weighted draw that turns a slate of chances into names. Pure
+ * and randomised; the caller reads the store.
  */
 
 import { globalSlotOf } from '@shared/jobs'
 import type { Disposition } from '@shared/relationship'
-import type { Conversation, TimeSlot } from '@shared/types'
+import type { ChatMessage, Conversation, TimeSlot } from '@shared/types'
 import { MIDTERM_WEEK, FINALS_WEEK } from '../prompts/occasions'
 import { weekendSaturdayOf } from '../prompts/gameDate'
+import { REACH_OUT_TOPICS, type ReachOutTopic } from '../prompts/slotIntroPrompt'
 
 /** Her base odds of asking him out in one slot, by what she is to him. */
 const ASK_CHANCE = {
@@ -37,6 +39,29 @@ const DECLINE_COOLDOWN_BASE = 4
 
 /** The longest that doubling reaches — two weeks of slots. */
 const DECLINE_COOLDOWN_CAP = 28
+
+/** Her odds of reaching out just to talk in one slot, by what she is to him; nobody less reaches out. */
+const REACH_OUT_CHANCE = {
+  lover: 0.3,
+  devoted: 0.22,
+  trusted: 0.15,
+  friendly: 0.08
+} as const
+
+/** However many win their roll, only this many reach out in one slot. */
+const MAX_REACH_OUTS = 1
+
+/** Slots of quiet the whole roster keeps after any one reach-out lands. */
+export const REACH_OUT_QUIET_SLOTS = 1
+
+/** Slots her thread has to have been quiet before she reaches out, with nothing of hers unanswered. */
+const REACH_OUT_GAP_SLOTS = 3
+
+/** The first wait a reach-out he never answered buys, doubling with each one after it. */
+const UNANSWERED_REACH_OUT_BASE = 6
+
+/** The longest that doubling reaches — two weeks of slots. */
+const UNANSWERED_REACH_OUT_CAP = 28
 
 /** What {@link askChanceOf} weighs: where she stands with him, and whether she has anyone else. */
 export interface AskChanceInput {
@@ -76,16 +101,66 @@ export function slotAskMultiplier(date: number, time: TimeSlot): number {
   return multiplier
 }
 
-/** The slot her latest invitation was sent in, or null when she has never sent one. */
-export function lastInviteSlotOf(conversation: Conversation | undefined): number | null {
+/** The slot of her newest text that `marked` picks out, or null when there is none. */
+function lastMarkedSlotOf(
+  conversation: Conversation | undefined,
+  marked: (message: ChatMessage) => boolean
+): number | null {
   const messages = conversation?.messages ?? []
   for (let index = messages.length - 1; index >= 0; index--) {
     const message = messages[index]
-    if (message.sender === 'contact' && message.invite) {
+    if (message.sender === 'contact' && marked(message)) {
       return globalSlotOf(message.date, message.time)
     }
   }
   return null
+}
+
+/** The slot her latest invitation was sent in, or null when she has never sent one. */
+export function lastInviteSlotOf(conversation: Conversation | undefined): number | null {
+  return lastMarkedSlotOf(conversation, (message) => message.invite === true)
+}
+
+/** The slot her latest reach-out was sent in, or null when she has never reached out. */
+export function lastReachOutSlotOf(conversation: Conversation | undefined): number | null {
+  return lastMarkedSlotOf(conversation, (message) => message.reachOut === true)
+}
+
+/** The slot of the newest text either of them sent, or null for a thread of system lines alone. */
+export function lastTextSlotOf(conversation: Conversation | undefined): number | null {
+  const messages = conversation?.messages ?? []
+  for (let index = messages.length - 1; index >= 0; index--) {
+    const message = messages[index]
+    if (message.sender !== 'system') return globalSlotOf(message.date, message.time)
+  }
+  return null
+}
+
+/** Her odds of reaching out this slot: her band's, the lover band ahead of any tier. */
+export function reachOutChanceOf(isLover: boolean, disposition: Disposition): number {
+  if (isLover) return REACH_OUT_CHANCE.lover
+  return disposition === 'devoted'
+    ? REACH_OUT_CHANCE.devoted
+    : disposition === 'trusted'
+      ? REACH_OUT_CHANCE.trusted
+      : disposition === 'friendly'
+        ? REACH_OUT_CHANCE.friendly
+        : 0
+}
+
+/**
+ * How long her thread has to have been quiet before she reaches out, doubling for every
+ * reach-out of hers he has left unanswered.
+ */
+export function reachOutGapSlots(unanswered: number): number {
+  if (unanswered <= 0) return REACH_OUT_GAP_SLOTS
+  return Math.min(UNANSWERED_REACH_OUT_CAP, UNANSWERED_REACH_OUT_BASE * 2 ** (unanswered - 1))
+}
+
+/** What she reaches out about, drawn evenly. */
+export function rollReachOutTopic(rand: () => number = Math.random): ReachOutTopic {
+  const index = Math.min(REACH_OUT_TOPICS.length - 1, Math.floor(rand() * REACH_OUT_TOPICS.length))
+  return REACH_OUT_TOPICS[index]
 }
 
 /** How long she waits before asking again, doubling for every invitation he let stand. */
@@ -107,12 +182,13 @@ export interface SlotAskCandidate {
 }
 
 /**
- * Rolls every candidate, then draws at most {@link MAX_ASKERS} of the winners without
- * replacement, each winner weighted by her own chance. Returns the charIds in draw order.
+ * Rolls every candidate, then draws at most `max` of the winners without replacement, each
+ * winner weighted by her own chance. Returns the charIds in draw order.
  */
 export function rollSlotAskers(
   candidates: readonly SlotAskCandidate[],
-  rand: () => number = Math.random
+  rand: () => number = Math.random,
+  max: number = MAX_ASKERS
 ): string[] {
   const winners: SlotAskCandidate[] = []
   for (const candidate of candidates) {
@@ -121,7 +197,7 @@ export function rollSlotAskers(
 
   const picked: string[] = []
   const pool = [...winners]
-  while (picked.length < MAX_ASKERS && pool.length > 0) {
+  while (picked.length < max && pool.length > 0) {
     const total = pool.reduce((sum, candidate) => sum + candidate.chance, 0)
     let ticket = rand() * total
     let index = pool.length - 1
@@ -136,6 +212,14 @@ export function rollSlotAskers(
     pool.splice(index, 1)
   }
   return picked
+}
+
+/** The one girl who reaches out this slot, drawn as {@link rollSlotAskers} draws, or null. */
+export function rollSlotReachOut(
+  candidates: readonly SlotAskCandidate[],
+  rand: () => number = Math.random
+): string | null {
+  return rollSlotAskers(candidates, rand, MAX_REACH_OUTS)[0] ?? null
 }
 
 /** One contact who could ask him to the slot's occasion, and whether the slot places her anywhere. */

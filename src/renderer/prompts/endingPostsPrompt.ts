@@ -93,6 +93,7 @@ function characterBlock(input: EndingPostsInput): string[] {
         info.flags ?? emptyFlags(),
         info.nameKnown,
         affectionFor(info, date, character),
+        info,
         input.stats ?? DEFAULT_PLAYER_STATS,
         // Everybody here is off campus: whatever they have left is a phone.
         { texting: true, texted },

@@ -3,8 +3,10 @@ import {
   affectionFor,
   emptyFlags,
   foldRelationshipEvents,
+  observedUpperHalves,
   refreshedFlags,
-  withMemoryReplaced
+  withMemoryReplaced,
+  withRomanceScenes
 } from '@shared/relationship'
 import { escapeRegExp } from '@shared/sentences'
 import { affectionsOf, type SceneSetup } from '@shared/sceneCreator'
@@ -810,6 +812,16 @@ interface GameStoreState {
   refreshDerivedFlags: (charIds: readonly string[]) => void
   /** Files a crush the ending rolled for her. Latches — a second call is a no-op. */
   setCrush: (charId: string) => void
+  /**
+   * Steps every girl's new-crush and new-relationship scene count over the boundary, off the
+   * entries she crossed it with and who was cast.
+   */
+  stepRomanceScenes: (
+    before: Readonly<Record<string, CharInfo>>,
+    charIds: readonly string[]
+  ) => void
+  /** Records which upper halves of her tiers each girl is in, off her affection today. */
+  observeUpperHalves: () => void
 
   /**
    * Appends one Bunnyboard message, creating the conversation on first use.
@@ -2159,6 +2171,29 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
         return { ...info, flags: { ...flags, hasCrush: true } }
       })
     ),
+
+  // The step lives in `shared/relationship`, shared with the ending's projection.
+  stepRomanceScenes: (before, charIds) =>
+    set((state) => {
+      const charInfo = withRomanceScenes(before, state.charInfo, charIds)
+      return charInfo === state.charInfo ? {} : { charInfo }
+    }),
+
+  observeUpperHalves: () =>
+    set((state) => {
+      let charInfo = state.charInfo
+      for (const charId of state.chars) {
+        const info = charInfo[charId]
+        if (!info) continue
+        const affection = affectionFor(info, state.date, state.characters[charId])
+        const upperHalves = observedUpperHalves(info.upperHalves, affection)
+        // An entry nothing moved keeps its identity.
+        if (upperHalves === info.upperHalves) continue
+        if (charInfo === state.charInfo) charInfo = { ...charInfo }
+        charInfo[charId] = { ...info, upperHalves }
+      }
+      return charInfo === state.charInfo ? {} : { charInfo }
+    }),
 
   setSuspicions: (charId, records) =>
     set((state) =>

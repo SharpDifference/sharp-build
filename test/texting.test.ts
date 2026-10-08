@@ -26,6 +26,7 @@ import {
   expireHangoutInvitations,
   pickOccasionAsker,
   pickSlotAskers,
+  pickSlotReachOut,
   resolveFriendRequests,
   sceneActiveOf,
   sceneOnScreenOf,
@@ -35,6 +36,7 @@ import {
 } from '../src/renderer/stores/textingLoop'
 import { useBunnyboardStore } from '../src/renderer/stores/bunnyboardStore'
 import { BUNNYBOT_CHAT_ID, FRIENDS_INTRO_SLOT } from '../src/renderer/prompts/bunnybot'
+import { SPRING_BREAK_LEAVE } from '../src/renderer/prompts/springBreak'
 import { registerHangoutEntry } from '../src/renderer/stores/loop/hooks'
 import { applyLedger } from '../src/renderer/stores/sceneSanitizer'
 import { useGameStore } from '../src/renderer/stores/gameStore'
@@ -563,6 +565,61 @@ describe('pickSlotAskers', () => {
     // Mina is the next free attendee on the same plan, so it still gets its one
     // reminder — from somebody who is still speaking to him.
     expect(pickSlotAskers(7, 0, view)).toEqual(['mina_okafor'])
+  })
+})
+
+describe('pickSlotReachOut', () => {
+  /** The roll's view of the world, read off the store as it stands. */
+  const view = () => ({
+    events: useGameStore.getState().events,
+    charInfo: useGameStore.getState().charInfo,
+    npcRelationships: {}
+  })
+
+  // Her thread is open while she is away for the break and shut while she is in class: the
+  // phone's own gate, which is not the scene's.
+  it('reaches a girl away for spring break', () => {
+    seedLover()
+    useGameStore.setState({ date: SPRING_BREAK_LEAVE, time: 1, springBreakAway: ['a'] })
+    const rand = vi.spyOn(Math, 'random').mockReturnValue(0)
+    try {
+      expect(pickSlotReachOut(SPRING_BREAK_LEAVE, 1, view(), new Set())).toBe('sarah_rose')
+    } finally {
+      rand.mockRestore()
+    }
+  })
+
+  it('never reaches a girl in class, nor one with a plan in the slot', () => {
+    seedLover()
+    const rand = vi.spyOn(Math, 'random').mockReturnValue(0)
+    try {
+      // The same roll with nothing in her way picks her.
+      expect(pickSlotReachOut(7, 0, view(), new Set())).toBe('sarah_rose')
+
+      const free = useGameStore.getState().charInfo.a
+      useGameStore.setState({
+        charInfo: { a: { ...free, schedule: { [slotOf(0, 0)]: 'BIO 210' } } }
+      })
+      expect(pickSlotReachOut(7, 0, view(), new Set())).toBeNull()
+
+      useGameStore.setState({
+        charInfo: { a: free },
+        events: [
+          {
+            id: 'e1',
+            date: 7,
+            time: 0,
+            title: 'Lunch',
+            description: 'Lunch with Sarah.',
+            charIds: ['a'],
+            madeOn: { date: 6, time: 1 }
+          }
+        ]
+      })
+      expect(pickSlotReachOut(7, 0, view(), new Set())).toBeNull()
+    } finally {
+      rand.mockRestore()
+    }
   })
 })
 

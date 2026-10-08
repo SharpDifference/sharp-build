@@ -656,6 +656,9 @@ export interface CharJob {
  */
 export type CrushHint = { stat: StatKey; tier: StatTier } | { met: true }
 
+/** A disposition tier whose upper half reads differently from its lower one. */
+export type UpperHalf = 'neutral' | 'friendly' | 'trusted'
+
 /** What a standing haunt is for: the menu it was dealt from. */
 export type HauntKind = 'fun' | 'study' | 'activity' | 'meal' | 'grocery' | 'room'
 
@@ -750,6 +753,16 @@ export interface CharState {
    */
   crushHint?: CrushHint
   /**
+   * Scenes she has shared with the reader since her crush began or they became lovers; absent
+   * once that has settled, or while she holds neither.
+   */
+  romanceScenes?: number
+  /**
+   * The upper halves of her tiers she has been in, each `again` once she has since been out of
+   * it, above or below; read off her affection at every boundary.
+   */
+  upperHalves?: Partial<Record<UpperHalf, 'first' | 'again'>>
+  /**
    * Everything she has ever posted, oldest first: her winter-break posts, then the
    * per-slot roll's. Absent for a girl whose break was somewhere else — and on the save rather
    * than the profile, since a like rewrites a post.
@@ -843,6 +856,8 @@ export interface ChatMessage {
   error?: boolean
   /** Her asking him out: the message every ask-out cooldown is counted off. */
   invite?: true
+  /** The first text of hers reaching out just to talk: what every reach-out wait is counted off. */
+  reachOut?: true
 }
 
 /** One Bunnyboard conversation with a contact, keyed by her charId. */
@@ -1186,6 +1201,15 @@ export interface SlotOpening {
   slotRumor?: { placeId: string; sentence: string }
   /** The status updates the opening's posters wrote, filed to their own feeds at step 1. */
   posts?: SlotIntroResponse['posts']
+  /** The texts the girls leaving for spring break wrote to say so, delivered at step 1. */
+  springBreakTexts?: SlotIntroResponse['springBreakTexts']
+  /** The texts of the one girl the opening rolled to reach out just to talk, delivered at step 1. */
+  reachOuts?: SlotIntroResponse['reachOuts']
+  /**
+   * Who leaves campus for spring break, picked by the ending whose next slot is the first on or
+   * after the notice and assigned by the boundary. Absent on every other opening.
+   */
+  springBreakAway?: string[]
   /**
    * What campus saw of the scene that ended into this slot — rolled at the ending off
    * the ledger it just paid for, so the narration above can say what is being said.
@@ -1579,7 +1603,7 @@ export interface PlaythroughRecord {
   /** The settled half of every character's entry, keyed by charId. */
   profiles: Record<string, CharProfile>
   /**
-   * The player's own name for the playthrough, given from Load Game � the one field written
+   * The player's own name for the playthrough, given from Load Game — the one field written
    * after New Game. Absent, the playthrough goes by its place in creation order.
    */
   name?: string
@@ -2065,6 +2089,16 @@ export interface SlotIntroResponse {
    * charKey; `text` is the post.
    */
   posts?: Array<{ char: string; text: string }>
+  /**
+   * The messages each girl leaving campus for spring break sends to tell the reader she is going:
+   * `char` is her charKey, `texts` the run of messages in the order she sends them.
+   */
+  springBreakTexts?: Array<{ char: string; texts: string[] }>
+  /**
+   * The messages the girl the slot rolled to reach out sends, just to talk: `char` is her charKey,
+   * `texts` the run of messages in the order she sends them.
+   */
+  reachOuts?: Array<{ char: string; texts: string[] }>
 }
 
 /**

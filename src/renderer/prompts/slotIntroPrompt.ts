@@ -67,6 +67,46 @@ export interface IntroBreakup {
   forFirstName: string
 }
 
+/** A contact leaving campus for spring break, texting the reader that she is going. */
+export interface IntroLeaver {
+  character: Character
+  info: CharInfo
+  /** How the reply names her back — resolved through `charKeyToId`. */
+  charKey: string
+  /** Whether a Bunnyboard thread with her already holds anything (`hasTexted`). */
+  texted: boolean
+}
+
+/** What a girl reaching out just to talk texts the reader about, rolled by the app. */
+export const REACH_OUT_TOPICS = ['wellbeing', 'goodNews', 'badNews', 'question'] as const
+
+/** One of {@link REACH_OUT_TOPICS}. */
+export type ReachOutTopic = (typeof REACH_OUT_TOPICS)[number]
+
+/** Each reach-out topic as the prompt names it beside her key. */
+const REACH_OUT_TOPIC_PHRASE: Record<ReachOutTopic, string> = {
+  wellbeing: 'checking in on how he is doing',
+  goodNews: 'telling him some good news of hers',
+  badNews: 'telling him some bad news of hers',
+  question: 'asking him a question'
+}
+
+/** A contact this slot rolled in to text the reader just to talk, about one rolled topic. */
+export interface IntroReachOut {
+  character: Character
+  info: CharInfo
+  /** How the reply names her back — resolved through `charKeyToId`. */
+  charKey: string
+  /** Whether a Bunnyboard thread with her already holds anything (`hasTexted`). */
+  texted: boolean
+  /** What she is texting him about. */
+  topic: ReachOutTopic
+  /** Her TEXTING HISTORY lines: what the two of them last texted about, and when. */
+  thread: readonly string[]
+  /** Where she is, who with, and what she is there for, when the slot places her anywhere. */
+  whereabouts?: { location: string; companions: NpcCompanions; haunt?: Haunt }
+}
+
 /**
  * A character posting a status update this slot. A girl doing both is in this list and
  * the askers'; `LOREBOOK` describes her once.
@@ -108,6 +148,10 @@ export interface SlotIntroInput {
   askers: readonly IntroAsker[]
   /** The lovers the finished slot left for somebody else, each ending it over text now. */
   breakups: readonly IntroBreakup[]
+  /** The girls the spring break pick just sent away, each texting him she is going. */
+  leavers: readonly IntroLeaver[]
+  /** The one contact, if any, texting him just to talk this slot. */
+  reachOuts: readonly IntroReachOut[]
   /**
    * Characters posting a status update this slot — the 10% roll's passers, anyone also
    * under {@link askers} included.
@@ -185,6 +229,30 @@ const SCHEMA = objectSchema('slot_intro', ['lines'], {
       properties: {
         char: { type: 'string' },
         text: { type: 'string' }
+      }
+    }
+  },
+  springBreakTexts: {
+    type: 'array',
+    items: {
+      type: 'object',
+      additionalProperties: false,
+      required: ['char', 'texts'],
+      properties: {
+        char: { type: 'string' },
+        texts: { type: 'array', items: { type: 'string' } }
+      }
+    }
+  },
+  reachOuts: {
+    type: 'array',
+    items: {
+      type: 'object',
+      additionalProperties: false,
+      required: ['char', 'texts'],
+      properties: {
+        char: { type: 'string' },
+        texts: { type: 'array', items: { type: 'string' } }
       }
     }
   }
@@ -318,12 +386,38 @@ function posterBlock(input: SlotIntroInput): string[] {
   ]
 }
 
-/** Everybody the three blocks above name, described once each. */
+/** The girls leaving campus for spring break, each telling him so by text as the slot opens. */
+function leaverBlock(input: SlotIntroInput): string[] {
+  if (input.leavers.length === 0) return []
+
+  return [
+    'LEAVING FOR SPRING BREAK',
+    'Each of these characters is texting the reader right now to let him know she is leaving campus on Saturday for spring break and will be gone for the week. Write one entry in "springBreakTexts" for each, and nothing for anyone else. They are described under LOREBOOK.',
+    ...input.leavers.map(({ charKey }) => `- ${charKey}`)
+  ]
+}
+
+/** The contact texting the reader just to talk this slot, beside what she is texting about. */
+function reachOutBlock(input: SlotIntroInput): string[] {
+  if (input.reachOuts.length === 0) return []
+
+  return [
+    'REACHING OUT',
+    'Each of these characters is texting the reader right now just to talk, about what is listed beside her. Write one entry in "reachOuts" for each, and nothing for anyone else. They are described under LOREBOOK.',
+    ...input.reachOuts.map(({ charKey, topic }) => `- ${charKey} — ${REACH_OUT_TOPIC_PHRASE[topic]}`)
+  ]
+}
+
+/** Everybody the five blocks above name, described once each. */
 function characterBlock(input: SlotIntroInput): string[] {
   const entries: string[][] = []
   const named = new Set<string>()
 
-  for (const entry of [...input.askers, ...input.breakups, ...input.posters]) {
+  // A girl reaching out comes ahead of the posters, so her entry is the one carrying her thread.
+  const listed: ReadonlyArray<
+    IntroAsker | IntroBreakup | IntroLeaver | IntroReachOut | IntroPoster
+  > = [...input.askers, ...input.breakups, ...input.leavers, ...input.reachOuts, ...input.posters]
+  for (const entry of listed) {
     const { charKey, character, info, texted } = entry
     // A girl the slot placed somewhere; the girl ending it is texting from nowhere in particular.
     const whereabouts = 'whereabouts' in entry ? entry.whereabouts : undefined
@@ -356,6 +450,7 @@ function characterBlock(input: SlotIntroInput): string[] {
         info.flags ?? emptyFlags(),
         info.nameKnown,
         affectionFor(info, input.date, character),
+        info,
         input.stats ?? DEFAULT_PLAYER_STATS,
         // Everybody here reaches the reader by phone: a first contact is a conversation, not a meeting.
         { texting: true, texted },
@@ -363,6 +458,8 @@ function characterBlock(input: SlotIntroInput): string[] {
         { date: input.date, offset: info.moodCycleOffset ?? 0 }
       ),
       ...memoryLines(character, dedupedMemoriesFor(info).slice(-2), info.textMemory),
+      // What she and the reader last texted about, for the girl starting a conversation.
+      ...('thread' in entry ? entry.thread : []),
       ...notesLines(character.firstName, info.notes)
     ])
   }
@@ -404,6 +501,8 @@ export function buildSlotIntroPrompt(
     ...spaced(askerBlock(input)),
     ...spaced(breakupBlock(input)),
     ...spaced(posterBlock(input)),
+    ...spaced(leaverBlock(input)),
+    ...spaced(reachOutBlock(input)),
     ...spaced(rumor),
     'YOUR TURN',
     'Hey RITA, a new part of the reader\'s day is starting. Set the mood for them before they decide what to do with it.',
@@ -468,6 +567,28 @@ export function buildSlotIntroPrompt(
           // Refused out loud for "hangouts"'s reason.
           '',
           'Return nothing at all for "posts".'
+        ]),
+    ...(input.leavers.length > 0
+      ? [
+          '',
+          'Then fill "springBreakTexts", one entry per character under LEAVING FOR SPRING BREAK. "char" is her key exactly as written there. "texts" is one to three short messages she sends one after another, in her own texting voice — lowercase, slang, typos and emoji are all fine if that is how she types — letting the reader know she is leaving campus on Saturday and will be gone for spring break: what she is doing over the break, and how she feels about being away from him, in keeping with where the two of them stand. She is not inviting him along. No narration, no stage directions, no reply from the reader.',
+          'The narration in "lines" must not mention these messages or these characters at all — the reader has not opened his phone yet.'
+        ]
+      : [
+          // Refused out loud for "hangouts"'s reason.
+          '',
+          'Return nothing at all for "springBreakTexts".'
+        ]),
+    ...(input.reachOuts.length > 0
+      ? [
+          '',
+          'Then fill "reachOuts", one entry per character under REACHING OUT. "char" is her key exactly as written there. "texts" is one or two short messages she sends one after another, in her own texting voice — lowercase, slang, typos and emoji are all fine if that is how she types — starting a conversation with the reader about what is listed beside her name. Good or bad news is something that just happened in her own life, in keeping with how LOREBOOK describes her and where she is. A question is something she actually wants to know from him. She can pick up on time they recently spent together or on what they last texted about, and she ends on something he can answer. She is not asking to meet up or making plans. No narration, no stage directions, no reply from the reader.',
+          'The narration in "lines" must not mention these messages or these characters at all — the reader has not opened his phone yet.'
+        ]
+      : [
+          // Refused out loud for "hangouts"'s reason.
+          '',
+          'Return nothing at all for "reachOuts".'
         ])
   ].join('\n')
 

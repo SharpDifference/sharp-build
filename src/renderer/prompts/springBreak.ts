@@ -1,3 +1,5 @@
+import { isPositive } from '@shared/relationship'
+import type { CharInfo } from '@shared/types'
 import { formatDatePart } from './gameDate'
 import { SPRING_BREAK } from './occasions'
 
@@ -37,6 +39,15 @@ export function isAwayForSpringBreak(
 ): boolean {
   if (!away) return false
   return date >= SPRING_BREAK_LEAVE && date < SPRING_BREAK_RETURN && away.includes(charId)
+}
+
+/**
+ * Whether a leaver texts the reader that she is going: a contact who has not blocked him and is
+ * friendly or warmer.
+ */
+export function sendsSpringBreakNotice(info: CharInfo | undefined, affection: number): boolean {
+  const flags = info?.flags
+  return Boolean(flags?.gaveContactInfo) && !flags?.blocked && isPositive(affection)
 }
 
 /**

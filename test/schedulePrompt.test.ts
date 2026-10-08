@@ -95,6 +95,7 @@ describe('the PLANS half of the ledger request', () => {
       roster: [],
       classes: {},
       playerSchedule: {},
+      classRosters: {},
       occasions: [],
       bg: null,
       classCode: null,
@@ -110,6 +111,7 @@ describe('the PLANS half of the ledger request', () => {
       outfitReady: {},
       lessNsfwText: false,
       memoryBudgets: DEFAULT_MEMORY_BUDGETS,
+      history: {},
       roomReady: {}
     }
   }

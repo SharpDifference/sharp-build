@@ -100,7 +100,7 @@ describe('settleSpringBreak', () => {
 
   it('does nothing at all before that Monday', () => {
     seed(SPRING_BREAK_NOTICE - 1)
-    expect(settleSpringBreak()).toEqual([])
+    expect(settleSpringBreak()).toBeNull()
     expect(useGameStore.getState().springBreakAway).toBeNull()
   })
 
@@ -134,7 +134,7 @@ describe('settleSpringBreak', () => {
         calendarEvent({ id: 'dropped', date: SPRING_BREAK_RETURN - 1, charIds: ['d'] })
       ]
     })
-    const cancellations = settleSpringBreak()
+    const cancellations = settleSpringBreak()?.cancellations ?? []
     expect(cancellations.map((entry) => entry.charId).sort()).toEqual(['b', 'd'])
     expect(cancellations.every((entry) => entry.reason === 'away')).toBe(true)
 
@@ -149,7 +149,22 @@ describe('settleSpringBreak', () => {
     useGameStore.setState({
       events: [calendarEvent({ id: 'after', date: SPRING_BREAK_RETURN, charIds: ['b'] })]
     })
-    expect(settleSpringBreak()).toEqual([])
+    expect(settleSpringBreak()?.cancellations).toEqual([])
     expect(useGameStore.getState().events).toHaveLength(1)
+  })
+
+  it('takes the pick the ending banked over the affection it reads now', () => {
+    // The opening's texts were written for the banked pick, so a replayed boundary lands that one.
+    seed(SPRING_BREAK_NOTICE)
+    useGameStore.setState({
+      events: [
+        calendarEvent({ id: 'live', date: SPRING_BREAK_LEAVE, charIds: ['b'] }),
+        calendarEvent({ id: 'banked', date: SPRING_BREAK_LEAVE, charIds: ['c'] })
+      ]
+    })
+    const settled = settleSpringBreak(['a', 'c'])
+    expect(useGameStore.getState().springBreakAway).toEqual(['a', 'c'])
+    expect(settled?.cancellations.map((entry) => entry.charId)).toEqual(['c'])
+    expect(useGameStore.getState().events.map((event) => event.id)).toEqual(['live'])
   })
 })

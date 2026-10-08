@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, type JSX } from 'react'
 import { createPortal } from 'react-dom'
 import { AnimatePresence, motion } from 'motion/react'
 import { kindSentenceOf } from '@shared/academics'
-import { FINAL_DATE, studentsOf, TIME_SLOTS } from '@shared/classes'
+import { FINAL_DATE, TIME_SLOTS } from '@shared/classes'
 import { jobDefOf, shiftSlotOf, WEEK_COLUMNS, WEEK_DAY_HEADERS } from '@shared/jobs'
 import type { CalendarEvent, ClassEntry, Occasion, TimeSlot } from '@shared/types'
 import { weatherAt, type Weather } from '@shared/weather'
@@ -18,7 +18,7 @@ import {
   shiftWeekdayOf,
   slotHalf
 } from '../prompts/gameDate'
-import { everAttended } from '../prompts/classProgress'
+import { knownClassmatesOf } from '../prompts/classProgress'
 import { classSlotOf, jobClosedOn, occasionsOn } from '../prompts/occasions'
 import { profileUrl, useSpriteVersion } from '../stores/characterStore'
 import { useGameStore } from '../stores/gameStore'
@@ -344,15 +344,9 @@ export function CalendarModal({
     return charIds.map((id) => ({ id, name: nameOf(id) }))
   }
 
-  /**
-   * The classmates the reader knows sit in that room: he has attended it, or her Bunnyboard
-   * profile told him.
-   */
+  /** The classmates the reader knows sit in that room. */
   function rosterOf(entry: ClassEntry): string[] {
-    const attended = everAttended(classRecords[entry.code])
-    return known(studentsOf(entry, chars, charInfo)).filter(
-      (charId) => attended || charInfo[charId]?.flags?.gaveContactInfo === true
-    )
+    return knownClassmatesOf(entry, chars, charInfo, classRecords[entry.code])
   }
 
   /** An occasion on a card, wherever on the day it is read: above both halves, or inside one. */

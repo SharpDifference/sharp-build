@@ -19,10 +19,13 @@ import {
   milestoneMarkOf,
   milestoneSoured,
   milestoneStatusLines,
+  observedUpperHalves,
   readerStandingOf,
   refreshedFlags,
   rollsCrush,
-  withMemoryReplaced
+  romanceScenesAfter,
+  withMemoryReplaced,
+  withRomanceScenes
 } from '@shared/relationship'
 import { pointsForTier, type PlayerStats } from '@shared/playerStats'
 import type { CharInfo, CharMemory, CrushHint, MemoryType, SocialPost } from '@shared/types'
@@ -531,6 +534,94 @@ describe('refreshedFlags', () => {
     const lover = { ...emptyFlags(), isLover: true }
     expect(refreshedFlags(lover, -100).knowsLoveLife).toBe(true)
     expect(refreshedFlags(emptyFlags(), 100).knowsLoveLife).toBe(false)
+  })
+})
+
+describe('the new-romance scene count', () => {
+  // Stepped at every boundary and projected by the ending: a wrong step tells RITA a crush is
+  // fresh, or long settled, on every prompt for the rest of the playthrough.
+  const crush = { ...emptyFlags(), hasCrush: true }
+  const lover = { ...emptyFlags(), isLover: true }
+
+  it('starts what the boundary began at 0, the scene that began it not counting', () => {
+    expect(romanceScenesAfter(emptyFlags(), charInfo({ flags: crush }), true)).toBe(0)
+    expect(romanceScenesAfter(emptyFlags(), charInfo({ flags: lover }), true)).toBe(0)
+    // A crush turned lovers in one scene is a new relationship, whatever the crush had counted.
+    expect(romanceScenesAfter(crush, charInfo({ flags: lover, romanceScenes: 1 }), true)).toBe(0)
+  })
+
+  it('counts only scenes she was cast in, and drops the count once it settles', () => {
+    expect(romanceScenesAfter(crush, charInfo({ flags: crush, romanceScenes: 0 }), false)).toBe(0)
+    expect(romanceScenesAfter(crush, charInfo({ flags: crush, romanceScenes: 0 }), true)).toBe(1)
+    expect(
+      romanceScenesAfter(crush, charInfo({ flags: crush, romanceScenes: 1 }), true)
+    ).toBeUndefined()
+    expect(
+      romanceScenesAfter(lover, charInfo({ flags: lover, romanceScenes: 0 }), true)
+    ).toBeUndefined()
+  })
+
+  it('keeps an absent count absent, a save from before it reading as settled', () => {
+    expect(romanceScenesAfter(crush, charInfo({ flags: crush }), true)).toBeUndefined()
+    expect(romanceScenesAfter(lover, charInfo({ flags: lover }), true)).toBeUndefined()
+  })
+
+  it('drops the count once she holds neither', () => {
+    const brokeUp = charInfo({ flags: { ...emptyFlags(), brokenUp: 1 }, romanceScenes: 0 })
+    expect(romanceScenesAfter(lover, brokeUp, true)).toBeUndefined()
+    // A crush cleared at scene start as she went negative.
+    expect(romanceScenesAfter(emptyFlags(), charInfo({ romanceScenes: 1 }), false)).toBeUndefined()
+  })
+
+  it('rewrites only the entries that moved, and deletes a settled count', () => {
+    const before = {
+      a: charInfo({ flags: crush, romanceScenes: 0 }),
+      b: charInfo({ flags: emptyFlags() })
+    }
+    expect(withRomanceScenes(before, before, [])).toBe(before)
+
+    // b became lovers across this boundary; a sat it out.
+    const after = { ...before, b: charInfo({ flags: lover }) }
+    const stepped = withRomanceScenes(before, after, ['b'])
+    expect(stepped.a).toBe(after.a)
+    expect(stepped.b.romanceScenes).toBe(0)
+
+    // a's second scene and b's first settle them both; the key goes, never left as undefined.
+    const once = withRomanceScenes(stepped, stepped, ['a'])
+    const settled = withRomanceScenes(once, once, ['a', 'b'])
+    expect('romanceScenes' in settled.a).toBe(false)
+    expect('romanceScenes' in settled.b).toBe(false)
+  })
+})
+
+describe('observedUpperHalves', () => {
+  // Read off her affection at every boundary: a half wrongly marked tells RITA she is growing
+  // closer while she is cooling, or never lets the rising line show.
+  it('begins the half she is in, every half below it counting as passed', () => {
+    const halves = observedUpperHalves(undefined, 25)
+    expect(halves).toEqual({ neutral: 'again', friendly: 'first' })
+    expect(observedUpperHalves(halves, 28)).toBe(halves)
+  })
+
+  it('turns a half again once she drops back under it or climbs past it', () => {
+    const inFriendly = { neutral: 'again', friendly: 'first' } as const
+    expect(observedUpperHalves(inFriendly, 18)).toEqual({ neutral: 'again', friendly: 'again' })
+    expect(observedUpperHalves(inFriendly, 35)).toEqual({ neutral: 'again', friendly: 'again' })
+  })
+
+  it('counts a half she jumped over as reached, so decaying back into it is no first stay', () => {
+    expect(observedUpperHalves(undefined, 60)).toEqual({
+      neutral: 'again',
+      friendly: 'again',
+      trusted: 'again'
+    })
+  })
+
+  it('leaves a half she never reached absent, and keeps an again for good', () => {
+    expect(observedUpperHalves(undefined, 5)).toBeUndefined()
+    const again = { neutral: 'again' } as const
+    expect(observedUpperHalves(again, 12)).toBe(again)
+    expect(observedUpperHalves(again, -40)).toBe(again)
   })
 })
 

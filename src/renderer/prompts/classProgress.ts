@@ -1,4 +1,12 @@
-import type { ClassEntry, ClassRecord, Occasion, ProjectSession } from '@shared/types'
+import type {
+  Character,
+  CharInfo,
+  ClassEntry,
+  ClassRecord,
+  Occasion,
+  ProjectSession
+} from '@shared/types'
+import { studentsOf } from '@shared/classes'
 import {
   isCourse,
   kindOf,
@@ -15,6 +23,7 @@ import {
   meetingDatesOf,
   meetingsBefore
 } from './occasions'
+import type { Classmate, ClassRoster } from './lorebook'
 import type { ClassMeetingRecap, ClassSceneContext, ProjectSceneContext } from './scenePrompt'
 
 /**
@@ -172,6 +181,55 @@ export function skippedFactMeetings(
 /** Whether the reader has ever attended this class. */
 export function everAttended(record: ClassRecord | undefined): boolean {
   return (record ?? EMPTY_RECORD).meetings.some((meeting) => meeting.attended)
+}
+
+/**
+ * The classmates the reader knows sit in `entry`, in `chars` order: introduced, and seen there
+ * by attending it or told by her Bunnyboard profile.
+ */
+export function knownClassmatesOf(
+  entry: ClassEntry,
+  chars: readonly string[],
+  charInfo: Readonly<Record<string, CharInfo>>,
+  record: ClassRecord | undefined
+): string[] {
+  const attended = everAttended(record)
+  return studentsOf(entry, chars, charInfo).filter(
+    (charId) =>
+      charInfo[charId]?.nameKnown === true &&
+      (attended || charInfo[charId]?.flags?.gaveContactInfo === true)
+  )
+}
+
+/**
+ * Who sits in each class of the catalog, by class code: every roster girl enrolled, and those
+ * {@link knownClassmatesOf} says the reader knows are there, each sorted by first name. A class
+ * nobody on the roster takes is absent.
+ */
+export function classRostersOf(
+  classes: Readonly<Record<string, ClassEntry>>,
+  chars: readonly string[],
+  characters: Readonly<Record<string, Pick<Character, 'firstName'>>>,
+  charInfo: Readonly<Record<string, CharInfo>>,
+  classRecords: Readonly<Record<string, ClassRecord>>
+): Record<string, ClassRoster> {
+  const named = (charIds: readonly string[]): Classmate[] =>
+    charIds
+      .flatMap((charId) => {
+        const character = characters[charId]
+        return character ? [{ charId, firstName: character.firstName }] : []
+      })
+      .sort((a, b) => (a.firstName < b.firstName ? -1 : a.firstName > b.firstName ? 1 : 0))
+  const rosters: Record<string, ClassRoster> = {}
+  for (const entry of Object.values(classes)) {
+    const enrolled = studentsOf(entry, chars, charInfo)
+    if (enrolled.length === 0) continue
+    rosters[entry.code] = {
+      enrolled: named(enrolled),
+      known: named(knownClassmatesOf(entry, chars, charInfo, classRecords[entry.code]))
+    }
+  }
+  return rosters
 }
 
 /** Whether the reader has put a session into the project since this class last met. */

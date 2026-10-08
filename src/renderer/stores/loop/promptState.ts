@@ -17,6 +17,7 @@ import {
   type TimeSlot
 } from '@shared/types'
 import {
+  classRostersOf,
   classSceneContextOf,
   projectSceneContextOf,
   recapOf
@@ -32,7 +33,11 @@ import type {
 } from '../../prompts/scenePrompt'
 import { recentLines, SCENE_WINDOW_WORDS, windowFloor } from '../../prompts/sceneWindow'
 import { readerBlockOf } from '../../prompts/setting'
-import { composeTextingSummary, hasTexted } from '../../prompts/textingPrompt'
+import {
+  composeTextingSummary,
+  hasTexted,
+  unansweredReachOuts
+} from '../../prompts/textingPrompt'
 import { upcomingPlanLines } from '../../prompts/upcomingPlans'
 import { SEED_WORD_BAG, SEED_WORDS } from '../../prompts/seedWords'
 import { useAssetStore } from '../assetStore'
@@ -68,7 +73,13 @@ export function scheduleInput(date: number, time: TimeSlot): SchedulePromptInput
         messages: conversation.messages.filter((m) => m.date === date && m.time === time)
       }
     })
-    .filter((thread) => thread.firstName && thread.messages.length > 0)
+    // Nor is a girl who reached out to him and was never answered.
+    .filter(
+      (thread) =>
+        thread.firstName &&
+        thread.messages.length > 0 &&
+        unansweredReachOuts(thread.messages).length === 0
+    )
 
   return {
     date,
@@ -326,6 +337,13 @@ export function promptState(): PromptState {
       .filter((character): character is Character => Boolean(character)),
     classes: game.classes,
     playerSchedule: game.playerSchedule,
+    classRosters: classRostersOf(
+      game.classes,
+      game.chars,
+      game.characters,
+      game.charInfo,
+      game.classRecords
+    ),
     stats: game.stats,
     droppedNotices: announceableDrops(),
     addedNotices: announceableAdds(),
@@ -398,6 +416,7 @@ export function promptState(): PromptState {
     // Absent when the player has set no custom one, which is what `scenePersonaFor` reads as.
     ...(scenePersona !== undefined ? { scenePersona } : {}),
     memoryBudgets: memoryBudgetsNow(),
+    history: game.history,
     cgReady: game.cgReady,
     customCgReady: game.customCgReady,
     outfitReady: game.outfitReady,

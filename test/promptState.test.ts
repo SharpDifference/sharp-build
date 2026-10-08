@@ -265,4 +265,34 @@ describe('the threads the texting ledger reads', () => {
     seedThreads('a')
     expect(texters()).toEqual(['Marina'])
   })
+
+  // A girl who reached out and was left unanswered gave the ledger nothing to read.
+  it('drops a reach-out he never answered, and keeps one he did', () => {
+    seedThreads(null)
+    const reachOut = {
+      id: 'b-0',
+      sender: 'contact' as const,
+      text: 'how did the quiz go??',
+      date: 7,
+      time: 0 as const,
+      reachOut: true as const
+    }
+    const conversations = useGameStore.getState().bunnyboard.conversations
+    const marina = conversations.b
+    useGameStore.setState({
+      bunnyboard: {
+        ...useGameStore.getState().bunnyboard,
+        conversations: { ...conversations, b: { ...marina, messages: [reachOut] } }
+      }
+    })
+    expect(texters()).toEqual(['Ingrid'])
+
+    useGameStore.setState({
+      bunnyboard: {
+        ...useGameStore.getState().bunnyboard,
+        conversations: { ...conversations, b: { ...marina, messages: [reachOut, ...marina.messages] } }
+      }
+    })
+    expect(texters()).toEqual(['Ingrid', 'Marina'])
+  })
 })

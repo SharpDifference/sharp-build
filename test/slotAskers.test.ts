@@ -10,6 +10,8 @@ import {
   declineCooldownSlots,
   drawOccasionAsker,
   lastInviteSlotOf,
+  reachOutChanceOf,
+  reachOutGapSlots,
   rollSlotAskers,
   slotAskMultiplier,
   type AskChanceInput
@@ -149,6 +151,35 @@ describe('declineCooldownSlots', () => {
     expect(waits[1]).toBeGreaterThan(waits[0])
     // The doubling runs out: a long streak waits no longer than a capped one.
     expect(declineCooldownSlots(9)).toBe(declineCooldownSlots(40))
+  })
+})
+
+describe('reachOutChanceOf', () => {
+  it('never has an acquaintance or anybody colder reach out, and rises with what he is to her', () => {
+    for (const disposition of ['neutral', 'annoyed', 'hostile'] as Disposition[]) {
+      expect(reachOutChanceOf(false, disposition)).toBe(0)
+    }
+    const friendly = reachOutChanceOf(false, 'friendly')
+    const trusted = reachOutChanceOf(false, 'trusted')
+    const devoted = reachOutChanceOf(false, 'devoted')
+    expect(friendly).toBeGreaterThan(0)
+    expect(trusted).toBeGreaterThan(friendly)
+    expect(devoted).toBeGreaterThan(trusted)
+    expect(reachOutChanceOf(true, 'devoted')).toBeGreaterThan(devoted)
+  })
+
+  // A lover reaches out whatever the memories say this week, as she asks him out.
+  it('takes the lover band ahead of any tier', () => {
+    expect(reachOutChanceOf(true, 'hostile')).toBe(reachOutChanceOf(true, 'devoted'))
+  })
+})
+
+describe('reachOutGapSlots', () => {
+  it('lengthens her wait with every reach-out he leaves unanswered, then stops', () => {
+    const waits = [0, 1, 2, 3, 4, 9].map(reachOutGapSlots)
+    for (let i = 1; i < waits.length; i++) expect(waits[i]).toBeGreaterThanOrEqual(waits[i - 1])
+    expect(waits[1]).toBeGreaterThan(waits[0])
+    expect(reachOutGapSlots(9)).toBe(reachOutGapSlots(40))
   })
 })
 

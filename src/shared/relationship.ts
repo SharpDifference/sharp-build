@@ -24,7 +24,8 @@ import type {
   MemoryType,
   RelationshipEvent,
   SceneLine,
-  TextMark
+  TextMark,
+  UpperHalf
 } from './types'
 
 /** Affection scoring, disposition tiers and flag transitions. */
@@ -308,14 +309,88 @@ export function affectionOfDisposition(disposition: Disposition): number {
   return DISPOSITION_AFFECTION[disposition]
 }
 
-/** Completes `"<FirstName> ___ the reader."` for prompt injection. */
-export const DISPOSITION_PHRASE: Record<Disposition, string> = {
-  devoted: 'is devoted to',
-  trusted: 'trusts',
-  friendly: 'is friendly towards',
-  neutral: "doesn't particularly care about",
-  annoyed: 'is annoyed by',
-  hostile: 'hates'
+/** Completes `"<FirstName> ___."` for prompt injection, one phrase per tier. */
+export const DISPOSITION_PREDICATE: Record<Disposition, string> = {
+  devoted: 'is devoted to the reader',
+  trusted: 'trusts the reader',
+  friendly: 'is friendly towards the reader',
+  neutral: "doesn't particularly care about the reader",
+  annoyed: 'is annoyed by the reader',
+  hostile: 'hates the reader'
+}
+
+/**
+ * The three tiers that read differently in their upper half: the score it starts above, its
+ * tier's ceiling, what it says the first time she is in it and what it says once she has been
+ * out of it. Neutral's half is counted from where everybody starts.
+ */
+const UPPER_HALVES: Record<UpperHalf, { from: number; to: number; first: string; again: string }> =
+  {
+    neutral: {
+      from: FRIENDLY_FLOOR / 2,
+      to: FRIENDLY_FLOOR,
+      first: 'is warming up to the reader',
+      again: 'is on good terms with the reader'
+    },
+    friendly: {
+      from: (FRIENDLY_FLOOR + TRUSTED_FLOOR) / 2,
+      to: TRUSTED_FLOOR,
+      first: 'is friends with the reader and is confiding in him more and more',
+      again: 'is close friends with the reader and confides in him'
+    },
+    trusted: {
+      from: (TRUSTED_FLOOR + DEVOTED_FLOOR) / 2,
+      to: DEVOTED_FLOOR,
+      first: 'trusts the reader deeply and is appreciating him more and more',
+      again: 'trusts the reader deeply and appreciates him'
+    }
+  }
+
+const UPPER_HALF_KEYS = Object.keys(UPPER_HALVES) as UpperHalf[]
+
+/**
+ * Her record of upper halves after one more reading of her affection: a half she is in is kept,
+ * or begun; one she has dropped back under turns `again` once she has been in it, and one she is
+ * above turns `again` outright, passing over it counting as having been there. Same object when
+ * nothing moved.
+ */
+export function observedUpperHalves(
+  halves: CharInfo['upperHalves'],
+  affection: number
+): CharInfo['upperHalves'] {
+  let next = halves
+  for (const key of UPPER_HALF_KEYS) {
+    const { from, to } = UPPER_HALVES[key]
+    const was = halves?.[key]
+    let now: 'first' | 'again' | undefined
+    if (affection > to) now = 'again'
+    else if (affection > from) now = was ?? 'first'
+    else now = was && 'again'
+    if (now === undefined || now === was) continue
+    next = { ...next, [key]: now }
+  }
+  return next
+}
+
+/**
+ * Completes `"<FirstName> ___."` for how she feels: her tier's phrase, or its upper half's, read
+ * as rising the first time she is there and as a level once she has been out of it. A lover's
+ * neutral and friendly tiers read plain beside the status line's word on them.
+ */
+export function dispositionPredicateOf(
+  affection: number,
+  halves: CharInfo['upperHalves'],
+  isLover: boolean
+): string {
+  const disposition = dispositionOf(affection)
+  const split =
+    disposition === 'trusted' ||
+    (!isLover && (disposition === 'friendly' || disposition === 'neutral'))
+  if (split) {
+    const half = UPPER_HALVES[disposition]
+    if (affection > half.from) return halves?.[disposition] === 'again' ? half.again : half.first
+  }
+  return DISPOSITION_PREDICATE[disposition]
 }
 
 /** What the reader calls her on her contact profile, by tier. */
@@ -766,4 +841,61 @@ export function refreshedFlags(flags: CharFlags, affection: number): CharFlags {
   )
     return flags
   return { ...flags, hasCrush, benefits, knowsTraits, knowsBackstory, knowsLoveLife }
+}
+
+/** How many scenes shared with her a new crush and a new relationship take to settle. */
+const CRUSH_SETTLE_SCENES = 2
+const LOVER_SETTLE_SCENES = 1
+
+/** A running count one scene on, or absent once it reaches `settle`; absent stays absent. */
+function countedScene(
+  scenes: number | undefined,
+  cast: boolean,
+  settle: number
+): number | undefined {
+  if (scenes === undefined) return undefined
+  const next = cast ? scenes + 1 : scenes
+  return next >= settle ? undefined : next
+}
+
+/**
+ * Her `romanceScenes` once a boundary has run: 0 where it made her a lover or gave her a crush,
+ * the scene that did it not counting; one more for a scene she was cast in; absent once settled
+ * or while she holds neither.
+ */
+export function romanceScenesAfter(
+  before: CharFlags | undefined,
+  after: CharInfo,
+  cast: boolean
+): number | undefined {
+  const flags = after.flags ?? emptyFlags()
+  if (flags.isLover) {
+    return before?.isLover ? countedScene(after.romanceScenes, cast, LOVER_SETTLE_SCENES) : 0
+  }
+  if (flags.hasCrush) {
+    return before?.hasCrush ? countedScene(after.romanceScenes, cast, CRUSH_SETTLE_SCENES) : 0
+  }
+  return undefined
+}
+
+/**
+ * Every entry's `romanceScenes` stepped over one boundary, off the flags each crossed it with and
+ * who was cast; an entry it leaves alone keeps its identity, and so does the map when none moved.
+ */
+export function withRomanceScenes(
+  before: Readonly<Record<string, Pick<CharInfo, 'flags'> | undefined>>,
+  after: Readonly<Record<string, CharInfo>>,
+  cast: readonly string[]
+): Readonly<Record<string, CharInfo>> {
+  let next: Record<string, CharInfo> | null = null
+  for (const [charId, info] of Object.entries(after)) {
+    const scenes = romanceScenesAfter(before[charId]?.flags, info, cast.includes(charId))
+    if (scenes === info.romanceScenes) continue
+    const stepped = { ...info }
+    if (scenes === undefined) delete stepped.romanceScenes
+    else stepped.romanceScenes = scenes
+    next ??= { ...after }
+    next[charId] = stepped
+  }
+  return next ?? after
 }

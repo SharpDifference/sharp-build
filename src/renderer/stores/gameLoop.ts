@@ -20,6 +20,7 @@ import { factoidLine, kindOf, projectProgress, projectProgressLine } from '@shar
 import { giftActionLine, itemDefOf } from '@shared/shop'
 import type { NpcSlotOverlay } from '@shared/npcRelationships'
 import { isSilentLine, isSlotSaveId } from '@shared/saveRules'
+import { affectionFor, withRomanceScenes } from '@shared/relationship'
 import {
   charKeyOf,
   READER_SPEAKER,
@@ -61,8 +62,11 @@ import {
   buildSlotIntroPrompt,
   type IntroAsker,
   type IntroBreakup,
-  type IntroPoster
+  type IntroLeaver,
+  type IntroPoster,
+  type IntroReachOut
 } from '../prompts/slotIntroPrompt'
+import { sendsSpringBreakNotice } from '../prompts/springBreak'
 import {
   ambientLoreCharacters,
   characterLoreForIds,
@@ -79,8 +83,9 @@ import {
   textLedgerCharKeys,
   type SchedulePromptInput
 } from '../prompts/schedulePrompt'
-import { hasTexted } from '../prompts/textingPrompt'
+import { composeTextingSummary, hasTexted } from '../prompts/textingPrompt'
 import { buildTextLedgerPrompt, mergeLedgerReplies } from '../prompts/textLedgerPrompt'
+import { rollReachOutTopic } from './slotAskers'
 import { SETTING } from '../prompts/setting'
 import {
   buildClosingPrompt,
@@ -136,10 +141,13 @@ import {
   deliverEventCancellations,
   deliverSlotBreakups,
   deliverSlotHangouts,
+  deliverSlotReachOuts,
+  deliverSpringBreakTexts,
   deliverVenusJobIntro,
   deliverVenusMessages,
   pickOccasionAsker,
   pickSlotAskers,
+  pickSlotReachOut,
   plannedWith,
   resetTextingLoop,
   resolveFriendRequests
@@ -223,7 +231,7 @@ import {
 import { armEpilogue, dropEndingArt } from './loop/endingArt'
 import { dropProfilePicture, loadProfilePicture } from './loop/profilePicture'
 import { farewellDisposition, seniorNames } from './loop/farewells'
-import { settleSpringBreak } from './loop/springBreak'
+import { settleSpringBreak, springBreakPickFor } from './loop/springBreak'
 import { dropHeldSceneLines, sceneInProgress, streamScene, unpark } from './loop/stream'
 import {
   announceableAdds,
@@ -350,9 +358,10 @@ async function beginSlot(): Promise<void> {
     return
   }
 
-  // Who leaves campus for spring break. First, because it reads the affection the
-  // boundary just saved and the sweeps below write `charInfo`.
-  const awayCancellations = settleSpringBreak()
+  // Who leaves campus for spring break: the pick the ending banked with this opening, or one made
+  // now. First, because it reads the affection the boundary just saved and the sweeps below write
+  // `charInfo`.
+  const springBreak = settleSpringBreak(loopState.bankedOpening?.springBreakAway)
 
   // Friend requests resolve against today's disposition, inside the start-of-slot save.
   resolveFriendRequests()
@@ -393,7 +402,8 @@ async function beginSlot(): Promise<void> {
   const banked = loopState.bankedOpening
   const narration = tutorial
     ? (banked ?? silent)
-    : (banked ?? fetchSlotIntro(state.date, state.time, [], [], [], undefined, overlay))
+    : (banked ??
+      fetchSlotIntro(state.date, state.time, [], [], [], springBreak?.away ?? null, undefined, overlay))
   loopState.bankedOpening = null
   // **Nothing was banked, so this slot is waiting on a call**: the curtain is the loading screen,
   // so it is told there is a load to report and stays down over the whole of it — the
@@ -440,14 +450,19 @@ async function beginSlot(): Promise<void> {
   // first put their people on his contacts, since a plan is coordinated by text.
   addPlanContacts(opening.events)
   useGameStore.getState().addEvents(opening.events)
+  // Each leaver's own word that she is going, ahead of the plans her going cancels.
+  deliverSpringBreakTexts(opening.springBreakTexts)
   // The break's withdrawals ride with the ledger's: one message, one shape.
-  deliverEventCancellations([...awayCancellations, ...opening.cancellations])
+  deliverEventCancellations([...(springBreak?.cancellations ?? []), ...opening.cancellations])
 
   // Before the fold, so the invitations are inside the start-of-slot save.
   deliverSlotHangouts(opening.hangouts, opening.askOccasionId)
 
   // The texts the girls he left wrote, filed on the same terms.
   deliverSlotBreakups(opening.breakups)
+
+  // The girl reaching out just to talk; after the invitations, so one standing for her wins.
+  deliverSlotReachOuts(opening.reachOuts)
 
   // The status updates the same call wrote, filed before the fold on the same terms.
   deliverSlotPosts(opening.posts)
@@ -731,6 +746,11 @@ async function fetchSlotIntro(
   cancellations: readonly EventCancellation[] = [],
   /** The lovers the finished slot left, each ending it by text as this one opens. */
   breakups: readonly IntroBreakup[] = [],
+  /**
+   * The spring break pick this opening settles, on the first slot on or after the notice: each
+   * leaver who would tell him texts that she is going. Null on every other opening.
+   */
+  springBreakPick: readonly string[] | null = null,
   pendingSummary?: string | null,
   npcOverlay: NpcSlotOverlay | null = null,
   view: PostLedgerView = liveView(),
@@ -831,10 +851,70 @@ async function fetchSlotIntro(
     })
   }
 
+  // The leavers who would tell him they are going; a girl ending it with him says only that.
+  const leavers: IntroLeaver[] = []
+  const breakingUp = new Set(breakups.map(({ character }) => character.charId))
+  for (const charId of springBreakPick ?? []) {
+    const character = game.characters[charId]
+    const info = view.charInfo[charId]
+    if (!character || !info || breakingUp.has(charId)) continue
+    if (!sendsSpringBreakNotice(info, affectionFor(info, date, character))) continue
+    leavers.push({
+      character,
+      info,
+      charKey: charKeyOf(character.firstName, character.lastName),
+      texted: hasTexted(game.bunnyboard.conversations[charId])
+    })
+  }
+
+  // The one contact texting him just to talk, about what the app picked for her: nobody the
+  // slot already has texting him about something else.
+  const taken = new Set(
+    [...askers, ...breakups, ...leavers].map(({ character }) => character.charId)
+  )
+  const reachOutKey = pickSlotReachOut(date, time, view, taken)
+  const reachOuts: IntroReachOut[] = []
+  for (const charKey of reachOutKey ? [reachOutKey] : []) {
+    const charId = game.charKeyToId[charKey]
+    const character = game.characters[charId]
+    const info = view.charInfo[charId]
+    if (!character || !info) continue
+    const conversation = game.bunnyboard.conversations[charId]
+    const whereabouts = npcWhereaboutsFor(charId, date, time, npcOverlay, view.charInfo)
+    reachOuts.push({
+      charKey,
+      character,
+      info,
+      texted: hasTexted(conversation),
+      topic: rollReachOutTopic(),
+      // Her thread as a scene in the slot about to open would read it.
+      thread: composeTextingSummary(
+        conversation,
+        info.ignoredInvitation === true,
+        character.firstName,
+        { date, time }
+      ),
+      ...(whereabouts
+        ? {
+            whereabouts: {
+              location: whereabouts.location,
+              companions: {
+                knownNames: whereabouts.knownNames,
+                unknown: whereabouts.unknown
+              },
+              ...(whereabouts.haunt ? { haunt: whereabouts.haunt } : {})
+            }
+          }
+        : {})
+    })
+  }
+
   // The girls no list carries but the opening should know anyway: the closest friends of
-  // whoever is asking, ending it or posting.
+  // whoever is asking, ending it, leaving, reaching out or posting.
   const presentIds = new Set(
-    [...askers, ...breakups, ...posters].map(({ character }) => character.charId)
+    [...askers, ...breakups, ...leavers, ...reachOuts, ...posters].map(
+      ({ character }) => character.charId
+    )
   )
   const present = [...presentIds].flatMap((charId) => {
     const character = game.characters[charId]
@@ -875,12 +955,15 @@ async function fetchSlotIntro(
       recent: recentSummaries(date, time, pendingSummary),
       askers,
       breakups,
+      leavers,
+      reachOuts,
       posters,
       occasions,
       occasionLeadUps: occasionLeadUpLines(date, time, game.occasions),
       weather: game.weather,
       ...(rumorPlace ? { rumorPlace } : {}),
-      springBreakAway: game.springBreakAway,
+      // The pick being settled, which the store does not hold until the boundary assigns it.
+      springBreakAway: springBreakPick ?? game.springBreakAway,
       ...(backgroundLore.length > 0 ? { backgroundLore } : {})
     },
     SETTING,
@@ -899,12 +982,20 @@ async function fetchSlotIntro(
       // What the narration actually said about the place it was handed. A rumor about
       // an entry that is not a place, or one the narration never named, banks nothing.
       const said = rumorPlace?.id ? rumorSentenceFor(rumorPlace, written) : null
+      // Only the girls the slot rolled: an entry for anybody else would skip her odds and waits.
+      const asked = new Set(askers.map(({ charKey }) => charKey))
+      const hangouts = Array.isArray(result.data.hangouts) ? result.data.hangouts : []
+      const reachedOut = Array.isArray(result.data.reachOuts) ? result.data.reachOuts : []
       return {
         lines: narrate([opening, ...written]),
-        hangouts: result.data.hangouts,
+        hangouts: hangouts.filter((hangout) => asked.has(hangout.char)),
         breakups: result.data.breakups,
         ...(occasion ? { askOccasionId: occasion.id } : {}),
         posts: result.data.posts,
+        springBreakTexts: result.data.springBreakTexts,
+        ...(reachOutKey
+          ? { reachOuts: reachedOut.filter((entry) => entry.char === reachOutKey).slice(0, 1) }
+          : {}),
         events: [...events],
         cancellations: [...cancellations],
         // Banked with the narration it was rolled beside.
@@ -1023,11 +1114,13 @@ export function abandonEndingCall(): void {
 function settlePlans(
   ledger: LedgerResponse,
   date: number,
-  time: TimeSlot
+  time: TimeSlot,
+  /** The spring break pick the same ending is settling, which the store does not hold yet. */
+  springBreakPick: readonly string[] | null = null
 ): { events: CalendarEvent[]; cancellations: EventCancellation[] } {
   const game = useGameStore.getState()
   const placed = normalizeSchedule(ledger, game.charKeyToId, { date, time })
-  const settled = filterEventsByAttendance(placed, game.springBreakAway)
+  const settled = filterEventsByAttendance(placed, springBreakPick ?? game.springBreakAway)
 
   // An event that loses every attendee is dropped whole, and named here.
   if (placed.length > settled.events.length) {
@@ -1683,7 +1776,6 @@ async function fetchEndingOpening(
 ): Promise<BankedOpening | null> {
   const game = useGameStore.getState()
   const { date, time } = nextSlot(game.date, game.time)
-  const plans = settlePlans(ledger, game.date, game.time)
 
   // The finished scene, folded by value: the boundary owns the real apply, so
   // everything below narrates off a projection and writes nothing.
@@ -1702,9 +1794,18 @@ async function fetchEndingOpening(
   // what the boundary's fallback would see too.
   const crushes = rollCrushSettle(ledger, seen, stats)
   const npcRelationships = rollNpcRelationshipSettle(bondedCharIds(ledger), groups)
+  // The scene counts stepped as the boundary will step them, so a crush rolled tonight reads as
+  // new in the morning too.
+  const charInfo = withRomanceScenes(game.charInfo, withCrushes(seen, crushes), game.cast)
+
+  // Who leaves for spring break, when the slot about to open is the one that settles it: picked
+  // off the affection the projection leaves and banked for the boundary to assign, so the texts
+  // the opening writes and the pick the save keeps are one answer.
+  const springBreakPick = springBreakPickFor(date, charInfo)
+  const plans = settlePlans(ledger, game.date, game.time, springBreakPick)
 
   const view: PostLedgerView = {
-    charInfo: withCrushes(seen, crushes),
+    charInfo,
     stats,
     // The calendar plus what the scene just agreed to.
     events: [...game.events, ...plans.events],
@@ -1724,6 +1825,7 @@ async function fetchEndingOpening(
       events: plans.events,
       cancellations: plans.cancellations,
       ...(npcOverlay ? { npcOverlay } : {}),
+      ...(springBreakPick ? { springBreakAway: springBreakPick } : {}),
       rumorPass: rumor,
       crushes,
       npcRelationships
@@ -1737,6 +1839,7 @@ async function fetchEndingOpening(
     plans.events,
     plans.cancellations,
     introBreakupsOf(projected),
+    springBreakPick,
     useGameStore.getState().sceneSummary,
     npcOverlay,
     view,
@@ -1744,7 +1847,15 @@ async function fetchEndingOpening(
   )
   // An abandoned opening banks nothing, the rolls above included; the player replays the
   // turn.
-  return opening ? { ...opening, rumorPass: rumor, crushes, npcRelationships } : null
+  return opening
+    ? {
+        ...opening,
+        ...(springBreakPick ? { springBreakAway: springBreakPick } : {}),
+        rumorPass: rumor,
+        crushes,
+        npcRelationships
+      }
+    : null
 }
 
 /**
@@ -2590,6 +2701,9 @@ async function crossSlotBoundary(): Promise<void> {
       owedTexts.push(() => deliverBunnybotNow([bunnybotSeenTipText(seenWith.firstName)]))
     }
   }
+  // After every pass that can make her a lover or give her a crush, off the entries the boundary
+  // started from: the step the ending projected for the opening.
+  useGameStore.getState().stepRomanceScenes(game.charInfo, useGameStore.getState().cast)
   // Filed under the slot the scene ran in, so before the clock moves on.
   useGameStore.getState().commitSceneToHistory(game.date, game.time)
   // Stamped with the finishing slot and before the cast clears below: the ask-out roll reads it
@@ -2631,6 +2745,8 @@ async function crossSlotBoundary(): Promise<void> {
   if (!over && !keepReplay) useGameStore.getState().dropReplay(game.date, game.time)
 
   useGameStore.getState().advanceSlot()
+  // Off the affection the slot about to open reads, so a girl decayed out of a half is caught.
+  useGameStore.getState().observeUpperHalves()
   // The whole scene is cleared before the write, so the boundary save records `scene: null`;
   // `beginSlot` clears the same things again, but after the write.
   useGameStore.getState().setCast([])

@@ -14,6 +14,7 @@ import {
   type NpcSlotOverlay
 } from '@shared/npcRelationships'
 import { readerBlockOf } from '../prompts/setting'
+import { classRostersOf } from '../prompts/classProgress'
 import { memoryBudgetsOf } from '@shared/settingsRules'
 import { useSettingsStore } from './settingsStore'
 import {
@@ -52,7 +53,7 @@ import {
   normalizeHangout,
   type HangoutVerdict
 } from '../prompts/hangoutClassifierPrompt'
-import { buildTextingPrompt } from '../prompts/textingPrompt'
+import { buildTextingPrompt, unansweredReachOuts } from '../prompts/textingPrompt'
 import { upcomingPlanLines } from '../prompts/upcomingPlans'
 import {
   charKeyOf,
@@ -83,6 +84,7 @@ import {
   shiftNow
 } from './timetable'
 import { isMoodHomebound } from '../prompts/moods'
+import { sendsSpringBreakNotice } from '../prompts/springBreak'
 import { outingOccasionAt } from '../prompts/occasions'
 import {
   askChanceOf,
@@ -90,12 +92,19 @@ import {
   declineCooldownSlots,
   drawOccasionAsker,
   lastInviteSlotOf,
+  lastReachOutSlotOf,
+  lastTextSlotOf,
+  reachOutChanceOf,
+  reachOutGapSlots,
   rollSlotAskers,
+  rollSlotReachOut,
   slotAskMultiplier,
   ASK_QUIET_SLOTS,
+  REACH_OUT_QUIET_SLOTS,
   type OccasionAskCandidate,
   type SlotAskCandidate
 } from './slotAskers'
+import { isFeedContact } from './feedView'
 import type { NpcCompanions } from '../prompts/npcRelationship'
 
 /** Who is with `charId` this slot, as the sentence naming them reads. */
@@ -469,6 +478,13 @@ export async function sendMessage(charId: string, text: string): Promise<void> {
         npcRelationships: game.npcRelationships,
         classes: game.classes,
         playerSchedule: game.playerSchedule,
+        classRosters: classRostersOf(
+          game.classes,
+          game.chars,
+          game.characters,
+          game.charInfo,
+          game.classRecords
+        ),
         playerJob: game.job,
         occasions: game.occasions,
         weather: game.weather,
@@ -486,7 +502,8 @@ export async function sendMessage(charId: string, text: string): Promise<void> {
           game.characters,
           globalSlotOf(game.date, game.time)
         ),
-        memoryBudget: memoryBudgetsOf(useSettingsStore.getState().settings ?? {}).one
+        memoryBudget: memoryBudgetsOf(useSettingsStore.getState().settings ?? {}).one,
+        history: game.history
       },
       // The same reader block a scene gets, grades and all.
       readerBlockOf(game)
@@ -1220,6 +1237,53 @@ export function pickSlotAskers(
 }
 
 /**
+ * Who texts the reader just to talk this slot, as a charKey, or null: one contact at most, none in
+ * `taken` (whoever the slot already has texting him) and none with a plan in it. A girl away for
+ * spring break may; one in class or at work, whose thread is shut, may not.
+ */
+export function pickSlotReachOut(
+  date: number,
+  time: TimeSlot,
+  view: SlotAskerView,
+  taken: ReadonlySet<string>
+): string | null {
+  const game = useGameStore.getState()
+  const conversations = game.bunnyboard.conversations
+  const target = globalSlotOf(date, time)
+
+  // One reach-out, then a spell of quiet, whoever sent it.
+  let newest: number | null = null
+  for (const conversation of Object.values(conversations)) {
+    const last = lastReachOutSlotOf(conversation)
+    if (last !== null && (newest === null || last > newest)) newest = last
+  }
+  if (!askCooldownOver(newest, target, REACH_OUT_QUIET_SLOTS)) return null
+
+  const candidates: SlotAskCandidate[] = []
+  for (const charId of game.chars) {
+    if (taken.has(charId)) continue
+    if (plannedWith(charId, date, time, view.events)) continue
+    if (charBusyNow(charId, date, time)) continue
+    const conversation = conversations[charId]
+    if (conversation?.pendingHangout) continue
+    const info = view.charInfo[charId]
+    if (!info || !isFeedContact(info)) continue
+    // Her thread has to have gone quiet, and longer for every reach-out of hers left unanswered.
+    const gap = reachOutGapSlots(unansweredReachOuts(conversation?.messages ?? []).length)
+    if (!askCooldownOver(lastTextSlotOf(conversation), target, gap)) continue
+    const chance = reachOutChanceOf(
+      info.flags?.isLover ?? false,
+      dispositionOf(affectionFor(info, date, game.characters[charId]))
+    )
+    if (chance > 0) candidates.push({ charId, chance })
+  }
+
+  const picked = rollSlotReachOut(candidates)
+  const character = picked ? game.characters[picked] : undefined
+  return character ? charKeyOf(character.firstName, character.lastName) : null
+}
+
+/**
  * The charIds who shared a scene with the reader in the slot before `(day, half)`.
  */
 function inSceneLastSlot(day: number, half: TimeSlot): ReadonlySet<string> {
@@ -1296,12 +1360,63 @@ export function deliverSlotBreakups(breakups: SlotIntroResponse['breakups']): vo
     const flags = game.charInfo[charId]?.flags
     if (!flags?.gaveContactInfo || flags.blocked) continue
 
-    const texts = (breakup.texts ?? [])
-      .map((text) => text?.trim())
-      .filter((text): text is string => Boolean(text))
-      .slice(0, 4)
-    for (const text of texts) deliver(charId, chatMessage('contact', text))
+    deliverContactTexts(charId, breakup.texts, 4)
   }
+}
+
+/** Files the texts the slot opening wrote for the girls leaving campus for spring break. */
+export function deliverSpringBreakTexts(entries: SlotIntroResponse['springBreakTexts']): void {
+  for (const entry of entries ?? []) {
+    const game = useGameStore.getState()
+    const charId = game.charKeyToId[entry.char]
+    if (!charId) continue
+
+    // Only a girl the pick sent away says she is going, and only one who would tell him.
+    if (!game.springBreakAway?.includes(charId)) continue
+    const info = game.charInfo[charId]
+    const affection = affectionFor(info, game.date, game.characters[charId])
+    if (!sendsSpringBreakNotice(info, affection)) continue
+
+    deliverContactTexts(charId, entry.texts, 3)
+  }
+}
+
+/** Files the texts of the girl the slot opening rolled to reach out just to talk. */
+export function deliverSlotReachOuts(reachOuts: SlotIntroResponse['reachOuts']): void {
+  for (const entry of reachOuts ?? []) {
+    const game = useGameStore.getState()
+    const charId = game.charKeyToId[entry.char]
+    if (!charId) continue
+
+    // She can only text a number he has, and not one she has blocked him on.
+    if (!isFeedContact(game.charInfo[charId])) continue
+    // An invitation of hers still standing outranks just talking.
+    if (game.bunnyboard.conversations[charId]?.pendingHangout) continue
+
+    deliverContactTexts(charId, entry.texts, 3, true)
+  }
+}
+
+/**
+ * Files a run of a contact's messages, blanks dropped and at most `cap` of them; `reachOut`
+ * marks the first as her reaching out.
+ */
+function deliverContactTexts(
+  charId: string,
+  texts: readonly string[] | undefined,
+  cap: number,
+  reachOut = false
+): void {
+  // A custom endpoint's JSON is not held to the schema, so a lone string is not a run of texts.
+  const kept = (Array.isArray(texts) ? texts : [])
+    .map((text) => (typeof text === 'string' ? text.trim() : ''))
+    .filter(Boolean)
+    .slice(0, cap)
+  kept.forEach((text, index) => {
+    const message = chatMessage('contact', text)
+    if (reachOut && index === 0) message.reachOut = true
+    deliver(charId, message)
+  })
 }
 
 /**
