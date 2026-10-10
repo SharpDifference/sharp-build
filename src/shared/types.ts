@@ -444,7 +444,19 @@ export interface CharMemory {
   date: number
   type: MemoryType
   desc: string
+  /**
+   * The days of the breaks between semesters it was carried across, which its age does not
+   * count; absent on a memory of the semester it was made in.
+   */
+  breakDays?: number
 }
+
+/**
+ * Which half of the year a semester is. A character's intake is the season she arrived in:
+ * the January intake advances a year at the end of each fall, the August intake at the end of
+ * each spring.
+ */
+export type Season = 'spring' | 'fall'
 
 /** What an intimate act was. */
 export type ActKind = 'kiss' | 'sex'
@@ -693,6 +705,13 @@ export interface CharProfile extends CharSchedule {
   handle?: string
   /** What she does with spring break, one short phrase. */
   springBreakPlans?: string
+  /**
+   * The season she arrived in, which decides when her year goes up; absent in the first
+   * semester, where a freshman arrived in the spring and anybody older in a fall.
+   */
+  intake?: Season
+  /** What she is doing since she graduated, one short phrase; present exactly on a graduate. */
+  pursuing?: string
 }
 
 /** The half a playthrough accumulates — what every save file carries about her. */
@@ -840,6 +859,12 @@ export type GameHistory = Record<number, Partial<Record<TimeSlot, string>>>
 /** Who a Bunnyboard chat message is from. `system` lines are app-written. */
 export type ChatSender = 'player' | 'contact' | 'system'
 
+/** The asks a slot opening may roll any girl's invitation into, each dealt once a round. */
+export const EVERYDAY_ASKS = ['help', 'exercise', 'meal', 'shopping'] as const
+
+/** One of {@link EVERYDAY_ASKS}. */
+export type EverydayAsk = (typeof EVERYDAY_ASKS)[number]
+
 /** One Bunnyboard text message. */
 export interface ChatMessage {
   /** crypto.randomUUID(); the stable list key. */
@@ -858,6 +883,8 @@ export interface ChatMessage {
   invite?: true
   /** The first text of hers reaching out just to talk: what every reach-out wait is counted off. */
   reachOut?: true
+  /** The everyday ask her invitation was rolled into: what the round of them is read off. */
+  everydayAsk?: EverydayAsk
 }
 
 /** One Bunnyboard conversation with a contact, keyed by her charId. */
@@ -1188,6 +1215,11 @@ export interface SlotOpening {
    * Absent for a slot that had none, or that he was not free to go to one on.
    */
   askOccasionId?: string
+  /**
+   * The everyday ask each asker's invitation was rolled into, by charKey, stamped onto her
+   * invitation at step 1. Absent for an opening that rolled none.
+   */
+  everydayAsks?: Record<string, EverydayAsk>
   /** The plans the merged ledger found, normalized and attendance-filtered. */
   events: CalendarEvent[]
   /** Who that filtering took off an event, announced by text at step 1. */
@@ -1246,12 +1278,17 @@ export type BunnybotHandover = 'contact' | 'haunt'
 
 /** On-disk save file — `/data/saves/{playthroughId}/{saveId}.json`. */
 export interface GameSave {
-  schemaVersion: 12
+  schemaVersion: 13
   /**
    * The playthrough this save belongs to. Derived from the containing folder
    * name on read, so the copy written into the file is never authoritative.
    */
   playthroughId: string
+  /**
+   * The id of the semester the save is in, a key of {@link PlaythroughRecord.semesters};
+   * absent in the playthrough's first semester.
+   */
+  semester?: string
   /**
    * `Date.now().toString()` for a slot-save, incremented on filename collision
    * until free; the literal `autosave` for the in-progress-scene save; `manual01` to
@@ -1275,7 +1312,7 @@ export interface GameSave {
   /** What the playthrough has counted up about him; absent in saves from before them. */
   tallies?: ReaderTallies
 
-  /** Days elapsed; day 0 = January 19. */
+  /** Days elapsed in the save's semester; day 0 is its first Monday, January 19 or August 17. */
   date: number
   time: TimeSlot
   /** The moving half of every character's entry; the settled half is the record's. */
@@ -1298,8 +1335,18 @@ export interface GameSave {
   events: CalendarEvent[]
   /** The part-time job the reader holds, or null. One at a time. */
   job: JobState | null
-  /** Job ids the reader was fired from or quit; an employer here never returns to the board. */
+  /**
+   * Job ids the reader was fired from or quit; an employer here does not return to the board
+   * this semester, and one that fired him never does.
+   */
   jobsClosed: string[]
+  /**
+   * Every employer the reader has worked for and left, by job id; absent before he has left one
+   * in a save that knew to keep it.
+   */
+  formerJobs?: Record<string, FormerJob>
+  /** What the semesters before this one left on his record; absent in the first semester. */
+  transcript?: Transcript
   /** What the reader has bought and not yet given away, one entry per distinct item. */
   inventory: OwnedItem[]
   /**
@@ -1416,6 +1463,24 @@ export interface GameSave {
   thumbnail?: string
 }
 
+/** One employer the reader has left: the raises he had taken, and how it ended. */
+export interface FormerJob {
+  raises: number
+  /** He quit, was let go, or the semester ended under him. */
+  left: 'quit' | 'fired' | 'term'
+}
+
+/** The reader's academic record from the semesters before this one, summed. */
+export interface Transcript {
+  /** One grade point per course he finished, oldest semester first. */
+  gradePoints: number[]
+  /** Exams he aced, handed back. */
+  aced: number
+  /** Class meetings he attended, of {@link held}. */
+  attended: number
+  held: number
+}
+
 /** One dropped class — the record that makes the drop permanent. */
 export interface DroppedClass {
   /** The former classmates have been told once; they are never told again. */
@@ -1494,9 +1559,9 @@ export const MANUAL_SAVE_SLOTS = 90
 export const AUTOSAVE_ID = 'autosave'
 
 /**
- * Where every playthrough opens: the day slot of January 19. Read by the save New Game
- * writes, by the splash the crossing to it announces, and by the listing of a folder whose
- * semester has no timetable yet — so nothing can name a morning the file does not open on.
+ * Where every semester opens: the day slot of its first Monday. Read by the save New Game and
+ * Continue write, by the splash the crossing to it announces, and by the listing of a semester
+ * with no timetable yet — so nothing can name a morning the file does not open on.
  */
 export const FIRST_SLOT: { date: number; time: TimeSlot } = { date: 0, time: 0 }
 
@@ -1512,11 +1577,13 @@ export interface PlaythroughSummary {
   position: number
   /** The player's own name for it, off the record; absent when it has none. */
   name?: string
-  /** charIds, off the playthrough record; `[]` when it was refused. */
+  /** charIds of the newest file's roster; `[]` when the record was refused. */
   chars: string[]
   /** In-game position of the newest save. */
   date: number
   time: TimeSlot
+  /** Which semester of the playthrough that is, from 0; absent for the first. */
+  semesterIndex?: number
   /** Epoch ms of the newest save. */
   savedAt: number
   /** Slot-saves held, excluding the autosave; at most {@link MAX_SLOT_SAVES}. */
@@ -1529,10 +1596,15 @@ export interface PlaythroughSummary {
    */
   hasAutosave: boolean
   /**
-   * The folder holds a semester and no timetable yet: it reopens the registrar rather than
-   * a save.
+   * The newest thing in the folder is a semester with no timetable yet: it reopens the
+   * registrar rather than a save.
    */
   enrolling?: true
+  /**
+   * A next semester waiting at the registrar beside the saves, whether or not it is the
+   * newest thing in the folder; absent when none waits.
+   */
+  registration?: { savedAt: number; semesterIndex: number }
   /**
    * Why nothing in the folder can be read — a refused record, or no readable save — or null
    * when the newest readable save stands for it.
@@ -1553,6 +1625,8 @@ export interface SaveSummary {
   bg: string | null
   /** The save's {@link GameSave.thumbnail}, where it carries one. */
   thumbnail?: string
+  /** The save's {@link GameSave.semester}, where it is past the first. */
+  semester?: string
 }
 
 /** One listed save: a summary of the file as read, or the error that refused it. */
@@ -1572,13 +1646,13 @@ export interface SaveReadResult {
 
 /**
  * On-disk playthrough record — `/data/saves/{playthroughId}/playthrough.json`: everything
- * New Game settled and no save afterwards rewrites, written once beside the saves that read it
- * and again only when the player renames the playthrough.
- * The folder names the playthrough, so no id is carried here.
+ * New Game settled and no save afterwards rewrites, its top level the first semester's; written
+ * once beside the saves that read it, again with each semester Continue adds, and when the
+ * player renames the playthrough. The folder names the playthrough, so no id is carried here.
  */
 export interface PlaythroughRecord {
   schemaVersion: 3
-  /** charIds in this playthrough, in roster order. */
+  /** charIds of the first semester's roster, in roster order. */
   chars: string[]
   /**
    * The reader's own name, chosen at New Game and fixed for the playthrough; it reaches the
@@ -1603,10 +1677,86 @@ export interface PlaythroughRecord {
   /** The settled half of every character's entry, keyed by charId. */
   profiles: Record<string, CharProfile>
   /**
-   * The player's own name for the playthrough, given from Load Game — the one field written
-   * after New Game. Absent, the playthrough goes by its place in creation order.
+   * The player's own name for the playthrough, given from Load Game. Absent, the playthrough
+   * goes by its place in creation order.
    */
   name?: string
+  /**
+   * Every semester after the first, keyed by an id minted like a save id; two continued from
+   * the same ending sit side by side. Absent until the first Continue.
+   */
+  semesters?: Record<string, SemesterRecord>
+}
+
+/**
+ * One semester after the first, as the Continue that began it settled it: the record's own
+ * fields for that semester, and the semester it continued from as its ending left it.
+ */
+export interface SemesterRecord {
+  /** Which semester of the playthrough this is, from 1: one more than its parent's. */
+  index: number
+  /** The semester it continued from; absent when that was the first. */
+  parent?: string
+  /** The on-campus roster, in roster order. */
+  chars: string[]
+  /** Every girl who has graduated by this semester, oldest first. */
+  alumni: string[]
+  classes: Record<string, ClassEntry>
+  occasions: Occasion[]
+  jobClosures: Record<string, ShiftSlot[]>
+  weather: Weather[]
+  /** The roster's and the graduates' settled halves, keyed by charId. */
+  profiles: Record<string, CharProfile>
+  /** The senior picked to graduate early at this fall's ceremony; absent in a spring or with none. */
+  fallGraduate?: string
+  /** The semester it continued from, as the ending that continued it left it. */
+  before: SemesterLog
+}
+
+/**
+ * What a finished semester leaves for the calendar to read back, in its own day numbers: its
+ * history, its replays, the reader's timetable and his plans.
+ */
+export interface SemesterLog {
+  history: GameHistory
+  replays?: GameReplays
+  playerSchedule: Record<number, string>
+  events: CalendarEvent[]
+}
+
+/**
+ * What one semester's ending hands the next: the reader's moving state, every girl's carried
+ * entry and the bookkeeping kept across the break, every date already on the next semester's
+ * clock.
+ */
+export type SemesterCarry = Pick<
+  GameSave,
+  | 'stats'
+  | 'money'
+  | 'bio'
+  | 'inventory'
+  | 'jobsClosed'
+  | 'formerJobs'
+  | 'transcript'
+  | 'gradesStanding'
+  | 'bunnyboard'
+  | 'bunnymapUnlocked'
+  | 'bunnyshopUnlocked'
+  | 'venusJobIntroSent'
+  | 'bunnybotContactIntroSent'
+  | 'bunnybotFirstPostNudgeSent'
+  | 'bunnybotTwoTimingTipSent'
+  | 'bunnybotSeenTipSent'
+  | 'bunnybotDeferred'
+  | 'bunnybotThrough'
+  | 'npcRelationships'
+  | 'npcFriendships'
+> & {
+  tallies: ReaderTallies
+  /** The continuing girls' and every graduate's entries, keyed by charId. */
+  charInfo: Record<string, CharState>
+  /** The semester that just ended, for the calendar. */
+  before: SemesterLog
 }
 
 /** The record as New Game hands it over; `saveService` stamps the version. */
@@ -1661,6 +1811,7 @@ export interface HiddenScheduleAssignment {
 /** The social half of one profile — her handle and what she posted over the break. */
 export interface FeedAssignment {
   handle: string
+  /** What she posted over the break before the semester: winter's before a spring, summer's before a fall. */
   winterPosts: string[]
 }
 
@@ -1693,14 +1844,41 @@ export type EnrollmentDraft = QuickstartBundle & {
   bio?: string
   /** The output tokens New Game's own generation calls cost, carried onto the save at Finalize. */
   tokensGenerated?: number
+  /** The semester Continue is starting, where this is not the playthrough's first. */
+  continued?: ContinuedSemester
+}
+
+/**
+ * Everything a next semester's Finalize needs beyond the semester itself, so a registration
+ * reopens from the file and the characters alone.
+ */
+export interface ContinuedSemester {
+  /** The id the semester is written under, minted before the registration is. */
+  id: string
+  index: number
+  /** The semester it continues from; absent when that is the first. */
+  parent?: string
+  /** Every graduate by this semester, oldest first. */
+  alumni: string[]
+  /**
+   * The settled halves the continuing girls and the graduates bring with them, keyed by charId:
+   * the last semester's, with each year and intake already moved on.
+   */
+  priorProfiles: Record<string, CharProfile>
+  /** What each graduate is doing now, keyed by charId. */
+  pursuits: Record<string, string>
+  /** The senior picked to graduate early at the fall's ceremony. */
+  fallGraduate?: string
+  carry: SemesterCarry
 }
 
 /**
  * On-disk enrollment — `/data/saves/{playthroughId}/enrollment.json`: the semester waiting on
- * its timetable, replaced by the playthrough record at Finalize.
+ * its timetable, replaced by the playthrough record at Finalize, or folded into it as a next
+ * semester.
  */
 export interface Enrollment extends EnrollmentDraft {
-  schemaVersion: 2
+  schemaVersion: 3
   savedAt: number
 }
 

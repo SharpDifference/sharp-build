@@ -1,4 +1,4 @@
-import { SENIOR_YEAR, slotFullLabel } from '@shared/classes'
+import { slotFullLabel } from '@shared/classes'
 import { globalSlotOf, slotFromId } from '@shared/jobs'
 import type { PlayerStats } from '@shared/playerStats'
 import { STOCK_POSITIONS } from '@shared/positions'
@@ -48,6 +48,7 @@ import { useGrabBagStore } from '../grabBagStore'
 import { stageAsWritten } from '../sceneSanitizer'
 import { cancelAllTexts, expireHangoutInvitations } from '../textingLoop'
 import { presentCastOf } from './cast'
+import { partsForAWhile } from './farewells'
 import { prefetchTextLedger } from './hooks'
 import { currentRun, runStale } from './state'
 
@@ -84,8 +85,17 @@ export function scheduleInput(date: number, time: TimeSlot): SchedulePromptInput
   return {
     date,
     time,
+    season: game.calendar.season,
     threads,
-    characters: game.characters,
+    // Plans are made on campus: a graduate texts, but no plan can name her.
+    characters: Object.fromEntries(
+      game.chars.flatMap((charId) =>
+        game.characters[charId] ? [[charId, game.characters[charId]] as const] : []
+      )
+    ),
+    graduates: game.alumni.flatMap((charId) =>
+      game.characters[charId] ? [game.characters[charId]] : []
+    ),
     // Only the plans still ahead.
     planned: game.events.filter(
       (event) => globalSlotOf(event.date, event.time) > globalSlotOf(date, time)
@@ -104,10 +114,10 @@ export function recentSummaries(
   time: TimeSlot,
   pendingSummary?: string | null
 ): string[] {
-  const history = useGameStore.getState().history
+  const { history, calendar } = useGameStore.getState()
   const found: string[] = []
   const stamped = (day: number, slot: TimeSlot, summary: string): string =>
-    `${formatChatDivider(day, slot)} — ${summary}`
+    `${formatChatDivider(day, slot, calendar.season)} — ${summary}`
 
   let day = date
   let slot: TimeSlot = time
@@ -223,7 +233,7 @@ export function announceableDrops(): DroppedNotice[] {
     if (!entry) return []
     if (!(game.classRecords[code]?.meetings ?? []).some((meeting) => meeting.attended)) return []
     // The meeting has to be over: one in the slot being played is still running.
-    const missed = firstMeetingAfter(entry.slot, record.date, game.occasions)
+    const missed = firstMeetingAfter(entry.slot, record.date, game.calendar)
     if (missed === null) return []
     if (globalSlotOf(missed, slotFromId(entry.slot).time) >= now) return []
     return [{ code, name: entry.name, day: slotFullLabel(entry.slot) }]
@@ -242,7 +252,7 @@ export function announceableAdds(): AddedNotice[] {
     if (!entry) return []
     // Meetings held, not dates on the timetable: a first Monday cancelled by orientation is a
     // class that has not met.
-    if (meetingsBefore(entry.slot, record.date, game.occasions) === 0) return []
+    if (meetingsBefore(entry.slot, record.date, game.calendar) === 0) return []
     return [{ code, name: entry.name }]
   })
 }
@@ -318,7 +328,7 @@ export function promptState(): PromptState {
   const farewell = goodbyeWith
     ? {
         firstName: goodbyeWith.firstName,
-        senior: (game.charInfo[goodbyeWith.charId]?.year ?? 0) >= SENIOR_YEAR
+        forAWhile: partsForAWhile(goodbyeWith.charId)
       }
     : null
 
@@ -330,8 +340,8 @@ export function promptState(): PromptState {
     charInfo: game.charInfo,
     npcRelationships: game.npcRelationships,
     // Everyone the scene is not carrying — `game.cast`, not the departed-filtered list, or a
-    // character who walked out comes back as a lorebook paragraph.
-    roster: game.chars
+    // character who walked out comes back as a lorebook paragraph — graduates included.
+    roster: [...game.chars, ...game.alumni]
       .filter((charId) => !game.cast.includes(charId))
       .map((charId) => game.characters[charId])
       .filter((character): character is Character => Boolean(character)),
@@ -350,8 +360,9 @@ export function promptState(): PromptState {
     springBreakAway: game.springBreakAway,
     // Only ever set inside the epilogue.
     ...(farewell ? { farewell } : {}),
+    graduating: game.graduating,
     playerJob: game.job,
-    occasions: game.occasions,
+    calendar: game.calendar,
     weather: game.weather,
     bg: stage.bg,
     classCode: game.sceneClass,
@@ -377,7 +388,7 @@ export function promptState(): PromptState {
               classEntry,
               game.date,
               game.classRecords[classEntry.code],
-              game.occasions
+              game.calendar
             ) ?? undefined
         }
       : {}),
@@ -388,14 +399,14 @@ export function promptState(): PromptState {
             projectEntry,
             game.date,
             game.classRecords[projectEntry.code],
-            game.occasions
+            game.calendar
           ),
           projectScene:
             projectSceneContextOf(
               projectEntry,
               game.date,
               game.classRecords[projectEntry.code],
-              game.occasions
+              game.calendar
             ) ?? undefined
         }
       : {}),
@@ -427,7 +438,8 @@ export function promptState(): PromptState {
     upcomingPlans: upcomingPlanLines(
       game.events,
       game.characters,
-      globalSlotOf(game.date, game.time) + 1
+      globalSlotOf(game.date, game.time) + 1,
+      game.calendar.season
     ),
     // Whoever the prompt still carries but the stage does not; absent when nobody is.
     ...(hiddenCast.length > 0 ? { hiddenCast } : {}),

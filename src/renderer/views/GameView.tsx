@@ -13,9 +13,10 @@ import {
 import { AnimatePresence, motion } from 'motion/react'
 import { AUDIO_FILES, pitchSemitonesOf, VOICE_PITCH_DEFAULT } from '@shared/audio'
 import { isPermanent } from '@shared/errors'
-import { GAME_OVER_SCENES } from '@shared/gameOver'
+import { canContinueAfter, GAME_OVER_SCENES, gameCompleteSceneOf } from '@shared/gameOver'
 import { hashString } from '@shared/hash'
 import { isGameOver } from '@shared/money'
+import { calendarOf } from '@shared/semesters'
 import { quizAnswers, type QuizAnswer } from '@shared/academics'
 import {
   allBackgrounds,
@@ -96,6 +97,7 @@ import {
   lastScenePromptText,
   lastTurnAuthored,
   leaveCreatedScene,
+  leaveForNextSemester,
   leaveToMenu,
   manualSaveOffer,
   quitToDesktop,
@@ -149,6 +151,7 @@ import {
 } from '../stores/loop/createdScene'
 import {
   deleteReplay,
+  earlierSemesters,
   heldGame,
   readReplay,
   replayOffer,
@@ -545,6 +548,8 @@ export function GameView(): JSX.Element {
   const bg = useGameStore((s) => s.bg)
   const time = useGameStore((s) => s.time)
   const date = useGameStore((s) => s.date)
+  const season = useGameStore((s) => s.calendar.season)
+  const semesterIndex = useGameStore((s) => s.semesterIndex)
   const playthroughId = useGameStore((s) => s.playthroughId)
   const slots = useGameStore((s) => s.slots)
   const emotions = useGameStore((s) => s.emotions)
@@ -565,6 +570,7 @@ export function GameView(): JSX.Element {
   const activeGameOver = useGameStore((s) => s.activeGameOver)
   const endingArt = useGameStore((s) => s.endingArt)
   const endingArtPending = useGameStore((s) => s.endingArtPending)
+  const endingPostsPending = useGameStore((s) => s.endingPostsPending)
   const awaitingInput = useGameStore((s) => s.awaitingInput)
   const busy = useGameStore((s) => s.busy)
   const waitingForLine = useGameStore((s) => s.waitingForLine)
@@ -751,10 +757,34 @@ export function GameView(): JSX.Element {
   const job = useGameStore((s) => s.job)
   const playerSchedule = useGameStore((s) => s.playerSchedule)
   const classRecords = useGameStore((s) => s.classRecords)
-  const occasions = useGameStore((s) => s.occasions)
+  const calendar = useGameStore((s) => s.calendar)
 
-  /** The playthrough ended badly, and which way (`shared/gameOver.ts`). */
-  const gameOver = activeGameOver ? GAME_OVER_SCENES[activeGameOver] : null
+  /** How the playthrough ended (`shared/gameOver.ts`): a winning ending's words are its semester's. */
+  const gameOver = activeGameOver
+    ? activeGameOver === 'gameComplete'
+      ? gameCompleteSceneOf(semesterIndex)
+      : GAME_OVER_SCENES[activeGameOver]
+    : null
+  /** A winning ending the next semester follows, which is every one but the reader's own graduation. */
+  const continuable = activeGameOver === 'gameComplete' && canContinueAfter(semesterIndex)
+
+  /**
+   * Continue from the ending: the game leaves under a cover keeping the hour at both ends, as
+   * the way to the menu does, and the next semester's roster screen is raised under it.
+   */
+  function toNextSemester(): void {
+    const leftIn = half
+    cancelCrossing()
+    beginCrossing(undefined, menuCrossing(leftIn))
+    coverSwap(() => {
+      void (async () => {
+        const staged = await leaveForNextSemester()
+        setMenuTheme(leftIn)
+        setView(staged ? 'nextSemester' : 'mainMenu')
+        endCrossing()
+      })()
+    })
+  }
 
   /**
    * Writes the last decision point back and leaves, under a cover. The way out is a crossing like
@@ -857,19 +887,30 @@ export function GameView(): JSX.Element {
   }, [createdOver])
 
   /**
-   * Plays one past half's replay: read first, so a replay that cannot be read changes nothing,
-   * then the game is left for it under a curtain announcing the slot being replayed. The well's
-   * words are held with the game.
+   * Plays one past half's replay, of this semester or the earlier one `semesterIndex` names:
+   * read first, so a replay that cannot be read changes nothing, then the game is left for it
+   * under a curtain announcing the slot being replayed, in its own semester's dates and sky. The
+   * well's words are held with the game.
    */
-  function startReplay(date: number, time: TimeSlot): void {
+  function startReplay(date: number, time: TimeSlot, semesterIndex?: number): void {
     closePanel()
     const words = action
+    const from =
+      semesterIndex === undefined
+        ? undefined
+        : earlierSemesters().find(({ view }) => view.index === semesterIndex)?.view
+    const earlier = from && {
+      calendar: calendarOf(from.season, from.occasions),
+      weather: from.weather,
+      semesterIndex: from.index
+    }
     void (async () => {
-      const replay = await readReplay(date, time)
+      const replay = await readReplay(date, time, semesterIndex)
       if (!replay) return
-      const splash = slotStampOf(date, time, occasions, slotWeather(weather, date, time, false))
+      const sky = slotWeather(earlier?.weather ?? weather, date, time, false)
+      const splash = slotStampOf(date, time, earlier?.calendar ?? calendar, sky)
       if (!beginCrossing(undefined, { from: half, to: slotHalf(time), splash })) return
-      coverSwap(() => void enterReplay(replay, words))
+      coverSwap(() => void enterReplay(replay, words, earlier))
     })()
   }
 
@@ -1370,7 +1411,7 @@ export function GameView(): JSX.Element {
    * The playthrough's opening owns the screen: nothing on it but the dialogue box,
    * `BASE_REVEAL` and, once the turn is handed back, the input.
    */
-  const cinematic = isOrientationSlot(date, time)
+  const cinematic = isOrientationSlot(date, time, semesterIndex)
   /** The graduation epilogue: an authored screen the reader still reads and types on. */
   const epilogue = isGraduationSlot(date, time) && !gameOver
   /** A screen the game wrote end to end; each leaves at most `BASE_REVEAL` standing. */
@@ -1602,7 +1643,7 @@ export function GameView(): JSX.Element {
   const slotActions = useMemo(
     // A created scene and a replay have no slot, and their landing is never drawn.
     () => (created || replaying ? [] : slotActionsNow()),
-    [date, time, events, classes, job, playerSchedule, classRecords, occasions]
+    [date, time, events, classes, job, playerSchedule, classRecords, calendar]
   )
 
   /** The epilogue's own row, in the slot actions' place: a button per goodbye still owed. */
@@ -1968,6 +2009,7 @@ export function GameView(): JSX.Element {
         <SceneChrome
           theme={half}
           date={date}
+          season={season}
           night={half === 'night'}
           weather={slotSky}
           covered={covered}
@@ -2031,6 +2073,7 @@ export function GameView(): JSX.Element {
         <LandingChrome
           theme={half}
           date={date}
+          season={season}
           night={half === 'night'}
           weather={slotSky}
           epilogue={epilogue}
@@ -2509,12 +2552,21 @@ export function GameView(): JSX.Element {
             message={gameOver.message}
             extraText={activeGameOver === 'gameComplete' ? 'Download ending CG' : undefined}
             extraDisabled={!endingArt || savingArt}
+            extraFirst
             onExtra={() => {
               setSavingArt(true)
               void exportEndingArt().finally(() => setSavingArt(false))
             }}
-            confirmText="Return to the main menu"
-            onConfirm={() => toMenu()}
+            // Continue waits for the contacts' last posts, which the next semester carries.
+            {...(continuable
+              ? {
+                  cancelText: 'Return to the main menu',
+                  onCancel: () => toMenu(),
+                  confirmText: 'Continue',
+                  confirmDisabled: endingPostsPending,
+                  onConfirm: () => toNextSemester()
+                }
+              : { confirmText: 'Return to the main menu', onConfirm: () => toMenu() })}
           />
         )}
       </AnimatePresence>

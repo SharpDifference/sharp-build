@@ -7,7 +7,7 @@ import { useEffect, useLayoutEffect, useRef, useState, type JSX, type ReactNode 
 import { AnimatePresence, motion } from 'motion/react'
 
 import type { QuizAnswer, QuizLetter } from '@shared/academics'
-import type { TextMark } from '@shared/types'
+import type { Season, TextMark } from '@shared/types'
 import type { Weather } from '@shared/weather'
 import { formatNumericGameDate, formatWeekday } from '../prompts/gameDate'
 import { weekOf } from '../prompts/occasions'
@@ -53,6 +53,8 @@ export interface SceneChromeProps {
   /** The slot's own half of the day, not the hour the screen is being read at. */
   theme: ScreenTheme
   date: number
+  /** The semester's season, which names the month of the date. */
+  season: Season
   night: boolean
   /** The sky over the slot, which the stamp's mark is drawn as wherever it is not clear. */
   weather: Weather
@@ -135,7 +137,8 @@ export interface SceneChromeProps {
 
 /** The scene's chrome: the stamp, the rail, the box and the row under it. */
 export function SceneChrome(props: SceneChromeProps): JSX.Element {
-  const { theme, date, night, weather, covered, hidden, shown, rowShown, quiz, interject } = props
+  const { theme, date, season, night, weather, covered, hidden, shown, rowShown, quiz, interject } =
+    props
   // What the stamp wears where the sun or the crescent would be.
   const markKind = halfMarkKindOf(weather, night)
 
@@ -298,7 +301,7 @@ export function SceneChrome(props: SceneChromeProps): JSX.Element {
           <br />
           <span>{String(weekOf(date) + 1).padStart(2, '0')}</span>
         </div>
-        <div className="vu-scene-figure">{formatNumericGameDate(date)}</div>
+        <div className="vu-scene-figure">{formatNumericGameDate(date, season)}</div>
         <div className="vu-scene-weekday">{formatWeekday(date).slice(0, 3).toUpperCase()}</div>
         <div className={night ? 'vu-scene-half vu-scene-half--night' : 'vu-scene-half'}>
           <span>{night ? 'NIGHT' : 'DAY'}</span>

@@ -1,5 +1,5 @@
 import { FINAL_DATE } from './classes'
-import type { TimeSlot } from './types'
+import type { Season, TimeSlot } from './types'
 
 /**
  * The semester's sky: one reading per slot, rolled once at New Game onto the playthrough
@@ -51,9 +51,12 @@ const STORM_OF_WET_FROM_RAIN = 0.3
 const STORM_OF_WET_FROM_STORM = 0.35
 /** Storms favour the evening about two to one. */
 const STORM_HALF_FACTOR: Record<TimeSlot, number> = { 0: 0.67, 1: 1.33 }
-/** Storms are rare in January and common by May: the storm share's factor on the first day and the last. */
-const STORM_RAMP_START = 0.15
-const STORM_RAMP_END = 1.85
+/**
+ * Storms are rare in January and common by May, and common in late summer and rare by December:
+ * the storm share's factor at the cold end of a semester and at its warm end.
+ */
+const STORM_RAMP_COLD = 0.15
+const STORM_RAMP_WARM = 1.85
 
 const WET_AFTER: Record<Weather, number> = {
   clear: WET_AFTER_CLEAR,
@@ -71,9 +74,17 @@ const STORM_OF_WET: Record<Weather, number> = {
  * The next slot's sky from this one's: one draw, banded storm, then rain, then clear, so the
  * lowest draw is always the wettest answer and the highest is always dry.
  */
-function step(last: Weather, date: number, time: TimeSlot, rand: () => number): Weather {
+function step(
+  last: Weather,
+  date: number,
+  time: TimeSlot,
+  season: Season,
+  rand: () => number
+): Weather {
   const wet = WET_AFTER[last]
-  const ramp = STORM_RAMP_START + (STORM_RAMP_END - STORM_RAMP_START) * (date / FINAL_DATE)
+  // A spring warms toward its end; a fall starts warm and cools.
+  const warmth = season === 'spring' ? date / FINAL_DATE : 1 - date / FINAL_DATE
+  const ramp = STORM_RAMP_COLD + (STORM_RAMP_WARM - STORM_RAMP_COLD) * warmth
   const share = Math.min(1, STORM_OF_WET[last] * STORM_HALF_FACTOR[time] * ramp)
   const draw = rand()
   if (draw < wet * share) return 'storm'
@@ -84,10 +95,12 @@ function step(last: Weather, date: number, time: TimeSlot, rand: () => number): 
 /**
  * The whole semester's sky, one reading per slot: a chain in which rain tends to keep falling,
  * a storm mostly grows out of rain and then clears the air, and storms lean toward the evening
- * and the end of term. Every date in `dryDates` is clear in both halves, and so is day 0.
+ * and the warm end of the term. Every date in `dryDates` is clear in both halves, and so is
+ * day 0.
  */
 export function rollSemesterWeather(
   dryDates: ReadonlySet<number>,
+  season: Season,
   rand: () => number = Math.random
 ): Weather[] {
   const table: Weather[] = []
@@ -96,7 +109,7 @@ export function rollSemesterWeather(
     const date = Math.floor(index / 2)
     const time = (index % 2) as TimeSlot
     const next: Weather =
-      date === 0 || dryDates.has(date) ? 'clear' : step(last, date, time, rand)
+      date === 0 || dryDates.has(date) ? 'clear' : step(last, date, time, season, rand)
     table.push(next)
     last = next
   }

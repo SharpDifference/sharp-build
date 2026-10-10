@@ -1,22 +1,36 @@
+import type { ExamPeriod } from '@shared/academics'
+import { yearLabel } from '@shared/classes'
+import { locationDefOf, locationLabel } from '@shared/locations'
 import { affectionFor, dedupedMemoriesFor, emptyFlags } from '@shared/relationship'
 import { DEFAULT_PLAYER_STATS, type PlayerStats } from '@shared/playerStats'
+import { readerYearOf, seasonOf, semesterOrdinal } from '@shared/semesters'
 import {
   fullNameOf,
   type CalendarEvent,
   type Character,
   type CharInfo,
+  type EverydayAsk,
   type Haunt,
   type Occasion,
+  type Season,
   type StructuredRequest,
   type TimeSlot
 } from '@shared/types'
 import type { Weather } from '@shared/weather'
+import { formatRelativeSlot } from './gameDate'
 import type { LoreEntry } from './lorebook'
 import { examLookaheadLine } from './occasions'
 import { whereaboutsLine, type NpcCompanions } from './npcRelationship'
 import { relationshipLines } from './relationship'
 import { objectSchema } from './schema'
-import { memoryLines, notesLines, personaFor, profileLines, spaced } from './scenePrompt'
+import {
+  graduateLines,
+  memoryLines,
+  notesLines,
+  personaFor,
+  profileLines,
+  spaced
+} from './scenePrompt'
 import { springBreakLines } from './springBreak'
 import { weatherLines } from './weather'
 
@@ -24,6 +38,43 @@ import { weatherLines } from './weather'
 
 /** What a character has to be at in a slot — her class or her shift — named as a prompt says it. */
 export type Commitment = { kind: 'class'; name: string } | { kind: 'shift'; employer: string }
+
+/** What a girl asking him out of nowhere asks him to, when the app rolled her anything. */
+export type HangoutInvite =
+  | { kind: 'herRoom' }
+  | { kind: 'hisRoom' }
+  /** An exam in a lecture class the two of them take, and the slot it is sat in. */
+  | { kind: 'study'; className: string; exam: ExamPeriod; date: number; time: TimeSlot }
+  /** A location id off the map. */
+  | { kind: 'outing'; location: string }
+  | { kind: 'everyday'; ask: EverydayAsk }
+
+/** Each everyday ask as the prompt names it beside her key. */
+const EVERYDAY_ASK_PHRASE: Record<EverydayAsk, string> = {
+  help: 'asking him to help her with something',
+  exercise: 'asking him to work out or exercise with her',
+  meal: 'inviting him over for a meal she is cooking herself',
+  shopping: 'asking him to help her shop for something'
+}
+
+/** What a rolled invitation asks him to, as the line beside her key says it on `date`'s `time`. */
+function invitePhrase(invite: HangoutInvite, date: number, time: TimeSlot): string {
+  switch (invite.kind) {
+    case 'herRoom':
+      return 'asking him to come over to her room'
+    case 'hisRoom':
+      return 'asking him to have her over in his dorm room'
+    case 'study':
+      return `asking him to study with her for the ${invite.className} ${invite.exam} ${formatRelativeSlot(invite.date, invite.time, date, time)}`
+    case 'outing': {
+      // The blurb, since nothing else in this prompt says what the place is.
+      const blurb = locationDefOf(invite.location)?.blurb
+      return `asking him to come to ${locationLabel(invite.location)} with her${blurb ? `: ${blurb}` : ''}`
+    }
+    case 'everyday':
+      return EVERYDAY_ASK_PHRASE[invite.ask]
+  }
+}
 
 /** A contact this slot rolled in to text the reader an invitation. */
 export interface IntroAsker {
@@ -48,6 +99,11 @@ export interface IntroAsker {
    * for a girl asking about anything else.
    */
   occasion?: Occasion
+  /**
+   * What the app rolled her invitation into, for a girl asking about neither a plan nor an
+   * occasion. Absent when the roll landed nothing and she asks what she likes.
+   */
+  invite?: HangoutInvite
   /**
    * Where she is texting from, who is with her, and what she is there for when the place is
    * her own haunt. Absent for a slot nothing places her in, which is most of them.
@@ -162,6 +218,13 @@ export interface SlotIntroInput {
    * in by the loop.
    */
   occasions: readonly Occasion[]
+  /** The semester's season, which the exam lookahead names its dates by. */
+  season: Season
+  /**
+   * Which semester a later one's first morning opens, for the line saying he is back on campus;
+   * absent on every other slot.
+   */
+  backOnCampus?: number
   /** The lorebook lines for what this slot leads up to, built by the loop beside `occasions`. */
   occasionLeadUps?: readonly string[]
   /**
@@ -270,14 +333,23 @@ function weatherBlock(input: SlotIntroInput): string[] {
  */
 function campusBlock(input: SlotIntroInput): string[] {
   const leadUps = input.occasionLeadUps ?? []
-  const lookahead = examLookaheadLine(input.date)
-  if (input.occasions.length === 0 && leadUps.length === 0 && !lookahead) return []
+  const lookahead = examLookaheadLine(input.date, input.season)
+  const back = input.backOnCampus !== undefined ? backOnCampusLine(input.backOnCampus) : null
+  if (input.occasions.length === 0 && leadUps.length === 0 && !lookahead && !back) return []
   return [
     'WHAT\'S GOING ON',
+    ...(back ? [`- ${back}`] : []),
     ...input.occasions.map((occasion) => `- ${occasion.title} — ${occasion.description}`),
     ...leadUps.map((line) => `- ${line}`),
     ...(lookahead ? [`- ${lookahead}`] : [])
   ]
+}
+
+/** The first morning of a semester after his first: what he is back from, and as what. */
+function backOnCampusLine(semesterIndex: number): string {
+  const year = yearLabel(readerYearOf(semesterIndex)).toLowerCase()
+  const away = seasonOf(semesterIndex) === 'fall' ? 'summer vacation' : 'winter break'
+  return `The reader is back on campus after ${away}, starting his ${semesterOrdinal(semesterIndex)} semester as a ${year}. Classes start tomorrow.`
 }
 
 /** A place worth going, for a slot with nothing and nobody in it. */
@@ -296,14 +368,6 @@ function rumorBlock(input: SlotIntroInput): string[] {
  */
 function anyPlans(input: SlotIntroInput): boolean {
   return input.askers.some(({ plan }) => plan !== undefined)
-}
-
-/**
- * Whether anybody asking this slot is asking him to what is on — the other test the asker
- * block and `YOUR TURN` both make.
- */
-function anyOccasions(input: SlotIntroInput): boolean {
-  return input.askers.some(({ occasion }) => occasion !== undefined)
 }
 
 /** Whether anybody reminding him of a plan has a class or a shift in the slot. */
@@ -336,19 +400,14 @@ function askerBlock(input: SlotIntroInput): string[] {
 
   return [
     'ASKING TO HANG OUT',
-    'Each of these characters is texting the reader right now to ask him to spend this part of the day with her. Write one entry in "hangouts" for each, and nothing for anyone else. They are described under LOREBOOK.',
+    'Each of these characters is texting the reader right now to ask him to spend this part of the day with her, doing what is listed beside her where anything is. Write one entry in "hangouts" for each, and nothing for anyone else. They are described under LOREBOOK.',
     ...(anyPlans(input)
       ? [
           'Where a plan is listed beside a character, she is not inviting the reader out of nowhere: the two of them agreed to this already, and she is writing about that plan, for everyone going. Her message reads as a reminder or a "still on?", not as a new idea.'
         ]
       : []),
-    ...(anyOccasions(input)
-      ? [
-          'Where an occasion is listed beside a character, her text is about going to that occasion together — it is described under WHAT\'S GOING ON. She says what she wants to do or see there and asks him to come with her, and her "description" names it, like "Going to the Winter Gala with Sarah".'
-        ]
-      : []),
-    ...input.askers.map(({ character, charKey, plan, commitment, occasion }) =>
-      // The plan and the occasion ride the key, not the lorebook entry.
+    ...input.askers.map(({ character, charKey, plan, commitment, occasion, invite }) =>
+      // The plan, the occasion and the rolled ask ride the key, not the lorebook entry.
       plan
         ? `- ${charKey} — already planned for this part of the day: ` +
           (commitment
@@ -357,7 +416,9 @@ function askerBlock(input: SlotIntroInput): string[] {
             : plan.description)
         : occasion
           ? `- ${charKey} — asking him to come to ${occasion.title} with her`
-          : `- ${charKey}`
+          : invite
+            ? `- ${charKey} — ${invitePhrase(invite, input.date, input.time)}`
+            : `- ${charKey}`
     )
   ]
 }
@@ -426,6 +487,8 @@ function characterBlock(input: SlotIntroInput): string[] {
     entries.push([
       `${fullNameOf(character)} — "char": "${charKey}"`,
       ...profileLines(character, info.flags ?? emptyFlags()),
+      // A graduate posting or ending it from out of town.
+      ...graduateLines(character.firstName, info),
       ...(whereabouts
         ? [
             whereaboutsLine(
@@ -457,7 +520,7 @@ function characterBlock(input: SlotIntroInput): string[] {
         // Where she is in her cycle, for a Promiscuous girl's DTF days.
         { date: input.date, offset: info.moodCycleOffset ?? 0 }
       ),
-      ...memoryLines(character, dedupedMemoriesFor(info).slice(-2), info.textMemory),
+      ...memoryLines(character, dedupedMemoriesFor(info).slice(-2), info.textMemory, input.season),
       // What she and the reader last texted about, for the girl starting a conversation.
       ...('thread' in entry ? entry.thread : []),
       ...notesLines(character.firstName, info.notes)
@@ -488,7 +551,6 @@ export function buildSlotIntroPrompt(
   const rumor = rumorBlock(input)
   const planned = anyPlans(input)
   const committed = anyCommitments(input)
-  const occasioned = anyOccasions(input)
 
   const user = [
     'OPENING LINE',
@@ -529,15 +591,9 @@ export function buildSlotIntroPrompt(
             (committed
               ? ', and where she has class or work, she says whether she will meet him before or after it'
               : '') +
-            (occasioned
-              ? ' — or, where she has an occasion listed, going to that occasion with her, asked as an invitation to come along'
-              : '') +
             '. No narration, no stage directions, no other conversation. "description" is the plan in a few plain words, like "Getting dinner with Sarah at the Mockingbird" or "Studying with Chloe in the library".' +
             (planned
               ? ' If she has a hangout scheduled with the reader listed under her name, use that one.'
-              : '') +
-            (occasioned
-              ? ' If she has an occasion listed under her name, her "description" names that occasion.'
               : ''),
           'The narration in "lines" must not mention these messages or these characters at all — the reader has not opened his phone yet.'
         ]

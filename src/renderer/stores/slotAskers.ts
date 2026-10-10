@@ -1,16 +1,27 @@
 /**
  * Who texts the reader as a slot opens, as odds and draws: an invitation's chance by disposition
- * and the slot's modulation of it, a reach-out's chance and what it is about, the waits an
- * unanswered text serves, and the weighted draw that turns a slate of chances into names. Pure
- * and randomised; the caller reads the store.
+ * and the slot's modulation of it, what an invitation asks, a reach-out's chance and what it is
+ * about, the waits an unanswered text serves, and the weighted draw that turns a slate of chances
+ * into names. Pure and randomised; the caller reads the store.
  */
 
 import { globalSlotOf } from '@shared/jobs'
 import type { Disposition } from '@shared/relationship'
-import type { ChatMessage, Conversation, TimeSlot } from '@shared/types'
-import { MIDTERM_WEEK, FINALS_WEEK } from '../prompts/occasions'
+import {
+  EVERYDAY_ASKS,
+  type ChatMessage,
+  type Conversation,
+  type EverydayAsk,
+  type Season,
+  type TimeSlot
+} from '@shared/types'
+import { FINALS_WEEK, midtermWeekOf } from '../prompts/occasions'
 import { weekendSaturdayOf } from '../prompts/gameDate'
-import { REACH_OUT_TOPICS, type ReachOutTopic } from '../prompts/slotIntroPrompt'
+import {
+  REACH_OUT_TOPICS,
+  type HangoutInvite,
+  type ReachOutTopic
+} from '../prompts/slotIntroPrompt'
 
 /** Her base odds of asking him out in one slot, by what she is to him. */
 const ASK_CHANCE = {
@@ -90,12 +101,13 @@ export function askChanceOf(input: AskChanceInput, slotMultiplier: number): numb
 }
 
 /** What one slot is worth to an invitation: the weekend, the working day and the exam weeks. */
-export function slotAskMultiplier(date: number, time: TimeSlot): number {
+export function slotAskMultiplier(date: number, time: TimeSlot, season: Season): number {
   let multiplier = 1
   if (weekendSaturdayOf(date) !== null) multiplier *= SLOT_CHANCE.weekend
   else if (time === 0) multiplier *= SLOT_CHANCE.weekdayDay
+  const midterms = midtermWeekOf(season)
   const inExamWeek =
-    (date >= MIDTERM_WEEK.startDate && date <= MIDTERM_WEEK.endDate) ||
+    (date >= midterms.startDate && date <= midterms.endDate) ||
     (date >= FINALS_WEEK.startDate && date <= FINALS_WEEK.endDate)
   if (inExamWeek) multiplier *= SLOT_CHANCE.examWeek
   return multiplier
@@ -242,4 +254,90 @@ export function drawOccasionAsker(
   if (pool.length === 0) return null
   const index = Math.min(pool.length - 1, Math.floor(rand() * pool.length))
   return pool[index].charId
+}
+
+/** The odds of each ask an invitation out of nowhere may be rolled into, in the order tried. */
+const INVITE_CHANCE = {
+  lustfulRoom: 0.5,
+  intimateRoom: 0.25,
+  study: 0.5,
+  hisRoom: 0.25,
+  outing: 0.25,
+  help: 0.2,
+  exercise: 0.1,
+  meal: 0.1,
+  shopping: 0.1
+} as const
+
+/** How many days ahead an exam she shares with him may be for her to ask him to study for it. */
+export const STUDY_LEAD_DAYS = 3
+
+/** The exam a study invitation is about: a lecture the two of them take, and when it is sat. */
+export type StudyExam = Omit<Extract<HangoutInvite, { kind: 'study' }>, 'kind'>
+
+/** What {@link rollHangoutInvite} weighs: which of the asks she qualifies for. */
+export interface InviteRollInput {
+  /** Promiscuous, on one of her lustful days, and has slept with him before. */
+  lustful: boolean
+  /** A lover or a friend with benefits. */
+  intimate: boolean
+  /** A lover, a crush, or friendly and up. */
+  friend: boolean
+  /** The soonest exam ahead in a lecture the two of them take, or null. */
+  exam: StudyExam | null
+  /** The places she could take him along to, in a fixed order. */
+  outings: readonly string[]
+  /** The everyday asks already dealt in the round still open. */
+  round: ReadonlySet<EverydayAsk>
+}
+
+/**
+ * What a girl asking out of nowhere asks him to: each ask tried in turn and the first to land
+ * taken, an ask whose gate she fails skipped without a roll. Null when none lands.
+ */
+export function rollHangoutInvite(
+  input: InviteRollInput,
+  rand: () => number = Math.random
+): HangoutInvite | null {
+  // The gate first, so an ask she cannot be rolled into spends nothing.
+  const lands = (gate: boolean, chance: number): boolean => gate && rand() < chance
+  if (lands(input.lustful, INVITE_CHANCE.lustfulRoom)) return { kind: 'herRoom' }
+  if (lands(input.intimate, INVITE_CHANCE.intimateRoom)) return { kind: 'herRoom' }
+  if (input.exam && rand() < INVITE_CHANCE.study) return { kind: 'study', ...input.exam }
+  if (lands(input.friend, INVITE_CHANCE.hisRoom)) return { kind: 'hisRoom' }
+  if (lands(input.outings.length > 0, INVITE_CHANCE.outing)) {
+    const index = Math.min(input.outings.length - 1, Math.floor(rand() * input.outings.length))
+    return { kind: 'outing', location: input.outings[index] }
+  }
+  for (const ask of EVERYDAY_ASKS) {
+    if (lands(!input.round.has(ask), INVITE_CHANCE[ask])) return { kind: 'everyday', ask }
+  }
+  return null
+}
+
+/** The round after one more everyday ask is dealt: the last of them still missing starts it over. */
+export function dealEverydayAsk(
+  round: ReadonlySet<EverydayAsk>,
+  ask: EverydayAsk
+): ReadonlySet<EverydayAsk> {
+  const next = new Set(round).add(ask)
+  return next.size === EVERYDAY_ASKS.length ? new Set() : next
+}
+
+/**
+ * The everyday asks dealt in the round still open, off every one ever dealt, slot by slot oldest
+ * first. Inside a slot the asks the round lacks are dealt first, so the answer is the same
+ * whichever order that slot's invitations were filed in.
+ */
+export function everydayRoundOf(
+  bySlot: readonly (readonly EverydayAsk[])[]
+): ReadonlySet<EverydayAsk> {
+  let round: ReadonlySet<EverydayAsk> = new Set()
+  for (const asks of bySlot) {
+    const before = round
+    const fresh = asks.filter((ask) => !before.has(ask))
+    const repeats = asks.filter((ask) => before.has(ask))
+    for (const ask of [...fresh, ...repeats]) round = dealEverydayAsk(round, ask)
+  }
+  return round
 }

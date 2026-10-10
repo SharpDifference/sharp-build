@@ -4,6 +4,7 @@ import {
   fullNameOf,
   type Character,
   type CharInfo,
+  type Season,
   type StructuredRequest,
   type TimeSlot
 } from '@shared/types'
@@ -23,8 +24,8 @@ export interface EndingPoster {
   charKey: string
   /** Whether a Bunnyboard thread with her already holds anything (`hasTexted`). */
   texted: boolean
-  /** She is graduating out of reach rather than home for the summer. */
-  senior: boolean
+  /** She graduated at the ceremony, rather than going home for the break. */
+  graduating: boolean
   /** How long after the ceremony she is posting, in days. */
   daysAfter: number
   /** Which half of that day she is posting in. */
@@ -39,6 +40,10 @@ export interface EndingPostsInput {
   stats?: PlayerStats
   /** The player's `lessNsfwText` setting; picks which persona heads this call's prefix. */
   lessNsfwText: boolean
+  /** The semester's season, which names the month of every date and the break that follows it. */
+  season: Season
+  /** The reader graduated at the ceremony too, which is the end of his time at Venus. */
+  readerGraduated: boolean
   /** Everybody the reply writes a post for, one entry each. */
   posters: readonly EndingPoster[]
 }
@@ -60,22 +65,26 @@ const SCHEMA = objectSchema('ending_posts', ['posts'], {
 })
 
 /** The day the semester ended and what the campus is doing about it. */
-function semesterBlock(): string[] {
+function semesterBlock(season: Season, readerGraduated: boolean): string[] {
+  const fall = season === 'fall'
   return [
     'THE SEMESTER IS OVER',
-    `The graduation ceremony was held on ${formatGameDate(GRADUATION_DATE)} and campus is emptying out for summer vacation.`,
+    `The graduation ceremony was held on ${formatGameDate(GRADUATION_DATE, season)} and campus is emptying out for ${fall ? 'winter' : 'summer'} vacation.`,
     'The seniors have graduated and are leaving Veridan.',
-    'Everybody else is heading home until the fall.'
+    ...(readerGraduated ? ['The reader graduated with them and is leaving Veridan too.'] : []),
+    `Everybody else is heading home until the ${fall ? 'spring' : 'fall'}.`
   ]
 }
 
 /** When she is writing, and what she is writing it from — the last line of her entry. */
-function postingLine(poster: EndingPoster): string {
+function postingLine(poster: EndingPoster, season: Season): string {
   const days = poster.daysAfter === 1 ? '1 day' : `${poster.daysAfter} days`
   const half = poster.time === 0 ? 'morning' : 'evening'
-  const where = poster.senior
+  const where = poster.graduating
     ? 'has graduated and is moving on from Venus University'
-    : 'is home for the summer and back in the fall'
+    : season === 'fall'
+      ? 'is home for winter vacation and back in the spring'
+      : 'is home for the summer and back in the fall'
   return `${poster.character.firstName} is posting ${days} after graduation, in the ${half}; she ${where}.`
 }
 
@@ -100,8 +109,8 @@ function characterBlock(input: EndingPostsInput): string[] {
         // Where she is in her cycle, for a Promiscuous girl's DTF days.
         { date, offset: info.moodCycleOffset ?? 0 }
       ),
-      ...memoryLines(character, dedupedMemoriesFor(info).slice(-3), info.textMemory),
-      postingLine(poster),
+      ...memoryLines(character, dedupedMemoriesFor(info).slice(-3), info.textMemory, input.season),
+      postingLine(poster, input.season),
       ...notesLines(character.firstName, info.notes)
     ]
   })
@@ -127,7 +136,7 @@ export function buildEndingPostsPrompt(
   reader: string
 ): StructuredRequest {
   const user = [
-    ...spaced(semesterBlock()),
+    ...spaced(semesterBlock(input.season, input.readerGraduated)),
     ...spaced(characterBlock(input)),
     ...spaced(posterBlock(input)),
     'YOUR TURN',

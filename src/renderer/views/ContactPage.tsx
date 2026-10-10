@@ -67,12 +67,14 @@ export function ContactPage({
   const classes = useGameStore((s) => s.classes)
   const characters = useGameStore((s) => s.characters)
   const chars = useGameStore((s) => s.chars)
+  const alumni = useGameStore((s) => s.alumni)
   const npcRelationships = useGameStore((s) => s.npcRelationships)
   const npcFriendships = useGameStore((s) => s.npcFriendships)
   // The whole map, for the other half of a pair: `info` is only ever this girl's.
   const charInfo = useGameStore((s) => s.charInfo)
   const playerSchedule = useGameStore((s) => s.playerSchedule)
   const date = useGameStore((s) => s.date)
+  const season = useGameStore((s) => s.calendar.season)
   const requestsSent = useGameStore((s) => s.bunnyboard.requestsSent)
   const closePage = useBunnyboardStore((s) => s.closePage)
   const version = useSpriteVersion(charId)
@@ -115,7 +117,9 @@ export function ContactPage({
     ...feed.map((post) => ({ kind: 'post' as const, post, date: post.date, time: post.time })),
     ...made.map((entry) => ({ kind: 'made' as const, ...entry, date: entry.pair.date, time: entry.pair.time }))
   ].sort(newestFirst)
-  const dorm = info ? dormLabel(info.dorm) : ''
+  // A graduate's page says she graduated where a year would be, and lives in no dorm.
+  const pursuing = info?.pursuing
+  const dorm = info && pursuing === undefined ? dormLabel(info.dorm) : ''
   const affection = affectionFor(info, date, character)
   const tag = relationshipTagOf(flags, affection)
   // Each reveal shows on its persisted flag OR the live condition.
@@ -127,8 +131,8 @@ export function ContactPage({
   // The same paragraph the prompts are given.
   const loveLife = loveLifeBlurb(character, flags)
   const showLoveLife = Boolean(loveLife) && (flags.knowsLoveLife || flags.isLover)
-  // Her friends are published like any other field of her page, met or not.
-  const known = chars.filter((id) => Boolean(characters[id]))
+  // Her friends are published like any other field of her page, met or not, graduates or not.
+  const known = [...chars, ...alumni].filter((id) => Boolean(characters[id]))
   const friends = npcFriendsOf(npcRelationships, charId, known)
   const enemies = showBackstory ? npcEnemiesOf(npcRelationships, charId, known) : []
   // Her shifts, once she has actually taken the job.
@@ -173,7 +177,7 @@ export function ContactPage({
             {handle && <div className="vu-contact-handle">@{handle}</div>}
             {info?.major && (
               <div className="vu-contact-line">
-                {yearLabel(info.year)} · {info.major}
+                {pursuing !== undefined ? 'Graduated' : yearLabel(info.year)} · {info.major}
                 {dorm ? ` · ${dorm}` : ''}
               </div>
             )}
@@ -267,7 +271,9 @@ export function ContactPage({
                 )}
 
                 <Field label="Schedule">
-                  {schedule.length === 0 ? (
+                  {pursuing !== undefined ? (
+                    <p className="vu-contact-empty">Moved away from Veridan. Now {pursuing}.</p>
+                  ) : schedule.length === 0 ? (
                     <p className="vu-contact-empty">Nothing scheduled.</p>
                   ) : (
                     <div className="vu-contact-week">
@@ -317,7 +323,7 @@ export function ContactPage({
                     <li className="vu-contact-made" key={`friends:${entry.pair.a}|${entry.pair.b}`}>
                       Became friends with {entry.name}.{' '}
                       <span className="vu-contact-when">
-                        {formatShortGameDate(entry.pair.date)}
+                        {formatShortGameDate(entry.pair.date, season)}
                       </span>
                     </li>
                   ) : (
@@ -330,7 +336,7 @@ export function ContactPage({
                         {...gestures(false, quietLift, quietPress)}
                         onClick={() => useGameStore.getState().toggleFeedLike(charId, entry.post.id)}
                       >
-                        {formatShortGameDate(entry.post.date)} · ♥{' '}
+                        {formatShortGameDate(entry.post.date, season)} · ♥{' '}
                         {entry.post.likes + (entry.post.liked ? 1 : 0)}
                       </motion.button>
                     </li>
@@ -351,7 +357,7 @@ export function ContactPage({
               <div className="vu-contact-memories">
                 {recent.map((memory, index) => (
                   <Fragment key={`${memory.date}-${index}`}>
-                    <span className="vu-contact-when">{formatShortGameDate(memory.date)}</span>
+                    <span className="vu-contact-when">{formatShortGameDate(memory.date, season)}</span>
                     <span>“{memorySentence(character.firstName, memory)}”</span>
                     <motion.button
                       className="vu-square vu-contact-memory-edit"

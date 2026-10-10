@@ -10,7 +10,7 @@ import { STAT_KEYS, STAT_LABELS, type PlayerStats } from '@shared/playerStats'
 import { formatNumericGameDate, formatWeekday } from '../prompts/gameDate'
 import type { RevealKey } from '../prompts/introScript'
 import { weekOf } from '../prompts/occasions'
-import type { TextMark } from '@shared/types'
+import type { Season, TextMark } from '@shared/types'
 import type { Weather } from '@shared/weather'
 import type { SlotAction, SlotActionTone } from '../stores/slotActions'
 import type { ScreenTheme } from './clockTheme'
@@ -104,6 +104,8 @@ export interface LandingChromeProps {
   /** The slot's own half of the day, not the hour the screen is being read at. */
   theme: ScreenTheme
   date: number
+  /** The semester's season, which names the month of the date. */
+  season: Season
   night: boolean
   /** The sky over the slot, which the banner's mark is drawn as wherever it is not clear. */
   weather: Weather
@@ -178,8 +180,20 @@ export interface LandingChromeProps {
 }
 
 export function LandingChrome(props: LandingChromeProps): JSX.Element {
-  const { theme, date, night, weather, covered, hidden, held, sending, stats, actions, shown } =
-    props
+  const {
+    theme,
+    date,
+    season,
+    night,
+    weather,
+    covered,
+    hidden,
+    held,
+    sending,
+    stats,
+    actions,
+    shown
+  } = props
   // What the banner wears where the sun or the crescent would be.
   const markKind = halfMarkKindOf(weather, night)
 
@@ -327,17 +341,16 @@ export function LandingChrome(props: LandingChromeProps): JSX.Element {
                 'Someday, sometime...'
               ) : (
                 <>
-                  {weekday} {formatNumericGameDate(date)} · {night ? 'Evening' : 'Morning'}
+                  {weekday} {formatNumericGameDate(date, season)} · {night ? 'Evening' : 'Morning'}
                 </>
               )}
             </div>
-            {/* The calendar is anchored in January and ends at graduation in May, so the term it
-                names is a fact about the shipped semester rather than a label invented here. The
-                goodbyes stand in the week after graduation's, which is the summer. */}
+            {/* The term is the semester's season. The goodbyes stand in the week after
+                graduation's, which is the break that follows it. */}
             <div className="vu-landing-meta">
               {props.epilogue
-                ? `WEEK ${weekOf(date) + 2} · SUMMER VACATION`
-                : `WEEK ${weekOf(date) + 1} · SPRING SEMESTER`}
+                ? `WEEK ${weekOf(date) + 2} · ${season === 'fall' ? 'WINTER' : 'SUMMER'} VACATION`
+                : `WEEK ${weekOf(date) + 1} · ${season === 'fall' ? 'FALL' : 'SPRING'} SEMESTER`}
             </div>
           </div>
         </motion.div>

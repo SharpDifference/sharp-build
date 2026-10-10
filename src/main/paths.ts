@@ -196,9 +196,19 @@ export function getEnrollmentPath(playthroughId: string): string {
   return join(getPlaythroughPath(playthroughId), 'enrollment.json')
 }
 
-/** `/data/saves/{playthroughId}/ending.png` — the graduation picture. */
-export function getEndingArtPath(playthroughId: string): string {
-  return join(getPlaythroughPath(playthroughId), 'ending.png')
+/**
+ * `/data/saves/{playthroughId}/ending.png` — the first semester's graduation picture — or
+ * `ending-{semesterId}.png` for a later semester's.
+ */
+export function getEndingArtPath(playthroughId: string, semesterId?: string): string {
+  const name = semesterId === undefined ? 'ending.png' : `ending-${semesterId}.png`
+  return join(getPlaythroughPath(playthroughId), name)
+}
+
+/** The semester id a later semester's graduation picture is named for, or null for any other file. */
+export function endingArtSemesterOf(fileName: string): string | null {
+  const match = /^ending-([0-9]+)\.png$/.exec(fileName)
+  return match ? match[1] : null
 }
 
 /** `/data/saves/{playthroughId}/profile.png` — the reader's own picture. */

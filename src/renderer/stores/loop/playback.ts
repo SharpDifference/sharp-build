@@ -28,6 +28,7 @@ export interface PlaybackSlice {
   activeGameOver: GameOverReason | null
   date: number
   time: TimeSlot
+  semesterIndex: number
   sceneSummary: string | null
   reread: number
   /** A replay from the calendar is being read: nothing in it can be interrupted. */
@@ -68,7 +69,10 @@ export function playbackOffered(s: PlaybackSlice): boolean {
     s.activeGameOver === null &&
     (s.replaying !== null ||
       (s.cast.length > 0 &&
-        !(isOrientationSlot(s.date, s.time) && !s.currentSceneTranscript.some(isReaderLine))))
+        !(
+          isOrientationSlot(s.date, s.time, s.semesterIndex) &&
+          !s.currentSceneTranscript.some(isReaderLine)
+        )))
   )
 }
 

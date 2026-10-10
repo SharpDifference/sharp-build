@@ -65,6 +65,8 @@ export interface PhotoMeta {
   /** The in-game day and half it was taken on. */
   date: number
   time: TimeSlot
+  /** Which semester of the playthrough it was taken in, from 0; absent in the first. */
+  semesterIndex?: number
   rows: PhotoRow[]
   /** The player's own words. */
   prompt: string

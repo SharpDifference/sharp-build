@@ -18,7 +18,7 @@ const { announceableAdds, announceableDrops, recentSummaries, scheduleInput } =
 
 /** How a summary is stamped, so the tests do not restate the formatter. */
 function stamped(date: number, time: 0 | 1, summary: string): string {
-  return `${formatChatDivider(date, time)} — ${summary}`
+  return `${formatChatDivider(date, time, 'spring')} — ${summary}`
 }
 
 /** History as `{date: {time: summary}}`, the shape the save holds. */
@@ -76,7 +76,7 @@ describe('recentSummaries', () => {
       6: { 0: 'He went to class.', 1: 'They had dinner.' }
     })
     const lines = recentSummaries(7, 0, 'They are still talking.')
-    expect(lines.filter((line) => line.startsWith(formatChatDivider(6, 1)))).toEqual([
+    expect(lines.filter((line) => line.startsWith(formatChatDivider(6, 1, 'spring')))).toEqual([
       stamped(6, 1, 'They are still talking.')
     ])
     expect(lines).toHaveLength(3)

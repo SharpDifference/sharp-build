@@ -9,7 +9,7 @@ import {
   type Weather
 } from '@shared/weather'
 import { DRY_OCCASION_IDS, dryOccasionDates } from '../src/renderer/prompts/weather'
-import { STATIC_OCCASIONS } from '../src/renderer/prompts/occasions'
+import { staticOccasionsOf } from '../src/renderer/prompts/occasions'
 import { lcg } from './fixtures'
 
 /**
@@ -20,15 +20,15 @@ import { lcg } from './fixtures'
 
 /** `rollSemesterWeather` under many seeds, over the dry-occasion mask every New Game uses. */
 function seededRolls(count: number): Weather[][] {
-  const dryDates = dryOccasionDates()
+  const dryDates = dryOccasionDates('spring')
   const tables: Weather[][] = []
-  for (let seed = 1; seed <= count; seed++) tables.push(rollSemesterWeather(dryDates, lcg(seed)))
+  for (let seed = 1; seed <= count; seed++) tables.push(rollSemesterWeather(dryDates, 'spring', lcg(seed)))
   return tables
 }
 
 describe('rollSemesterWeather', () => {
   it('rolls one reading per slot, every one from the vocabulary', () => {
-    const table = rollSemesterWeather(new Set(), lcg(1))
+    const table = rollSemesterWeather(new Set(), 'spring', lcg(1))
     expect(table).toHaveLength(WEATHER_SLOTS)
     expect(table.every((reading) => (WEATHER_KINDS as readonly string[]).includes(reading))).toBe(
       true
@@ -37,7 +37,7 @@ describe('rollSemesterWeather', () => {
 
   it('keeps a dry date and both halves of day 0 clear even on the wettest possible draw', () => {
     const dryDates = new Set([10, 50])
-    const table = rollSemesterWeather(dryDates, () => 0)
+    const table = rollSemesterWeather(dryDates, 'spring', () => 0)
     expect(table[0]).toBe('clear')
     expect(table[1]).toBe('clear')
     expect(table[20]).toBe('clear')
@@ -52,7 +52,7 @@ describe('rollSemesterWeather', () => {
   })
 
   it('rolls an all-clear semester on the driest possible draw', () => {
-    const table = rollSemesterWeather(new Set(), () => 1)
+    const table = rollSemesterWeather(new Set(), 'spring', () => 1)
     expect(table.every((reading) => reading === 'clear')).toBe(true)
   })
 
@@ -113,12 +113,14 @@ describe('weatherAt', () => {
 
 describe('DRY_OCCASION_IDS / dryOccasionDates', () => {
   it('names only occasions the static calendar actually has', () => {
-    const ids = new Set(STATIC_OCCASIONS.map((occasion) => occasion.id))
+    const ids = new Set(
+      [...staticOccasionsOf('spring'), ...staticOccasionsOf('fall')].map((occasion) => occasion.id)
+    )
     for (const id of DRY_OCCASION_IDS) expect(ids.has(id)).toBe(true)
   })
 
   it('covers every day of the Selkie MusicFest and day 0', () => {
-    const dates = dryOccasionDates()
+    const dates = dryOccasionDates('spring')
     expect(dates.has(0)).toBe(true)
     expect(dates.has(102)).toBe(true)
     expect(dates.has(103)).toBe(true)

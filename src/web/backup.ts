@@ -15,11 +15,14 @@ import {
   profilePictureEntry,
   replaysFromBackup,
   scenesFromBackup,
+  semesterEndingArtEntry,
+  semesterPicturesFromBackup,
   type BackupFile,
   type BackupPhoto,
   type BackupPlaythrough,
   type BackupReplay,
-  type BackupSave
+  type BackupSave,
+  type SemesterPicture
 } from '@shared/backup'
 import { namedRel } from '@shared/characterFiles'
 import { SAFE_CHAR_ID } from '@shared/characterRules'
@@ -72,9 +75,16 @@ export async function exportBackup(): Promise<string> {
       if (save) saves.push({ playthroughId: key[0], saveId: key[1], save })
     }
 
-    // Only a replay some carried save names travels; one a restore would refuse costs only itself.
+    const playthroughs: Record<string, BackupPlaythrough> = {}
+    for (const key of await db.getAllKeys('playthroughs')) {
+      const row = await db.get('playthroughs', key)
+      if (row) playthroughs[key] = row
+    }
+
+    // Only a replay some carried save or record names travels; one a restore would refuse costs
+    // only itself.
     const replays: BackupReplay[] = []
-    for (const { playthroughId, replayId } of namedReplays(saves)) {
+    for (const { playthroughId, replayId } of namedReplays(saves, playthroughs)) {
       const row = await db.get('replays', [playthroughId, replayId])
       if (row === undefined) continue
       try {
@@ -85,18 +95,21 @@ export async function exportBackup(): Promise<string> {
       }
     }
 
-    const playthroughs: Record<string, BackupPlaythrough> = {}
-    for (const key of await db.getAllKeys('playthroughs')) {
-      const row = await db.get('playthroughs', key)
-      if (row) playthroughs[key] = row
-    }
-
+    // A first semester's picture is kept under its playthrough's id, a later one's under
+    // `{playthroughId}.{semesterId}`.
     const endingArt: string[] = []
+    const semesterEndingArt: SemesterPicture[] = []
     for (const key of await db.getAllKeys('endingArt')) {
       const art = await db.get('endingArt', key)
       if (!art) continue
-      endingArt.push(key)
-      files[endingArtEntry(key)] = await bytesOf(art)
+      const [playthroughId, semesterId] = String(key).split('.')
+      if (semesterId === undefined) {
+        endingArt.push(key)
+        files[endingArtEntry(key)] = await bytesOf(art)
+      } else {
+        semesterEndingArt.push({ playthroughId, semesterId })
+        files[semesterEndingArtEntry(playthroughId, semesterId)] = await bytesOf(art)
+      }
     }
 
     const profilePictures: string[] = []
@@ -180,6 +193,7 @@ export async function exportBackup(): Promise<string> {
       playthroughs,
       saves,
       endingArt,
+      ...(semesterEndingArt.length > 0 ? { semesterEndingArt } : {}),
       profilePictures,
       photos,
       backgrounds,
@@ -234,6 +248,7 @@ export async function importBackup(): Promise<boolean> {
   })
   const scenes = scenesFromBackup(record)
   const replays = replaysFromBackup(record)
+  const semesterPictures = semesterPicturesFromBackup(record)
   // Nothing the backup does not name is written: an entry naming a path of its own choosing
   // would put a file where this build never looks for one.
   const updatedAt = Date.now()
@@ -289,6 +304,10 @@ export async function importBackup(): Promise<boolean> {
       if (bytes && SAFE_NUMERIC_ID.test(playthroughId)) {
         void art.put(imageBlob(bytes), playthroughId)
       }
+    }
+    for (const { playthroughId, semesterId } of semesterPictures) {
+      const bytes = entries[semesterEndingArtEntry(playthroughId, semesterId)]
+      if (bytes) void art.put(imageBlob(bytes), `${playthroughId}.${semesterId}`)
     }
 
     const pictures = tx.objectStore('profilePictures')

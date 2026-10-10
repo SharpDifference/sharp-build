@@ -131,23 +131,27 @@ function dormOf(charId: string): DormId {
   return useGameStore.getState().charInfo[charId].dorm
 }
 
+/** Where somebody off campus is, as the phone tells it: out of town. */
+export function awayWhereabouts(charId: string): Whereabouts {
+  return {
+    charId,
+    source: 'told',
+    kind: 'away',
+    location: null,
+    placeKey: AWAY_PLACE_KEY,
+    placeLabel: 'Out of town',
+    placeIcon: AWAY_ICON,
+    placeBlurb: '',
+    onCampus: false
+  }
+}
+
 /** The told route: where she actually is, obligations included. */
 function toldWhereabouts(charId: string, date: number, time: TimeSlot): Whereabouts {
   const base = { charId, source: 'told' as const }
 
   // First of everything, on `charHiddenLocationNow`'s own ordering.
-  if (charAwayNow(charId, date)) {
-    return {
-      ...base,
-      kind: 'away',
-      location: null,
-      placeKey: AWAY_PLACE_KEY,
-      placeLabel: 'Out of town',
-      placeIcon: AWAY_ICON,
-      placeBlurb: '',
-      onCampus: false
-    }
-  }
+  if (charAwayNow(charId, date)) return awayWhereabouts(charId)
 
   const classCode = charClassNow(charId, date, time)
   if (classCode !== null) {
@@ -263,7 +267,7 @@ export function mapFillers(shownKeys: readonly string[], count: number): Section
 
   const open = [...LOCATIONS, ...NARRATIVE_LOCATIONS]
     .map((def) => def.id)
-    .filter((id) => isLocationOpen(id, slot) && !placeClosedOn(id, on, game.occasions))
+    .filter((id) => isLocationOpen(id, slot) && !placeClosedOn(id, on, game.calendar))
     .map(placeSection)
     .filter((section) => !shownKeys.includes(section.placeKey))
 

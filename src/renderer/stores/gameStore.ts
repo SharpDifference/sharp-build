@@ -11,6 +11,14 @@ import {
 import { escapeRegExp } from '@shared/sentences'
 import { affectionsOf, type SceneSetup } from '@shared/sceneCreator'
 import type { GameReplays } from '@shared/replays'
+import { SAVE_SCHEMA_VERSION } from '@shared/saveRules'
+import {
+  calendarOf,
+  charStateOf,
+  graduatesOf,
+  semesterOf,
+  type SemesterCalendar
+} from '@shared/semesters'
 import { displaySlotsOf, retireCgs } from './stageDisplay'
 import {
   chargeAbsences,
@@ -78,8 +86,6 @@ import {
   type Suspicion,
   type Character,
   type CharInfo,
-  type CharProfile,
-  type CharState,
   type ClassEntry,
   type ClassMeetingRecord,
   type FeedExtras,
@@ -97,7 +103,8 @@ import {
   type IntimateAct,
   type PlaythroughRecord,
   type JobState,
-  type Occasion,
+  type FormerJob,
+  type Transcript,
   type OwnedItem,
   type SceneGift,
   type ShiftSlot,
@@ -168,7 +175,8 @@ export type ReplayStayFields = Pick<
   | 'charInfo'
   | 'charKeyToId'
   | 'weather'
-  | 'occasions'
+  | 'calendar'
+  | 'semesterIndex'
 >
 
 /**
@@ -245,8 +253,19 @@ interface GameStoreState {
   replaying: { over?: true } | null
   date: number
   time: TimeSlot
-  /** charIds loaded into the current save. */
+  /** The save's semester, a key of the record's semesters; null in the first. */
+  semesterId: string | null
+  /** Which semester of the playthrough the save is in, from 0. */
+  semesterIndex: number
+  /** The on-campus roster of the save's semester. */
   chars: string[]
+  /**
+   * Every girl who has graduated by this semester, oldest first: loaded and textable, never
+   * cast, scheduled or rolled for.
+   */
+  alumni: string[]
+  /** Who graduates at this semester's ceremony, in roster order (`graduatesOf`). */
+  graduating: string[]
   /** The reader's own name, chosen at New Game and fixed for the playthrough. */
   playerFirstName: string
   playerLastName: string
@@ -284,14 +303,18 @@ interface GameStoreState {
   bunnyboard: BunnyboardState
   /** Plans the reader has made, oldest first. Persisted. */
   events: CalendarEvent[]
-  /** The occasions this playthrough invented. Persisted; write-once at New Game. */
-  occasions: Occasion[]
+  /** The semester's season and the occasions it invented. Read off the record. */
+  calendar: SemesterCalendar
   /** The occasions he turned down an invitation to, or let one stand. Persisted. */
   occasionsDeclined: string[]
   /** The part-time job the reader holds, or null. One at a time. */
   job: JobState | null
-  /** Job ids he was fired from or quit; those employers never post again. */
+  /** Job ids he was fired from or quit; those employers do not post again this semester. */
   jobsClosed: string[]
+  /** Every employer he has left, by job id. Persisted. */
+  formerJobs: Record<string, FormerJob>
+  /** What the semesters before this one left on his record; null in the first. Persisted. */
+  transcript: Transcript | null
   /** The slots each all-hours employer is not offering this playthrough. */
   jobClosures: Record<string, ShiftSlot[]>
   /** Every slot's sky, read off the record and never rewritten. */
@@ -469,6 +492,11 @@ interface GameStoreState {
    * modal wait on.
    */
   endingArtPending: boolean
+  /**
+   * The contacts' last posts are still being asked for — what Continue waits on, so the next
+   * semester carries them.
+   */
+  endingPostsPending: boolean
   /** True while a classifier or scene call is in flight. */
   busy: boolean
   /** True while a scene call may still append lines; distinct from `busy`. */
@@ -634,6 +662,7 @@ interface GameStoreState {
   /** Publishes the graduation picture, or takes it away on the way out. */
   setEndingArt: (url: string | null) => void
   setEndingArtPending: (pending: boolean) => void
+  setEndingPostsPending: (pending: boolean) => void
   /** Hands the screen the reader's own picture as an object URL, or clears it. */
   setProfilePicture: (url: string | null) => void
   /** Keeps the goodbye that just ended, for the log the menu reads it back from. */
@@ -882,7 +911,10 @@ interface GameStoreState {
   markEventNoShow: (eventId: string, charIds: readonly string[]) => void
   /** Moves one plan to another slot — the one field of an event the player edits. */
   rescheduleEvent: (eventId: string, date: number, time: TimeSlot) => void
-  /** The reader was hired. `settledThrough` is the slot he accepted in. */
+  /**
+   * The reader was hired. `settledThrough` is the slot he accepted in. An employer he worked
+   * for before takes him back on the raises he left with and a clean record.
+   */
   takeJob: (jobId: string, shifts: readonly ShiftSlot[], settledThrough: number) => void
   /** Credits one worked shift and pays for it. Returns whether the streak just bought a raise. */
   recordShiftWorked: (slotId: number, pay: number) => boolean
@@ -890,8 +922,11 @@ interface GameStoreState {
   recordStrike: (slotId: number) => void
   /** The one setter for the rest of `JobState` — shifts, the excuse, the sweep's mark. */
   updateJob: (patch: Partial<JobState>) => void
-  /** Fired or quit: drops the job and closes that employer for the playthrough. */
-  endJob: () => void
+  /**
+   * Fired or quit: drops the job, files it among his former jobs and closes that employer for
+   * the semester — for good where he was fired.
+   */
+  endJob: (left: 'quit' | 'fired') => void
 
   /** Files one meeting of one class. Write-once per date: a replayed boundary is inert. */
   recordClassMeeting: (code: string, meeting: ClassMeetingRecord) => void
@@ -1063,27 +1098,8 @@ function patchConversation(
   }
 }
 
-/**
- * Every key of the settled half. A field added to `CharProfile` is a compile error until
- * it is listed here, which is what keeps it out of the save files.
- */
-const PROFILE_KEYS: Record<keyof CharProfile, true> = {
-  year: true,
-  dorm: true,
-  major: true,
-  schedule: true,
-  hiddenSchedule: true,
-  moodCycleOffset: true,
-  handle: true,
-  springBreakPlans: true
-}
-
-/** The half of one entry a save file carries: everything the record already holds, dropped. */
-function charStateOf(info: CharInfo): CharState {
-  const state = { ...info } as Record<string, unknown>
-  for (const key of Object.keys(PROFILE_KEYS)) delete state[key]
-  return state as unknown as CharState
-}
+/** The calendar a store holds before any semester is loaded: a spring with nothing invented. */
+const NO_CALENDAR: SemesterCalendar = calendarOf('spring', [])
 
 /** The entry for a charId the save has none for; the writers must survive one. */
 export function blankCharInfo(): CharInfo {
@@ -1352,7 +1368,11 @@ const initialState = {
   replaying: null as { over?: true } | null,
   date: 0,
   time: 0 as TimeSlot,
+  semesterId: null as string | null,
+  semesterIndex: 0,
   chars: [] as string[],
+  alumni: [] as string[],
+  graduating: [] as string[],
   playerFirstName: DEFAULT_PLAYER_FIRST_NAME,
   playerLastName: DEFAULT_PLAYER_LAST_NAME,
   stats: DEFAULT_PLAYER_STATS,
@@ -1366,10 +1386,12 @@ const initialState = {
   replays: {} as GameReplays,
   bunnyboard: emptyBunnyboard(),
   events: [] as CalendarEvent[],
-  occasions: [] as Occasion[],
+  calendar: NO_CALENDAR,
   occasionsDeclined: [] as string[],
   job: null as JobState | null,
   jobsClosed: [] as string[],
+  formerJobs: {} as Record<string, FormerJob>,
+  transcript: null as Transcript | null,
   jobClosures: {} as Record<string, ShiftSlot[]>,
   weather: [] as Weather[],
   inventory: [] as OwnedItem[],
@@ -1434,6 +1456,7 @@ const initialState = {
   endingArt: null as string | null,
   profilePicture: null as string | null,
   endingArtPending: false,
+  endingPostsPending: false,
   farewellLog: [] as SceneLine[],
   busy: false,
   streaming: false,
@@ -1460,14 +1483,22 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
   ...initialState,
   loads: 0,
 
-  loadSave: (save, record, characters) =>
+  loadSave: (save, record, characters) => {
+    // The record read as the semester the save is in; the services refuse a save whose
+    // semester the record does not hold.
+    const semester = semesterOf(record, save.semester)
     set({
       ...initialState,
       loads: get().loads + 1,
       playthroughId: save.playthroughId,
       date: save.date,
       time: save.time,
-      chars: record.chars,
+      semesterId: semester.id ?? null,
+      semesterIndex: semester.index,
+      chars: semester.chars,
+      // A graduate whose character is gone is left out, her save entry kept as it is.
+      alumni: semester.alumni.filter((charId) => characters[charId] !== undefined),
+      graduating: graduatesOf(semester),
       playerFirstName: record.playerFirstName,
       playerLastName: record.playerLastName,
       stats: save.stats,
@@ -1481,22 +1512,24 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
       charInfo: Object.fromEntries(
         Object.entries(save.charInfo).map(([charId, state]) => [
           charId,
-          { ...blankCharInfo(), ...record.profiles[charId], ...state }
+          { ...blankCharInfo(), ...semester.profiles[charId], ...state }
         ])
       ),
-      classes: record.classes,
+      classes: semester.classes,
       playerSchedule: save.playerSchedule,
       history: save.history,
       // Younger than the save format: a save from before it keeps none.
       replays: save.replays ?? {},
       bunnyboard: save.bunnyboard,
       events: save.events,
-      occasions: record.occasions,
+      calendar: calendarOf(semester.season, semester.occasions),
       occasionsDeclined: save.occasionsDeclined ?? [],
       job: save.job,
       jobsClosed: save.jobsClosed,
-      jobClosures: record.jobClosures,
-      weather: record.weather,
+      formerJobs: save.formerJobs ?? {},
+      transcript: save.transcript ?? null,
+      jobClosures: semester.jobClosures,
+      weather: semester.weather,
       inventory: save.inventory,
       classRecords: save.classRecords,
       gradesStanding: save.gradesStanding,
@@ -1530,7 +1563,8 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
       characters,
       charKeyToId: buildCharKeyToId(characters),
       ...freshStage()
-    }),
+    })
+  },
 
   loadCreatedScene: (scene, fields, characters) =>
     set({
@@ -1604,6 +1638,7 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
   setEndingArt: (url) => set({ endingArt: url }),
 
   setEndingArtPending: (pending) => set({ endingArtPending: pending }),
+  setEndingPostsPending: (pending) => set({ endingPostsPending: pending }),
 
   setProfilePicture: (url) => set({ profilePicture: url }),
 
@@ -2182,7 +2217,7 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
   observeUpperHalves: () =>
     set((state) => {
       let charInfo = state.charInfo
-      for (const charId of state.chars) {
+      for (const charId of [...state.chars, ...state.alumni]) {
         const info = charInfo[charId]
         if (!info) continue
         const affection = affectionFor(info, state.date, state.characters[charId])
@@ -2527,7 +2562,12 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
     }),
 
   takeJob: (jobId, shifts, settledThrough) =>
-    set({ job: newJobState(jobId, [...shifts], settledThrough) }),
+    set((state) => ({
+      job: {
+        ...newJobState(jobId, [...shifts], settledThrough),
+        raises: state.formerJobs[jobId]?.raises ?? 0
+      }
+    })),
 
   recordShiftWorked: (slotId, pay) => {
     const { job, tallies } = get()
@@ -2574,12 +2614,13 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
   updateJob: (patch) =>
     set((state) => (state.job ? { job: { ...state.job, ...patch } } : {})),
 
-  endJob: () =>
+  endJob: (left) =>
     set((state) => {
       if (!state.job) return {}
-      const { jobId } = state.job
+      const { jobId, raises } = state.job
       return {
         job: null,
+        formerJobs: { ...state.formerJobs, [jobId]: { raises, left } },
         jobsClosed: state.jobsClosed.includes(jobId)
           ? state.jobsClosed
           : [...state.jobsClosed, jobId]
@@ -2822,7 +2863,8 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
   toGameSave: () => {
     const state = get()
     return {
-      schemaVersion: 12 as const,
+      schemaVersion: SAVE_SCHEMA_VERSION,
+      ...(state.semesterId !== null ? { semester: state.semesterId } : {}),
       stats: state.stats,
       money: state.money,
       bio: state.bio,
@@ -2841,6 +2883,8 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
       events: state.events,
       job: state.job,
       jobsClosed: state.jobsClosed,
+      ...(Object.keys(state.formerJobs).length > 0 ? { formerJobs: state.formerJobs } : {}),
+      ...(state.transcript ? { transcript: state.transcript } : {}),
       inventory: state.inventory,
       classRecords: state.classRecords,
       gradesStanding: state.gradesStanding,

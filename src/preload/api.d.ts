@@ -51,6 +51,7 @@ import type {
   PlaythroughListing,
   Result,
   SaveDraft,
+  SemesterRecord,
   SaveReadResult,
   SceneResponse,
   SettingsPatch,
@@ -307,10 +308,10 @@ export interface VenusUniversityApi {
     /** One save with the record it is read against — everything loading it needs. */
     read: (playthroughId: string, saveId: string) => Promise<Result<SaveReadResult>>
     /**
-     * Writes the semester the registrar is about to offer, minting the playthrough folder it
-     * will belong to.
+     * Writes the semester the registrar is about to offer: a first semester into a playthrough
+     * folder it mints, a next one beside the record of the playthrough `playthroughId` names.
      */
-    enroll: (draft: EnrollmentDraft) => Promise<Result<CreatedEnrollment>>
+    enroll: (draft: EnrollmentDraft, playthroughId?: string) => Promise<Result<CreatedEnrollment>>
     /** The semester waiting in one folder, for the registrar reopening on it. */
     enrollment: (playthroughId: string) => Promise<Result<Enrollment>>
     /**
@@ -321,6 +322,16 @@ export interface VenusUniversityApi {
       playthrough: PlaythroughDraft,
       draft: SaveDraft,
       playthroughId?: string
+    ) => Promise<Result<CreatedPlaythrough>>
+    /**
+     * Begins a next semester: adds it to the playthrough's record, writes its opening save into
+     * the boundary window and removes the registration it came from.
+     */
+    continueSemester: (
+      playthroughId: string,
+      semesterId: string,
+      semester: SemesterRecord,
+      draft: SaveDraft
     ) => Promise<Result<CreatedPlaythrough>>
     /**
      * Mints a slot-boundary save and prunes the window; the autosave stands. A `replay` the draft
@@ -356,23 +367,28 @@ export interface VenusUniversityApi {
      */
     rename: (playthroughId: string, name: string) => Promise<Result<void>>
     /**
-     * Draws the graduation picture from the renderer's reference sheet, writes it into the
-     * playthrough folder and answers with the same bytes.
+     * Draws a semester's graduation picture from the renderer's reference sheet, writes it into
+     * the playthrough folder and answers with the same bytes; `semesterId` is absent for the
+     * first semester.
      */
     generateEndingArt: (
       playthroughId: string,
       sheet: string,
       friendCount: number,
-      group: string
+      group: string,
+      semesterId?: string
       // A plain `ArrayBuffer`, as for `readWardrobeImage`.
     ) => Promise<Result<Uint8Array<ArrayBuffer>>>
-    /** The picture already on disk, or `null` where there is none. */
-    readEndingArt: (playthroughId: string) => Promise<Result<Uint8Array<ArrayBuffer> | null>>
+    /** A semester's picture already on disk, or `null` where there is none. */
+    readEndingArt: (
+      playthroughId: string,
+      semesterId?: string
+    ) => Promise<Result<Uint8Array<ArrayBuffer> | null>>
     /**
-     * Saves a copy of the graduation picture where the native dialog points; `null`
+     * Saves a copy of a semester's graduation picture where the native dialog points; `null`
      * when the player cancels.
      */
-    exportEndingArt: (playthroughId: string) => Promise<Result<string | null>>
+    exportEndingArt: (playthroughId: string, semesterId?: string) => Promise<Result<string | null>>
     /** The reader's own picture kept beside the playthrough, or `null` where there is none. */
     readProfilePicture: (playthroughId: string) => Promise<Result<Uint8Array<ArrayBuffer> | null>>
     /** Keeps the reader's picture, a PNG as base64, beside the playthrough. */

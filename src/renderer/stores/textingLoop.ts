@@ -4,8 +4,24 @@
  * turns an agreed hangout into a real scene.
  */
 
-import { formatDateBanner, prevSlot } from '../prompts/gameDate'
-import type { CalendarEvent, CharInfo, EventCancellation, Occasion } from '@shared/types'
+import { formatDateBanner, prevSlot, shiftWeekdayOf } from '../prompts/gameDate'
+import type {
+  CalendarEvent,
+  CharInfo,
+  EventCancellation,
+  EverydayAsk,
+  Occasion
+} from '@shared/types'
+import { kindOf } from '@shared/academics'
+import {
+  HOTEL_LOCATION,
+  isLocationOpen,
+  LOCATIONS,
+  LOWRISE_LOCATION,
+  NARRATIVE_LOCATIONS
+} from '@shared/locations'
+import { hasTrait } from '@shared/traits'
+import { isWet, weatherAt } from '@shared/weather'
 import { affectionFor, dispositionOf, emptyFlags, isPositive } from '@shared/relationship'
 import { requestAcceptChance } from '@shared/feed'
 import {
@@ -14,7 +30,7 @@ import {
   type NpcSlotOverlay
 } from '@shared/npcRelationships'
 import { readerBlockOf } from '../prompts/setting'
-import { classRostersOf } from '../prompts/classProgress'
+import { classRostersOf, examDateOf } from '../prompts/classProgress'
 import { memoryBudgetsOf } from '@shared/settingsRules'
 import { useSettingsStore } from './settingsStore'
 import {
@@ -22,6 +38,7 @@ import {
   globalSlotOf,
   isBossChat,
   jobDefOf,
+  shiftSlotOf,
   slotFromId,
   type JobMessageKind
 } from '@shared/jobs'
@@ -83,26 +100,31 @@ import {
   playerClassNow,
   shiftNow
 } from './timetable'
-import { isMoodHomebound } from '../prompts/moods'
+import { isMoodHomebound, isMoodLustful } from '../prompts/moods'
 import { sendsSpringBreakNotice } from '../prompts/springBreak'
-import { outingOccasionAt } from '../prompts/occasions'
+import { outingOccasionAt, placeClosedOn } from '../prompts/occasions'
+import type { HangoutInvite } from '../prompts/slotIntroPrompt'
 import {
   askChanceOf,
   askCooldownOver,
   declineCooldownSlots,
   drawOccasionAsker,
+  everydayRoundOf,
   lastInviteSlotOf,
   lastReachOutSlotOf,
   lastTextSlotOf,
   reachOutChanceOf,
   reachOutGapSlots,
+  rollHangoutInvite,
   rollSlotAskers,
   rollSlotReachOut,
   slotAskMultiplier,
   ASK_QUIET_SLOTS,
   REACH_OUT_QUIET_SLOTS,
+  STUDY_LEAD_DAYS,
   type OccasionAskCandidate,
-  type SlotAskCandidate
+  type SlotAskCandidate,
+  type StudyExam
 } from './slotAskers'
 import { isFeedContact } from './feedView'
 import type { NpcCompanions } from '../prompts/npcRelationship'
@@ -308,7 +330,13 @@ function deliverDue(
 export function deliverVenusMessages(): void {
   const game = useGameStore.getState()
   const currentSlot = globalSlotOf(game.date, game.time)
-  const due = venusMessagesDue(game.playerFirstName, game.venusThrough, currentSlot)
+  const due = venusMessagesDue(
+    game.playerFirstName,
+    game.venusThrough,
+    currentSlot,
+    game.calendar.season,
+    game.semesterIndex
+  )
 
   deliverDue(VENUS_CHAT_ID, due)
 
@@ -331,7 +359,7 @@ export function deliverVenusJobIntro(): void {
   const game = useGameStore.getState()
   if (game.venusJobIntroSent) return
   if (game.job !== null) return
-  if (isTutorialSlot(game.date, game.time)) return
+  if (isTutorialSlot(game.date, game.time, game.semesterIndex)) return
   if (playerClassNow(game.date, game.time) !== null) return
 
   useGameStore.getState().markVenusJobIntroSent()
@@ -458,8 +486,8 @@ export async function sendMessage(charId: string, text: string): Promise<void> {
   useBunnyboardStore.getState().setTextBusy(charId, true)
 
   try {
-    // Everyone else on the roster, for the lorebook's character entries.
-    const others = game.chars
+    // Everyone else on the roster and every graduate, for the lorebook's character entries.
+    const others = [...game.chars, ...game.alumni]
       .filter((id) => id !== charId)
       .map((id) => game.characters[id])
       .filter((other): other is Character => Boolean(other))
@@ -486,7 +514,7 @@ export async function sendMessage(charId: string, text: string): Promise<void> {
           game.classRecords
         ),
         playerJob: game.job,
-        occasions: game.occasions,
+        calendar: game.calendar,
         weather: game.weather,
         // Where she is texting from; never a class or shift, as the composer is shut then.
         charLocation: charHiddenLocationNow(charId),
@@ -500,7 +528,8 @@ export async function sendMessage(charId: string, text: string): Promise<void> {
         upcomingPlans: upcomingPlanLines(
           game.events,
           game.characters,
-          globalSlotOf(game.date, game.time)
+          globalSlotOf(game.date, game.time),
+          game.calendar.season
         ),
         memoryBudget: memoryBudgetsOf(useSettingsStore.getState().settings ?? {}).one,
         history: game.history
@@ -703,7 +732,7 @@ async function classifyHangout(
     conversation?.messages ?? [],
     sent,
     replies.map((text) => chatMessage('contact', text)),
-    { date: game.date, time: game.time, weather: game.weather }
+    { date: game.date, time: game.time, season: game.calendar.season, weather: game.weather }
   )
 
   for (;;) {
@@ -783,12 +812,15 @@ export async function beginHangout(): Promise<void> {
 
 /** The line under a meet-up agreed with a girl who has left campus for spring break. */
 function deliverAwayNotice(charId: string): void {
-  const character = useGameStore.getState().characters[charId]
+  const game = useGameStore.getState()
+  const name = game.characters[charId]?.firstName ?? 'She'
   deliver(
     charId,
     chatMessage(
       'system',
-      `${character?.firstName ?? 'She'} is away for spring break and can't meet up.`
+      game.alumni.includes(charId)
+        ? `${name} graduated and moved away from Veridan, so you can't meet up.`
+        : `${name} is away for spring break and can't meet up.`
     )
   )
 }
@@ -840,7 +872,7 @@ export function rescheduleHangout(
   // A `system` line: what the app owns is that the calendar moved.
   deliver(
     charId,
-    chatMessage('system', `You rescheduled ${event.title} to ${formatDateBanner(date, time)}`)
+    chatMessage('system', `You rescheduled ${event.title} to ${formatDateBanner(date, time, game.calendar.season)}`)
   )
 }
 
@@ -1092,7 +1124,7 @@ function readerFreeAt(day: number, half: TimeSlot, events: readonly CalendarEven
 export function askOccasionFor(day: number, half: TimeSlot, view: SlotAskerView): Occasion | null {
   const game = useGameStore.getState()
   if (!readerFreeAt(day, half, view.events)) return null
-  const occasion = outingOccasionAt(day, half, game.occasions)
+  const occasion = outingOccasionAt(day, half, game.calendar)
   if (!occasion || game.occasionsDeclined.includes(occasion.id)) return null
   return occasion
 }
@@ -1218,7 +1250,7 @@ export function pickSlotAskers(
   }
   if (!askCooldownOver(newest, target, ASK_QUIET_SLOTS)) return picked
 
-  const modulation = slotAskMultiplier(day, half)
+  const modulation = slotAskMultiplier(day, half, game.calendar.season)
   const seenLastSlot = inSceneLastSlot(day, half)
   const candidates: SlotAskCandidate[] = []
   for (const charId of game.chars) {
@@ -1284,6 +1316,105 @@ export function pickSlotReachOut(
 }
 
 /**
+ * What `charId`'s invitation out of nowhere asks the reader to this slot — off what she is to him,
+ * her day, the lectures they share and the map — or null for one she words as she likes. `round`
+ * is the everyday asks already dealt.
+ */
+export function rollAskerInvite(
+  charId: string,
+  date: number,
+  time: TimeSlot,
+  view: SlotAskerView,
+  round: ReadonlySet<EverydayAsk>
+): HangoutInvite | null {
+  const character = useGameStore.getState().characters[charId]
+  const info = view.charInfo[charId]
+  if (!character || !info) return null
+  const flags = info.flags ?? emptyFlags()
+  const intimate = flags.isLover || flags.benefits
+  return rollHangoutInvite({
+    lustful:
+      hasTrait(character, 'Promiscuous') &&
+      flags.hadSex &&
+      isMoodLustful(date, info.moodCycleOffset ?? 0, hasTrait(character, 'Mood-swings')),
+    intimate,
+    friend: flags.isLover || flags.hasCrush || isPositive(affectionFor(info, date, character)),
+    exam: sharedExamAhead(info, date, time),
+    outings: outingsFor(info, date, time, intimate),
+    round
+  })
+}
+
+/**
+ * The soonest midterm or final after this slot and at most {@link STUDY_LEAD_DAYS} out, in a
+ * lecture she and the reader both take, or null.
+ */
+function sharedExamAhead(info: CharInfo, date: number, time: TimeSlot): StudyExam | null {
+  const game = useGameStore.getState()
+  const now = globalSlotOf(date, time)
+  let soonest: { slot: number; exam: StudyExam } | null = null
+  // In code order, so of two exams in one slot the lower code is kept.
+  const classes = Object.values(game.classes).sort((a, b) =>
+    a.code < b.code ? -1 : a.code > b.code ? 1 : 0
+  )
+  for (const entry of classes) {
+    if (kindOf(entry) !== 'lecture') continue
+    if (game.playerSchedule[entry.slot] !== entry.code) continue
+    if (info.schedule?.[entry.slot] !== entry.code) continue
+    // A class slot's low bit is its half of the day.
+    const half = (entry.slot % 2) as TimeSlot
+    for (const exam of ['midterm', 'final'] as const) {
+      const on = examDateOf(entry, exam, game.calendar)
+      if (on === null || on - date > STUDY_LEAD_DAYS) continue
+      const slot = globalSlotOf(on, half)
+      if (slot <= now || (soonest && slot >= soonest.slot)) continue
+      soonest = { slot, exam: { className: entry.name, exam, date: on, time: half } }
+    }
+  }
+  return soonest?.exam ?? null
+}
+
+/**
+ * Where she could ask him along to this slot: any place the map shows but the dorms, open, and
+ * not open-air under rain, none of her haunts nor her workplace, and the hotel only for a girl
+ * who is `intimate` with him. In catalog order.
+ */
+function outingsFor(info: CharInfo, date: number, time: TimeSlot, intimate: boolean): string[] {
+  const game = useGameStore.getState()
+  const slot = shiftSlotOf(shiftWeekdayOf(date), time)
+  const wet = isWet(weatherAt(game.weather, date, time))
+  const haunts = new Set(Object.values(info.hiddenSchedule ?? {}).map(({ location }) => location))
+  const workplace = info.job ? jobDefOf(info.job.jobId)?.locationId : undefined
+  return [...LOCATIONS, ...NARRATIVE_LOCATIONS]
+    .filter(
+      (def) =>
+        def.id !== LOWRISE_LOCATION &&
+        def.id !== workplace &&
+        !haunts.has(def.id) &&
+        (intimate || def.id !== HOTEL_LOCATION) &&
+        !(wet && def.outdoors) &&
+        isLocationOpen(def.id, slot) &&
+        !placeClosedOn(def.id, date, game.calendar)
+    )
+    .map((def) => def.id)
+}
+
+/** The everyday asks dealt in the round still open, read off every invitation they marked. */
+export function everydayRoundNow(): ReadonlySet<EverydayAsk> {
+  const bySlot = new Map<number, EverydayAsk[]>()
+  for (const conversation of Object.values(useGameStore.getState().bunnyboard.conversations)) {
+    for (const message of conversation.messages) {
+      if (message.sender !== 'contact' || !message.everydayAsk) continue
+      const slot = globalSlotOf(message.date, message.time)
+      bySlot.set(slot, [...(bySlot.get(slot) ?? []), message.everydayAsk])
+    }
+  }
+  return everydayRoundOf(
+    [...bySlot.entries()].sort(([a], [b]) => a - b).map(([, asks]) => asks)
+  )
+}
+
+/**
  * The charIds who shared a scene with the reader in the slot before `(day, half)`.
  */
 function inSceneLastSlot(day: number, half: TimeSlot): ReadonlySet<string> {
@@ -1314,11 +1445,13 @@ export function plannedWith(
 
 /**
  * Files the invitations the slot opening wrote. `occasionId` is the occasion its askers were
- * asking him to, stamped onto every one of them that is not a reminder about a plan.
+ * asking him to, stamped onto every one of them that is not a reminder about a plan;
+ * `everydayAsks` the everyday ask each charKey's invitation was rolled into, stamped onto hers.
  */
 export function deliverSlotHangouts(
   hangouts: SlotIntroResponse['hangouts'],
-  occasionId?: string
+  occasionId?: string,
+  everydayAsks: Readonly<Record<string, EverydayAsk>> = {}
 ): void {
   for (const hangout of hangouts ?? []) {
     const game = useGameStore.getState()
@@ -1337,7 +1470,11 @@ export function deliverSlotHangouts(
 
     // Two people who agreed to meet up have exchanged numbers.
     addContact(charId)
-    deliver(charId, chatMessage('contact', text))
+    const message = chatMessage('contact', text)
+    // Marked only once it is delivered: what the round of everyday asks is read back off.
+    const ask = everydayAsks[hangout.char]
+    if (ask) message.everydayAsk = ask
+    deliver(charId, message)
     // A reminder about a plan already on the calendar is not an invitation and starts no cooldown.
     const reminder = plannedWith(charId, game.date, game.time) !== null
     if (!reminder) useGameStore.getState().markInvitation(charId)

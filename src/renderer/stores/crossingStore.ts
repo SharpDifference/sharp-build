@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import type { TimeSlot } from '@shared/types'
+import type { Season, TimeSlot } from '@shared/types'
 import type { Weather } from '@shared/weather'
 import type { ScreenTheme } from '../views/clockTheme'
 
@@ -19,6 +19,8 @@ export type CrossingPhase = 'idle' | 'closing' | 'holding' | 'opening'
 export interface SlotStamp {
   date: number
   time: TimeSlot
+  /** The season of the semester the date is in, which the printed date is read in. */
+  season: Season
   /** The occasion's title, where the slot falls on one. */
   occasion: string | null
   /** The slot's sky, which picks the mark the splash wears. */

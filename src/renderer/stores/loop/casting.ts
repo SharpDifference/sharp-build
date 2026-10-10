@@ -16,6 +16,7 @@ import {
 import { firstNameOf, isContact, nameIsKnown } from './classify'
 import { jobDefOf, JOB_CATALOG } from '@shared/jobs'
 import { ELYSIUM_LOCATION, LOWRISE_LOCATION, ROOM_LOCATION } from '@shared/locations'
+import { isTutorialSlot } from '../../prompts/introScript'
 import { loreEntryById } from '../../prompts/lorebook'
 import { hauntActivity } from '../../prompts/npcRelationship'
 
@@ -126,6 +127,15 @@ export function pickFirstNightCast(inPublic: boolean, location?: string | null):
   return unmet.length > 0 ? [anyOf(unmet)] : pickCast(inPublic, location)
 }
 
+/** The encounter draw, with the first night's guaranteed stranger. */
+export function drawFreeCast(inPublic: boolean, location?: string | null): string[] {
+  const game = useGameStore.getState()
+  const where = resolveLocationId(location)
+  return isTutorialSlot(game.date, game.time, game.semesterIndex)
+    ? pickFirstNightCast(inPublic, where)
+    : pickCast(inPublic, where)
+}
+
 /**
  * Splits a mention list into who actually shows up and what the reader's action says about the
  * rest.
@@ -173,16 +183,17 @@ export function planAttendees(event: CalendarEvent): string[] {
 /**
  * A line under a plan's opening action for each attendee in the cast who has class or a shift
  * this slot, leaving the model to pick whether it comes after the scene or she has just come
- * from it. A girl working where the scene is set gets none.
+ * from it. A girl whose class or shift the scene itself is — working where it is set, or
+ * sitting the class it is in — gets none.
  */
 export function commitmentNotes(
   cast: readonly string[],
   attendees: readonly string[],
-  workers: readonly string[]
+  atCommitment: readonly string[]
 ): string[] {
   const notes: string[] = []
   for (const charId of cast) {
-    if (!attendees.includes(charId) || workers.includes(charId)) continue
+    if (!attendees.includes(charId) || atCommitment.includes(charId)) continue
     const commitment = charCommitmentAt(charId)
     if (!commitment) continue
     const what =
@@ -194,6 +205,13 @@ export function commitmentNotes(
     )
   }
   return notes
+}
+
+/** Names run together as a sentence reads them: "Mina", "Mina and Mia", "Mina, Mia and Sara". */
+export function listOf(items: readonly string[]): string {
+  return items.length > 1
+    ? `${items.slice(0, -1).join(', ')} and ${items[items.length - 1]}`
+    : (items[0] ?? '')
 }
 
 /** Spelled-out counts for the stranger item below; `PORTRAIT_SLOTS` bounds the range. */
@@ -213,9 +231,7 @@ export function runIntoNote(charIds: readonly string[], location?: string | null
   if (strangers === 1) items.push("someone they don't know")
   else if (strangers > 1) items.push(`${COUNT_WORDS[strangers] ?? strangers} people they don't know`)
 
-  const listed =
-    items.length > 1 ? `${items.slice(0, -1).join(', ')} and ${items[items.length - 1]}` : items[0]
-  let note = `They happen to run into ${listed}.`
+  let note = `They happen to run into ${listOf(items)}.`
 
   const resolved = location ? resolveLocationId(location) : null
   if (resolved) {

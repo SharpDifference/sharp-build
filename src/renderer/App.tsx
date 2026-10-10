@@ -141,8 +141,11 @@ function App(): JSX.Element {
       {view === 'mainMenu' && <MainMenu />}
       {view === 'manageCharacters' && <ManageCharactersView />}
       {view === 'sceneCreator' && <SceneCreatorView />}
-      {/* `quickstart` and `classSelect` both render from inside `NewGameView`. */}
-      {(view === 'newGame' || view === 'quickstart' || view === 'classSelect') && <NewGameView />}
+      {/* `quickstart`, `classSelect` and `nextSemester` all render from inside `NewGameView`. */}
+      {(view === 'newGame' ||
+        view === 'quickstart' ||
+        view === 'classSelect' ||
+        view === 'nextSemester') && <NewGameView />}
       {view === 'game' && <GameView key={gameLoads} />}
 
       {/* Written before the portal host, so a modal opened during a crossing — the reader's

@@ -32,6 +32,7 @@ import { OUTFIT_SKIN_EXPOSURE } from '@shared/tags'
 import { hasTrait } from '@shared/traits'
 import type { Weather } from '@shared/weather'
 import type { NpcRelationshipMap } from '@shared/npcRelationships'
+import type { SemesterCalendar } from '@shared/semesters'
 import {
   allBackgrounds,
   charKeyOf,
@@ -52,12 +53,12 @@ import {
   type JobState,
   MEMORY_TYPES,
   type MemoryBudgets,
-  type Occasion,
   type OutfitLock,
   type OutfitSet,
   type Position,
   type ProjectSession,
   type SceneLine,
+  type Season,
   type ShiftSlot,
   type SpriteRef,
   type StockOutfitSet,
@@ -205,10 +206,12 @@ export interface PromptState {
    */
   springBreakAway?: readonly string[] | null
   /**
-   * Set only for a goodbye in the graduation epilogue: who it is with, and whether
-   * she is graduating out of the reader's reach or merely going home for the summer.
+   * Set only for a goodbye in the graduation epilogue: who it is with, and whether one of them
+   * is graduating out of the other's reach or she is merely going home for the break.
    */
-  farewell?: { firstName: string; senior: boolean }
+  farewell?: { firstName: string; forAWhile: boolean }
+  /** Who graduates at this semester's ceremony, by charId. */
+  graduating?: readonly string[]
   /**
    * Classes he added at add/drop and has not yet walked into — every unspent add;
    * `classCode` decides which applies.
@@ -219,10 +222,10 @@ export interface PromptState {
   /** The reader's accumulated stats, used for relationship requirement guidance. */
   stats?: PlayerStats
   /**
-   * The save's generated occasions only; the fixed half of the calendar is merged
-   * in by `occasionsAt`.
+   * The semester's season and the occasions the save invented; the fixed half of the
+   * calendar is merged in by `occasionsAt`.
    */
-  occasions: readonly Occasion[]
+  calendar: SemesterCalendar
   /**
    * The whole semester's sky, one reading per slot — the NOW line walks back through it for how
    * long the weather has held. Absent means nothing is said about it.
@@ -715,8 +718,15 @@ function castBlock(cast: readonly Character[], state: PromptState): string[] {
         state.date
       )
     )
-    // Whether she has left for the summer yet.
-    lines.push(...graduationCastLines(character.firstName, state.date))
+    // Whether she graduates at the ceremony, and whether she has left for the break yet.
+    lines.push(
+      ...graduationCastLines(
+        character.firstName,
+        state.date,
+        state.calendar.season,
+        state.graduating?.includes(character.charId) ?? false
+      )
+    )
     lines.push(...newJobLine(character.firstName, info?.job, state.date))
     lines.push(
       ...droppedClassLines(character.firstName, info?.schedule, state.droppedNotices ?? [])
@@ -726,7 +736,12 @@ function castBlock(cast: readonly Character[], state: PromptState): string[] {
     const memoryBudget = memoryBudgetFor(state.memoryBudgets, cast.length)
     // Deduped before the budget is spent.
     lines.push(
-      ...memoryLines(character, dedupedMemoriesFor(info).slice(-memoryBudget), info?.textMemory)
+      ...memoryLines(
+        character,
+        dedupedMemoriesFor(info).slice(-memoryBudget),
+        info?.textMemory,
+        state.calendar.season
+      )
     )
 
     // What the two of them have been texting about on Bunnyboard.
@@ -789,9 +804,18 @@ export function spaced(lines: readonly string[]): string[] {
   return lines.length > 0 ? [...lines, ''] : []
 }
 
-/** Her year and major, with the dorm clause where she has one. */
+/** Her year and major, with the dorm clause where she has one; a graduate's year is that she graduated. */
 export function yearMajorLine(info: CharInfo): string {
+  if (info.pursuing !== undefined) return `Year: Graduated | Major: ${info.major}.`
   return `Year: ${yearLabel(info.year)} | Major: ${info.major}.${dormClause(info.dorm)}`
+}
+
+/** What a graduate is doing with her life now, and that she is nowhere he can meet her. */
+export function graduateLines(firstName: string, info: CharInfo | undefined): string[] {
+  if (info?.pursuing === undefined) return []
+  return [
+    `${firstName} graduated from Venus University, moved away from Veridan, and is now ${info.pursuing}. She is out of town.`
+  ]
 }
 
 /** Everything written about who a character *is*, shared by the cast block and the phone. */
@@ -963,14 +987,15 @@ function addedClassLines(
 export function memoryLines(
   character: Character,
   memories: readonly CharMemory[],
-  textMemory?: CharMemory
+  textMemory: CharMemory | undefined,
+  season: Season
 ): string[] {
   if (memories.length === 0) return []
   return [
     `${character.firstName}'s Memories:`,
     ...memories.map((entry) => {
       const desc = entry === textMemory ? overTextDesc(entry.desc) : entry.desc
-      return `- ${formatShortGameDate(entry.date)}: ${character.firstName} ${entry.type} that ${readerize(desc)}`
+      return `- ${formatShortGameDate(entry.date, season)}: ${character.firstName} ${entry.type} that ${readerize(desc)}`
     })
   ]
 }
@@ -1145,9 +1170,9 @@ function nowBlock(cast: readonly Character[], state: PromptState): string[] {
     'NOW',
     // A farewell replaces the date and semester lines.
     ...(state.farewell
-      ? farewellNowLines(state.farewell.firstName, state.farewell.senior)
+      ? farewellNowLines(state.farewell.firstName, state.farewell.forAWhile, state.calendar.season)
       : [
-          `It is ${formatDateBanner(state.date, state.time)}`,
+          `It is ${formatDateBanner(state.date, state.time, state.calendar.season)}`,
           formatSemesterProgress(state.date),
           ...(state.weather ? weatherLines(state.weather, state.date, state.time) : [])
         ]),
@@ -1338,7 +1363,7 @@ function lectureTurnLines(state: PromptState): string[] {
 /** The rest of the always-on lines: whatever is going on in the world today. */
 function occasionLore(state: PromptState): string[] {
   if (state.farewell) return []
-  return occasionLoreLines(state.date, state.time, state.occasions)
+  return occasionLoreLines(state.date, state.time, state.calendar)
 }
 
 /**
@@ -1353,7 +1378,7 @@ function projectLore(state: PromptState): string[] {
     [
       `${entry.name} (${entry.code}): ${fullDescriptionOf(entry)}${kind ? ` ${kind}` : ''}`,
       ...recapLines(entry.code, state.projectRecap ?? []),
-      ...workLines(entry.code, state.projectScene)
+      ...workLines(entry.code, state.projectScene, state.calendar.season)
     ].join('\n')
   ]
 }
@@ -1362,14 +1387,18 @@ function projectLore(state: PromptState): string[] {
  * What the project already is, for the hour about to add to it: the last session's
  * own summary, stamped with the slot it was, then where that leaves the whole thing.
  */
-function workLines(code: string, context: ProjectSceneContext | undefined): string[] {
+function workLines(
+  code: string,
+  context: ProjectSceneContext | undefined,
+  season: Season
+): string[] {
   if (!context) return []
   const last = context.lastSession
   return [
     `${code} PROJECT:`,
     ...(last?.summary
       ? [
-          `The reader last worked on his project on ${formatChatDivider(last.date, last.time)}: ${last.summary}`
+          `The reader last worked on his project on ${formatChatDivider(last.date, last.time, season)}: ${last.summary}`
         ]
       : []),
     projectStandingLine(context.progress)
@@ -1489,7 +1518,7 @@ function castScenePrompt(
     [
       ...classLoreFor(scanned, state),
       ...characterLoreFor(scanned, state, cast),
-      ...recapLore(scanned, state.date, state.time, state.history)
+      ...recapLore(scanned, state.date, state.time, state.history, state.calendar.season)
     ],
     rumor
   )
@@ -1634,7 +1663,7 @@ export function buildSoloPrompt(
         undefined,
         state.upcomingPlans
       ),
-      ...recapLore(scanned, state.date, state.time, state.history)
+      ...recapLore(scanned, state.date, state.time, state.history, state.calendar.season)
     ],
     // A solo scene is an opening too, and the only one it has.
     state.slotRumor

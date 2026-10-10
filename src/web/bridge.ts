@@ -103,14 +103,16 @@ function desktopOnly<T>(what: string): Promise<Result<T>> {
   return Promise.resolve({ ok: false, error: appError('DESKTOP_ONLY', DESKTOP_ONLY_NOTE, what) })
 }
 
-/** Draws the graduation picture and keeps it beside the playthrough it belongs to. */
+/** Draws a semester's graduation picture and keeps it beside the playthrough it belongs to. */
 async function generateEndingArt(
   playthroughId: string,
   sheet: string,
   friendCount: number,
-  signal: AbortSignal
+  signal: AbortSignal,
+  semesterId?: string
 ): Promise<Uint8Array<ArrayBuffer>> {
-  assertSafePlaythroughId(playthroughId)
+  // The key it will be kept under, checked before anything is drawn.
+  saves.endingArtKey(playthroughId, semesterId)
   const bytes = base64ToBytes(sheet)
   assertEndingRequest(friendCount, bytes)
 
@@ -123,7 +125,7 @@ async function generateEndingArt(
   // Last gate before the write, which would leave a picture behind a playthrough deleted while
   // it was being drawn.
   if (signal.aborted) throw appError('CANCELLED', 'Generation was cancelled.')
-  await saves.writeEndingArt(playthroughId, imageBlob(art))
+  await saves.writeEndingArt(playthroughId, imageBlob(art), semesterId)
   return new Uint8Array(art)
 }
 
@@ -309,12 +311,17 @@ export function buildApi(): VenusUniversityApi {
       list: (playthroughId) => result('read the saves', () => saves.listSaves(playthroughId)),
       read: (playthroughId, saveId) =>
         result('read the save', () => saves.readSave(playthroughId, saveId)),
-      enroll: (draft) => result('save the class registration', () => saves.writeEnrollment(draft)),
+      enroll: (draft, playthroughId) =>
+        result('save the class registration', () => saves.writeEnrollment(draft, playthroughId)),
       enrollment: (playthroughId) =>
         result('read the class registration', () => saves.readEnrollment(playthroughId)),
       create: (playthrough, draft, playthroughId) =>
         result('start the playthrough', () =>
           saves.createPlaythrough(playthrough, draft, playthroughId)
+        ),
+      continueSemester: (playthroughId, semesterId, semester, draft) =>
+        result('begin the semester', () =>
+          saves.continueSemester(playthroughId, semesterId, semester, draft)
         ),
       slot: (playthroughId, draft, replay) =>
         result('write the save', () => saves.writeSlotSave(playthroughId, draft, replay)),
@@ -332,20 +339,20 @@ export function buildApi(): VenusUniversityApi {
         result('delete the playthrough', () => saves.deletePlaythrough(playthroughId)),
       rename: (playthroughId, name) =>
         result('rename the playthrough', () => saves.renamePlaythrough(playthroughId, name)),
-      generateEndingArt: (playthroughId, sheet, friendCount, group) =>
+      generateEndingArt: (playthroughId, sheet, friendCount, group, semesterId) =>
         result('draw the graduation picture', () =>
           runAbortable(group, (signal) =>
-            generateEndingArt(playthroughId, sheet, friendCount, signal)
+            generateEndingArt(playthroughId, sheet, friendCount, signal, semesterId)
           )
         ),
-      readEndingArt: (playthroughId) =>
+      readEndingArt: (playthroughId, semesterId) =>
         result('read the graduation picture', async () => {
-          const bytes = await saves.readEndingArt(playthroughId)
+          const bytes = await saves.readEndingArt(playthroughId, semesterId)
           return bytes === null ? null : new Uint8Array(bytes)
         }),
-      exportEndingArt: (playthroughId) =>
+      exportEndingArt: (playthroughId, semesterId) =>
         result('save the ending CG', async () => {
-          const bytes = await saves.readEndingArt(playthroughId)
+          const bytes = await saves.readEndingArt(playthroughId, semesterId)
           if (bytes === null) {
             throw appError(
               'ENDING_ART_UNEXPORTABLE',

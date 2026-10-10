@@ -16,6 +16,9 @@ import {
   profilePictureEntry,
   replaysFromBackup,
   scenesFromBackup,
+  semesterEndingArtEntry,
+  semesterPicturesFromBackup,
+  type SemesterPicture,
   type BackupFile,
   type BackupPhoto,
   type BackupPlaythrough,
@@ -71,7 +74,7 @@ import {
   restoreCustomBackground
 } from './backgroundService'
 import { getCharacter, ownCharIds } from './characterService'
-import { readEndingArt } from './endingArtService'
+import { endingArtSemesters, readEndingArt } from './endingArtService'
 import { getGrabBags, setGrabBags } from './grabBagService'
 import { sniffImageFile } from './imageFiles'
 import { readValidatedJson, writeAtomicJson } from './jsonFile'
@@ -189,10 +192,16 @@ async function backupScenes(): Promise<SavedScene[]> {
   return scenes
 }
 
-/** Every replay some carried save names, whole; one that cannot be read is left out with a warning. */
-async function backupReplays(saves: readonly BackupSave[]): Promise<BackupReplay[]> {
+/**
+ * Every replay some carried save or some carried record's semester log names, whole; one that
+ * cannot be read is left out with a warning.
+ */
+async function backupReplays(
+  saves: readonly BackupSave[],
+  playthroughs: Readonly<Record<string, BackupPlaythrough>>
+): Promise<BackupReplay[]> {
   const replays: BackupReplay[] = []
-  for (const { playthroughId, replayId } of namedReplays(saves)) {
+  for (const { playthroughId, replayId } of namedReplays(saves, playthroughs)) {
     const replay = await optional(
       `replay ${playthroughId}/${replayId}`,
       REPLAY_NOT_FOUND.code,
@@ -215,6 +224,7 @@ export async function exportBackup(targetPath: string): Promise<void> {
     const playthroughs: Record<string, BackupPlaythrough> = {}
     const saves: BackupSave[] = []
     const endingArt: string[] = []
+    const semesterEndingArt: SemesterPicture[] = []
     const profilePictures: string[] = []
     const photos: BackupPhoto[] = []
 
@@ -234,6 +244,14 @@ export async function exportBackup(targetPath: string): Promise<void> {
         await mkdir(dirname(path), { recursive: true })
         await writeFile(path, art)
         endingArt.push(playthroughId)
+      }
+      for (const semesterId of await endingArtSemesters(playthroughId)) {
+        const later = await readEndingArt(playthroughId, semesterId)
+        if (!later) continue
+        const path = join(scratch, semesterEndingArtEntry(playthroughId, semesterId))
+        await mkdir(dirname(path), { recursive: true })
+        await writeFile(path, later)
+        semesterEndingArt.push({ playthroughId, semesterId })
       }
 
       const picture = await readProfilePicture(playthroughId)
@@ -289,7 +307,7 @@ export async function exportBackup(targetPath: string): Promise<void> {
 
     const backgrounds = await backupBackgrounds(scratch)
     const scenes = await backupScenes()
-    const replays = await backupReplays(saves)
+    const replays = await backupReplays(saves, playthroughs)
 
     const record: BackupFile = {
       schemaVersion: BACKUP_SCHEMA_VERSION,
@@ -298,6 +316,7 @@ export async function exportBackup(targetPath: string): Promise<void> {
       playthroughs,
       saves,
       endingArt,
+      ...(semesterEndingArt.length > 0 ? { semesterEndingArt } : {}),
       profilePictures,
       photos,
       backgrounds,
@@ -365,7 +384,8 @@ async function swapSaves(staged: string): Promise<void> {
 async function restoreSaves(
   scratch: string,
   record: BackupFile,
-  replays: readonly BackupReplay[]
+  replays: readonly BackupReplay[],
+  semesterPictures: readonly SemesterPicture[]
 ): Promise<void> {
   const staged = scratchDir('saves')
 
@@ -408,6 +428,18 @@ async function restoreSaves(
         await rename(join(scratch, endingArtEntry(playthroughId)), picture).catch(
           (err: unknown) => {
             console.warn(`[backup] no graduation picture for ${playthroughId}:`, err)
+          }
+        )
+      }
+
+      for (const { semesterId } of semesterPictures.filter(
+        (entry) => entry.playthroughId === playthroughId
+      )) {
+        const picture = join(folder, basename(getEndingArtPath(playthroughId, semesterId)))
+        // Named but not in the zip is one missing picture, not a failed restore.
+        await rename(join(scratch, semesterEndingArtEntry(playthroughId, semesterId)), picture).catch(
+          (err: unknown) => {
+            console.warn(`[backup] no graduation picture for ${playthroughId}/${semesterId}:`, err)
           }
         )
       }
@@ -535,10 +567,11 @@ export async function importBackup(archivePath: string): Promise<void> {
     const backgrounds = backgroundsFromBackup(record)
     const scenes = scenesFromBackup(record)
     const replays = replaysFromBackup(record)
+    const semesterPictures = semesterPicturesFromBackup(record)
 
     await replaceSettings(settings)
     await setGrabBags(record.grabbags)
-    await restoreSaves(scratch, record, replays)
+    await restoreSaves(scratch, record, replays, semesterPictures)
     await restoreCharacters(scratch, record)
     await restoreBackgrounds(scratch, backgrounds)
     await restoreScenes(scenes)

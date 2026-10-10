@@ -11,6 +11,7 @@ import {
   type ScenePromptState
 } from '../src/renderer/prompts/scenePrompt'
 import { cgAction } from '@shared/sceneActions'
+import { calendarOf } from '@shared/semesters'
 import { DEFAULT_MEMORY_BUDGETS } from '@shared/settingsRules'
 import { READER_SPEAKER, type SceneLine, type TimeSlot } from '@shared/types'
 import { character, charactersById } from './fixtures'
@@ -39,7 +40,7 @@ function promptState() {
     classes: {},
     playerSchedule: {},
     classRosters: {},
-    occasions: [],
+    calendar: calendarOf('spring', []),
     bg: null,
     classCode: null,
     projectClass: null,
@@ -139,7 +140,7 @@ describe('buildLedgerPrompt — STATS', () => {
       transcript(),
       { ...promptState(), ...state },
       'READER',
-      { date: 0, time: 0 as TimeSlot, threads: [], characters: roster, planned: [] }
+      { date: 0, time: 0 as TimeSlot, season: 'spring', threads: [], characters: roster, graduates: [], planned: [] }
     )
     return {
       user,
@@ -188,8 +189,10 @@ describe('ledgerStoryFallback', () => {
     return buildLedgerPrompt([sarah], scene, promptState(), 'READER', {
       date: 0,
       time: 0 as TimeSlot,
+      season: 'spring',
       threads: [],
       characters: roster,
+      graduates: [],
       planned: []
     })
   }
@@ -307,7 +310,15 @@ describe('ledgerTranscriptOf', () => {
       [...opening, ...transcript()],
       promptState(),
       'READER',
-      { date: 0, time: 0 as TimeSlot, threads: [], characters: charactersById(sarah), planned: [] }
+      {
+        date: 0,
+        time: 0 as TimeSlot,
+        season: 'spring',
+        threads: [],
+        characters: charactersById(sarah),
+        graduates: [],
+        planned: []
+      }
     )
     expect(user).not.toContain('What would you like to do?')
     expect(user).not.toContain('January 19, Monday morning.')

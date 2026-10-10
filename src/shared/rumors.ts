@@ -58,8 +58,13 @@ export interface RumorPassInput {
   cast: readonly string[]
   /** Who walked out of the scene before it ended, and so saw nothing. */
   departed: readonly string[]
-  /** Every character in the save, which is who can hear about it. */
+  /** Every girl on campus, which is who can hear about it. */
   roster: readonly string[]
+  /**
+   * The graduates, gone from Veridan: they neither see nor hear a thing, but a friend of one
+   * still minds him cheating on her.
+   */
+  alumni: readonly string[]
   charInfo: Readonly<Record<string, Pick<CharInfo, 'flags' | 'suspicions'> | undefined>>
   npcRelationships: NpcRelationshipMap
   /** Who each girl spent the slot with. */
@@ -132,7 +137,7 @@ export function rumorPass(
         if (flagOf(w, 'isLover')) return { kind: 'lover' }
         if (flagOf(w, 'hasCrush')) return { kind: 'crush' }
       }
-      const jilted = input.roster.filter(
+      const jilted = [...input.roster, ...input.alumni].filter(
         (lover) =>
           flagOf(lover, 'isLover') &&
           !flagOf(lover, 'harem') &&

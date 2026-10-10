@@ -21,7 +21,7 @@ import { useGameStore } from './gameStore'
  */
 export function currentSlot(date?: number, time?: TimeSlot): number | null {
   const game = useGameStore.getState()
-  return classSlotOf(date ?? game.date, time ?? game.time, game.occasions)
+  return classSlotOf(date ?? game.date, time ?? game.time, game.calendar)
 }
 
 /**
@@ -46,7 +46,7 @@ export function shiftNow(date?: number, time?: TimeSlot): ShiftSlot | null {
   const game = useGameStore.getState()
   if (!game.job) return null
   const on = date ?? game.date
-  if (jobClosedOn(game.job.jobId, on, game.occasions)) return null
+  if (jobClosedOn(game.job.jobId, on, game.calendar)) return null
   const slot = shiftSlotOf(shiftWeekdayOf(on), time ?? game.time)
   return game.job.shifts.includes(slot) ? slot : null
 }
@@ -61,12 +61,13 @@ export function charJobNow(charId: string, date?: number, time?: TimeSlot): stri
   // Nobody works a shift from another country.
   if (charAwayNow(charId, on)) return null
   const jobId = charJobAt(game.charInfo[charId]?.job, on, time ?? game.time)
-  return jobClosedOn(jobId, on, game.occasions) ? null : jobId
+  return jobClosedOn(jobId, on, game.calendar) ? null : jobId
 }
 
-/** True while `charId` is off campus for spring break. */
+/** True while `charId` is off campus: away for spring break, or graduated and gone from Veridan. */
 export function charAwayNow(charId: string, date?: number): boolean {
   const game = useGameStore.getState()
+  if (game.alumni.includes(charId)) return true
   return isAwayForSpringBreak(game.springBreakAway, charId, date ?? game.date)
 }
 
@@ -107,7 +108,7 @@ export function charStandingHauntAt(charId: string, date: number, time: TimeSlot
   if (!haunt) return null
   // A class or a shift outranks a haunt: a save whose timetable moved under it (add/drop).
   if (charBusyNow(charId, date, time)) return null
-  if (hauntClosedOn(haunt.location, haunt.kind, date, game.occasions)) return null
+  if (hauntClosedOn(haunt.location, haunt.kind, date, game.calendar)) return null
   return haunt
 }
 

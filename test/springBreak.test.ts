@@ -1,11 +1,11 @@
 import { describe, expect, it } from 'vitest'
 import type { CharMemory } from '@shared/types'
 import { useGameStore } from '../src/renderer/stores/gameStore'
+import { isBreakOutingWeek } from '../src/renderer/prompts/occasions'
 import { settleSpringBreak } from '../src/renderer/stores/loop/springBreak'
 import { calendarEvent, character, charactersById, charInfo } from './fixtures'
 import {
   isAwayForSpringBreak,
-  isSpringBreakOutingWeek,
   pickSpringBreakLeavers,
   SPRING_BREAK_LEAVE,
   SPRING_BREAK_NOTICE,
@@ -56,12 +56,12 @@ describe('isAwayForSpringBreak', () => {
   })
 })
 
-describe('isSpringBreakOutingWeek', () => {
+describe('isBreakOutingWeek', () => {
   it('covers only the weekdays of the break, so it cannot overlap a weekend', () => {
     for (let date = SPRING_BREAK_LEAVE; date <= SPRING_BREAK_RETURN; date++) {
       const weekday = date % 7
       const weekend = weekday === 5 || weekday === 6
-      expect(isSpringBreakOutingWeek(date)).toBe(!weekend)
+      expect(isBreakOutingWeek(date, 'spring')).toBe(!weekend)
     }
   })
 })

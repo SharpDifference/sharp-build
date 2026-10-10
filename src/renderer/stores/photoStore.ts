@@ -543,6 +543,7 @@ export const usePhotoStore = create<PhotoStoreState>((set, get) => ({
         schemaVersion: PHOTO_SCHEMA_VERSION,
         date: game.date,
         time: game.time,
+        ...(game.semesterIndex > 0 ? { semesterIndex: game.semesterIndex } : {}),
         rows: draft.rows,
         prompt: draft.prompt,
         options: draft.options,

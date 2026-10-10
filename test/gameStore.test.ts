@@ -1383,15 +1383,29 @@ describe('the job actions', () => {
     expect(struck.settledThrough).toBe(10)
   })
 
-  it('closes an employer permanently, whichever way the job ended', () => {
-    useGameStore.getState().endJob()
+  it('closes an employer whichever way the job ended, and remembers how it did', () => {
+    useGameStore.getState().endJob('fired')
     expect(useGameStore.getState().job).toBeNull()
     expect(useGameStore.getState().jobsClosed).toEqual(['fast_eats'])
+    expect(useGameStore.getState().formerJobs.fast_eats).toMatchObject({ left: 'fired' })
 
     // Taking and losing a second job does not disturb the first entry.
     useGameStore.getState().takeJob('cutetea', [2], 8)
-    useGameStore.getState().endJob()
+    useGameStore.getState().endJob('quit')
     expect(useGameStore.getState().jobsClosed).toEqual(['fast_eats', 'cutetea'])
+    expect(useGameStore.getState().formerJobs.cutetea).toEqual({ raises: 0, left: 'quit' })
+  })
+
+  it('takes a returning hand back on the raises he left with and a clean record', () => {
+    useGameStore.setState({ formerJobs: { cutetea: { raises: 2, left: 'term' } } })
+    useGameStore.getState().takeJob('cutetea', [2], 8)
+    expect(useGameStore.getState().job).toMatchObject({
+      jobId: 'cutetea',
+      raises: 2,
+      strikes: 0,
+      streak: 0,
+      shiftsWorked: 0
+    })
   })
 })
 

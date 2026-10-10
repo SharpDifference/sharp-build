@@ -364,10 +364,15 @@ function characterParagraphs(
       info.job && (info.job.startsOn ?? 0) <= date ? jobDefOf(info.job.jobId)?.employer : undefined
     const affection = affectionFor(info, date, character)
     const reader = readerStandingLine(character.firstName, info.flags, affection)
+    // A graduate's life since, where anybody else's year, major and dorm would be.
+    const who =
+      info.pursuing !== undefined
+        ? `${fullNameOf(character)} graduated from Venus University, where she majored in ${info.major}, moved away from Veridan, and is now ${info.pursuing}. She is out of town.`
+        : `${fullNameOf(character)} is a ${yearLabel(info.year).toLowerCase()} majoring in ${info.major}.`
     lines.push(
-      `${fullNameOf(character)} is a ${yearLabel(info.year).toLowerCase()} majoring in ${info.major}.` +
+      who +
         appearanceSentence(character) +
-        dormSentence(info.dorm) +
+        (info.pursuing !== undefined ? '' : dormSentence(info.dorm)) +
         `${employer ? ` She works part-time at ${employer}.` : ''}` +
         ` ${character.personality} ${absentNote(character.firstName)}` +
         standingSentences(character, relations) +

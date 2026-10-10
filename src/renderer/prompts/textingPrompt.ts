@@ -1,6 +1,7 @@
 import { affectionFor, dedupedMemoriesFor, emptyFlags } from '@shared/relationship'
 import { ROOM_LOCATION } from '@shared/locations'
 import type { NpcRelationshipMap } from '@shared/npcRelationships'
+import type { SemesterCalendar } from '@shared/semesters'
 import {
   type Character,
   type CharInfo,
@@ -10,7 +11,7 @@ import {
   type GameHistory,
   type Haunt,
   type JobState,
-  type Occasion,
+  type Season,
   type StructuredRequest,
   type TimeSlot
 } from '@shared/types'
@@ -35,6 +36,7 @@ import { occasionLoreLines } from './occasions'
 import { recapLore } from './recaps'
 import { objectSchema } from './schema'
 import {
+  graduateLines,
   herClassmates,
   memoryLines,
   notesLines,
@@ -100,8 +102,8 @@ export interface TextingPromptState {
   classRosters: Readonly<Record<string, ClassRoster>>
   /** The part-time job the reader holds, or null — the rest of his week. */
   playerJob: JobState | null
-  /** The save's generated occasions; the fixed calendar is merged in on read. */
-  occasions: readonly Occasion[]
+  /** The semester's season and the occasions the save invented; the fixed calendar is merged in on read. */
+  calendar: SemesterCalendar
   /**
    * The whole semester's sky, one reading per slot — the NOW line walks back through it for how
    * long the weather has held. Absent means nothing is said about it.
@@ -151,11 +153,15 @@ function messageStub(message: ChatMessage, firstName: string): string {
  * A window of messages rendered for injection, newest last; system lines ride along as
  * context the character plausibly has.
  */
-export function stampedStubs(window: readonly ChatMessage[], firstName: string): string[] {
+export function stampedStubs(
+  window: readonly ChatMessage[],
+  firstName: string,
+  season: Season
+): string[] {
   const lines: string[] = []
   let stamped: string | null = null
   for (const message of window) {
-    const stamp = formatChatDivider(message.date, message.time)
+    const stamp = formatChatDivider(message.date, message.time, season)
     if (stamp !== stamped) {
       lines.push(`[${stamp}]`)
       stamped = stamp
@@ -320,7 +326,10 @@ export function buildTextingPrompt(
   reader: string
 ): StructuredRequest {
   const name = character.firstName
-  const away = isAwayForSpringBreak(state.springBreakAway, character.charId, state.date)
+  // Off campus: away for the break, or graduated and gone from Veridan.
+  const away =
+    info?.pursuing !== undefined ||
+    isAwayForSpringBreak(state.springBreakAway, character.charId, state.date)
   const thread: ChatMessage[] = [
     ...(conversation?.messages ?? []).slice(-TEXTING_HISTORY_CAP),
     {
@@ -332,13 +341,13 @@ export function buildTextingPrompt(
     }
   ]
   // The new text is the last line of the log, so it gets its own stamp when it lands in a new slot.
-  const history = stampedStubs(thread, name)
+  const history = stampedStubs(thread, name, state.calendar.season)
   const summary = conversation?.summary ?? null
 
   // The scan covers the whole thread the model reads, not just the new message.
   const scan = [summary ?? '', ...history].join('\n')
   // Today's occasions are always-on.
-  const today = occasionLoreLines(state.date, state.time, state.occasions)
+  const today = occasionLoreLines(state.date, state.time, state.calendar)
 
   // An entry's standings are measured against the one girl on the thread.
   const relations = { relationships: state.npcRelationships, present: [character] }
@@ -370,7 +379,8 @@ export function buildTextingPrompt(
         .join('\n'),
       state.date,
       state.time,
-      state.history
+      state.history,
+      state.calendar.season
     )
   ])
 
@@ -378,6 +388,7 @@ export function buildTextingPrompt(
     'CHARACTER',
     `${name} ${character.lastName}.`,
     ...(info?.major ? [yearMajorLine(info)] : []),
+    ...graduateLines(name, info),
     // The phone takes the one-character budget.
     ...profileLines(character, info?.flags ?? emptyFlags()),
     ...relationshipLines(
@@ -416,7 +427,8 @@ export function buildTextingPrompt(
     ...memoryLines(
       character,
       dedupedMemoriesFor(info).slice(-state.memoryBudget),
-      info?.textMemory
+      info?.textMemory,
+      state.calendar.season
     ),
     ...notesLines(name, info?.notes)
   ]
@@ -436,7 +448,7 @@ export function buildTextingPrompt(
     ...characterBlock,
     '',
     'NOW',
-    `It is ${formatDateBanner(state.date, state.time)}`,
+    `It is ${formatDateBanner(state.date, state.time, state.calendar.season)}`,
     formatSemesterProgress(state.date),
     // Texting happens before the slot's scene; without this she treats the day as over.
     state.time === 0 ? 'Morning classes are starting soon.' : 'Night classes are starting soon.',

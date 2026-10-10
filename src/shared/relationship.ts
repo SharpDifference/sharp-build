@@ -258,13 +258,16 @@ export function loveLifeBlurb(
   return parts.join(' ')
 }
 
-/** Sum of every memory's points times its recency weight. */
+/**
+ * Sum of every memory's points times its recency weight; a memory carried across a break ages
+ * only by the days lived in a semester.
+ */
 export function affectionOf(memories: readonly CharMemory[], today: number): number {
   let total = 0
   for (const entry of memories) {
     const points = POINTS[entry.type]
     if (points === undefined) continue
-    total += points * weightFor(Math.max(0, today - entry.date))
+    total += points * weightFor(Math.max(0, today - entry.date - (entry.breakDays ?? 0)))
   }
   return total
 }
@@ -889,6 +892,8 @@ export function withRomanceScenes(
 ): Readonly<Record<string, CharInfo>> {
   let next: Record<string, CharInfo> | null = null
   for (const [charId, info] of Object.entries(after)) {
+    // A graduate is never cast again, so a romance with her is never counted toward settling.
+    if (info.pursuing !== undefined) continue
     const scenes = romanceScenesAfter(before[charId]?.flags, info, cast.includes(charId))
     if (scenes === info.romanceScenes) continue
     const stepped = { ...info }

@@ -36,6 +36,7 @@ import type {
   Result,
   SaveDraft,
   SceneResponse,
+  SemesterRecord,
   SetTarget,
   SettingsPatch,
   SlotIntroResponse,
@@ -58,6 +59,7 @@ import {
   readAudio
 } from './services/assetService'
 import {
+  continueSemester,
   createPlaythrough,
   deletePlaythrough,
   deleteSave,
@@ -366,7 +368,19 @@ export function registerIpcHandlers(): void {
 
   handle('saves:playthroughs', () => listPlaythroughs())
   handle('saves:list', (_event, playthroughId: string) => listSaves(playthroughId))
-  handle('saves:enroll', (_event, draft: EnrollmentDraft) => writeEnrollment(draft))
+  handle('saves:enroll', (_event, draft: EnrollmentDraft, playthroughId?: string) =>
+    writeEnrollment(draft, playthroughId)
+  )
+  handle(
+    'saves:continueSemester',
+    (
+      _event,
+      playthroughId: string,
+      semesterId: string,
+      semester: SemesterRecord,
+      draft: SaveDraft
+    ) => continueSemester(playthroughId, semesterId, semester, draft)
+  )
   handle('saves:enrollment', (_event, playthroughId: string) => readEnrollment(playthroughId))
   handle(
     'saves:create',
@@ -394,12 +408,23 @@ export function registerIpcHandlers(): void {
   // The graduation picture.
   handle(
     'saves:generateEndingArt',
-    (_event, playthroughId: string, sheet: string, friendCount: number, group: string) =>
-      runAbortable(group, (signal) => generateEndingArt(playthroughId, sheet, friendCount, signal))
+    (
+      _event,
+      playthroughId: string,
+      sheet: string,
+      friendCount: number,
+      group: string,
+      semesterId?: string
+    ) =>
+      runAbortable(group, (signal) =>
+        generateEndingArt(playthroughId, sheet, friendCount, signal, semesterId)
+      )
   )
-  handle('saves:readEndingArt', (_event, playthroughId: string) => readEndingArt(playthroughId))
+  handle('saves:readEndingArt', (_event, playthroughId: string, semesterId?: string) =>
+    readEndingArt(playthroughId, semesterId)
+  )
   // A copy of the picture, saved where the native dialog points; a dismissed dialog resolves `null`.
-  handle('saves:exportEndingArt', async (event, playthroughId: string) => {
+  handle('saves:exportEndingArt', async (event, playthroughId: string, semesterId?: string) => {
     const { canceled, filePath } = await showSaveDialogFor(event, {
       title: 'Save ending CG',
       defaultPath: ENDING_ART_FILE_NAME,
@@ -407,7 +432,7 @@ export function registerIpcHandlers(): void {
     })
     if (canceled || filePath === undefined || filePath === '') return null
 
-    await copyEndingArtTo(playthroughId, filePath)
+    await copyEndingArtTo(playthroughId, filePath, semesterId)
     return filePath
   })
 

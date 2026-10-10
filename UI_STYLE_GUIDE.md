@@ -119,7 +119,7 @@
 - `.vu-pill` — the flat outline pill for a utility beside the thing it acts on, never an answer a foot offers.
 - `.vu-link` — an outward link inside prose: accent ink, underlined at rest, since it leaves the app and that is worth saying before the cursor is on it.
 - `.vu-deadnote` / `.vu-deadnote-pill` — the wrapper around a control and the pill a hover raises over it (§14).
-- `.vu-title` — a screen's name over its own tint blob, the blob leaning while the word does not.
+- `.vu-title` — a screen's name over its own tint blob, the blob leaning while the word does not. New Game+ stands the semester it opens beside its title as a muted reading.
 - `.vu-tab` — a panel's title, on a modal or on a screen's own card, on a half-pill hung off the panel's corner, filled in the accent and taking the accent's shadow; it is the panel's forward layer, and whatever sits under that corner still owes it clearance.
 - `.vu-slot` — a tile in a week grid, with `--on` for the pick, `--dead` for an hour already spoken for, a half mark and a note naming what holds it.
 - `.vu-box-rewind` — the back mark on the box's round cap, mirroring the forward mark on its flat side.
@@ -212,6 +212,7 @@
 ## 12. The week
 
 - Every calendar and week grid reads Sunday-first: Sunday opens the row and Saturday closes it.
+- Once a playthrough has more than one semester, the Calendar's month reading carries the semester's name on a muted line under the month, so the reading keeps its width as the arrows cross from one semester's months into another's.
 - That is a fact about how a week is printed and nothing else — slot indices stay Monday-zero underneath, so a screen reorders columns and never data.
 - The order lives in `WEEK_COLUMNS` (`shared/jobs.ts`): labels are read out of the shared header array by index and the slot helper is handed the index.
 
@@ -221,6 +222,7 @@
 - `.vu-stage-portrait` is a sprite standing on the stage's ground at the stage's height, the game stage's and the milestone's alike.
 - A state's border goes on the crop rather than through the paper's border knob: the crop fills the paper's padding box and paints over the face.
 - A face in a list is quiet; a face that opens something is a control, and anything riding a face is its sibling rather than its child.
+- A tile the player cannot take off a roster wears a sticker naming why on the corner the ✕ would ride, and no ✕: New Game+'s returning girls wear Returning.
 - A sprite a click re-renders is a control on the picture inside the crop, never on the archway around it; so is the plus that fills an empty set, standing in a dashed crop where the gap's word would.
 - What rides the crop's square bottom corner — Hide, or Delete in the danger ink — is a sibling after the picture, and a title a click renames is the title itself, swapped for a box at its own size. A custom outfit's name keeps its own lowercase there and on the render strip, where every other set's title is in capitals, since the name is the word the writer is given, and a custom CG's name does the same on its caption, in the CG picker and on the strip; its column's inline links add Instructions beside the repairs.
 - A character with an unknown name is drawn without a face outside the scene she is in, the mask being the point (`DESIGN_GUIDE.md` "Coding conventions"); inside it, the Cast modal and the gift picker keep her face and mask the name as the box does.

@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useRef, useState, type JSX } from 'react'
 import { AnimatePresence, motion } from 'motion/react'
 import { toAppError } from '@shared/errors'
+import { seasonOf } from '@shared/semesters'
 import { writerReady } from '@shared/settingsRules'
 import { shuffle } from '@shared/shuffle'
-import type { Result } from '@shared/types'
+import type { Result, Season } from '@shared/types'
 import logoUrl from '../../../assets/vu_logo.png'
 import { ConfirmModal } from '../components/ConfirmModal'
 import { PhotoFailedModal } from '../components/PhotoFailedModal'
@@ -363,7 +364,9 @@ export function MainMenu(): JSX.Element {
             >
               Continue
               <span className="vu-btn-sub">
-                {newest.enrolling ? 'class registration' : whereYouLeftOff(newest.date)}
+                {newest.enrolling
+                  ? 'class registration'
+                  : whereYouLeftOff(newest.date, seasonOf(newest.semesterIndex ?? 0))}
               </span>
             </motion.button>
           ) : (
@@ -555,9 +558,9 @@ export function MainMenu(): JSX.Element {
 }
 
 /** Where the newest playthrough stands, in the bookkeeping voice: `wk2 · tue jan 27`. */
-function whereYouLeftOff(date: number): string {
+function whereYouLeftOff(date: number, season: Season): string {
   const week = Math.floor(date / 7) + 1
-  return `wk${week} · ${formatWeekday(date).slice(0, 3)} ${formatShortGameDate(date)}`.toLowerCase()
+  return `wk${week} · ${formatWeekday(date).slice(0, 3)} ${formatShortGameDate(date, season)}`.toLowerCase()
 }
 
 /** The two chip marks, drawn in `currentColor` so one rule tints them. */

@@ -10,6 +10,7 @@ import type {
   EventCancellation,
   LedgerResponse,
   SceneLine,
+  Season,
   TimeSlot
 } from '@shared/types'
 import { stampedStubs } from './textingPrompt'
@@ -34,14 +35,18 @@ export interface SchedulePromptInput {
   /** The slot being read — what "tonight" is measured against. */
   date: number
   time: TimeSlot
+  /** The semester's season, which names the month of every date. */
+  season: Season
   /** Every message sent this slot, grouped by character; empty groups are dropped. */
   threads: ReadonlyArray<{
     charKey: string
     firstName: string
     messages: readonly ChatMessage[]
   }>
-  /** The whole roster, keyed by charId — the keys `chars` may name. */
+  /** The on-campus roster, keyed by charId — the keys `chars` may name. */
   characters: Record<string, Character>
+  /** The graduates: gone from Veridan, so in no plan, but still texting him. */
+  graduates: readonly Character[]
   /** Plans already on the calendar inside the horizon, so none is placed twice. */
   planned: readonly CalendarEvent[]
 }
@@ -62,9 +67,9 @@ function slotOptions(date: number, time: TimeSlot): SlotOption[] {
 }
 
 /** `"391 — Thursday, February 5, night"` — one offered slot, as the prompt lists it. */
-function slotOptionLine(option: SlotOption): string {
+function slotOptionLine(option: SlotOption, season: Season): string {
   const half = slotHalf(option.time)
-  return `${option.id} — ${formatDatePart(option.date)}, ${half}`
+  return `${option.id} — ${formatDatePart(option.date, season)}, ${half}`
 }
 
 /**
@@ -186,7 +191,7 @@ export function scheduleBlocks(input: SchedulePromptInput, wantPlans: boolean): 
   const now = [
     // What "tomorrow" in a transcript is measured against; the scene never says what day it is.
     'NOW',
-    `The part of the day you are reading has just ended. It was ${formatDateBanner(input.date, input.time)}`
+    `The part of the day you are reading has just ended. It was ${formatDateBanner(input.date, input.time, input.season)}`
   ]
   if (!wantPlans) return now
 
@@ -201,7 +206,7 @@ export function scheduleBlocks(input: SchedulePromptInput, wantPlans: boolean): 
     '',
     'SLOTS — the only times a plan may be placed in. Each line is an id, then when it is.',
     "'''",
-    ...slotOptions(input.date, input.time).map(slotOptionLine),
+    ...slotOptions(input.date, input.time).map((option) => slotOptionLine(option, input.season)),
     "'''",
     '',
     'ALREADY PLANNED — plans that are on the calendar already.',
@@ -241,7 +246,7 @@ function threadBlocks(input: SchedulePromptInput): string[] {
     if (messages.length === 0) continue
     // Blank line between blocks only; the first sits flush against the caller's header.
     if (lines.length > 0) lines.push('')
-    lines.push(`— texts with ${firstName} —`, ...stampedStubs(messages, firstName))
+    lines.push(`— texts with ${firstName} —`, ...stampedStubs(messages, firstName, input.season))
   }
   return lines
 }

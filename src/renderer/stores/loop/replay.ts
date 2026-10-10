@@ -1,4 +1,5 @@
 import { replayIdsOf, type SlotReplay } from '@shared/replays'
+import { semesterChain, type ChainedSemester } from '@shared/semesters'
 import {
   AUTOSAVE_ID,
   READER_SPEAKER,
@@ -162,7 +163,8 @@ export function holdGame(inputDraft: string): HeldGame | null {
       charInfo: game.charInfo,
       charKeyToId: game.charKeyToId,
       weather: game.weather,
-      occasions: game.occasions
+      calendar: game.calendar,
+      semesterIndex: game.semesterIndex
     }
   }
   return held
@@ -193,16 +195,48 @@ export function replayStayOf(game: HeldGame, replay: SlotReplay): ReplayStayFiel
   }
 }
 
-/** Reads the replay kept for one finished slot; null, having said why, where it cannot be read. */
-export async function readReplay(date: number, time: TimeSlot): Promise<SlotReplay | null> {
+/**
+ * The semesters before the one being played, oldest first, each with the history, replays,
+ * timetable and plans its ending left; none in a playthrough's first semester.
+ */
+export function earlierSemesters(): ChainedSemester[] {
+  const record = loopState.record
+  if (!record) return []
+  return semesterChain(record, useGameStore.getState().semesterId ?? undefined).slice(0, -1)
+}
+
+/** Refused for a replay with somebody in it whose character is gone. */
+const REPLAY_CAST_GONE = {
+  code: 'REPLAY_CAST_GONE',
+  message: "Somebody in this replay is no longer in the game, so it can't be played."
+}
+
+/**
+ * Reads the replay kept for one finished slot — of the semester being played, or of the earlier
+ * one `semesterIndex` names; null, having said why, where it cannot be read or staged.
+ */
+export async function readReplay(
+  date: number,
+  time: TimeSlot,
+  semesterIndex?: number
+): Promise<SlotReplay | null> {
   const run = currentRun()
   const game = useGameStore.getState()
-  const id = game.replays[date]?.[time]
+  const replays =
+    semesterIndex === undefined
+      ? game.replays
+      : earlierSemesters().find(({ view }) => view.index === semesterIndex)?.log?.replays
+  const id = replays?.[date]?.[time]
   if (!game.playthroughId || !id) return null
   const result = await window.api.replays.read(game.playthroughId, id)
   if (runStale(run)) return null
   if (!result.ok) {
     useUiStore.getState().showError(result.error)
+    return null
+  }
+  // A graduate whose character was deleted since is loaded no more, and has no sprite to stand.
+  if (result.data.cast.some((charId) => !game.characters[charId])) {
+    useUiStore.getState().showError(REPLAY_CAST_GONE)
     return null
   }
   return result.data

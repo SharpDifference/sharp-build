@@ -5,16 +5,7 @@ import { useGameStore } from '../gameStore'
 import { coverSceneOpening } from '../slotCrossing'
 import { plannedWith } from '../textingLoop'
 import { castCharactersOf, nameOf } from './cast'
-import {
-  admitLocals,
-  commitmentNotes,
-  injectPasserby,
-  planAttendees,
-  resolveAttendance,
-  resolveLocationId,
-  runIntoNote,
-  workersAtLocation
-} from './casting'
+import { planAttendees } from './casting'
 import {
   buildClassifyAttempt,
   classifyAction,
@@ -23,6 +14,8 @@ import {
   type Verdict
 } from './classify'
 import { registerHangoutEntry } from './hooks'
+import { armSceneRecords } from './jobs'
+import { composeMeeting, kindLabel, meetingKindOf } from './meetings'
 import { applyCast, reader, scenePromptState } from './promptState'
 import { currentRun, loopState, runStale, type TurnSnapshot } from './state'
 import { deliverSceneLines, streamScene, type PreviewSink, type SceneCall } from './stream'
@@ -124,6 +117,9 @@ export async function startHangoutScene(
     ...(preset ? { preset } : {})
   }
   loopState.lastTurn = snapshot
+  // A hangout casts afresh, as a typed opening does; the records come off the scene it casts.
+  loopState.jobShift = null
+  loopState.projectWork = null
 
   game.setInputDraft('')
   game.setAwaitingInput(false)
@@ -135,6 +131,8 @@ export async function startHangoutScene(
 
   if (ready?.scene) {
     const scene = ready.scene
+    // Armed here and never by the prefetch, off the scene kind it already put on the store.
+    armSceneRecords()
     // First, so the reader's own line precedes the scene's in the log. An opening, not a
     // continuation: the hangout scene starts here.
     useGameStore.getState().logPlayerAction(scene.action, false)
@@ -165,6 +163,7 @@ export async function startHangoutScene(
 
   const cast = await castHangout(charId, description, verdict)
   if (runStale(run)) return
+  armSceneRecords()
   // An opening, not a continuation: the hangout scene starts here.
   useGameStore.getState().logPlayerAction(cast.action, false)
   const castCharacters = castCharactersOf(cast.cast)
@@ -186,14 +185,15 @@ export async function startHangoutScene(
 
 /**
  * Casts an agreed hangout and settles the phone for the slot it is spending — the
- * one path the prefetch and the serial fallback share.
+ * one path the prefetch and the serial fallback share. Whatever kind of scene its words are,
+ * it is that too, with her in it; words the slot cannot hold play as the meeting alone.
  */
 async function castHangout(
   charId: string,
   description: string,
   verdict: Verdict
 ): Promise<{ cast: string[]; action: string }> {
-  const { mentioned, inPublic, sceneLocation } = verdict
+  const { mentioned, actionType, inPublic, sceneLocation } = verdict
   const game = useGameStore.getState()
 
   // The plan she has with him this slot, if any: every attendee comes, named or not, and her
@@ -201,31 +201,22 @@ async function castHangout(
   const event = plannedWith(charId, game.date, game.time)
   const attendees = event ? planAttendees(event) : []
 
-  // A girl at work where they are meeting is available rather than busy.
-  const workers = workersAtLocation(sceneLocation).map((worker) => worker.charId)
-  const attendance = resolveAttendance([...attendees, ...mentioned], charId, [
-    ...workers,
-    ...attendees
-  ])
-  const notes = [...attendance.notes, ...commitmentNotes(attendance.cast, attendees, workers)]
-  let cast = attendance.cast
+  // A hangout rolls like a named typed action: the pinned character is the naming. Named, so a
+  // haunt is the crash-the-party roll, except for whoever she is out with this slot.
+  const meeting = meetingKindOf(actionType)
+  const composed = composeMeeting(
+    { called: [...attendees, ...mentioned], required: charId, attendees, inPublic, sceneLocation },
+    meeting
+  )
+  const { cast, passerby } = composed
+  const action = [description, ...composed.notes].join('\n')
 
-  // A hangout rolls like a named typed action: the pinned character is the naming.
-  const passerby = injectPasserby(cast, inPublic, resolveLocationId(sceneLocation))
-  if (passerby) {
-    cast = [...cast, passerby]
-    notes.push(runIntoNote([passerby]))
-  }
-
-  // Last, after the pinned character has her slot; named, so a haunt is the crash-the-party
-  // roll, except for whoever she is out with this slot.
-  const atWork = admitLocals(cast, sceneLocation, { named: true, inPublic })
-  cast = atWork.cast
-  const action = [description, ...notes, ...atWork.notes].join('\n')
-
+  const kind = kindLabel(composed.scene)
   console.log(
     `[cast] hangout: ${mentioned.map(nameOf).join(', ') || 'nobody'}` +
-      `${inPublic ? ' [public]' : ' [private]'}` +
+      `${actionType ? ` (${actionType})` : ''}` +
+      `${meeting.kind === 'none' && meeting.reason ? ` — met as company: ${meeting.reason}` : ''}` +
+      `${kind ? ` | ${kind}` : ''}${inPublic ? ' [public]' : ' [private]'}` +
       ` → cast: ${cast.map(nameOf).join(', ')}` +
       `${passerby ? ` (ran into ${nameOf(passerby)})` : ''}`
   )
@@ -233,7 +224,7 @@ async function castHangout(
   // She is never her own snub: answering her cleared her `pendingHangout`, and the cast
   // `applyCast` expires against covers the whole room.
   await applyCast(cast, {
-    ...(atWork.jobId ? { visitJobId: atWork.jobId } : {}),
+    ...composed.scene,
     // The texts that arranged this are not a plan he still owes her; her thread alone,
     // since only one attendee ever texts about a plan.
     textLedgerSkip: charId,

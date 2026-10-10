@@ -17,11 +17,9 @@ import {
 } from '@shared/npcRelationships'
 import type { CharInfo, Haunt, TimeSlot } from '@shared/types'
 import { globalSlotOf, shiftSlotOf } from '@shared/jobs'
-import { classSlotOf, hauntClosedOn } from '../../prompts/occasions'
+import { classSlotOf, hauntClosedOn, isBreakOutingWeek } from '../../prompts/occasions'
 import { isMoodHomebound } from '../../prompts/moods'
 import { prevSlot, shiftWeekdayOf, weekendSaturdayOf } from '../../prompts/gameDate'
-import { isSummerOutingWeek } from '../../prompts/graduation'
-import { isSpringBreakOutingWeek } from '../../prompts/springBreak'
 import { useGameStore } from '../gameStore'
 import { rollNpcOverlay, type OutingWindow, type OverlayCharInput } from '../npcOverlay'
 import { rollDormRunIns, rollLooseRunIns, type RunInCharInput } from '../npcRunIns'
@@ -87,7 +85,7 @@ export function rollNpcOverlayNow(
 
 /** Which fatigue window a date falls in. */
 function outingWindowOf(date: number): OutingWindow {
-  if (isSpringBreakOutingWeek(date) || isSummerOutingWeek(date)) return 'break'
+  if (isBreakOutingWeek(date, useGameStore.getState().calendar.season)) return 'break'
   return weekendSaturdayOf(date) !== null ? 'weekend' : null
 }
 
@@ -112,7 +110,7 @@ export function rollSlotEncounterGroups(): NpcEncounterGroup[] {
   const groups: NpcEncounterGroup[] = []
 
   // Who sat in a lecture together; null on a weekend or a closed day.
-  const slot = classSlotOf(game.date, game.time, game.occasions)
+  const slot = classSlotOf(game.date, game.time, game.calendar)
   if (slot !== null) {
     for (const entry of Object.values(game.classes)) {
       if (entry.slot !== slot) continue
@@ -178,7 +176,7 @@ function runInSpots(): string[] {
     (def) =>
       def.onCampus === true &&
       def.id !== LOWRISE_LOCATION &&
-      !hauntClosedOn(def.id, 'fun', game.date, game.occasions)
+      !hauntClosedOn(def.id, 'fun', game.date, game.calendar)
   ).map((def) => def.id)
 }
 

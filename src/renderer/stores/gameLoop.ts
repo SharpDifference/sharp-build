@@ -1,14 +1,6 @@
-import { GAME_OVER_SCENES, gameOverReasonOf } from '@shared/gameOver'
+import { GAME_OVER_SCENES, gameCompleteSceneOf, gameOverReasonOf } from '@shared/gameOver'
 import { earnLine, spendLine, spentOf } from '@shared/money'
-import {
-  globalSlotOf,
-  jobDefOf,
-  NO_JOB_MESSAGE,
-  NO_SHIFT_MESSAGE,
-  rollShiftGain,
-  shiftRecordOf,
-  shiftSlotOf
-} from '@shared/jobs'
+import { globalSlotOf, NO_JOB_MESSAGE, shiftSlotOf } from '@shared/jobs'
 import {
   applyStatDeltas,
   resolveStatDeltas,
@@ -28,6 +20,7 @@ import {
   type CalendarEvent,
   type Character,
   type EventCancellation,
+  type EverydayAsk,
   type GameSave,
   type PlaythroughRecord,
   type LedgerResponse,
@@ -39,9 +32,10 @@ import {
   type StructuredRequest,
   type TimeSlot
 } from '@shared/types'
+import { LAST_SEMESTER, semesterOf } from '@shared/semesters'
 import type { SavedScene, SceneSetup } from '@shared/sceneCreator'
 import type { SlotReplay } from '@shared/replays'
-import { formatSlotOpening, nextSlot, ordinal, shiftWeekdayOf } from '../prompts/gameDate'
+import { formatSlotOpening, nextSlot, shiftWeekdayOf } from '../prompts/gameDate'
 import {
   introScrollLines,
   isOrientationSlot,
@@ -76,6 +70,7 @@ import {
   rumorSentenceFor
 } from '../prompts/lorebook'
 import { pickSlotPosters } from './feedRolls'
+import { isFeedContact } from './feedView'
 import { deliverSlotPosts, rollFeedExtrasIfNewSlot, rollSuggestions } from './loop/feed'
 import {
   filterEventsByAttendance,
@@ -85,7 +80,7 @@ import {
 } from '../prompts/schedulePrompt'
 import { composeTextingSummary, hasTexted } from '../prompts/textingPrompt'
 import { buildTextLedgerPrompt, mergeLedgerReplies } from '../prompts/textLedgerPrompt'
-import { rollReachOutTopic } from './slotAskers'
+import { dealEverydayAsk, rollReachOutTopic } from './slotAskers'
 import { SETTING } from '../prompts/setting'
 import {
   buildClosingPrompt,
@@ -104,6 +99,7 @@ import {
   PORTRAIT_SLOTS,
   summariesWithin,
   useGameStore,
+  type ReplayStayFields,
   type SceneKind
 } from './gameStore'
 import { useCharacterStore } from './characterStore'
@@ -129,7 +125,7 @@ import {
   revealSceneOpening,
   revealSlot
 } from './slotCrossing'
-import { charCommitmentAt, charJobNow, charStandingHauntAt, shiftNow } from './timetable'
+import { charCommitmentAt, charStandingHauntAt } from './timetable'
 import { useBunnyboardStore } from './bunnyboardStore'
 import {
   addPlanContacts,
@@ -145,12 +141,14 @@ import {
   deliverSpringBreakTexts,
   deliverVenusJobIntro,
   deliverVenusMessages,
+  everydayRoundNow,
   pickOccasionAsker,
   pickSlotAskers,
   pickSlotReachOut,
   plannedWith,
   resetTextingLoop,
-  resolveFriendRequests
+  resolveFriendRequests,
+  rollAskerInvite
 } from './textingLoop'
 import {
   bunnybotHauntRevealTexts,
@@ -164,6 +162,7 @@ import {
   classifierGate,
   classifyAction,
   firstNameOf,
+  graduateRejection,
   isContact,
   nameIsKnown,
   rejection,
@@ -171,18 +170,11 @@ import {
   type Verdict
 } from './loop/classify'
 import {
-  admitLocals,
   anyOf,
-  commitmentNotes,
-  injectPasserby,
+  drawFreeCast,
   localsAtLocation,
-  pickCast,
-  pickFirstNightCast,
   planAttendees,
-  resolveAttendance,
-  resolveLocationId,
   runIntoNote,
-  workersAtLocation,
   workingHereNote
 } from './loop/casting'
 import {
@@ -197,7 +189,16 @@ import { startHangoutScene } from './loop/hangouts'
 import { liveView, withCrushes, withRumorPass, type PostLedgerView } from './loop/ledgerView'
 import { registerLoopHooks } from './loop/hooks'
 import { failTurn, runSceneTurn } from './loop/turn'
-import { resolveProject, settleShifts } from './loop/jobs'
+import { armSceneRecords, sceneRecordsOf, settleShifts } from './loop/jobs'
+import {
+  composeMeeting,
+  kindLabel,
+  meetingKindOf,
+  NO_KIND,
+  sceneKindOf,
+  shiftOf,
+  type SceneKindVerdict
+} from './loop/meetings'
 import {
   applyNewFriendships,
   applyNpcOverlay,
@@ -230,7 +231,7 @@ import {
 } from './loop/replay'
 import { armEpilogue, dropEndingArt } from './loop/endingArt'
 import { dropProfilePicture, loadProfilePicture } from './loop/profilePicture'
-import { farewellDisposition, seniorNames } from './loop/farewells'
+import { farewellDisposition, graduatingNames } from './loop/farewells'
 import { settleSpringBreak, springBreakPickFor } from './loop/springBreak'
 import { dropHeldSceneLines, sceneInProgress, streamScene, unpark } from './loop/stream'
 import {
@@ -261,6 +262,8 @@ import {
   type EndingAnswer,
   type TurnSnapshot
 } from './loop/state'
+import { stageContinuation } from './newGame'
+import { carryOf } from './semesterCarry'
 import { buildStatusSteps, markStatusLine } from './loop/statusSteps'
 import {
   memoryEditRows,
@@ -331,7 +334,15 @@ async function beginSlot(): Promise<void> {
     // goodbye; outside the branch below because a reload lands here too.
     armEpilogue()
     // Queued only: `graduationSeen` is raised where the scroll is read.
-    if (!state.graduationSeen) state.appendPendingLines(graduationScrollLines(seniorNames()))
+    if (!state.graduationSeen) {
+      state.appendPendingLines(
+        graduationScrollLines(
+          graduatingNames(),
+          state.calendar.season,
+          state.semesterIndex === LAST_SEMESTER
+        )
+      )
+    }
     advance()
     // The curtain announces the morning like any other and peels back off the scroll's first
     // line, which `advance` has already put up.
@@ -346,7 +357,7 @@ async function beginSlot(): Promise<void> {
   state.setSceneQuiz(null)
 
   // The authored first slot: the arrival scroll, then freshman orientation.
-  if (isOrientationSlot(state.date, state.time)) {
+  if (isOrientationSlot(state.date, state.time, state.semesterIndex)) {
     state.setWaitingForLine(false)
     state.setAwaitingInput(false)
     state.appendPendingLines(introScrollLines(state.stats, state.date))
@@ -397,7 +408,7 @@ async function beginSlot(): Promise<void> {
   state.setWaitingForLine(true)
 
   // Banked by the ending that led here, or fetched when no scene precedes the slot.
-  const tutorial = isTutorialSlot(state.date, state.time)
+  const tutorial = isTutorialSlot(state.date, state.time, state.semesterIndex)
   const silent: SlotOpening = { lines: [], hangouts: [], events: [], cancellations: [] }
   const banked = loopState.bankedOpening
   const narration = tutorial
@@ -456,7 +467,7 @@ async function beginSlot(): Promise<void> {
   deliverEventCancellations([...(springBreak?.cancellations ?? []), ...opening.cancellations])
 
   // Before the fold, so the invitations are inside the start-of-slot save.
-  deliverSlotHangouts(opening.hangouts, opening.askOccasionId)
+  deliverSlotHangouts(opening.hangouts, opening.askOccasionId, opening.everydayAsks)
 
   // The texts the girls he left wrote, filed on the same terms.
   deliverSlotBreakups(opening.breakups)
@@ -717,7 +728,9 @@ function endEpilogue(reason: 'gameComplete' | 'endingDebt'): void {
   game.setWaitingForLine(false)
   game.setAwaitingInput(false)
   game.setBusy(false)
-  game.appendPendingLines(GAME_OVER_SCENES[reason].lines.map((text) => ({ speaker: '', text })))
+  const scene =
+    reason === 'gameComplete' ? gameCompleteSceneOf(game.semesterIndex) : GAME_OVER_SCENES[reason]
+  game.appendPendingLines(scene.lines.map((text) => ({ speaker: '', text })))
   advance()
 }
 
@@ -759,7 +772,7 @@ async function fetchSlotIntro(
   const run = currentRun()
   const group = call.group ?? LOOP_LLM_GROUP
   const stale = call.stale ?? ((): boolean => false)
-  const opening = formatSlotOpening(date, time)
+  const opening = formatSlotOpening(date, time, useGameStore.getState().calendar.season)
   // Split as the scene's own lines are: the narration is read in the same box, and what is
   // banked here is what the landing plays back.
   const narrate = (lines: string[]): SceneLine[] =>
@@ -767,9 +780,13 @@ async function fetchSlotIntro(
 
   const game = useGameStore.getState()
 
-  // Who posts a status update this slot, as charKeys — the whole roster, strangers included.
+  // Who posts a status update this slot, as charKeys — the whole roster, strangers included,
+  // and every graduate still on his feed.
   const postingKeys = new Set(
-    pickSlotPosters(game.chars, game.characters).flatMap((charId) => {
+    pickSlotPosters(
+      [...game.chars, ...game.alumni.filter((charId) => isFeedContact(view.charInfo[charId]))],
+      game.characters
+    ).flatMap((charId) => {
       const character = game.characters[charId]
       return character ? [charKeyOf(character.firstName, character.lastName)] : []
     })
@@ -787,6 +804,9 @@ async function fetchSlotIntro(
   }
 
   const askers: IntroAsker[] = []
+  // The everyday asks already dealt; each asker's own is dealt before the next one rolls.
+  let round = everydayRoundNow()
+  const everydayAsks: Record<string, EverydayAsk> = {}
   for (const charKey of askerKeys) {
     const charId = game.charKeyToId[charKey]
     const character = game.characters[charId]
@@ -796,6 +816,12 @@ async function fetchSlotIntro(
     const plan = plannedWith(charId, date, time, view.events)
     // The class or the shift she meets him before or after.
     const commitment = plan ? charCommitmentAt(charId, date, time) : null
+    // What she asks for, when it is neither a plan nor the occasion.
+    const invite = plan || occasion ? null : rollAskerInvite(charId, date, time, view, round)
+    if (invite?.kind === 'everyday') {
+      round = dealEverydayAsk(round, invite.ask)
+      everydayAsks[charKey] = invite.ask
+    }
     // Where she is texting from and who is with her, off the overlay for the slot about
     // to open — the store's still describes the hour being played.
     const whereabouts = npcWhereaboutsFor(charId, date, time, npcOverlay, view.charInfo)
@@ -808,6 +834,7 @@ async function fetchSlotIntro(
       ...(commitment ? { commitment } : {}),
       // A girl with a plan is writing about that; anybody else is asking him to the occasion.
       ...(occasion && !plan ? { occasion } : {}),
+      ...(invite ? { invite } : {}),
       ...(whereabouts
         ? {
             whereabouts: {
@@ -920,7 +947,7 @@ async function fetchSlotIntro(
     const character = game.characters[charId]
     return character ? [character] : []
   })
-  const absent = game.chars
+  const absent = [...game.chars, ...game.alumni]
     .filter((charId) => !presentIds.has(charId))
     .flatMap((charId) => {
       const character = game.characters[charId]
@@ -935,7 +962,7 @@ async function fetchSlotIntro(
 
   // What is going on today, read once: the rumor is drawn only for a slot with neither an
   // occasion nor an asker.
-  const occasions = occasionsAt(date, time, game.occasions)
+  const occasions = occasionsAt(date, time, game.calendar)
   // Drawn before the request, so a retry re-sends the same place and the reply's own sentence
   // about it can be banked.
   const rumorPlace =
@@ -959,7 +986,12 @@ async function fetchSlotIntro(
       reachOuts,
       posters,
       occasions,
-      occasionLeadUps: occasionLeadUpLines(date, time, game.occasions),
+      season: game.calendar.season,
+      // A later semester's first morning says he has come back.
+      ...(game.semesterIndex > 0 && date === 0 && time === 0
+        ? { backOnCampus: game.semesterIndex }
+        : {}),
+      occasionLeadUps: occasionLeadUpLines(date, time, game.calendar),
       weather: game.weather,
       ...(rumorPlace ? { rumorPlace } : {}),
       // The pick being settled, which the store does not hold until the boundary assigns it.
@@ -991,6 +1023,7 @@ async function fetchSlotIntro(
         hangouts: hangouts.filter((hangout) => asked.has(hangout.char)),
         breakups: result.data.breakups,
         ...(occasion ? { askOccasionId: occasion.id } : {}),
+        ...(Object.keys(everydayAsks).length > 0 ? { everydayAsks } : {}),
         posts: result.data.posts,
         springBreakTexts: result.data.springBreakTexts,
         ...(reachOutKey
@@ -1295,14 +1328,26 @@ export async function submitAction(
     loopState.projectWork = null
   }
 
-  // A turn naming a stranger is refused before the classifier.
-  const stranger = game.chars.find(
+  // A turn naming a stranger is refused before the classifier; a graduate he never learned the
+  // name of is one too.
+  const stranger = [...game.chars, ...game.alumni].find(
     (charId) =>
       !nameIsKnown(charId) &&
       namesCharacter(trimmed, game.characters[charId]?.firstName ?? '')
   )
   if (stranger) {
     failTurn(rejection(UNKNOWN_NAME_REJECTION), snapshot)
+    return
+  }
+  // So is a scene opening on a graduate, who is gone from Veridan; mid-scene she can be talked
+  // about, her lorebook entry saying she is out of town.
+  const graduate = isContinuation
+    ? undefined
+    : game.alumni.find((charId) =>
+        namesCharacter(trimmed, game.characters[charId]?.firstName ?? '')
+      )
+  if (graduate) {
+    failTurn(rejection(graduateRejection(graduate)), snapshot)
     return
   }
 
@@ -1316,6 +1361,9 @@ export async function submitAction(
     plan = cast
     await applyCastToScene(plan)
     if (runStale(run)) return
+    // Off the scene just cast, the same derivation a resumed save runs, so what the boundary
+    // credits cannot depend on whether the player reloaded during it.
+    armSceneRecords()
   }
 
   // Whoever is still in the scene; a cast that has entirely walked off comes back whole.
@@ -1376,7 +1424,7 @@ async function castTurn(
   }
 
   // A plan's own button is a meeting with its attendees whatever the words sound like, as the
-  // same plan begun from her reminder is; one whose words are project work is also a session.
+  // same plan begun from her reminder is, and also whatever kind of scene the words are.
   const game = useGameStore.getState()
   const event = snapshot.planId
     ? game.events.find(
@@ -1385,15 +1433,16 @@ async function castTurn(
       )
     : undefined
   const attendees = event ? planAttendees(event) : []
+  const meeting = event ? meetingKindOf(actionType) : null
 
-  const plan = actionType.startsWith('project:')
-    ? castProjectTurn(actionType, mentioned, trimmed, inPublic, sceneLocation, snapshot, attendees)
-    : event
-      ? castPeopleTurn(mentioned, trimmed, inPublic, sceneLocation, snapshot, attendees)
-      : actionType.startsWith('goto_class:')
-        ? await castClassTurn(actionType, mentioned, trimmed, snapshot)
-        : actionType === 'job'
-          ? castJobTurn(trimmed, inPublic, snapshot)
+  const plan = meeting
+    ? castPeopleTurn(mentioned, trimmed, inPublic, sceneLocation, snapshot, attendees, meeting)
+    : actionType.startsWith('goto_class:')
+      ? await castClassTurn(actionType, mentioned, trimmed, snapshot)
+      : actionType === 'job'
+        ? castJobTurn(trimmed, inPublic, snapshot)
+        : actionType.startsWith('project:')
+          ? castProjectTurn(actionType, mentioned, trimmed, inPublic, sceneLocation, snapshot)
           : castPeopleTurn(mentioned, trimmed, inPublic, sceneLocation, snapshot)
   if (!plan) return null
 
@@ -1408,9 +1457,12 @@ async function castTurn(
   }
 
   // Logged beside main's `[classify]` lines, so the casting decision reads as one sequence.
+  const kind = kindLabel(plan.scene)
   console.log(
     `[cast] classified: ${mentioned.map(nameOf).join(', ') || 'nobody'}` +
-      `${actionType ? ` (${actionType})` : ''}${inPublic ? ' [public]' : ' [private]'}` +
+      `${actionType ? ` (${actionType})` : ''}` +
+      `${meeting?.kind === 'none' && meeting.reason ? ` — met as company: ${meeting.reason}` : ''}` +
+      `${kind ? ` | ${kind}` : ''}${inPublic ? ' [public]' : ' [private]'}` +
       ` → cast: ${plan.cast.map(nameOf).join(', ') || 'nobody — solo scene'}` +
       `${plan.passerby ? ` (ran into ${nameOf(plan.passerby)})` : ''}` +
       `${
@@ -1441,7 +1493,7 @@ async function castClassTurn(
   // A lecture's midterm and final are sat, not played; intercepted after `castForClass`,
   // so an enrollment refusal still outranks the exam.
   const examEntry = game.classes[resolved.classCode]
-  const exam = examEntry ? examOn(examEntry, game.date, game.occasions) : null
+  const exam = examEntry ? examOn(examEntry, game.date, game.calendar) : null
   if (examEntry && exam && kindOf(examEntry) === 'lecture') {
     await startExam(examEntry, exam, snapshot)
     return null
@@ -1457,24 +1509,16 @@ function castJobTurn(
   snapshot: TurnSnapshot
 ): CastPlan | null {
   // Both refusals are composed from the save; the model was never told.
-  const game = useGameStore.getState()
-  const slot = shiftNow()
-  if (!game.job) {
-    failTurn(rejection(NO_JOB_MESSAGE), snapshot)
+  const kind = sceneKindOf('job')
+  if (kind.kind !== 'shift') {
+    failTurn(rejection(kind.kind === 'none' && kind.reason ? kind.reason : NO_JOB_MESSAGE), snapshot)
     return null
   }
-  if (slot === null) {
-    failTurn(rejection(NO_SHIFT_MESSAGE), snapshot)
-    return null
-  }
-
-  const def = jobDefOf(game.job.jobId)
+  const { job, def } = kind
 
   // Whoever else is rostered here right now is on the other side of the counter,
   // resolved without the classifier and seated ahead of the draw.
-  const coworkers = game.chars
-    .filter((charId) => charJobNow(charId) === game.job?.jobId)
-    .slice(0, PORTRAIT_SLOTS)
+  const coworkers = kind.coworkers.slice(0, PORTRAIT_SLOTS)
 
   // Whoever spends this slot at his workplace turns up on his side of the counter, cast
   // outright.
@@ -1489,41 +1533,24 @@ function castJobTurn(
   const customers = filled < PORTRAIT_SLOTS ? drawFreeCast(inPublic, def?.locationId) : []
   const cast = [...coworkers, ...locals, ...customers].slice(0, PORTRAIT_SLOTS)
   const drawn = cast.filter((charId) => !coworkers.includes(charId))
-  // Rolled once here and written onto the scene, so a reload pays the same stats back.
-  // An employer with a single gain leaves the field off: the derivation finds it anyway.
-  const gain = def ? rollShiftGain(def) : null
-  // Never also `visitJobId`: one paragraph describes the workplace either way.
-  const scene = {
-    jobId: game.job.jobId,
-    ...(def && gain && def.gains.length > 1 ? { jobStats: [...gain.stats] } : {})
-  }
-  // The same derivation a resumed save runs, so what the boundary pays
-  // for an hour cannot depend on whether the player reloaded during it.
-  loopState.jobShift = shiftRecordOf(game.job, scene, game.date, game.time)
+  const shift = shiftOf(kind)
   return {
     cast,
-    scene,
+    scene: shift.scene,
     passerby: null,
     // Under the action, like a busy character's absence, so the Chat Log shows it too.
     sceneAction: [
       sceneAction,
-      ...(def
-        ? [
-            // The shift he is about to work: `recordShiftWorked` runs at the boundary, after
-            // this prompt is built.
-            `(He is working his ${ordinal(game.job.shiftsWorked + 1)} shift as a ${def.title} at ${def.employer}, ${def.duty}.)`
-          ]
-        : []),
-      ...coworkers.map((charId) => workingHereNote(charId, game.job!.jobId)),
+      ...(shift.note ? [shift.note] : []),
+      ...coworkers.map((charId) => workingHereNote(charId, job.jobId)),
       ...(drawn.length > 0 ? [runIntoNote(drawn)] : [])
     ].join('\n')
   }
 }
 
 /**
- * A `project:` verdict: a work session in an otherwise ordinary scene, cast as
- * {@link castPeopleTurn} casts it. A plan's button with no project to work on plays as the
- * meeting alone rather than being refused.
+ * A typed `project:` verdict: a work session in an otherwise ordinary scene, cast as
+ * {@link castPeopleTurn} casts it.
  */
 function castProjectTurn(
   actionType: string,
@@ -1531,45 +1558,27 @@ function castProjectTurn(
   sceneAction: string,
   inPublic: boolean,
   sceneLocation: string,
-  snapshot: TurnSnapshot,
-  attendees: readonly string[] = []
+  snapshot: TurnSnapshot
 ): CastPlan | null {
-  const resolved = resolveProject(actionType.slice('project:'.length))
-  if (!resolved || resolved === 'unassigned') {
-    if (attendees.length > 0) {
-      return castPeopleTurn(mentioned, sceneAction, inPublic, sceneLocation, snapshot, attendees)
-    }
-    // Both refusals are composed from the reader's timetable; the classifier was never told it.
+  const kind = sceneKindOf(actionType)
+  if (kind.kind !== 'project') {
     failTurn(
       rejection(
-        resolved === 'unassigned'
-          ? "That class hasn't handed out its project yet."
+        kind.kind === 'none' && kind.reason
+          ? kind.reason
           : "You don't have a project to work on right now."
       ),
       snapshot
     )
     return null
   }
-
-  const entry = useGameStore.getState().classes[resolved.code]
-  // Straight under the reader's words, ahead of the absences and encounters.
-  const people = castPeopleTurn(
-    mentioned,
-    `${sceneAction}\n(He is putting a work session into his ${entry?.name ?? 'course'} project.)`,
-    inPublic,
-    sceneLocation,
-    snapshot,
-    attendees
-  )
-  if (!people) return null
-  // Armed only once the cast is settled, so a refused turn leaves no session behind.
-  loopState.projectWork = resolved
-  return { ...people, scene: { ...people.scene, projectClass: resolved.code } }
+  return castPeopleTurn(mentioned, sceneAction, inPublic, sceneLocation, snapshot, [], kind)
 }
 
 /**
- * Every other verdict: the people the reader named, or whoever he runs into. A plan's
- * `attendees` come first and clear the busy gate, as the plan's own button brings them.
+ * Every other verdict: the people the reader named, or whoever he runs into, in the kind of
+ * scene the verdict is. A plan's `attendees` come first and clear the busy gate, as the plan's
+ * own button brings them.
  */
 function castPeopleTurn(
   mentioned: string[],
@@ -1577,7 +1586,8 @@ function castPeopleTurn(
   inPublic: boolean,
   sceneLocation: string,
   snapshot: TurnSnapshot,
-  attendees: readonly string[] = []
+  attendees: readonly string[] = [],
+  kind: SceneKindVerdict = NO_KIND
 ): CastPlan | null {
   // Naming her needs her number; checked before availability, so unreachable
   // outranks busy. Safe to name her back: a stranger was refused two gates above.
@@ -1587,54 +1597,22 @@ function castPeopleTurn(
     return null
   }
 
-  // Whoever is working where the action is set clears the busy gate.
-  const workers = workersAtLocation(sceneLocation).map((worker) => worker.charId)
   const called = [...attendees, ...mentioned]
-  const attendance = resolveAttendance(called, undefined, [...workers, ...attendees])
-  const notes = [...attendance.notes, ...commitmentNotes(attendance.cast, attendees, workers)]
+  const composed = composeMeeting({ called, attendees, inPublic, sceneLocation }, kind)
 
   // A named cast that is entirely busy is refused; a partly free one plays, with the absences
   // written under the action.
-  if (called.length > 0 && attendance.cast.length === 0) {
+  if (called.length > 0 && composed.people.length === 0) {
     failTurn(rejection('Nobody you named is free right now.'), snapshot)
     return null
   }
 
-  const named = called.length > 0
-  let cast: string[]
-  let passerby: string | null = null
-  if (named) {
-    cast = attendance.cast
-    // Only a named cast rolls for a passerby: the draw below accounts for its own bodies.
-    passerby = injectPasserby(cast, inPublic, resolveLocationId(sceneLocation))
-    if (passerby) {
-      cast = [...cast, passerby]
-      notes.push(runIntoNote([passerby]))
-    }
-  } else {
-    cast = drawFreeCast(inPublic, sceneLocation)
-    // Every uninvited body is named under the action, whichever branch added it.
-    if (cast.length > 0) notes.push(runIntoNote(cast))
-  }
-
-  // Last, so the people the reader came for have their slots first; the one branch
-  // that can add to a full scene's notes without adding to its cast.
-  const atWork = admitLocals(cast, sceneLocation, { named, inPublic })
   return {
-    cast: atWork.cast,
-    scene: atWork.jobId ? { visitJobId: atWork.jobId } : {},
-    passerby,
-    sceneAction: [sceneAction, ...notes, ...atWork.notes].join('\n')
+    cast: composed.cast,
+    scene: composed.scene,
+    passerby: composed.passerby,
+    sceneAction: [sceneAction, ...composed.notes].join('\n')
   }
-}
-
-/** The encounter draw, with the first night's guaranteed stranger. */
-function drawFreeCast(inPublic: boolean, location?: string | null): string[] {
-  const game = useGameStore.getState()
-  const where = resolveLocationId(location)
-  return isTutorialSlot(game.date, game.time)
-    ? pickFirstNightCast(inPublic, where)
-    : pickCast(inPublic, where)
 }
 
 /** Puts a decided cast on the stage and settles the phone for the slot it spends. */
@@ -1818,7 +1796,7 @@ async function fetchEndingOpening(
 
   // The first night's opening is the authored tutorial and the last morning's the authored
   // graduation: no call, but the plans, overlay and settles are banked either way.
-  if (isTutorialSlot(date, time) || isGraduationSlot(date, time)) {
+  if (isTutorialSlot(date, time, game.semesterIndex) || isGraduationSlot(date, time)) {
     return {
       lines: [],
       hangouts: [],
@@ -2149,7 +2127,7 @@ function projectStatusLines(): string[] {
   const game = useGameStore.getState()
   const entry = game.classes[loopState.projectWork.code]
   if (!entry) return []
-  const period = projectPeriodOf(entry, game.date, game.occasions)
+  const period = projectPeriodOf(entry, game.date, game.calendar)
   if (!period) return []
   // The session being reported is not banked until the boundary, so it is counted in here.
   const worked = workedOn(game.classRecords[loopState.projectWork.code], loopState.projectWork.exam) + 1
@@ -2629,7 +2607,7 @@ async function crossSlotBoundary(): Promise<void> {
   // The same claim filed by the slot of the week, which the map reads; before
   // `advanceSlot`, so the clock still names the scene's slot. Orientation files nothing.
   const seenSlot = shiftSlotOf(shiftWeekdayOf(game.date), game.time)
-  const newlySeen = isOrientationSlot(game.date, game.time)
+  const newlySeen = isOrientationSlot(game.date, game.time, game.semesterIndex)
     ? []
     : useGameStore.getState().markSeenAt(useGameStore.getState().cast, seenSlot)
   // The first standing haunt seen is what earns him BunnyMap, if a contact has not already.
@@ -2825,11 +2803,9 @@ export function enterGame(
     : null
   // Both records are derived from the save the way the cast turn derived them;
   // without them the boundary credits neither the shift nor the session.
-  loopState.jobShift = shiftRecordOf(save.job, save.scene, save.date, save.time)
-  // Only `resolveProject`'s exact-name arm may answer here; its fallback is for a fresh action.
-  const project = save.scene.projectClass ? resolveProject(save.scene.projectClass) : null
-  loopState.projectWork =
-    typeof project === 'object' && project?.code === save.scene.projectClass ? project : null
+  const records = sceneRecordsOf(save.job, save.scene, save.date, save.time)
+  loopState.jobShift = records.jobShift
+  loopState.projectWork = records.projectWork
 
   // A save taken on a line the reader had not turned yet shows that line as it stands, and the
   // next click reads on from it.
@@ -2900,6 +2876,26 @@ export async function leaveToMenu(opts?: { keepCrossing?: boolean }): Promise<vo
 }
 
 /**
+ * Continue from the ending: once the contacts' last posts are in, hands what the ending leaves
+ * to the next semester's roster screen, then leaves the game under the caller's curtain, as
+ * leaving for the menu does. False where there was no playthrough to continue.
+ */
+export async function leaveForNextSemester(): Promise<boolean> {
+  await loopState.endingPostsCall
+  const game = useGameStore.getState()
+  const record = loopState.record
+  const playthroughId = game.playthroughId
+  if (record && playthroughId) {
+    const view = semesterOf(record, game.semesterId ?? undefined)
+    // Read off the store before the teardown resets it: purchases since the goodbyes included.
+    const handoff = carryOf(game, view)
+    stageContinuation({ playthroughId, record, from: view.id, handoff })
+  }
+  await leaveToMenu({ keepCrossing: true })
+  return Boolean(record && playthroughId)
+}
+
+/**
  * Leaves for the main menu without the last word, for a playthrough about to be deleted: the
  * decision point is dropped rather than written, and the writes already queued settle so none
  * lands after its files are gone. The caller is running the crossing back, as `keepCrossing` says.
@@ -2934,9 +2930,14 @@ export async function leaveCreatedScene(): Promise<void> {
  * Enters a replay from the calendar under the curtain the caller raised: the game being played is
  * held in memory as a load of it would find it and torn down with nothing written, and the stay
  * queues every line the scene delivered, the reader's own among them, to be read from its first.
- * Where the game cannot be held now, the curtain lifts back onto it.
+ * An earlier semester's replay stays under that semester's calendar and sky. Where the game
+ * cannot be held now, the curtain lifts back onto it.
  */
-export async function enterReplay(replay: SlotReplay, inputDraft: string): Promise<void> {
+export async function enterReplay(
+  replay: SlotReplay,
+  inputDraft: string,
+  earlier?: Pick<ReplayStayFields, 'calendar' | 'weather' | 'semesterIndex'>
+): Promise<void> {
   const run = currentRun()
   // What the game already queued lands first: the teardown below would drop it.
   await writesSettled()
@@ -2949,7 +2950,7 @@ export async function enterReplay(replay: SlotReplay, inputDraft: string): Promi
   leaveGame(true)
 
   const live = useGameStore.getState()
-  live.loadReplay(replayStayOf(held, replay), held.characters)
+  live.loadReplay({ ...replayStayOf(held, replay), ...earlier }, held.characters)
   const cast = [...replay.cast]
   live.restoreScene({
     ...openingScene(replayLinesOf(replay.transcript)),
@@ -3020,9 +3021,13 @@ export async function switchGame(playthroughId: string, saveId: string): Promise
   const read = await window.api.saves.read(playthroughId, saveId)
   if (!read.ok) throw read.error
   const { record, save } = read.data
+  // The save's own semester: its roster, and the graduates who are loaded beside it.
+  const semester = semesterOf(record, save.semester)
 
   const characters = Object.fromEntries(
-    castOf(record.chars, useSaveStore.getState().characters).map((c) => [c.charId, c])
+    castOf([...semester.chars, ...semester.alumni], useSaveStore.getState().characters).map(
+      (c) => [c.charId, c]
+    )
   )
 
   leaveGame(true)

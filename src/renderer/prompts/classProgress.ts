@@ -3,10 +3,10 @@ import type {
   CharInfo,
   ClassEntry,
   ClassRecord,
-  Occasion,
   ProjectSession
 } from '@shared/types'
 import { studentsOf } from '@shared/classes'
+import type { SemesterCalendar } from '@shared/semesters'
 import {
   isCourse,
   kindOf,
@@ -38,11 +38,11 @@ const EMPTY_RECORD: ClassRecord = { meetings: [] }
 export function examOn(
   entry: ClassEntry,
   date: number,
-  occasions: readonly Occasion[]
+  calendar: SemesterCalendar
 ): ExamPeriod | null {
   if (kindOf(entry) === null) return null
-  if (examMeetingDateOf(entry.slot, 'midterm', occasions) === date) return 'midterm'
-  if (examMeetingDateOf(entry.slot, 'final', occasions) === date) return 'final'
+  if (examMeetingDateOf(entry.slot, 'midterm', calendar) === date) return 'midterm'
+  if (examMeetingDateOf(entry.slot, 'final', calendar) === date) return 'final'
   return null
 }
 
@@ -50,25 +50,25 @@ export function examOn(
 export function examDateOf(
   entry: ClassEntry,
   exam: ExamPeriod,
-  occasions: readonly Occasion[]
+  calendar: SemesterCalendar
 ): number | null {
-  return examMeetingDateOf(entry.slot, exam, occasions)
+  return examMeetingDateOf(entry.slot, exam, calendar)
 }
 
 /**
  * The meeting the midterm comes back at — the first one after it — or null when the midterm
  * is the class's last meeting, which a generated cancellation can produce.
  */
-export function handbackDateOf(entry: ClassEntry, occasions: readonly Occasion[]): number | null {
-  const midterm = examMeetingDateOf(entry.slot, 'midterm', occasions)
-  return midterm === null ? null : firstMeetingAfter(entry.slot, midterm, occasions)
+export function handbackDateOf(entry: ClassEntry, calendar: SemesterCalendar): number | null {
+  const midterm = examMeetingDateOf(entry.slot, 'midterm', calendar)
+  return midterm === null ? null : firstMeetingAfter(entry.slot, midterm, calendar)
 }
 
 /** How many exams the reader is *known* to have aced by `date`. */
 export function handedBackAcedCount(
   records: Readonly<Record<string, ClassRecord>>,
   classes: Readonly<Record<string, ClassEntry>>,
-  occasions: readonly Occasion[],
+  calendar: SemesterCalendar,
   date: number,
   finalsScoresShown: boolean
 ): number {
@@ -76,7 +76,7 @@ export function handedBackAcedCount(
   for (const [code, record] of Object.entries(records)) {
     const entry = classes[code]
     if (entry && record.midtermScore !== undefined && record.midtermScore >= PERFECT_SCORE) {
-      const handback = handbackDateOf(entry, occasions)
+      const handback = handbackDateOf(entry, calendar)
       if (handback !== null && date >= handback) count += 1
     }
     if (finalsScoresShown && record.finalScore !== undefined && record.finalScore >= PERFECT_SCORE) {
@@ -101,13 +101,13 @@ export interface ProjectPeriod {
 export function projectPeriodOf(
   entry: ClassEntry,
   date: number,
-  occasions: readonly Occasion[]
+  calendar: SemesterCalendar
 ): ProjectPeriod | null {
   if (!isCourse(entry) || entry.kind !== 'project') return null
 
-  const meetings = meetingDatesOf(entry.slot, occasions)
-  const midterm = examMeetingDateOf(entry.slot, 'midterm', occasions)
-  const finals = examMeetingDateOf(entry.slot, 'final', occasions)
+  const meetings = meetingDatesOf(entry.slot, calendar)
+  const midterm = examMeetingDateOf(entry.slot, 'midterm', calendar)
+  const finals = examMeetingDateOf(entry.slot, 'final', calendar)
   if (meetings.length === 0 || midterm === null) return null
 
   const difficulty = entry.difficulty
@@ -115,7 +115,7 @@ export function projectPeriodOf(
   // Through the midterm showcase is the first project; the second is set at the handback.
   if (date <= midterm) {
     const assignmentDate = meetings[0]
-    const span = meetingsBefore(entry.slot, midterm, occasions)
+    const span = meetingsBefore(entry.slot, midterm, calendar)
     return {
       exam: 'midterm',
       assignmentDate,
@@ -124,11 +124,11 @@ export function projectPeriodOf(
     }
   }
 
-  const assignmentDate = handbackDateOf(entry, occasions)
+  const assignmentDate = handbackDateOf(entry, calendar)
   if (assignmentDate === null || finals === null) return null
   const span =
-    meetingsBefore(entry.slot, finals, occasions) -
-    meetingsBefore(entry.slot, assignmentDate, occasions)
+    meetingsBefore(entry.slot, finals, calendar) -
+    meetingsBefore(entry.slot, assignmentDate, calendar)
   return {
     exam: 'final',
     assignmentDate,
@@ -167,14 +167,14 @@ export function skippedFactMeetings(
   entry: ClassEntry,
   examDate: number,
   record: ClassRecord | undefined,
-  occasions: readonly Occasion[]
+  calendar: SemesterCalendar
 ): number {
   return (record ?? EMPTY_RECORD).meetings.filter(
     (meeting) =>
       !meeting.attended &&
       meeting.date < examDate &&
-      (classMeetingIndexOf(entry.slot, meeting.date, occasions) ?? 1) > 1 &&
-      examOn(entry, meeting.date, occasions) === null
+      (classMeetingIndexOf(entry.slot, meeting.date, calendar) ?? 1) > 1 &&
+      examOn(entry, meeting.date, calendar) === null
   ).length
 }
 
@@ -238,9 +238,9 @@ function workedSinceLastMeeting(
   date: number,
   record: ClassRecord | undefined,
   exam: ExamPeriod,
-  occasions: readonly Occasion[]
+  calendar: SemesterCalendar
 ): boolean {
-  const meetings = meetingDatesOf(entry.slot, occasions)
+  const meetings = meetingDatesOf(entry.slot, calendar)
   const previous = [...meetings].reverse().find((meeting) => meeting < date) ?? -1
   return sessionsOf(record, exam).some(
     (session) => session.date > previous && session.date <= date
@@ -255,9 +255,9 @@ export function projectSceneContextOf(
   entry: ClassEntry,
   date: number,
   record: ClassRecord | undefined,
-  occasions: readonly Occasion[]
+  calendar: SemesterCalendar
 ): ProjectSceneContext | null {
-  const period = projectPeriodOf(entry, date, occasions)
+  const period = projectPeriodOf(entry, date, calendar)
   if (!period) return null
   const sessions = sessionsOf(record, period.exam)
   const last = sessions[sessions.length - 1]
@@ -275,30 +275,30 @@ export function recapOf(
   entry: ClassEntry,
   date: number,
   record: ClassRecord | undefined,
-  occasions: readonly Occasion[]
+  calendar: SemesterCalendar
 ): ClassMeetingRecap[] {
   const meetings = (record ?? EMPTY_RECORD).meetings.filter((meeting) => meeting.date < date)
   if (meetings.length === 0) return []
 
   const line = (meeting: ClassRecord['meetings'][number]): ClassMeetingRecap => ({
-    week: classMeetingIndexOf(entry.slot, meeting.date, occasions) ?? 0,
+    week: classMeetingIndexOf(entry.slot, meeting.date, calendar) ?? 0,
     attended: meeting.attended,
     summary: meeting.summary,
     factoid: meeting.factoid
   })
 
   const kind = kindOf(entry)
-  const midterm = kind === null ? null : examMeetingDateOf(entry.slot, 'midterm', occasions)
+  const midterm = kind === null ? null : examMeetingDateOf(entry.slot, 'midterm', calendar)
   if (kind === null || midterm === null || date <= midterm) return meetings.map(line)
 
   // The score is withheld until the handback meeting has happened.
-  const handback = handbackDateOf(entry, occasions)
+  const handback = handbackDateOf(entry, calendar)
   const score = handback !== null && date >= handback ? record?.midtermScore : undefined
   const sat = meetings.find((meeting) => meeting.date === midterm)
 
   return [
     {
-      week: classMeetingIndexOf(entry.slot, midterm, occasions) ?? 0,
+      week: classMeetingIndexOf(entry.slot, midterm, calendar) ?? 0,
       attended: true,
       summary: midtermRecapSummary(kind, sat?.attended === true, score)
     },
@@ -314,22 +314,22 @@ export function classSceneContextOf(
   entry: ClassEntry,
   date: number,
   record: ClassRecord | undefined,
-  occasions: readonly Occasion[]
+  calendar: SemesterCalendar
 ): ClassSceneContext | null {
-  const index = classMeetingIndexOf(entry.slot, date, occasions)
+  const index = classMeetingIndexOf(entry.slot, date, calendar)
   if (index === null) return null
 
   const kind = kindOf(entry)
-  const exam = examOn(entry, date, occasions)
-  const isHandback = handbackDateOf(entry, occasions) === date
+  const exam = examOn(entry, date, calendar)
+  const isHandback = handbackDateOf(entry, calendar) === date
 
-  const period = projectPeriodOf(entry, date, occasions)
+  const period = projectPeriodOf(entry, date, calendar)
   const project = period
     ? {
         worked: workedOn(record, period.exam),
         needed: period.needed,
         progress: projectProgress(workedOn(record, period.exam), period.needed),
-        workedThisWeek: workedSinceLastMeeting(entry, date, record, period.exam, occasions)
+        workedThisWeek: workedSinceLastMeeting(entry, date, record, period.exam, calendar)
       }
     : undefined
 
@@ -339,7 +339,7 @@ export function classSceneContextOf(
     isMidterm: exam === 'midterm',
     isFinals: exam === 'final',
     isHandback,
-    recap: recapOf(entry, date, record, occasions),
+    recap: recapOf(entry, date, record, calendar),
     ...(project ? { project } : {}),
     // Only the midterm is handed back in a scene; finals land in narration.
     ...(isHandback && typeof record?.midtermScore === 'number'

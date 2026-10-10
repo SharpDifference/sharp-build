@@ -3,7 +3,7 @@
  * "yesterday morning", "last Monday" — gets that slot's summary out of the playthrough log.
  */
 import { globalSlotOf } from '@shared/jobs'
-import type { GameHistory, TimeSlot } from '@shared/types'
+import type { GameHistory, Season, TimeSlot } from '@shared/types'
 import { formatShortGameDate, formatTimeSlot, shiftWeekdayOf, weekdayOf } from './gameDate'
 
 /** One slot of the semester, by day and half. */
@@ -149,12 +149,13 @@ export function recapLore(
   text: string,
   date: number,
   time: TimeSlot,
-  history: GameHistory
+  history: GameHistory,
+  season: Season
 ): string[] {
   return recalledSlots(text, date, time).flatMap((slot) => {
     const summary = history[slot.date]?.[slot.time]?.replace(/\s*\n+\s*/g, ' ').trim()
     return summary
-      ? [`${formatShortGameDate(slot.date)}, ${formatTimeSlot(slot.time)} summary: ${summary} ${RECAP_GUARD}`]
+      ? [`${formatShortGameDate(slot.date, season)}, ${formatTimeSlot(slot.time)} summary: ${summary} ${RECAP_GUARD}`]
       : []
   })
 }

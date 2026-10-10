@@ -57,7 +57,8 @@ const {
   endingArtEntry,
   photoEntry,
   profilePictureEntry,
-  replaysFromBackup
+  replaysFromBackup,
+  semesterEndingArtEntry
 } = await import('../src/shared/backup')
 const { cgRel, expressionRel, STAGING_DIR } = await import('../src/shared/characterFiles')
 const { validateRecord } = await import('../src/shared/jsonValidate')
@@ -258,6 +259,29 @@ describe('exportBackup', () => {
 })
 
 describe('importBackup', () => {
+  // A later semester's picture sits beside the first one's under its own name, and a restore that
+  // dropped it would lose the one picture its ending ever drew.
+  it("carries a later semester's graduation picture out and back", async () => {
+    await seedSettings()
+    const { playthroughId } = await seedPlaythrough()
+    const later = PNG_BYTES
+    await writeFile(getEndingArtPath(playthroughId, '1700000000999'), later)
+    const archive = join(root, 'semesters.zip')
+    await exportBackup(archive)
+
+    const entries = await entriesOf(archive)
+    const backup = JSON.parse(new TextDecoder().decode(entries[BACKUP_NAME])) as BackupFile
+    expect(backup.semesterEndingArt).toEqual([{ playthroughId, semesterId: '1700000000999' }])
+    expect(entries[semesterEndingArtEntry(playthroughId, '1700000000999')]).toEqual(later)
+
+    await rm(getSavesPath(), { recursive: true, force: true })
+    await importBackup(archive)
+    expect(await readFile(getEndingArtPath(playthroughId, '1700000000999'))).toEqual(
+      Buffer.from(later)
+    )
+    expect(await readFile(getEndingArtPath(playthroughId))).toEqual(Buffer.from(ENDING_ART))
+  })
+
   it('puts a backup back and keeps the stored key', async () => {
     const { archive, playthroughId, saveIds, character } = await seedAndExport()
 

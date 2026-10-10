@@ -108,10 +108,12 @@ const api: VenusUniversityApi = {
     playthroughs: () => ipcRenderer.invoke('saves:playthroughs'),
     list: (playthroughId) => ipcRenderer.invoke('saves:list', playthroughId),
     read: (playthroughId, saveId) => ipcRenderer.invoke('saves:read', playthroughId, saveId),
-    enroll: (draft) => ipcRenderer.invoke('saves:enroll', draft),
+    enroll: (draft, playthroughId) => ipcRenderer.invoke('saves:enroll', draft, playthroughId),
     enrollment: (playthroughId) => ipcRenderer.invoke('saves:enrollment', playthroughId),
     create: (playthrough, draft, playthroughId) =>
       ipcRenderer.invoke('saves:create', playthrough, draft, playthroughId),
+    continueSemester: (playthroughId, semesterId, semester, draft) =>
+      ipcRenderer.invoke('saves:continueSemester', playthroughId, semesterId, semester, draft),
     slot: (playthroughId, draft, replay) =>
       ipcRenderer.invoke('saves:slot', playthroughId, draft, replay),
     overwrite: (playthroughId, saveId, draft) =>
@@ -125,11 +127,19 @@ const api: VenusUniversityApi = {
     deletePlaythrough: (playthroughId) =>
       ipcRenderer.invoke('saves:deletePlaythrough', playthroughId),
     rename: (playthroughId, name) => ipcRenderer.invoke('saves:rename', playthroughId, name),
-    generateEndingArt: (playthroughId, sheet, friendCount, group) =>
-      ipcRenderer.invoke('saves:generateEndingArt', playthroughId, sheet, friendCount, group),
-    readEndingArt: (playthroughId) => ipcRenderer.invoke('saves:readEndingArt', playthroughId),
-    exportEndingArt: (playthroughId) =>
-      ipcRenderer.invoke('saves:exportEndingArt', playthroughId),
+    generateEndingArt: (playthroughId, sheet, friendCount, group, semesterId) =>
+      ipcRenderer.invoke(
+        'saves:generateEndingArt',
+        playthroughId,
+        sheet,
+        friendCount,
+        group,
+        semesterId
+      ),
+    readEndingArt: (playthroughId, semesterId) =>
+      ipcRenderer.invoke('saves:readEndingArt', playthroughId, semesterId),
+    exportEndingArt: (playthroughId, semesterId) =>
+      ipcRenderer.invoke('saves:exportEndingArt', playthroughId, semesterId),
     readProfilePicture: (playthroughId) =>
       ipcRenderer.invoke('saves:readProfilePicture', playthroughId),
     writeProfilePicture: (playthroughId, png) =>

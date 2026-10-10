@@ -1,4 +1,8 @@
+import { SENIOR_YEAR } from '@shared/classes'
+import { FALLBACK_DORM } from '@shared/dorms'
 import { appError, toAppError } from '@shared/errors'
+import { fallbackHandleOf } from '@shared/feed'
+import { intakeOf, seasonOf, semesterChain } from '@shared/semesters'
 import { emptyTallies } from '@shared/tallies'
 import {
   charKeyOf,
@@ -9,22 +13,29 @@ import {
   type HiddenScheduleAssignment,
   type JobAssignment,
   type Occasion,
+  type PlaythroughRecord,
   type Result
 } from '@shared/types'
 import {
   buildClassPrompt,
   decorateClasses,
   validateClassDraft,
-  type ClassGenReply
+  type ClassGenReply,
+  type ContinuedCatalog
 } from '../prompts/classPrompt'
 import {
+  buildContinuedProfilePrompt,
   buildProfilePrompt,
   feedAssignmentsOf,
   hiddenScheduleAssignmentsOf,
   jobAssignmentsOf,
   mergeProfiles,
   springBreakAssignmentsOf,
+  validateContinuedProfiles,
   validateProfileDraft,
+  type ContinuedProfileDraft,
+  type ContinuedProfileInput,
+  type ContinuedProfileReply,
   type ProfileGenDraft,
   type ProfileGenReply
 } from '../prompts/profilePrompt'
@@ -39,6 +50,7 @@ import { SEED_WORD_BAG, SEED_WORDS } from '../prompts/seedWords'
 import { buildSchedules, type ScheduleResult } from './classScheduler'
 import { useGameStore } from './gameStore'
 import { useGrabBagStore } from './grabBagStore'
+import type { SemesterHandoff } from './semesterCarry'
 import { retrySilently } from './silentRetry'
 
 /** The cancellation group New Game's three one-shots register under. */
@@ -174,8 +186,10 @@ async function fetchProfiles(current: StartAttempt): Promise<Result<ProfileGenDr
   }
 }
 
-/** Fetches the save's own calendar occasions. */
-async function fetchOccasions(current: StartAttempt): Promise<Result<Occasion[]>> {
+/** Fetches the semester's own calendar occasions. */
+async function fetchOccasions(
+  current: Pick<StartAttempt, 'occasionRequest' | 'occasionRequests'>
+): Promise<Result<Occasion[]>> {
   const generated = await window.api.llm.generateOccasions<OccasionGenDraft>(
     current.occasionRequest,
     NEW_GAME_LLM_GROUP
@@ -274,15 +288,16 @@ export async function startNewGame(roster: readonly Character[]): Promise<StartO
   sleepers = []
   // Clears the tokens any call since the main menu added, so the enrollment counts only this run's.
   useGameStore.setState({ tallies: emptyTallies() })
-  const occasionRequests = planOccasionSlots((count) =>
-    useGrabBagStore.getState().drawMany(SEED_WORD_BAG, SEED_WORDS, count)
+  const occasionRequests = planOccasionSlots(
+    (count) => useGrabBagStore.getState().drawMany(SEED_WORD_BAG, SEED_WORDS, count),
+    'spring'
   )
   const current: StartAttempt = {
     roster,
     classRequest: buildClassPrompt(roster),
     profileRequest: buildProfilePrompt(roster),
     occasionRequests,
-    occasionRequest: buildOccasionPrompt(occasionRequests)
+    occasionRequest: buildOccasionPrompt(occasionRequests, 'spring')
   }
   attempt = current
 
@@ -308,8 +323,325 @@ export async function retryNewGameStart(roster: readonly Character[]): Promise<S
 export function cancelNewGameStart(): void {
   run = null
   attempt = null
+  nextAttempt = null
   const waking = sleepers
   sleepers = []
   for (const wake of waking) wake()
   void window.api.jobs.cancelGroup(NEW_GAME_LLM_GROUP)
+}
+
+/**
+ * A Continue on its way to the next semester's roster screen: the playthrough, its record as the
+ * ending read it, the semester that just ended, and what that ending handed on.
+ */
+export interface Continuation {
+  playthroughId: string
+  record: PlaythroughRecord
+  /** The semester that just ended; undefined for the first. */
+  from: string | undefined
+  handoff: SemesterHandoff
+}
+
+let continuation: Continuation | null = null
+
+/** Hands the next semester's roster screen the Continue it is about to be raised for. */
+export function stageContinuation(next: Continuation): void {
+  continuation = next
+}
+
+/** What is staged, left where it is: a `useState` initializer runs twice under StrictMode. */
+export function stagedContinuation(): Continuation | null {
+  return continuation
+}
+
+/** Drops the staged Continue, once the screen holding it has mounted. */
+export function clearStagedContinuation(): void {
+  continuation = null
+}
+
+/** A next semester as its generation settles it: the semester, and what its registration carries beyond it. */
+export interface NextSemesterResult extends StartResult {
+  /** What each graduate is doing now, by charId. */
+  pursuits: Record<string, string>
+  /** The senior picked to graduate early at a fall's ceremony. */
+  fallGraduate?: string
+}
+
+/** How one press of a next semester's Start ended. */
+export type NextOutcome =
+  | { status: 'ready'; data: NextSemesterResult }
+  | { status: 'failed'; error: AppError; missing: string[] }
+  | { status: 'cancelled' }
+
+/** One press of a next semester's Start, held across its retries. */
+interface NextAttempt {
+  roster: readonly Character[]
+  characters: Readonly<Record<string, Character>>
+  continuation: Continuation
+  catalog: ContinuedCatalog
+  profileInput: ContinuedProfileInput
+  classRequest: ReturnType<typeof buildClassPrompt>
+  profileRequest: ReturnType<typeof buildContinuedProfilePrompt>
+  occasionRequests: OccasionRequest[]
+  occasionRequest: ReturnType<typeof buildOccasionPrompt>
+  classDraft?: ClassGenReply
+  profiles?: ContinuedProfileDraft
+  occasions?: Occasion[]
+}
+
+let nextAttempt: NextAttempt | null = null
+
+/** Every class this timeline has run, by code, oldest semester first: what the catalog avoids. */
+function takenClassesOf(
+  record: PlaythroughRecord,
+  from: string | undefined
+): ContinuedCatalog['taken'] {
+  const taken = new Map<string, string>()
+  for (const { view } of semesterChain(record, from)) {
+    for (const entry of Object.values(view.classes)) {
+      if (!taken.has(entry.code)) taken.set(entry.code, entry.name)
+    }
+  }
+  return [...taken].map(([code, name]) => ({ code, name }))
+}
+
+/** Fetches and validates a next semester's catalog. */
+async function fetchNextClasses(current: NextAttempt): Promise<Result<ClassGenReply>> {
+  const generated = await window.api.llm.generateClasses<ClassGenReply>(
+    current.classRequest,
+    NEW_GAME_LLM_GROUP
+  )
+  if (!generated.ok) return { ok: false, error: generated.error }
+  try {
+    return { ok: true, data: validateClassDraft(generated.data, current.roster, current.catalog) }
+  } catch (err) {
+    return { ok: false, error: toAppError(err) }
+  }
+}
+
+/** Fetches and validates a next semester's profiles. */
+async function fetchNextProfiles(current: NextAttempt): Promise<Result<ContinuedProfileDraft>> {
+  const generated = await window.api.llm.generateProfiles<ContinuedProfileReply>(
+    current.profileRequest,
+    NEW_GAME_LLM_GROUP
+  )
+  if (!generated.ok) return { ok: false, error: generated.error }
+  try {
+    return { ok: true, data: validateContinuedProfiles(generated.data, current.profileInput) }
+  } catch (err) {
+    return { ok: false, error: toAppError(err) }
+  }
+}
+
+/**
+ * A next semester composed out of its three replies: the returning girls kept on their year,
+ * dorm, course load, employer and habits, the first-years as New Game deals them.
+ */
+function composeNext(
+  current: NextAttempt,
+  classDraft: ClassGenReply,
+  profiles: ContinuedProfileDraft,
+  occasions: Occasion[]
+): NextSemesterResult {
+  const { roster, characters } = current
+  const { handoff } = current.continuation
+  const keyOf = (character: Character): string => charKeyOf(character.firstName, character.lastName)
+
+  const merged = Object.fromEntries(
+    roster.map((character) => {
+      const key = keyOf(character)
+      const entry = classDraft.characters[key]
+      const prior = handoff.priorProfiles[character.charId]
+      const newcomer = profiles.newcomers.characters[key]
+      // A returning girl takes as many classes as she did, inside the bounds a first-year is held to.
+      const load = prior ? Object.keys(prior.schedule).length : (newcomer?.classesTaken ?? 4)
+      const classesTaken = Math.min(6, Math.max(3, load || 4))
+      return [
+        key,
+        {
+          ...entry,
+          year: prior?.year ?? 1,
+          dorm: prior?.dorm ?? newcomer?.dorm ?? FALLBACK_DORM,
+          classesTaken,
+          majorClassesTaken: Math.min(entry.majorClassesTaken, classesTaken)
+        }
+      ]
+    })
+  )
+  const schedules = buildSchedules(decorateClasses({ ...classDraft, characters: merged }), roster)
+
+  /** One assignment map re-keyed from charKey to charId, absences dropped. */
+  const byCharId = <T,>(byKey: Record<string, T>, among: readonly Character[]): Record<string, T> =>
+    Object.fromEntries(
+      among
+        .map((c) => [c.charId, byKey[keyOf(c)]] as const)
+        .filter(([, assignment]) => assignment !== undefined)
+    ) as Record<string, T>
+
+  const onRoster = (charId: string): boolean => roster.some((c) => c.charId === charId)
+  const returningJobs = Object.fromEntries(
+    Object.entries(handoff.jobs).filter(([charId]) => onRoster(charId))
+  )
+  const returningHaunts = Object.fromEntries(
+    Object.entries(handoff.haunts).filter(([charId]) => onRoster(charId))
+  )
+
+  // Handles stay as they were; the posts are the break's, a first-year having none.
+  const graduates = handoff.alumni.flatMap((charId) =>
+    characters[charId] ? [characters[charId]] : []
+  )
+  const feeds: Record<string, FeedAssignment> = {
+    ...byCharId(feedAssignmentsOf(profiles.newcomers), roster)
+  }
+  for (const character of [...roster, ...graduates]) {
+    const prior = handoff.priorProfiles[character.charId]
+    if (!prior) continue
+    feeds[character.charId] = {
+      handle: prior.handle ?? fallbackHandleOf(character.firstName, character.lastName),
+      winterPosts: profiles.breakPosts[keyOf(character)] ?? []
+    }
+  }
+
+  const season = seasonOf(handoff.index)
+  // A fall's early graduate: one of its seniors from the August intake, picked as it starts.
+  const seniors = roster.filter((character) => {
+    const prior = handoff.priorProfiles[character.charId]
+    return prior !== undefined && prior.year >= SENIOR_YEAR && intakeOf(prior) === 'fall'
+  })
+  const fallGraduate =
+    season === 'fall' && seniors.length > 0
+      ? seniors[Math.floor(Math.random() * seniors.length)].charId
+      : undefined
+
+  return {
+    schedules,
+    jobs: { ...byCharId(jobAssignmentsOf(profiles.newcomers), roster), ...returningJobs },
+    haunts: {
+      ...byCharId(hiddenScheduleAssignmentsOf(profiles.newcomers), roster),
+      ...returningHaunts
+    },
+    feeds,
+    springBreakPlans: byCharId(profiles.springBreakPlans, roster),
+    occasions,
+    pursuits: byCharId(profiles.pursuits, graduates),
+    ...(fallGraduate ? { fallGraduate } : {})
+  }
+}
+
+/** Runs whatever a next semester's attempt is still missing, then composes it. */
+async function runNextAttempt(current: NextAttempt, mine: object): Promise<NextOutcome> {
+  const [classResult, profileResult, occasionResult] = await Promise.all([
+    current.classDraft
+      ? Promise.resolve<Result<ClassGenReply>>({ ok: true, data: current.classDraft })
+      : sendUntilAnswered('classes', mine, () => fetchNextClasses(current)),
+    current.profiles
+      ? Promise.resolve<Result<ContinuedProfileDraft>>({ ok: true, data: current.profiles })
+      : sendUntilAnswered('profiles', mine, () => fetchNextProfiles(current)),
+    current.occasions
+      ? Promise.resolve<Result<Occasion[]>>({ ok: true, data: current.occasions })
+      : sendUntilAnswered('occasions', mine, () => fetchOccasions(current))
+  ])
+  if (stale(mine)) return { status: 'cancelled' }
+
+  // Banked before the verdict below, so a retry re-sends only what is still missing.
+  if (classResult.ok) current.classDraft = classResult.data
+  if (profileResult.ok) current.profiles = profileResult.data
+  if (occasionResult.ok) current.occasions = occasionResult.data
+
+  if (!classResult.ok || !profileResult.ok || !occasionResult.ok) {
+    const failures: { label: string; error: AppError }[] = []
+    if (!classResult.ok) failures.push({ label: CALL_LABELS.classes, error: classResult.error })
+    if (!profileResult.ok) {
+      failures.push({ label: CALL_LABELS.profiles, error: profileResult.error })
+    }
+    if (!occasionResult.ok) {
+      failures.push({ label: CALL_LABELS.occasions, error: occasionResult.error })
+    }
+    return {
+      status: 'failed',
+      error: failures[0].error,
+      missing: failures.map((failure) => failure.label)
+    }
+  }
+
+  nextAttempt = null
+  return {
+    status: 'ready',
+    data: composeNext(current, classResult.data, profileResult.data, occasionResult.data)
+  }
+}
+
+/**
+ * A next semester's Start: the three one-shots in parallel — a catalog around the returning
+ * majors and away from every class already run, the first-years' profiles beside the returning
+ * girls' break and the graduates' lives, and the season's occasions — then the local passes.
+ */
+export async function startNextSemester(
+  next: Continuation,
+  roster: readonly Character[],
+  characters: Readonly<Record<string, Character>>
+): Promise<NextOutcome> {
+  const mine = {}
+  run = mine
+  sleepers = []
+  // Clears the tokens any call since the ending added, so the registration counts only this run's.
+  useGameStore.setState({ tallies: emptyTallies() })
+
+  const { handoff } = next
+  const season = seasonOf(handoff.index)
+  const keyOf = (character: Character): string => charKeyOf(character.firstName, character.lastName)
+  const returning = roster.filter((character) => handoff.priorProfiles[character.charId])
+  const catalog: ContinuedCatalog = {
+    majors: Object.fromEntries(
+      returning.map((character) => [
+        keyOf(character),
+        handoff.priorProfiles[character.charId].major
+      ])
+    ),
+    taken: takenClassesOf(next.record, next.from)
+  }
+  const profileInput: ContinuedProfileInput = {
+    season,
+    newcomers: roster.filter((character) => !handoff.priorProfiles[character.charId]),
+    returning,
+    graduates: handoff.alumni.flatMap((charId) => {
+      const character = characters[charId]
+      const prior = handoff.priorProfiles[charId]
+      if (!character || !prior) return []
+      return [
+        { character, major: prior.major, ...(prior.pursuing ? { pursuing: prior.pursuing } : {}) }
+      ]
+    })
+  }
+  const occasionRequests = planOccasionSlots(
+    (count) => useGrabBagStore.getState().drawMany(SEED_WORD_BAG, SEED_WORDS, count),
+    season
+  )
+  const current: NextAttempt = {
+    roster,
+    characters,
+    continuation: next,
+    catalog,
+    profileInput,
+    classRequest: buildClassPrompt(roster, catalog),
+    profileRequest: buildContinuedProfilePrompt(profileInput),
+    occasionRequests,
+    occasionRequest: buildOccasionPrompt(occasionRequests, season)
+  }
+  nextAttempt = current
+  return runNextAttempt(current, mine)
+}
+
+/** A next semester's Retry: re-sends only the calls with no reply yet. */
+export async function retryNextSemester(
+  next: Continuation,
+  roster: readonly Character[],
+  characters: Readonly<Record<string, Character>>
+): Promise<NextOutcome> {
+  const current = nextAttempt
+  if (!current) return startNextSemester(next, roster, characters)
+  const mine = {}
+  run = mine
+  sleepers = []
+  return runNextAttempt(current, mine)
 }
