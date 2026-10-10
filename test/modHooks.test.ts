@@ -136,3 +136,26 @@ describe('preparing a way on', () => {
     expect(await ready).toBeNull()
   })
 })
+
+describe('the scene hooks', () => {
+  const Nothing = (): null => null
+
+  it('offers the scene places of the mods that are on, in list order, under their ids', async () => {
+    const hooks = await fresh({ off: false }, ['first', 'second', 'off'])
+    const play = { Seat: Nothing, Panel: Nothing }
+    hooks.registerHooks('second', { scenePlay: play })
+    hooks.registerHooks('off', { scenePlay: play })
+    hooks.registerHooks('first', { scenePlay: play })
+    hooks.registerHooks('first', { playerActs: () => undefined })
+    expect(hooks.scenePlays().map((entry) => entry.modId)).toEqual(['first', 'second'])
+  })
+
+  it('hands a landed scene reply to the mods that are on', async () => {
+    const hooks = await fresh({ off: false }, ['first', 'off'])
+    const seen = vi.fn()
+    hooks.registerHooks('first', { afterSceneReply: (ctx) => seen(ctx.reply.extra) })
+    hooks.registerHooks('off', { afterSceneReply: () => seen('off') })
+    hooks.afterSceneReply({ reply: { lines: [], extra: 'kept' }, cast: [], solo: false, ending: false })
+    expect(seen.mock.calls).toEqual([['kept']])
+  })
+})
