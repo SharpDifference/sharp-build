@@ -21,7 +21,6 @@ import { quizAnswers, type QuizAnswer } from '@shared/academics'
 import {
   allBackgrounds,
   fullNameOf,
-  READER_SPEAKER,
   roomBgIdOf,
   type AppError,
   type SpriteRef,
@@ -1182,13 +1181,11 @@ export function GameView(): JSX.Element {
 
   const text = currentLine?.text ?? ''
 
-  // Who the stage lights are on, if anyone: a narrator line (`''`) and the reader's
-  // (`READER_SPEAKER`) both resolve to nobody, and nothing dims.
+  // Who the stage lights are on, if anyone: a narrator line (`''`) resolves to nobody, and
+  // nothing dims.
   const speakingCharId = currentLine?.speaker ? charKeyToId[currentLine.speaker] : undefined
-  // The name the box wears: hers, or the reader's own on his line, which only a replay shows; a
-  // key that resolves to nobody wears none, as narration does.
-  const speaker =
-    speakingCharId || currentLine?.speaker === READER_SPEAKER ? speakerNameOf(currentLine) : ''
+  // The name the box wears: hers; a key that resolves to nobody wears none, as narration does.
+  const speaker = speakingCharId ? speakerNameOf(currentLine) : ''
 
   // Typewriter reveal, keyed on the line's identity so two identical lines in a row both reveal.
   const [revealed, setRevealed] = useState(0)
@@ -1249,7 +1246,7 @@ export function GameView(): JSX.Element {
 
   /**
    * The voice under the typewriter: a blip on every third letter or digit, at the pitch of
-   * whoever is speaking, or the narrator's for narration and the reader's own lines.
+   * whoever is speaking, or the narrator's for narration.
    */
   const revealedBefore = useRef(0)
   useEffect(() => {

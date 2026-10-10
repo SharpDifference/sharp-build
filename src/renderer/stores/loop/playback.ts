@@ -79,8 +79,8 @@ export function playbackOffered(s: PlaybackSlice): boolean {
 /**
  * Whether stepping back a line is open: a line of the reply on screen has been reached, and the
  * scene has an earlier line that says something. Closed while a turn is in flight before its
- * reply's first line shows, and at a decision point after a reply with no lines. A replay shows
- * the reader's lines too, so there it is open wherever an earlier line says something.
+ * reply's first line shows, and at a decision point after a reply with no lines. A replay has no
+ * turn in flight, so there it is open wherever an earlier line of the scene says something.
  */
 export function rewindOpenOf(s: PlaybackSlice): boolean {
   if (!playbackOffered(s)) return false

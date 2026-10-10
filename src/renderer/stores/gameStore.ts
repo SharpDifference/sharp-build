@@ -721,7 +721,7 @@ interface GameStoreState {
   truncateUnread: () => void
   /**
    * Steps playback back to the previous line that says something, across the reader's own lines
-   * as far as the scene's first reply — onto his own lines too in a replay — putting the lines
+   * as far as the scene's first reply — in a replay as far as its first line — putting the lines
    * after it back on the queue and the stage back as it stood there. Returns false, changing
    * nothing, when there is no such line.
    */
@@ -1273,26 +1273,22 @@ function foldedStageOf(
 
 /**
  * What reaching the next pending line sets — popped and shown, its `bg` and actions applied, one
- * fewer beat ahead read — with the reader's lines in front of it logged and charged on the way.
- * In a replay his line is charged and then shown like any other. `landed` is false when only his
- * lines were left, and null means the queue was empty.
+ * fewer beat ahead read — with the reader's lines in front of it logged and charged on the way,
+ * a replay's as well. `landed` is false when only his lines were left, and null means the queue
+ * was empty.
  */
 function nextLineFields(
   state: GameStoreState
 ): { patch: Partial<GameStoreState>; landed: boolean } | null {
   if (state.pendingLines.length === 0) return null
 
-  // A rewind across the reader's line put it back on the queue: it is passed over unshown, and
-  // charged as the decision point before it was.
+  // The reader's line on the queue — a replay's, or one a rewind put back — is passed over
+  // unshown, and charged as the decision point before it was.
   let queue = state.pendingLines
   let sceneLog = state.sceneLog
   let absences = { offStage: state.offStage, departed: state.departed }
   const reader = (line: SceneLine | undefined): boolean => line?.speaker === READER_SPEAKER
-  if (state.replaying && reader(queue[0])) {
-    const charged = chargeAbsences(absences.offStage, absences.departed)
-    absences = { offStage: charged.offStage, departed: charged.departed }
-  }
-  while (!state.replaying && reader(queue[0])) {
+  while (reader(queue[0])) {
     const charged = chargeAbsences(absences.offStage, absences.departed)
     absences = { offStage: charged.offStage, departed: charged.departed }
     sceneLog = [...sceneLog, queue[0]]
@@ -1858,8 +1854,7 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
   rewindLine: () => {
     const state = get()
     const log = state.sceneLog
-    const replaying = state.replaying !== null
-    const target = rewindTargetOf(log, replaying)
+    const target = rewindTargetOf(log, state.replaying !== null)
     if (target === -1) return false
     const sceneLog = log.slice(0, target + 1)
     const stepped = log.slice(target + 1)
@@ -1869,12 +1864,9 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
       currentLine: log[target],
       ...foldedStageOf(state, sceneLog),
       lineRewound: state.lineRewound + 1,
-      // The lines stepped back over were read, all but the reader's own counting outside a
-      // replay, where his are shown too, and so was the decision point if it was open.
-      reread:
-        state.reread +
-        (replaying ? stepped.length : nonReaderCount(stepped)) +
-        (state.awaitingInput ? 1 : 0)
+      // The lines stepped back over were read, all but the reader's own, and so was the decision
+      // point if it was open.
+      reread: state.reread + nonReaderCount(stepped) + (state.awaitingInput ? 1 : 0)
     })
     return true
   },

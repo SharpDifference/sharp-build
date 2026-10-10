@@ -2929,7 +2929,7 @@ export async function leaveCreatedScene(): Promise<void> {
 /**
  * Enters a replay from the calendar under the curtain the caller raised: the game being played is
  * held in memory as a load of it would find it and torn down with nothing written, and the stay
- * queues every line the scene delivered, the reader's own among them, to be read from its first.
+ * queues every line the scene delivered to be read from its first, the reader's own passed over.
  * An earlier semester's replay stays under that semester's calendar and sky. Where the game
  * cannot be held now, the curtain lifts back onto it.
  */

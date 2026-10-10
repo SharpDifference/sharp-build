@@ -329,7 +329,6 @@
 - A picture a cut mounts decodes synchronously, there being nothing left underneath it to hide a deferred decode.
 - The layer answers no pointer and each control takes its own back, so there is no `stopPropagation` anywhere.
 - The back mark on the box's round cap mirrors the forward mark on its flat side.
-- A replay says the reader's own lines in the box under a name pill with no portrait, nobody's face standing for his; the pill alone sits where the portrait's would end.
 
 ### The landing
 
