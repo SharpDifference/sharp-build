@@ -560,7 +560,7 @@ export function CalendarModal({
               {...gestures(dead, quietLift, quietPress)}
               onClick={() => onReplay(selected, time, day.current ? undefined : day.index)}
             >
-              {time === 0 ? 'Replay day' : 'Replay night'}
+              Replay
             </motion.button>
           </DeadNote>
         )}
