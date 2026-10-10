@@ -1,0 +1,55 @@
+import { describe, expect, it } from 'vitest'
+import { gamesOffered, seatsFor, MINI_GAMES, type MiniGameDef } from '../src/shared/minigames'
+import { modOn, NO_SWITCHES, withMod, type ModDef } from '../src/shared/mods'
+
+/** Which games a scene offers: the mod's switch, the place, and who is there to play. */
+
+function game(id: string, over: Partial<MiniGameDef> = {}): MiniGameDef {
+  return {
+    id,
+    modId: 'pack',
+    name: id,
+    icon: '',
+    blurb: '',
+    players: { min: 0, max: 1 },
+    skillBrief: '',
+    ...over
+  }
+}
+
+const cards = game('cards')
+const darts = game('darts', { locations: ['pub'], players: { min: 1, max: 3 } })
+const cabinet = game('cabinet', { locations: ['arcade'], players: { min: 0, max: 0 } })
+const all = [cards, darts, cabinet]
+const on = (): boolean => true
+const ids = (games: MiniGameDef[]): string[] => games.map((g) => g.id)
+
+describe('gamesOffered', () => {
+  it('offers a game only at its own places, and a game with none anywhere', () => {
+    expect(ids(gamesOffered({ location: 'pub', girls: 1 }, on, all))).toEqual(['cards', 'darts'])
+    expect(ids(gamesOffered({ location: 'arcade', girls: 0 }, on, all))).toEqual(['cards', 'cabinet'])
+    expect(ids(gamesOffered({ location: null, girls: 2 }, on, all))).toEqual(['cards'])
+  })
+
+  it('holds back a game that needs more girls than are here', () => {
+    expect(ids(gamesOffered({ location: 'pub', girls: 0 }, on, all))).toEqual(['cards'])
+  })
+
+  it('seats the girls here up to what the game takes', () => {
+    expect(seatsFor(darts, 5)).toBe(3)
+    expect(seatsFor(cards, 0)).toBe(0)
+    expect(seatsFor(cabinet, 2)).toBe(0)
+  })
+
+  it('offers nothing from a pack while the framework it requires is off', () => {
+    const mods: ModDef[] = [
+      { id: MINI_GAMES, name: '', author: '', version: '', scope: 'anytime', defaultOn: true, blurb: '' },
+      { id: 'pack', name: '', author: '', version: '', scope: 'anytime', defaultOn: true, blurb: '', requires: [MINI_GAMES] }
+    ]
+    const spot = { location: 'pub', girls: 1 }
+    const off = withMod(NO_SWITCHES, MINI_GAMES, false)
+    expect(gamesOffered(spot, (id) => modOn(off, id, undefined, mods), all)).toEqual([])
+    const back = withMod(off, MINI_GAMES, true)
+    expect(ids(gamesOffered(spot, (id) => modOn(back, id, undefined, mods), all))).toEqual(['cards', 'darts'])
+  })
+})
