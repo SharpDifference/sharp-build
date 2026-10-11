@@ -284,7 +284,37 @@ export function MiniGamePanel({ theme, onClose }: ScenePanelProps): JSX.Element 
                 disabled={result !== null}
                 autoComplete="off"
                 onChange={(event) => setRemark(event.target.value)}
+                // Sent from the key itself: the scene's own Enter is answered before a form's
+                // submit would be, and must not hear this one.
+                onKeyDown={(event) => {
+                  if (event.key !== 'Enter') return
+                  event.preventDefault()
+                  event.stopPropagation()
+                  speak()
+                }}
               />
+              <motion.button
+                id="minigame-say-send"
+                className="vu-minigame-saysend"
+                type="submit"
+                aria-label="Say it"
+                disabled={answering || !remark.trim() || result !== null}
+                {...gestures(answering || !remark.trim() || result !== null, quietLift, quietPress)}
+              >
+                <svg
+                  viewBox="0 0 24 24"
+                  width="18"
+                  height="18"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2.75"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  aria-hidden="true"
+                >
+                  <path d="M9 6l6 6-6 6" />
+                </svg>
+              </motion.button>
             </form>
           )}
           {/* Standing through the result's beat, dead, so the table does not jump as it ends. */}
