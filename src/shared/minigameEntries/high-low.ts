@@ -13,7 +13,7 @@ const HIGH_LOW: MiniGameDef = {
     {
       id: 'calls',
       describe:
-        'how many calls each player makes: 5 for a full game, fewer for a quick one, 1 for a single call each as a tiebreak',
+        'how many calls each player makes; a single call each is how a tiebreak is played',
       min: 1,
       max: 5,
       default: 5
