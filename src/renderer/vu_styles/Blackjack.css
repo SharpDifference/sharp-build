@@ -1,5 +1,5 @@
-/* Blackjack: her hand over the reader's, the count of hands and the two moves. Drawn on the
-   mini-game table; the buttons are base.css's. */
+/* Blackjack: the girls' hands over the reader's, the count of hands and the two moves. Drawn on
+   the mini-game table; the buttons are base.css's. */
 
 .vu-blackjack {
   display: flex;
@@ -14,6 +14,18 @@
   flex-direction: column;
   align-items: center;
   gap: 6px;
+}
+
+/* The girls' hands side by side, in the order they play. */
+.vu-blackjack-girls {
+  display: flex;
+  justify-content: center;
+  gap: 22px;
+}
+
+/* Several girls: each keeps a column of one width, so a hand that grows moves nobody. */
+.vu-blackjack-girls[data-several] > .vu-blackjack-side {
+  width: 150px;
 }
 
 /* A hand is a row of cards, tall enough to stand empty without the table jumping. */
@@ -130,4 +142,46 @@
 /* Her move, or the hand over: the moves stand back. */
 .vu-blackjack-moves[data-waiting] {
   opacity: 0.35;
+}
+
+/* Around a table of several the girls' cards are smaller, and their hands close up sooner. */
+.vu-blackjack-girls[data-several] .vu-blackjack-hand {
+  gap: 8px;
+  min-height: 80px;
+}
+
+.vu-blackjack-girls[data-several] .vu-blackjack-hand[data-many] {
+  gap: 0;
+}
+
+.vu-blackjack-girls[data-several] :is(.vu-blackjack-card, .vu-blackjack-back) {
+  width: 56px;
+  height: 78px;
+  border-radius: 10px;
+}
+
+.vu-blackjack-girls[data-several] .vu-blackjack-rank {
+  font-size: 28px;
+}
+
+.vu-blackjack-girls[data-several] .vu-blackjack-suit {
+  font-size: 18px;
+}
+
+.vu-blackjack-girls[data-several] .vu-blackjack-back svg {
+  width: 24px;
+  height: 24px;
+}
+
+/* The hands a girl has won, under her cards in the quieter voice. */
+.vu-blackjack-won {
+  margin: 0;
+  color: var(--vu-text-muted);
+  font: 700 12px var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Whose move it is: the name over that hand is said in the accent. */
+.vu-blackjack-side[data-turn] > .vu-blackjack-who {
+  color: var(--vu-accent);
 }
