@@ -15,7 +15,7 @@ const def: ModDef = {
     {
       id: SUGGEST_OFTEN,
       label: 'Girls suggest games often',
-      hint: 'Off, each game says how readily a girl brings it up, by place. On, she is keen to play any game wherever it can be played. Never in a class or on a shift, either way.',
+      hint: 'Off: each game says how readily a girl brings it up, by place.\nOn: she is keen to play any game, wherever it can be played.\nNever in a class or on a shift, either way.',
       default: false
     }
   ]
