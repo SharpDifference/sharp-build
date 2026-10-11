@@ -335,22 +335,40 @@ export function Pool({ play }: { play: GamePlay }): JSX.Element {
       sync()
     }
 
-    const beginTurn = (at: number): void => {
+    /** She settles over the shot she has chosen, her line of aim showing for a beat before she plays. */
+    const herPlay = (at: number): void => {
+      if (!her) return
+      const chosen = herShot(rack, her.skill)
+      plan = chosen
+      if (chosen.place) placeCue(rack.balls, chosen.place)
+      rack.inHand = false
+      phase = 'her-aim'
+      sync()
+      due = { at: at + HER_AIM_MS, run: () => shoot(chosen.angle, chosen.power) }
+    }
+
+    /**
+     * Whoever is on takes the table. The reader's is his at once. Hers, at his own pace, waits
+     * until he has read past everything said so far, the shot before it included; `said` is a
+     * turn already told of, the break of a rack just called.
+     */
+    const beginTurn = (at: number, said = false): void => {
       if (rack.turn === 'her' && her) {
         phase = 'her'
         sync()
-        due = {
-          at: at + HER_PAUSE_MS,
-          run: (then) => {
-            const chosen = herShot(rack, her.skill)
-            plan = chosen
-            if (chosen.place) placeCue(rack.balls, chosen.place)
-            rack.inHand = false
-            phase = 'her-aim'
-            sync()
-            due = { at: then + HER_AIM_MS, run: () => shoot(chosen.angle, chosen.power) }
-          }
+        if (!latest.current.stepped) {
+          due = { at: at + HER_PAUSE_MS, run: herPlay }
+          return
         }
+        if (said) {
+          herPlay(at)
+          return
+        }
+        const go = (): void => {
+          if (gone || ended) return
+          herPlay(performance.now())
+        }
+        void latest.current.read().then(go, go)
         return
       }
       phase = rack.inHand ? 'place' : 'aim'
@@ -358,14 +376,30 @@ export function Pool({ play }: { play: GamePlay }): JSX.Element {
     }
 
     const nextRack = (at: number): void => {
-      breaker = otherSide(breaker)
-      shots = []
-      rack = freshRack(breaker)
-      if (her)
-        latest.current.narrate(
-          `Rack ${racks.length + 1}. ${breaker === 'reader' ? 'You break' : `${her.name} breaks`}.`
-        )
-      beginTurn(at)
+      const next = otherSide(breaker)
+      const set = (then: number, said: boolean): void => {
+        breaker = next
+        shots = []
+        rack = freshRack(breaker)
+        beginTurn(then, said)
+      }
+      if (!her) {
+        set(at, false)
+        return
+      }
+      const called = latest.current.narrate(
+        `Rack ${racks.length + 1}. ${next === 'reader' ? 'You break' : `${her.name} breaks`}.`
+      )
+      if (!latest.current.stepped) {
+        set(at, false)
+        return
+      }
+      // At his own pace the rack just won stays on the table until he has read how it ended.
+      const go = (): void => {
+        if (gone || ended) return
+        set(performance.now(), true)
+      }
+      void called.then(go, go)
     }
 
     /** The balls have stopped: the shot is judged, said, and the next thing set going. */
@@ -402,12 +436,20 @@ export function Pool({ play }: { play: GamePlay }): JSX.Element {
         phase = 'between'
         sync()
         remark(got.record)
-        due = { at: at + RACK_PAUSE_MS, run: nextRack }
+        // At his own pace the next rack waits on him, not on the clock.
+        due = { at: now.stepped ? at : at + RACK_PAUSE_MS, run: nextRack }
         return
       }
       phase = 'settled'
       sync()
       remark(got.record)
+      if (now.stepped) {
+        // At his own pace his turn is his at once, whatever she is saying; hers waits on a word
+        // of hers, so that it is among what he reads before she plays.
+        if (rack.turn === 'reader' || !her) beginTurn(at)
+        else due = { at, run: beginTurn }
+        return
+      }
       due = { at: at + TURN_PAUSE_MS, run: beginTurn }
     }
 

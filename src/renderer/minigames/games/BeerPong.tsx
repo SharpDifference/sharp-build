@@ -154,12 +154,16 @@ export function BeerPong({ play }: { play: GamePlay }): JSX.Element {
     setFlight({ shot: next.log[next.log.length - 1], next, down: false })
   }
 
-  /** The reader stops whatever is sweeping; the second stop is the throw. */
-  function stop(): void {
+  /**
+   * The reader stops whatever is sweeping; the second stop is the throw. A stop made by key is
+   * him moving on from the line on the box, as a press on the table already is.
+   */
+  function stop(byKey = false): void {
     if (waiting) return
     const now = performance.now()
     if (now - pressedAt.current < PRESS_GAP_MS) return
     pressedAt.current = now
+    if (byKey) play.moved()
     if (stage === 0) {
       aim.current = swept.current * 2 - 1
       setStage(1)
@@ -169,8 +173,9 @@ export function BeerPong({ play }: { play: GamePlay }): JSX.Element {
   }
 
   /** The reader has the cups he is throwing at pulled together, once. */
-  function askRerack(): void {
+  function askRerack(byKey = false): void {
     if (waiting || !canRerack(game, 0)) return
+    if (byKey) play.moved()
     const left = game.sides[1].cups.length
     setGame(rerack(game, 0))
     setStage(0)
@@ -235,10 +240,34 @@ export function BeerPong({ play }: { play: GamePlay }): JSX.Element {
   }, [game])
 
   // A girl's throw, after a beat: her re-rack first where the cups are scattered, then the ball.
+  // Read at the reader's pace there is no beat: her move is made once he has moved past
+  // everything said so far, the throw before it included.
   useEffect(() => {
     if (!her || flight || speaking) return
     const side = game.turn
     const last = game.log[game.log.length - 1]
+    if (play.stepped) {
+      // The reader's own side's re-rack is his to call.
+      const pulls = side === 1 && herRerack(game, side)
+      const cups = game.sides[0].cups.length
+      let on = true
+      void play
+        .read()
+        .catch(() => undefined)
+        .then(() => {
+          if (!on || !live.current || finished.current) return
+          if (pulls) {
+            setGame(rerack(game, side))
+            play.narrate(`${her.name} calls ${several ? 'their' : 'her'} re-rack: your ${cups} cups are pulled in tight.`)
+            remark(who - 1, `${her.name} used her side's one re-rack: the ${cups} cups she is throwing at were pulled in tight.`)
+            return
+          }
+          launch(herThrow(game.sides[side === 0 ? 1 : 0].cups, her.skill, tipsyOf(game, side)))
+        })
+      return () => {
+        on = false
+      }
+    }
     const pause = !several ? HER_PAUSE_MS : !last || last.who === 0 ? BRISK.afterReaderMs : BRISK.betweenMs
     // The beat runs from the throw before hers, so time spent on a remark is not waited out twice.
     const left = Math.max(300, pause - (performance.now() - landedAt.current))
@@ -351,7 +380,7 @@ export function BeerPong({ play }: { play: GamePlay }): JSX.Element {
       // A button under focus answers Space itself.
       if (target && (['TEXTAREA', 'INPUT', 'BUTTON'].includes(target.tagName) || target.isContentEditable)) return
       event.preventDefault()
-      stopNow.current()
+      stopNow.current(true)
     }
     window.addEventListener('keydown', onKey, true)
     return () => window.removeEventListener('keydown', onKey, true)
@@ -375,7 +404,7 @@ export function BeerPong({ play }: { play: GamePlay }): JSX.Element {
         viewBox={`${VIEW.left} ${VIEW.top} ${VIEW.width} ${VIEW.height}`}
         role="img"
         aria-label={`The table: ${game.sides[1].cups.length} cups at the far end, ${game.sides[0].cups.length} at yours`}
-        onClick={stop}
+        onClick={() => stop()}
       >
         <rect className="vu-beerpong-top" x={-HALF_WIDTH} y="0" width={HALF_WIDTH * 2} height={LENGTH} rx="0.3" />
         <line className="vu-beerpong-mid" x1={-HALF_WIDTH} x2={HALF_WIDTH} y1={LENGTH / 2} y2={LENGTH / 2} />
@@ -468,7 +497,8 @@ export function BeerPong({ play }: { play: GamePlay }): JSX.Element {
               inert={waiting || undefined}
               data-waiting={waiting || undefined}
               {...gestures(waiting, lift, press)}
-              onClick={stop}
+              // A click with no pointer behind it is the button answering a key.
+              onClick={(event) => stop(event.detail === 0)}
               // Enter held on the button is one press, as Space is.
               onKeyDown={(event) => {
                 if (event.repeat) event.preventDefault()
@@ -482,7 +512,7 @@ export function BeerPong({ play }: { play: GamePlay }): JSX.Element {
               inert={!rerackable || undefined}
               data-waiting={!rerackable || undefined}
               {...gestures(!rerackable, lift, press)}
-              onClick={askRerack}
+              onClick={(event) => askRerack(event.detail === 0)}
               onKeyDown={(event) => {
                 if (event.repeat) event.preventDefault()
               }}

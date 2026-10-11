@@ -62,6 +62,9 @@ const SAY_WAIT_MS = 3000
 /** The least a hand lies there once the wait for her line is over. */
 const AFTER_REMARK_MS = 600
 
+/** At the reader's own pace, the beat a move takes on the board once the text allows it. */
+const STEP_MS = 400
+
 /** The table: the hand on it, and the hands already finished, this one among them once it is over. */
 interface Table {
   hand: HandState
@@ -172,6 +175,17 @@ export function Poker({ play }: { play: GamePlay }): JSX.Element | null {
   const movedFrom = useRef<HandState | null>(null)
   // The checks, calls and folds made since the last line: they are said together, in one.
   const unsaid = useRef<ActionMade[]>([])
+  // The last line said: once it is on the box, the reader has reached everything said so far.
+  const reached = useRef<Promise<void>>(Promise.resolve())
+  // The finished hand the next was dealt from: one deal a hand.
+  const dealtFrom = useRef<HandState | null>(null)
+
+  /** Says a line, and keeps hold of when the reader gets to it. */
+  function tell(text: string): Promise<void> {
+    const shown = play.narrate(text)
+    reached.current = shown
+    return shown
+  }
   useEffect(() => {
     live.current = true
     return () => {
@@ -193,10 +207,10 @@ export function Poker({ play }: { play: GamePlay }): JSX.Element | null {
     // On the next tick, so a mount that is at once undone and redone (StrictMode's) says it once.
     const timer = setTimeout(() => {
       const dealer = names[names.length - 1]
-      play.narrate(
+      tell(
         `${dealer} shuffles and deals hold'em for ${listed(['you', ...names.slice(0, -1), 'herself'])}: ${stack} in play chips each, blinds ${SMALL_BLIND} and ${BIG_BLIND}, up to ${hands} hands, and the most chips at the end wins.`
       )
-      play.narrate(dealLine(names, hand))
+      tell(dealLine(names, hand))
     }, 0)
     return () => clearTimeout(timer)
     // Once, as the table opens.
@@ -214,32 +228,51 @@ export function Poker({ play }: { play: GamePlay }): JSX.Element | null {
    * check, a call or a fold waits to be said with the others of its round, in one line: when the
    * reader is to move, before a bet or a raise, with the next card, or with how the hand ended.
    */
-  function carry(next: HandState, line?: string): void {
+  function carry(next: HandState, line?: string, own = false): void {
+    let last: Promise<void> | undefined
     const said = (text: string): void => {
       const all = [routine(), text].filter(Boolean).join(' ')
-      if (all) play.narrate(all)
+      if (all) last = tell(all)
     }
+    const rest: string[] = []
     if (!next.over) {
       if (line || next.toAct === 0) said(line ?? '')
-      setTable({ hand: next, done })
+    } else {
+      const [first, ...more] = resultLines(names, next)
+      said([line, first].filter(Boolean).join(' '))
+      rest.push(...more)
+      if (rest.length) last = tell(rest.join(' '))
+    }
+    const land = (): void => {
+      if (!next.over) {
+        setTable({ hand: next, done })
+        return
+      }
+      settledAt.current = performance.now()
+      const all = [...done, next]
+      setTable({ hand: next, done: all })
+      const stacks = next.seats.map((seat) => seat.stack)
+      if (!gameOver(stacks, all.length, hands)) {
+        remark(all)
+        return
+      }
+      finished.current = true
+      play.finish({
+        outcome: gameOutcome(stacks),
+        summary: pokerSummary(names, stacks, all.length),
+        account: pokerAccount(names, all, stack, hands)
+      })
+    }
+    // At the reader's own pace the board shows a girl's move, a card or a result only once he
+    // has got to its line. His own move shows at once, and so does one that leaves him to act:
+    // his buttons are never kept waiting, and pressing one is him moving on.
+    const held = play.stepped && !own && last && (next.over || next.toAct !== 0)
+    if (!held || !last) {
+      land()
       return
     }
-    settledAt.current = performance.now()
-    const [first, ...rest] = resultLines(names, next)
-    said([line, first].filter(Boolean).join(' '))
-    if (rest.length) play.narrate(rest.join(' '))
-    const all = [...done, next]
-    setTable({ hand: next, done: all })
-    const stacks = next.seats.map((seat) => seat.stack)
-    if (!gameOver(stacks, all.length, hands)) {
-      remark(all)
-      return
-    }
-    finished.current = true
-    play.finish({
-      outcome: gameOutcome(stacks),
-      summary: pokerSummary(names, stacks, all.length),
-      account: pokerAccount(names, all, stack, hands)
+    void last.then(() => {
+      if (live.current && !finished.current) land()
     })
   }
 
@@ -294,12 +327,12 @@ export function Poker({ play }: { play: GamePlay }): JSX.Element | null {
     // A bet, a raise and anything all-in has a line to itself, after what led to it.
     if (did.kind === 'bet' || did.kind === 'raise' || did.allIn) {
       const before = routine()
-      if (before) play.narrate(before)
-      carry(next, actionLine(names, did))
+      if (before) tell(before)
+      carry(next, actionLine(names, did), did.seat === 0)
       return
     }
     unsaid.current.push(did)
-    carry(next)
+    carry(next, undefined, did.seat === 0)
   }
 
   /** The reader's move, from one of his buttons. */
@@ -353,8 +386,21 @@ export function Poker({ play }: { play: GamePlay }): JSX.Element | null {
   useEffect(() => {
     if (!seated || hand.over || hand.toAct === 0) return
     const wait = hand.toAct === null ? STREET_MS : hand.seats[0].folded || hand.seats[0].out ? WATCHING_MS : GIRL_MS
-    const timer = setTimeout(step, wait)
-    return () => clearTimeout(timer)
+    if (!play.stepped) {
+      const timer = setTimeout(step, wait)
+      return () => clearTimeout(timer)
+    }
+    // At his own pace: a beat for the board, and then not before he has got to the last line said.
+    let gone = false
+    const timer = setTimeout(() => {
+      void reached.current.then(() => {
+        if (!gone) step()
+      })
+    }, STEP_MS)
+    return () => {
+      gone = true
+      clearTimeout(timer)
+    }
     // Every step puts a new hand on the table.
   }, [hand])
 
@@ -363,13 +409,24 @@ export function Poker({ play }: { play: GamePlay }): JSX.Element | null {
     if (!seated || !hand.over || over || speaking) return
     // Counted from when the hand was settled, so time spent waiting on her line is not added to.
     const lain = performance.now() - settledAt.current
-    const timer = setTimeout(() => {
-      if (finished.current) return
-      const stacks = hand.seats.map((seat) => seat.stack)
-      const next = dealHand(stacks, nextButton(stacks, hand.button), hand.no + 1, freshDeck())
-      play.narrate(dealLine(names, next))
-      setTable({ hand: next, done })
-    }, Math.max(NEXT_HAND_MS - lain, AFTER_REMARK_MS))
+    const timer = setTimeout(
+      () => {
+        if (finished.current || dealtFrom.current === hand) return
+        dealtFrom.current = hand
+        const stacks = hand.seats.map((seat) => seat.stack)
+        const next = dealHand(stacks, nextButton(stacks, hand.button), hand.no + 1, freshDeck())
+        const shown = tell(dealLine(names, next))
+        if (!play.stepped) {
+          setTable({ hand: next, done })
+          return
+        }
+        // The cards are dealt once he has stepped past how the last hand ended.
+        void shown.then(() => {
+          if (live.current && !finished.current) setTable({ hand: next, done })
+        })
+      },
+      play.stepped ? STEP_MS : Math.max(NEXT_HAND_MS - lain, AFTER_REMARK_MS)
+    )
     return () => clearTimeout(timer)
     // A hand ends once, which the hand itself says.
   }, [hand, over, speaking])

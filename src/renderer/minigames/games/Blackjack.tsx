@@ -188,6 +188,11 @@ export function Blackjack({ play }: { play: GamePlay }): JSX.Element | null {
   const sayCap = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
   // When the hand on the table was settled.
   const settledAt = useRef(0)
+  // Read at his own pace, a hand whose result he has not reached yet: his moves are over.
+  const [settling, setSettling] = useState(false)
+  const closing = useRef(false)
+  // One of them has been asked for a line that is not on the box yet.
+  const saying = useRef(false)
   useEffect(() => {
     live.current = true
     return () => {
@@ -200,7 +205,7 @@ export function Blackjack({ play }: { play: GamePlay }): JSX.Element | null {
   const score = tableWon(table.done, girls.length)
   const over = gameOver(score, table.done.length, hands)
   const handNo = table.done.length + (table.phase === 'over' ? 0 : 1)
-  const myTurn = table.phase === 'mine'
+  const myTurn = table.phase === 'mine' && !settling
   const mover = table.phase === 'girls' ? table.seats[table.at] : undefined
 
   // The game is on from the moment they sit down, and the first deal is said.
@@ -217,10 +222,19 @@ export function Blackjack({ play }: { play: GamePlay }): JSX.Element | null {
     // Once, as the table opens.
   }, [])
 
+  /**
+   * Whether the reader got to a line with the table still there to play on. Read at his own
+   * pace, a move is made on the table only once its line is on the box, which is after he has
+   * moved past the one before it.
+   */
+  function reached(line: Promise<void>): Promise<boolean> {
+    const here = (): boolean => live.current && !finished.current
+    return line.then(here, () => false)
+  }
+
   /** The hand is settled: its result is said, and the game either ends or goes on. */
-  function settle(now: Table): void {
-    if (finished.current) return
-    settledAt.current = performance.now()
+  async function settle(now: Table): Promise<void> {
+    if (finished.current || closing.current) return
     const hand: TableHand = {
       mine: now.mine,
       hits: now.hits,
@@ -228,7 +242,17 @@ export function Blackjack({ play }: { play: GamePlay }): JSX.Element | null {
     }
     const done = [...table.done, hand]
     const won = tableWon(done, girls.length)
-    play.narrate(`${tableResult(names, hand)} ${countLine('You', names, won)}.`)
+    const line = play.narrate(`${tableResult(names, hand)} ${countLine('You', names, won)}.`)
+    if (play.stepped) {
+      // The hands stay as they lie until he has read the move that ended it.
+      closing.current = true
+      setSettling(true)
+      const here = await reached(line)
+      closing.current = false
+      if (!here) return
+      setSettling(false)
+    }
+    settledAt.current = performance.now()
     setTable({
       ...now,
       phase: 'over',
@@ -256,6 +280,8 @@ export function Blackjack({ play }: { play: GamePlay }): JSX.Element | null {
    */
   function remark(done: readonly TableHand[]): void {
     if (!seated || remarks.current >= REMARKS[play.chattiness]) return
+    // At his own pace a hand can be over before her last line has come: never two at once.
+    if (play.stepped && saying.current) return
     const last = done[done.length - 1]
     const told = tableTold(names, last, done.length)
     const won = tableWon(done, girls.length)
@@ -278,13 +304,19 @@ export function Blackjack({ play }: { play: GamePlay }): JSX.Element | null {
     setSpeaking(true)
     clearTimeout(sayCap.current)
     sayCap.current = setTimeout(release, SAY_WAIT_MS)
+    const said = (): void => {
+      saying.current = false
+      release()
+    }
+    saying.current = true
     void Promise.resolve()
       .then(() => play.say(girls[by].charId, cue))
-      .then(release, release)
+      .then(said, said)
   }
 
   function hit(): void {
-    if (!myTurn || finished.current) return
+    if (!myTurn || finished.current || closing.current) return
+    play.moved()
     const before = handTotal(table.mine)
     const [card, deck] = drawCard(table.deck, Math.random, inPlay(table))
     const mine = [...table.mine, card]
@@ -294,7 +326,11 @@ export function Blackjack({ play }: { play: GamePlay }): JSX.Element | null {
       play.narrate(`You hit on ${before.total}: ${rankWord(card.rank)}. ${total}, bust.`)
       // Heads-up his bust is her hand as it lies; around a table the girls play on for it.
       if (several) setTable({ ...now, phase: 'girls' })
-      else settle(now)
+      else {
+        // At his own pace his card is on the table at once; the result waits to be read.
+        if (play.stepped) setTable(now)
+        void settle(now)
+      }
       return
     }
     play.narrate(
@@ -305,7 +341,8 @@ export function Blackjack({ play }: { play: GamePlay }): JSX.Element | null {
   }
 
   function stand(): void {
-    if (!myTurn || finished.current) return
+    if (!myTurn || finished.current || closing.current) return
+    play.moved()
     play.narrate(`You stand on ${handTotal(table.mine).total}.`)
     setTable({ ...table, phase: 'girls' })
   }
@@ -313,24 +350,32 @@ export function Blackjack({ play }: { play: GamePlay }): JSX.Element | null {
   /**
    * The next step of the girl whose turn it is: her face-down card first, then a move at a time
    * until she stands or busts, which passes the turn to the next girl or settles the hand.
+   * Read at the reader's own pace, each step is worked out, said, and put on the table once he
+   * has got to its line; `gone` says the step was called off meanwhile.
    */
-  function girlStep(): void {
+  async function girlStep(gone: () => boolean = () => false): Promise<void> {
     const at = table.at
     const seat = table.seats[at]
     if (!seat || finished.current || !live.current) return
     const name = names[at]
     const put = (next: Seat): Seat[] => table.seats.map((other, i) => (i === at ? next : other))
+    /** Says a step; false where it is not to be made after all. */
+    const told = async (text: string): Promise<boolean> => (await reached(play.narrate(text))) && !gone()
     if (!seat.turned) {
-      play.narrate(
-        `${name} turns her card: ${rankWord(seat.cards[1].rank)}. She has ${totalWord(seat.cards)}.`
-      )
+      const line = `${name} turns her card: ${rankWord(seat.cards[1].rank)}. She has ${totalWord(seat.cards)}.`
+      if (!play.stepped) play.narrate(line)
+      else if (!(await told(line))) return
       setTable({ ...table, seats: put({ ...seat, turned: true }) })
       return
     }
     /** Her hand is finished: the next girl's turn, or the end of the hand. */
     const pass = (now: Table): void => {
       if (at + 1 < now.seats.length) setTable({ ...now, at: at + 1 })
-      else settle(now)
+      else {
+        // At his own pace her last card is on the table while the result waits to be read.
+        if (play.stepped) setTable(now)
+        void settle(now)
+      }
     }
     // What she can see: every hand finished before hers, and one card of each still to come.
     const shown = [table.mine, ...table.seats.slice(0, at).map((other) => other.cards)]
@@ -340,7 +385,9 @@ export function Blackjack({ play }: { play: GamePlay }): JSX.Element | null {
     const made: HerMoveMade = { move, total: before, sound: soundAt(seat.cards, shown, behind) }
     const moves = [...seat.moves, made]
     if (move === 'stand') {
-      play.narrate(`${name} stands on ${before}.`)
+      const line = `${name} stands on ${before}.`
+      if (!play.stepped) play.narrate(line)
+      else if (!(await told(line))) return
       pass({ ...table, seats: put({ ...seat, moves }) })
       return
     }
@@ -349,11 +396,15 @@ export function Blackjack({ play }: { play: GamePlay }): JSX.Element | null {
     const { total } = handTotal(cards)
     const now: Table = { ...table, deck, seats: put({ ...seat, cards, moves }) }
     if (total > 21) {
-      play.narrate(`${name} hits on ${before}: ${rankWord(card.rank)}. ${total}, bust.`)
+      const line = `${name} hits on ${before}: ${rankWord(card.rank)}. ${total}, bust.`
+      if (!play.stepped) play.narrate(line)
+      else if (!(await told(line))) return
       pass(now)
       return
     }
-    play.narrate(`${name} hits on ${before}: ${rankWord(card.rank)}. ${total}.`)
+    const line = `${name} hits on ${before}: ${rankWord(card.rank)}. ${total}.`
+    if (!play.stepped) play.narrate(line)
+    else if (!(await told(line))) return
     setTable(now)
   }
 
@@ -390,26 +441,43 @@ export function Blackjack({ play }: { play: GamePlay }): JSX.Element | null {
 
   // The girls' moves, after a beat, one step at a time.
   useEffect(() => {
-    if (!mover) return
-    const timer = setTimeout(girlStep, several ? GIRLS_PAUSE_MS : HER_PAUSE_MS)
-    return () => clearTimeout(timer)
+    if (!mover || settling) return
+    // At his own pace there is no pause to read by: the step waits on its own line instead.
+    let off = false
+    const timer = setTimeout(
+      () => void girlStep(() => off),
+      play.stepped ? 0 : several ? GIRLS_PAUSE_MS : HER_PAUSE_MS
+    )
+    return () => {
+      off = true
+      clearTimeout(timer)
+    }
     // Each step changes whose turn it is, what she holds, what she has done or whether her card is up.
-  }, [table.phase, table.at, mover?.turned, mover?.cards.length, mover?.moves.length])
+  }, [table.phase, table.at, mover?.turned, mover?.cards.length, mover?.moves.length, settling])
 
   // The next hand, once the last has been looked at and whoever spoke has said what she had to say.
   useEffect(() => {
     if (!seated || table.phase !== 'over' || over || speaking) return
     // Counted from when the hand was settled, so time spent waiting on her line is not added to.
     const lain = performance.now() - settledAt.current
-    const timer = setTimeout(() => {
-      if (finished.current) return
-      const next = deal(table.deck, table.done, girls.length)
-      play.narrate(
-        tableDeal(names, next.done.length + 1, next.mine, next.seats.map((seat) => seat.cards[0]))
-      )
-      setTable(next)
-    }, Math.max(NEXT_HAND_MS - lain, AFTER_REMARK_MS))
-    return () => clearTimeout(timer)
+    let off = false
+    const timer = setTimeout(
+      async () => {
+        if (finished.current) return
+        const next = deal(table.deck, table.done, girls.length)
+        const line = play.narrate(
+          tableDeal(names, next.done.length + 1, next.mine, next.seats.map((seat) => seat.cards[0]))
+        )
+        // At his own pace the cards are dealt once he has read how the last hand came out.
+        if (play.stepped && (!(await reached(line)) || off)) return
+        setTable(next)
+      },
+      play.stepped ? 0 : Math.max(NEXT_HAND_MS - lain, AFTER_REMARK_MS)
+    )
+    return () => {
+      off = true
+      clearTimeout(timer)
+    }
     // A hand ends once, which the count of hands done says.
   }, [table.phase, table.done.length, over, speaking])
 

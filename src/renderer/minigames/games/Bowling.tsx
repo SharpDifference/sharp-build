@@ -145,20 +145,21 @@ export function Bowling({ play }: { play: GamePlay }): JSX.Element {
     setRolling({ who, thrown, before: table.standing, fallen, hit: false })
   }
 
-  /** The reader stops whatever is sweeping; the third stop is the throw. */
-  function stop(): void {
-    if (waiting) return
+  /** The reader stops whatever is sweeping; the third stop is the throw. Says whether it was one. */
+  function stop(): boolean {
+    if (waiting) return false
     const now = performance.now()
-    if (now - pressedAt.current < PRESS_GAP_MS) return
+    if (now - pressedAt.current < PRESS_GAP_MS) return false
     pressedAt.current = now
     if (balls.length === 0 && stage === 0) play.started()
     if (stage === 0) aim.current.position = swept.current * 2 - 1
     else if (stage === 1) aim.current.power = swept.current
     else {
       bowl({ ...aim.current, hook: swept.current * 2 - 1 }, 0)
-      return
+      return true
     }
     setStage(stage + 1)
+    return true
   }
 
   /** The ball has stopped and the pins are counted: onto the sheet, into the scene, and on. */
@@ -257,9 +258,23 @@ export function Bowling({ play }: { play: GamePlay }): JSX.Element {
     )
   }, [balls])
 
-  // A girl's ball, after a beat: thrown at what is standing, at her own skill.
+  // A girl's ball, after a beat: thrown at what is standing, at her own skill. Read at the
+  // reader's own pace there is no beat: she bowls once he has moved past everything said of the
+  // ball before.
   useEffect(() => {
     if (!her || rolling || speaking) return
+    if (play.stepped) {
+      let mine = true
+      void play
+        .read()
+        .catch(() => undefined)
+        .then(() => {
+          if (mine && live.current && !finished.current) bowl(herThrow(table.standing, her.skill), table.who)
+        })
+      return () => {
+        mine = false
+      }
+    }
     const afterReader = balls.length > 0 && balls[balls.length - 1].who === 0
     const pause = !several ? HER_PAUSE_MS : afterReader ? BRISK.afterReaderMs : BRISK.betweenMs
     // The beat runs from the ball before hers, so time spent on a remark is not waited out twice.
@@ -356,8 +371,13 @@ export function Bowling({ play }: { play: GamePlay }): JSX.Element {
       const target = event.target as HTMLElement | null
       // A button under focus answers Space itself.
       if (target && (['TEXTAREA', 'INPUT', 'BUTTON'].includes(target.tagName) || target.isContentEditable)) return
+      // The table's own listener, heard first, has already taken this press as him moving on.
+      const stepped = event.defaultPrevented
       event.preventDefault()
-      stopNow.current()
+      if (!stopNow.current()) return
+      // A stop by key is him moving on, and the one step this press is worth.
+      event.stopImmediatePropagation()
+      if (!stepped) play.moved()
     }
     window.addEventListener('keydown', onKey, true)
     return () => window.removeEventListener('keydown', onKey, true)
@@ -382,7 +402,7 @@ export function Bowling({ play }: { play: GamePlay }): JSX.Element {
         viewBox={`${-VIEW.half} 0 ${VIEW.half * 2} ${VIEW.height}`}
         role="img"
         aria-label={`The lane, ${standing.length - down.length} pins standing`}
-        onClick={stop}
+        onClick={() => void stop()}
       >
         <rect className="vu-bowling-gutter" x={-VIEW.half} y="0" width={VIEW.half * 2} height={VIEW.height} rx="3" />
         <rect className="vu-bowling-boards" x={-LANE_HALF} y="0" width={LANE_HALF * 2} height={VIEW.height} />
@@ -461,7 +481,10 @@ export function Bowling({ play }: { play: GamePlay }): JSX.Element {
             type="button"
             className="vu-btn vu-btn--outline vu-paper vu-btn--panel"
             {...gestures(waiting, lift, press)}
-            onClick={stop}
+            // Pressed by key there was no press on the surface to say he has moved on.
+            onClick={(event) => {
+              if (stop() && event.detail === 0) play.moved()
+            }}
             // Enter held on the button is one press, as Space is.
             onKeyDown={(event) => {
               if (event.repeat) event.preventDefault()

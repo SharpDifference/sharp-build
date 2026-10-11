@@ -51,6 +51,9 @@ const PAIR_MS = 700
 /** How long a cat takes to cross the table and swap two cards. */
 const CAT_MS = 1700
 
+/** Read at the reader's pace, the beat between a girl's first card and her second. */
+const HER_BEAT_MS = 450
+
 /** The longest the table waits on something being said. */
 const SAY_WAIT_MS = 3000
 
@@ -209,6 +212,11 @@ export function CatPairs({ play }: { play: GamePlay }): JSX.Element {
   const sayCap = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
   // When the two cards now face up were turned.
   const shownAt = useRef(0)
+  // Read at the reader's pace: a miss left face up for him, until he turns his next card.
+  const [held, setHeld] = useState<number[]>([])
+  // Read at the reader's pace: the short wait on a remark being written, and what ends it.
+  const hold = useRef<Promise<void>>(Promise.resolve())
+  const freed = useRef<(() => void) | undefined>(undefined)
   useEffect(() => {
     live.current = true
     return () => {
@@ -268,6 +276,12 @@ export function CatPairs({ play }: { play: GamePlay }): JSX.Element {
       awaited.current++
       clearTimeout(sayCap.current)
       setSpeaking(false)
+      freed.current?.()
+    }
+    if (play.stepped) {
+      hold.current = new Promise((resolve) => {
+        freed.current = resolve
+      })
     }
     setSpeaking(true)
     clearTimeout(sayCap.current)
@@ -282,10 +296,113 @@ export function CatPairs({ play }: { play: GamePlay }): JSX.Element {
       .then(said, said)
   }
 
+  /** The table is gone or the game handed back: whatever was waiting on a line does nothing more. */
+  const gone = (): boolean => !live.current || finished.current
+
+  /** The last pair is taken: the game is handed back, once. */
+  function end(now: Game): void {
+    setPhase('over')
+    finished.current = true
+    const final = pairCounts(now)
+    play.finish({
+      outcome: seated ? gameOutcome(final) : 'played',
+      summary: gameSummary(names, final, now.turns),
+      account: gameAccount(names, now, withCat)
+    })
+  }
+
+  /**
+   * At the reader's pace, a girl's turn from the table as it stands at `from`: it begins once he
+   * has moved past everything said so far, so a miss before hers lies face up until he has read
+   * it. Her two cards are turned a beat apart and the turn is said in one line.
+   */
+  async function herTurn(from: Game): Promise<void> {
+    const seat = from.turn - 1
+    const first = herFirst(from, memories.current[seat] ?? [])
+    await play.read()
+    if (gone()) return
+    memories.current = memories.current.map((memory, i) =>
+      observe(memory, first, from.cards[first], girls[i].skill)
+    )
+    setHeld([])
+    setUp([first])
+    const second = herSecond(from, memories.current[seat] ?? [], first, girls[seat].skill)
+    const now = playTurn(from, first, second)
+    const made = turnsMade(now).at(-1)!
+    const over = isOver(now)
+    await new Promise((resolve) => setTimeout(resolve, HER_BEAT_MS))
+    if (gone()) return
+    play.narrate(
+      `${turnLine(names[seat], made)}${!over && made.run > 0 ? ` ${countLine('You', names, pairCounts(now))}.` : ''}`
+    )
+    memories.current = memories.current.map((memory, i) =>
+      observe(memory, second, from.cards[second], girls[i].skill)
+    )
+    if (made.run > 0) {
+      memories.current = memories.current.map((memory) => cleared(memory, [first, second]))
+    }
+    setUp([first, second])
+    setGame(now)
+    if (over) {
+      end(now)
+      return
+    }
+    setPhase('show')
+    await settled(now, made.run > 0, [first, second])
+  }
+
+  /**
+   * At the reader's pace, what follows a turn whose line has been said: nothing here keeps time
+   * for reading. His own turn is his at once, with a miss left face up until he turns a card;
+   * a girl's turn and a cat's crossing begin only once he has moved past this one.
+   */
+  async function settled(now: Game, pair: boolean, cards: [number, number]): Promise<void> {
+    remark(now)
+    if (pair || !catDue(now)) {
+      if (now.turn === 0) {
+        setHeld(pair ? [] : cards)
+        setUp([])
+        setPhase('pick')
+        return
+      }
+      await hold.current
+      if (gone()) return
+      if (pair) setUp([])
+      setPhase('pick')
+      await herTurn(now)
+      return
+    }
+    await hold.current
+    if (gone()) return
+    await play.narrate(CAT_LINE)
+    if (gone()) return
+    const [a, b] = catPick(now)
+    setUp([])
+    setSwap([a, b])
+    setPhase('cat')
+    await new Promise((resolve) => setTimeout(resolve, CAT_MS))
+    if (gone()) return
+    memories.current = memories.current.map((memory, i) => catMoved(memory, a, b, girls[i].skill))
+    const next = catSwap(now, a, b)
+    setGame(next)
+    setSwap(null)
+    setPhase('pick')
+    if (next.turn !== 0) await herTurn(next)
+  }
+
   /** The player whose turn it is turns the card at `at`: the first of two, or the one that settles the turn. */
   function flip(at: number): void {
-    if (finished.current || !live.current || phase !== 'pick') return
+    if (finished.current || !live.current) return
+    // At his own pace, a press on any card while a turn lies shown is him moving on, and no more.
+    if (play.stepped && phase === 'show') {
+      play.moved()
+      return
+    }
+    if (phase !== 'pick') return
     if (game.taken[at] !== null || up.includes(at) || up.length > 1) return
+    // His own move, by press or by key, is him moving on from what was on the box.
+    if (game.turn === 0) play.moved()
+    if (held.length > 0) setHeld([])
     // Everyone at the table sees the card.
     memories.current = memories.current.map((memory, i) =>
       observe(memory, at, game.cards[at], girls[i].skill)
@@ -313,18 +430,12 @@ export function CatPairs({ play }: { play: GamePlay }): JSX.Element {
         `${turnLine(who, made)}${seated && made.run > 0 ? ` ${countLine('You', names, pairCounts(now))}.` : ''}`
       )
       setPhase('show')
-      remark(now)
+      if (play.stepped) void settled(now, made.run > 0, [first, at])
+      else remark(now)
       return
     }
     play.narrate(turnLine(who, made))
-    setPhase('over')
-    finished.current = true
-    const final = pairCounts(now)
-    play.finish({
-      outcome: seated ? gameOutcome(final) : 'played',
-      summary: gameSummary(names, final, now.turns),
-      account: gameAccount(names, now, withCat)
-    })
+    end(now)
   }
 
   // How the game stands, for anything said at the table.
@@ -346,7 +457,7 @@ export function CatPairs({ play }: { play: GamePlay }): JSX.Element {
 
   // A girl's turn, a card at a time after a beat: from what she remembers, at her skill.
   useEffect(() => {
-    if (phase !== 'pick' || speaking || game.turn === 0) return
+    if (play.stepped || phase !== 'pick' || speaking || game.turn === 0) return
     const timer = setTimeout(() => {
       const at = game.turn - 1
       const memory = memories.current[at] ?? []
@@ -363,7 +474,7 @@ export function CatPairs({ play }: { play: GamePlay }): JSX.Element {
   // Two cards lie face up: after a look a pair is left as taken and a miss is turned back, and
   // where a cat is due it comes now, with every card face down.
   useEffect(() => {
-    if (phase !== 'show' || speaking) return
+    if (play.stepped || phase !== 'show' || speaking) return
     const pair = (turnsMade(game).at(-1)?.run ?? 0) > 0
     // Counted from when the cards were turned, so time spent waiting on her line is not added to.
     const lain = performance.now() - shownAt.current
@@ -383,7 +494,7 @@ export function CatPairs({ play }: { play: GamePlay }): JSX.Element {
 
   // The cat's crossing: the two cards are seen to trade places, and then they have.
   useEffect(() => {
-    if (phase !== 'cat' || !swap) return
+    if (play.stepped || phase !== 'cat' || !swap) return
     const [a, b] = swap
     const timer = setTimeout(() => {
       if (finished.current) return
@@ -418,8 +529,10 @@ export function CatPairs({ play }: { play: GamePlay }): JSX.Element {
         }>
         {game.cards.map((cat, at) => {
           const takenBy = game.taken[at]
-          const faceUp = takenBy !== null || up.includes(at)
-          const dead = !myTurn || faceUp
+          const faceUp = takenBy !== null || up.includes(at) || held.includes(at)
+          // A miss left lying for him to read is turned back by his next card, which may be one of the two.
+          // While a turn lies shown at his pace every card takes a press, as his way on.
+          const dead = !(play.stepped && phase === 'show') && (!myTurn || takenBy !== null || up.includes(at))
           const moving = swap?.includes(at) ?? false
           return (
             // The swap moves this wrapper; the card inside keeps its own gestures.

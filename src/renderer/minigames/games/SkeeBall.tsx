@@ -35,8 +35,7 @@ import {
   typingIn,
   useAway,
   useOnTable,
-  useReducedMotion,
-  useWindowKeydown
+  useReducedMotion
 } from '../kit'
 import type { GamePlay } from '../kit'
 import '../../vu_styles/SkeeBall.css'
@@ -46,6 +45,8 @@ const REMARKS = { quiet: 0, some: 3, lots: 7 } as const
 
 /** How long she takes over a ball: long enough for the one before to be read first. */
 const HER_PAUSE_MS = 1200
+/** The beat before her ball where the text is read at the reader's own pace: no time for reading is kept. */
+const STEPPED_BEAT_MS = 300
 /** The same with more than one girl rolling, and their balls shown at a brisker pace. */
 const BRISK = { afterReaderMs: 900, betweenMs: 550, run: 0.75 } as const
 /** A ball's trip: up the ramp, the hop onto the board, the drop into a ring or down to the gutter, and the score standing. */
@@ -127,6 +128,8 @@ export function SkeeBall({ play }: { play: GamePlay }): JSX.Element {
   const spoken = useRef<number[]>([])
   // When the last ball was counted, for the beat before a girl's.
   const landedAt = useRef(0)
+  // How many balls' lines the reader has moved past, where he steps through them himself.
+  const [reached, setReached] = useState(0)
   // The terms are said once and the result handed over once, whatever is run twice.
   const opened = useRef(false)
   const finished = useRef(false)
@@ -239,7 +242,14 @@ export function SkeeBall({ play }: { play: GamePlay }): JSX.Element {
     setRolls(all)
     setRolling(null)
     setStage(0)
-    play.narrate(told.narration)
+    void play.narrate(told.narration)
+    // At the reader's own pace a girl's ball waits until he has moved past the line for the one before it.
+    if (play.stepped) {
+      const onBox = (): void => {
+        if (onTable() && !finished.current) setReached((count) => Math.max(count, all.length))
+      }
+      void play.read().then(onBox, onBox)
+    }
     if (!tableOf(all, balls, girls.length).over) {
       remark(all, told)
       return
@@ -275,10 +285,12 @@ export function SkeeBall({ play }: { play: GamePlay }): JSX.Element {
   // A girl's ball, after a beat: rolled at her own skill, for what the score asks of her.
   useEffect(() => {
     if (!her || rolling || speaking || away) return
+    // Read at his own pace, the ball before hers has to have been read past first: the board never runs ahead.
+    if (play.stepped && reached < rolls.length) return
     const afterReader = rolls.length > 0 && rolls[rolls.length - 1].who === 0
     const pause = !several ? HER_PAUSE_MS : afterReader ? BRISK.afterReaderMs : BRISK.betweenMs
     // The beat runs from the ball before hers, so time spent on a remark is not waited out twice.
-    const left = Math.max(300, pause - (performance.now() - landedAt.current))
+    const left = play.stepped ? STEPPED_BEAT_MS : Math.max(300, pause - (performance.now() - landedAt.current))
     const who = table.who
     const timer = setTimeout(
       () => launch({ who, ...herRoll(her.skill, needOf(rolls, who, balls, girls.length)) }),
@@ -286,7 +298,7 @@ export function SkeeBall({ play }: { play: GamePlay }): JSX.Element {
     )
     return () => clearTimeout(timer)
     // A girl's turn comes round once per ball landed, which the count alone says.
-  }, [her === undefined, rolls.length, rolling === null, speaking, away])
+  }, [her === undefined, rolls.length, rolling === null, speaking, away, reached])
 
   // The sweep under the reader's hand: the ball across the lane, then the spot up the board.
   useEffect(() => {
@@ -385,14 +397,24 @@ export function SkeeBall({ play }: { play: GamePlay }): JSX.Element {
     // One trip per roll, picked up where it was when the reader looks back.
   }, [roll, away])
 
-  // Space stops as a click does, wherever the pointer is, unless the reader is typing to her.
-  useWindowKeydown((event) => {
+  // Space stops as a click does, wherever the pointer is, unless the reader is typing to her. It
+  // is heard on the way down, so a line waiting to be stepped past never takes the press instead:
+  // the one press is his stop and him moving on.
+  const onSpace = useRef<(event: KeyboardEvent) => void>(() => undefined)
+  onSpace.current = (event) => {
     if (event.code !== 'Space' || event.repeat || typingIn(event)) return
     // A button under focus answers Space itself.
     if (event.target instanceof Element && event.target.closest('button, a')) return
     event.preventDefault()
+    if (waiting) return
+    play.moved()
     stop()
-  })
+  }
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent): void => onSpace.current(event)
+    window.addEventListener('keydown', onKey, true)
+    return () => window.removeEventListener('keydown', onKey, true)
+  }, [])
 
   const totals = totalsOf(rolls, girls.length)
   const players = ['You', ...names]
@@ -526,7 +548,11 @@ export function SkeeBall({ play }: { play: GamePlay }): JSX.Element {
             type="button"
             className="vu-btn vu-btn--outline vu-paper vu-btn--panel"
             {...gestures(waiting, lift, press)}
-            onClick={stop}
+            onClick={(event) => {
+              // Pressed by key, it is the reader moving on, as a press on the table is.
+              if (event.detail === 0 && !waiting) play.moved()
+              stop()
+            }}
             // Enter held on the button is one press, as Space is.
             onKeyDown={(event) => {
               if (event.repeat) event.preventDefault()

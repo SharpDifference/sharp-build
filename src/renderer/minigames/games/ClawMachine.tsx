@@ -71,10 +71,11 @@ const mix = (from: number, to: number, share: number): number => from + (to - fr
 
 type Axis = 'x' | 'z'
 /**
- * Where a go has got to: she is choosing, the claw waits to be run across, runs, waits to be
- * run back, runs, drops by itself, and after the last go the game is over.
+ * Where a go has got to: she is choosing, what was last said is still being reached, the claw
+ * waits to be run across, runs, waits to be run back, runs, drops by itself, and after the last
+ * go the game is over.
  */
-type Phase = 'picking' | 'ready-x' | 'moving-x' | 'ready-z' | 'moving-z' | 'drop' | 'over'
+type Phase = 'picking' | 'reading' | 'ready-x' | 'moving-x' | 'ready-z' | 'moving-z' | 'drop' | 'over'
 
 /** The game as it stands between renders: the loop reads and writes it every frame. */
 interface Live {
@@ -289,9 +290,12 @@ export function ClawMachine({ play }: { play: GamePlay }): JSX.Element {
     setPhase(next)
   }
 
-  /** The reader takes hold of one way: across first, then back, each once a go. */
-  function hold(axis: Axis): void {
-    if (awayNow.current || finished.current) return
+  /**
+   * The reader takes hold of one way: across first, then back, each once a go. Says whether a
+   * go was begun by it.
+   */
+  function hold(axis: Axis): boolean {
+    if (awayNow.current || finished.current) return false
     if (axis === 'x' && live.phase === 'ready-x') {
       if (!begun.current) {
         begun.current = true
@@ -299,10 +303,13 @@ export function ClawMachine({ play }: { play: GamePlay }): JSX.Element {
       }
       live.held = 'x'
       to('moving-x')
-    } else if (axis === 'z' && live.phase === 'ready-z') {
+      return true
+    }
+    if (axis === 'z' && live.phase === 'ready-z') {
       live.held = 'z'
       to('moving-z')
     }
+    return false
   }
 
   /** He lets go: across is settled, or the claw drops. */
@@ -343,7 +350,7 @@ export function ClawMachine({ play }: { play: GamePlay }): JSX.Element {
     live.left = COUNTDOWN_MS
     const name = her?.name ?? null
     const left = tries - live.goes.length
-    play.narrate(goTold(go, live.wanted?.id ?? null))
+    const told = play.narrate(goTold(go, live.wanted?.id ?? null))
     if (left > 0) {
       play.progress(accountOf(name, live.wanted, live.goes, tries))
       if (her) {
@@ -351,7 +358,18 @@ export function ClawMachine({ play }: { play: GamePlay }): JSX.Element {
         const cue = cueOf(go, her.name, live.wanted, live.goes, left)
         if (cue.notable || left === 1 || play.chattiness === 'lots') remark(cue.text)
       }
-      to('ready-x')
+      if (!play.stepped) {
+        to('ready-x')
+        return
+      }
+      // At his own pace the next go is not his until how this one went is on the box: taking
+      // hold of the stick is then him moving on from it, and the countdown runs on nothing unread.
+      to('reading')
+      void told
+        .catch(() => undefined)
+        .then(() => {
+          if (live.phase === 'reading' && !finished.current && onTable()) to('ready-x')
+        })
       return
     }
     finished.current = true
@@ -369,15 +387,23 @@ export function ClawMachine({ play }: { play: GamePlay }): JSX.Element {
     const named = got ? live.pile.find((toy) => toy.name === got.toy) : undefined
     const wanted = named ?? pickToy(live.pile, live.rand)
     live.wanted = wanted
+    let told: Promise<void>
     if (named && got?.line) {
       void Promise.resolve()
         .then(() => play.speak(her.charId, got.line))
         .catch(() => undefined)
-      play.narrate(`She means the ${wanted.name}: it is the one marked behind the glass. The first go is yours.`)
+      told = play.narrate(`She means the ${wanted.name}: it is the one marked behind the glass. The first go is yours.`)
     } else {
-      play.narrate(`${her.name} taps the glass over the ${wanted.name}: that is the one she has her eye on. The first go is yours.`)
+      told = play.narrate(`${her.name} taps the glass over the ${wanted.name}: that is the one she has her eye on. The first go is yours.`)
     }
-    to('ready-x')
+    // The first go is his once that line is on the box, which is after what she said: timed, her
+    // line has had its time by then; at his own pace, he has stepped past it.
+    to('reading')
+    void Promise.resolve(told)
+      .catch(() => undefined)
+      .then(() => {
+        if (live.phase === 'reading' && !finished.current && onTable()) to('ready-x')
+      })
   }
 
   // With her beside him the game is on as the table opens, and she is asked which toy she wants.
@@ -431,7 +457,8 @@ export function ClawMachine({ play }: { play: GamePlay }): JSX.Element {
     const axis = axisOf(event)
     if (!axis) return
     event.preventDefault()
-    if (!event.repeat) hold(axis)
+    // A go begun by key is him moving on from what was on the box, as a press on the stick is.
+    if (!event.repeat && hold(axis)) play.moved()
   })
 
   // The one clock: the runs, the countdown and the drop, stopped while the window is away.
@@ -599,7 +626,7 @@ export function ClawMachine({ play }: { play: GamePlay }): JSX.Element {
             ? 'Hold ↑ to run it back'
             : phase === 'moving-z'
               ? 'Let go to drop'
-              : phase === 'drop'
+              : phase === 'drop' || phase === 'reading'
                 ? '…'
                 : 'Out of goes'
 

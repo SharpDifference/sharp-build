@@ -60,6 +60,15 @@ export function HighLow({ play }: { play: GamePlay }): JSX.Element {
   // She is saying something about the last call: her own next call waits for it.
   const [speaking, setSpeaking] = useState(false)
   const remarks = useRef(0)
+  // Read at the reader's own pace: the card her call waits on him for, so it is asked for once.
+  const awaited = useRef(-1)
+  const mounted = useRef(true)
+  useEffect(() => {
+    mounted.current = true
+    return () => {
+      mounted.current = false
+    }
+  }, [])
   const her = play.opponents[0]
 
   // Five calls each unless the two of them settled on fewer.
@@ -83,8 +92,14 @@ export function HighLow({ play }: { play: GamePlay }): JSX.Element {
   function call(called: Call, byHer: boolean): void {
     if (over) return
     const next = deck[made.length + 1]
-    const all = [...made, { hers: byHer, call: called, right: callWins(shown, next, called) }]
     play.narrate(callLine(byHer && her ? her.name : 'You', called, shown, next))
+    turn(called, byHer)
+  }
+
+  /** Turns the card a call was made on, and ends the game where that was the last. */
+  function turn(called: Call, byHer: boolean): void {
+    const next = deck[made.length + 1]
+    const all = [...made, { hers: byHer, call: called, right: callWins(shown, next, called) }]
     setMade(all)
     if (!isOver(all)) {
       remark(all)
@@ -149,6 +164,17 @@ export function HighLow({ play }: { play: GamePlay }): JSX.Element {
   // Her call, after a beat: read off every card turned so far, at her skill.
   useEffect(() => {
     if (!her || !herTurn || speaking) return
+    if (play.stepped) {
+      // At the reader's own pace there is no beat: her line waits behind what he is reading,
+      // and her card is turned as it reaches the box.
+      if (awaited.current === made.length) return
+      awaited.current = made.length
+      const called = herCall(shown, deck.slice(0, made.length + 1), her.skill)
+      void play.narrate(callLine(her.name, called, shown, deck[made.length + 1])).then(() => {
+        if (mounted.current) turn(called, true)
+      })
+      return
+    }
     const timer = setTimeout(() => {
       call(herCall(shown, deck.slice(0, made.length + 1), her.skill), true)
     }, HER_PAUSE_MS)
