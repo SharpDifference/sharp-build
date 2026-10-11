@@ -66,6 +66,14 @@ export function useTableOpen(): boolean {
 }
 
 /**
+ * The scene has nothing more to offer a game: it has resolved into its closing bookkeeping, or the
+ * playthrough is over. The seat is then absent, where a turn merely out leaves it standing dim.
+ */
+export function useSceneSpent(): boolean {
+  return useGameStore((s) => s.statusShown || s.statusModal !== null || s.activeGameOver !== null)
+}
+
+/**
  * Takes the turn for a game, as an interjection does: the lines of the reply not yet read are
  * dropped, and the scene stands at a decision point. Nothing to do where it already does.
  */

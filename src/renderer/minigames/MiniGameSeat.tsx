@@ -2,11 +2,11 @@ import { useEffect, useRef, type JSX } from 'react'
 import type { SceneSeatProps } from '../mods/hooks'
 import { DiceIcon } from '../views/screenIcons'
 import { keptAgreed, useTableStore } from './session'
-import { useAtTurn, useGamesOffered, useTableOpen } from './table'
+import { useAtTurn, useGamesOffered, useSceneSpent, useTableOpen } from './table'
 
 /**
  * The framework's seat on a scene's rail: there while a game is on offer in this scene, dim
- * while it is not the reader's turn, and gone otherwise.
+ * while the reader cannot take a turn, and gone otherwise, the scene's closing included.
  */
 export function MiniGameSeat({ Seat, visible, open }: SceneSeatProps): JSX.Element {
   const offered = useGamesOffered()
@@ -27,7 +27,10 @@ export function MiniGameSeat({ Seat, visible, open }: SceneSeatProps): JSX.Eleme
     opener.current()
   }, [agreed, atTurn, visible])
 
-  const state = !visible || offered.length === 0 ? 'gone' : tableOpen ? 'shown' : 'dim'
+  const spent = useSceneSpent()
+  // Absent where there is nothing to offer; dim where there is, but not this moment.
+  const state =
+    !visible || spent || offered.length === 0 ? 'gone' : tableOpen ? 'shown' : 'dim'
   return (
     <Seat
       label={offered.length === 1 ? `Play ${offered[0].name}` : 'Play a game'}
