@@ -1,0 +1,182 @@
+/* Truth or Dare: the tally, whose turn it is, the turn so far, and the reader's pick or his
+   field. Drawn on the mini-game table; the buttons and the field are base.css's. */
+
+.vu-tod {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 12px;
+  width: 500px;
+}
+
+/* Everyone at the table in seat order, each with their points. */
+.vu-tod-tally {
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.vu-tod-seat {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 5px 14px;
+  border: 2.5px solid var(--vu-border);
+  border-radius: 999px;
+  background: var(--vu-surface);
+  color: var(--vu-text-body);
+  font: 700 13px var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Whose turn it is: the seat filled in the accent. */
+.vu-tod-seat[data-turn] {
+  background: var(--vu-accent);
+  color: var(--vu-accent-ink);
+}
+
+.vu-tod-seatname {
+  max-width: 110px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.vu-tod-turn {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: baseline;
+  gap: 4px 12px;
+  margin: 0;
+  color: var(--vu-text);
+  font: 700 15px var(--font-mono);
+}
+
+.vu-tod-turnmeta {
+  color: var(--vu-text-muted);
+  font-size: 12px;
+}
+
+/* The turn so far. It keeps its height from the first turn, so the table does not jump. */
+.vu-tod-log {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-height: 156px;
+  padding: 14px 18px;
+  border: 2.5px solid var(--vu-border);
+  border-radius: 20px;
+  background: var(--vu-surface);
+}
+
+.vu-tod-kind {
+  margin: 0;
+  color: var(--vu-accent);
+  font: 400 24px var(--font-display);
+  line-height: 1.1;
+  text-transform: capitalize;
+}
+
+.vu-tod-line {
+  margin: 0;
+  color: var(--vu-text-body);
+  font: 500 14px/1.5 var(--font-body);
+  overflow-wrap: anywhere;
+}
+
+.vu-tod-who {
+  margin-right: 8px;
+  color: var(--vu-text);
+  font: 700 12px var(--font-mono);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.vu-tod-deed {
+  display: block;
+  color: var(--vu-text-muted);
+  font-style: italic;
+}
+
+.vu-tod-verdict {
+  margin: auto 0 0;
+  color: var(--vu-text-muted);
+  font: 700 12px var(--font-mono);
+}
+
+.vu-tod-verdict[data-scored] {
+  color: var(--vu-accent);
+}
+
+/* The pick, the field or the wait: one room for all three. */
+.vu-tod-act {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  min-height: 150px;
+}
+
+.vu-tod-picks {
+  display: flex;
+  justify-content: center;
+  gap: 26px;
+  padding: 0 12px 10px 0;
+}
+
+.vu-tod-picks > button,
+.vu-tod-send > button {
+  transform-origin: center;
+}
+
+.vu-tod-form {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.vu-tod-ideas {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+/* A stock question or dare to send as it stands. */
+.vu-tod-idea {
+  width: 100%;
+  padding: 6px 14px;
+  border: 2px dashed var(--vu-border);
+  border-radius: 14px;
+  background: none;
+  color: var(--vu-text-body);
+  font: 500 13px/1.4 var(--font-body);
+  text-align: left;
+  cursor: pointer;
+}
+
+.vu-tod-send {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 16px;
+  padding: 0 12px 8px 0;
+}
+
+.vu-tod-wait {
+  margin: 0;
+  color: var(--vu-text-muted);
+  font: 500 15px var(--font-body);
+  font-style: italic;
+  text-align: center;
+}
+
+/* A round is out: the wait is said in the firmer voice. */
+.vu-tod-wait[data-out] {
+  color: var(--vu-text-body);
+}
