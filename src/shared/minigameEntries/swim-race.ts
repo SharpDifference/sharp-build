@@ -8,7 +8,7 @@ const SWIM_RACE: MiniGameDef = {
   blurb:
     'a freestyle swimming race, side by side in the water: long even strokes, a breath at the right moment and a clean turn at each end',
   format:
-    'A freestyle race over a set number of lengths: lengths of the pool at the stadium, and at the beach the same distance swum out to a buoy and back, once for every two lengths. Everyone racing dives in together on the whistle, each in a lane of their own, and turns at the end of every length; the first to touch at the end of the last length wins, and the others are placed by their times, to the hundredth of a second. Two who touch in the same hundredth share the place, and the reader sharing first is a draw. Alone the reader swims against the clock for a time. There are no heats, no handicaps and no other strokes.',
+    'A freestyle race over a set number of lengths: lengths of the pool at the stadium, and at the beach the same distance swum out to a buoy and back, once for every two lengths. Everyone racing dives in together on the whistle, each in a lane of their own; anyone who goes before it is called back and held while the others get away. They turn at the end of every length; the first to touch at the end of the last length wins, and the others are placed by their times, to the hundredth of a second. Two who touch in the same hundredth share the place, and the reader sharing first is a draw. Time is called 25 seconds a length after the whistle: whoever is still swimming then did not finish, is placed behind everyone who did, and for the reader that is a loss. Alone the reader swims against the clock for a time. There are no heats, no handicaps and no other strokes.',
   options: [
     {
       id: 'lengths',

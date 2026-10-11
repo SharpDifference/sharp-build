@@ -6,8 +6,13 @@ import {
   BREATH_GAP_MS,
   CYCLE_MS,
   GASP_MS,
+  LENGTH_LIMIT_MS,
   LENGTH_M,
+  PULL_LONG,
   PULL_MS,
+  PULL_SHORT,
+  STEP_MS,
+  TEMPO_RUSHED,
   TURN_GOOD_M,
   TURN_PERFECT_M,
   TURN_ZONE_M,
@@ -23,12 +28,16 @@ import {
   herTurn,
   legLabel,
   lengthsOf,
+  limitOf,
+  newRace,
   onBlocks,
   orderNow,
   outcomeOf,
   placesOf,
   raceAccount,
+  raceProgress,
   raceSummary,
+  runRace,
   stroke,
   strokeOf,
   strokeWorth,
@@ -44,7 +53,7 @@ import {
 /** Swim Race's rules: the stroke, the air, the turn, how she swims, and how a race is placed. */
 
 const SKILLS: readonly Skill[] = [1, 2, 3, 4, 5]
-const STEP = 16
+const STEP = STEP_MS
 
 /** A swimmer already in open water, `dist` metres in. */
 function inWater(dist = 5): Swimmer {
@@ -55,35 +64,48 @@ function inWater(dist = 5): Swimmer {
 }
 
 /**
- * The reader as a machine: the same pull at the same tempo all the way, a breath under
- * `breatheAt`, and a turn called `turnAt` metres from each wall (never, where it is null).
+ * The reader as a machine: the same pull at the same tempo all the way (or each as a function
+ * of the stroke's number), a breath under `breatheAt`, and a turn called `turnAt` metres from
+ * each wall (never, where it is null). Time is called on him as on anyone.
  */
 function swum(
   lengths: number,
-  pullMs: number,
-  cycleMs: number,
+  pullMs: number | ((at: number) => number),
+  cycleMs: number | ((at: number) => number),
   breatheAt: number,
   turnAt: number | null
 ): Swimmer {
   const swimmer = onBlocks(200)
+  const of = (value: number | ((at: number) => number), at: number): number =>
+    typeof value === 'number' ? value : value(at)
   let next = 0
-  let first = true
-  for (let clock = STEP; swimmer.finishMs === null && clock < 900_000; clock += STEP) {
+  let last: number | null = null
+  let taken = 0
+  for (let clock = STEP; swimmer.finishMs === null && clock <= limitOf(lengths); clock += STEP) {
     advance(swimmer, STEP, clock, lengths)
     if (!swimming(swimmer)) {
       next = 0
+      last = null
       continue
     }
     if (turnAt !== null && toWall(swimmer) <= turnAt) callTurn(swimmer, lengths)
     next -= STEP
     if (next > 0) continue
-    next += cycleMs
+    const cycle = of(cycleMs, taken)
+    next += cycle
     if (swimmer.air < breatheAt) breathe(swimmer)
-    stroke(swimmer, pullMs, first ? null : cycleMs)
-    first = false
+    stroke(swimmer, of(pullMs, taken), last)
+    last = cycle
+    taken++
   }
   return swimmer
 }
+
+/** A swimmer's time, and no time at all where it was called on her. */
+const timeIn = (swimmer: Swimmer): number => swimmer.finishMs ?? Infinity
+
+/** Swimming on the guide: the best pull on the cycle, a breath in good time, a perfect turn. */
+const guided = (lengths: number): number => timeIn(swum(lengths, PULL_MS, CYCLE_MS, 0.2, 0.6))
 
 const mean = (values: readonly number[]): number => values.reduce((sum, value) => sum + value, 0) / values.length
 
@@ -125,7 +147,51 @@ describe('Swim Race stroke', () => {
     const thrashed = swum(2, 150, 300, 0.2, 0.6)
     expect(even.finishMs).toBeGreaterThan(18_000)
     expect(even.finishMs).toBeLessThan(26_000)
-    expect(thrashed.finishMs ?? 0).toBeGreaterThan((even.finishMs ?? 0) * 1.5)
+    expect(timeIn(thrashed)).toBeGreaterThan((even.finishMs ?? 0) * 1.5)
+  })
+
+  it('is worth everything only close to the best pull, and less the longer it is held on', () => {
+    for (const share of [PULL_SHORT, 1, PULL_LONG]) expect(strokeWorth(PULL_MS * share, CYCLE_MS)).toBe(1)
+    expect(strokeWorth(PULL_MS * PULL_SHORT - 20, CYCLE_MS)).toBeLessThan(1)
+    expect(strokeWorth(PULL_MS * PULL_LONG + 20, CYCLE_MS)).toBeLessThan(1)
+    // The pulls a held key drifts to: each worth less than the one before.
+    const held = [550, 600, 650, 720].map((pull) => strokeWorth(pull, CYCLE_MS))
+    for (let i = 1; i < held.length; i++) expect(held[i]).toBeLessThan(held[i - 1])
+    expect(held[1]).toBeLessThan(0.9)
+    expect(held[3]).toBeLessThan(0.7)
+  })
+
+  it('never pays for a stroke begun sooner than the cycle: the worth lost is more than the time saved', () => {
+    expect(strokeWorth(PULL_MS, CYCLE_MS * TEMPO_RUSHED)).toBeLessThan(TEMPO_RUSHED)
+    for (let cycle = 200; cycle < CYCLE_MS; cycle += 10) {
+      // Worth for each second of swimming, against the guide's.
+      expect(strokeWorth(PULL_MS, cycle) / cycle).toBeLessThan(1 / CYCLE_MS)
+    }
+    // Let go and press again at once: two rushed strokes are worth less than the one they replace.
+    expect(strokeWorth(460, 480) * 2).toBeLessThan(0.5)
+  })
+
+  it.each([2, 4, 6])('is swum fastest on the guide, over %i lengths', (lengths) => {
+    const guide = guided(lengths)
+    expect(Number.isFinite(guide)).toBe(true)
+    const others: [string, number][] = [
+      ...[500, 600, 700, 770, 810, 855, 880].map((cycle): [string, number] => [`a ${cycle} ms cycle`, timeIn(swum(lengths, PULL_MS, cycle, 0.2, 0.6))]),
+      ...[950, 1000, 1200].map((cycle): [string, number] => [`a ${cycle} ms cycle`, timeIn(swum(lengths, PULL_MS, cycle, 0.2, 0.6))]),
+      ...[250, 350, 560, 600, 720, 880].map((pull): [string, number] => [`a ${pull} ms pull`, timeIn(swum(lengths, pull, CYCLE_MS, 0.2, 0.6))]),
+      ['a long hold on a quicker cycle', timeIn(swum(lengths, 720, 770, 0.2, 0.6))],
+      ['letting go and pressing again at once', timeIn(swum(lengths, 460, 480, 0.2, 0.6))],
+      ['holding on and pressing again at once', timeIn(swum(lengths, 700, 720, 0.2, 0.6))],
+      ['a short stroke and a long wait by turns', timeIn(swum(lengths, PULL_MS, (at) => (at % 2 ? 500 : 1300), 0.2, 0.6))],
+      ['a quick stroke and a guide one by turns', timeIn(swum(lengths, PULL_MS, (at) => (at % 2 ? 700 : CYCLE_MS), 0.2, 0.6))],
+      ['never breathing until forced', timeIn(swum(lengths, PULL_MS, CYCLE_MS, -1, 0.6))],
+      ['never breathing, on a quicker cycle', timeIn(swum(lengths, PULL_MS, 770, -1, 0.6))],
+      ['no turns called', timeIn(swum(lengths, PULL_MS, CYCLE_MS, 0.2, null))]
+    ]
+    for (const [how, time] of others) expect(time, how).toBeGreaterThan(guide)
+    // Anywhere inside the best pull is the guide's own time.
+    for (const share of [PULL_SHORT, PULL_LONG]) {
+      expect(timeIn(swum(lengths, PULL_MS * share, CYCLE_MS, 0.2, 0.6))).toBe(guide)
+    }
   })
 })
 
@@ -409,52 +475,69 @@ describe('Swim Race on paper', () => {
 })
 
 /**
- * The reader as an ordinary player: every pull and every cycle up to 120 ms out either way, a
- * breath every third or fourth stroke, and turns that are good rather than perfect.
+ * The reader as an ordinary player at the keys: every pull held a little long, from the best
+ * to 200 ms over it, the cycle up to 90 ms out either way, a breath when the air is getting
+ * low that he now and then puts off a stroke, and turns that are good rather than perfect
+ * (or none called at all, where `turns` is false).
  */
-function ordinary(lengths: number, rand: () => number): Swimmer {
+function ordinary(lengths: number, rand: () => number, turns = true): Swimmer {
   const swimmer = onBlocks(Math.round(300 + rand() * 150))
-  const off = (): number => (rand() - 0.5) * 240
   let next = 0
   let cycle: number | null = null
-  let sinceBreath = 0
-  let breatheEvery = 3 + Math.floor(rand() * 2)
   let turnAt = 1 + rand() * 1.2
-  for (let clock = STEP; swimmer.finishMs === null && clock < 900_000; clock += STEP) {
+  for (let clock = STEP; swimmer.finishMs === null && clock <= limitOf(lengths); clock += STEP) {
     advance(swimmer, STEP, clock, lengths)
     if (!swimming(swimmer)) {
       next = 0
       cycle = null
       continue
     }
-    if (toWall(swimmer) <= turnAt && callTurn(swimmer, lengths)) turnAt = 1 + rand() * 1.2
+    if (turns && toWall(swimmer) <= turnAt && callTurn(swimmer, lengths)) turnAt = 1 + rand() * 1.2
     next -= STEP
     if (next > 0) continue
-    const wait = CYCLE_MS + off()
+    const wait = CYCLE_MS + (rand() - 0.5) * 180
     next += wait
-    if (sinceBreath >= breatheEvery && breathe(swimmer)) {
-      sinceBreath = 0
-      breatheEvery = 3 + Math.floor(rand() * 2)
-    }
-    stroke(swimmer, PULL_MS + off(), cycle)
-    sinceBreath++
+    if (swimmer.air < 0.35 && rand() >= 0.25) breathe(swimmer)
+    stroke(swimmer, PULL_MS + rand() * 200, cycle)
     cycle = wait
   }
   return swimmer
 }
 
 describe('Swim Race balance', () => {
-  it('lets an ordinary player beat a poor swimmer and lose to a fine one, without running out of air', () => {
-    for (const lengths of [2, 4, 6]) {
-      const rand = seededRand(`ordinary ${lengths}`)
-      const mine = Array.from({ length: 200 }, () => ordinary(lengths, rand))
-      const beaten = (skill: Skill): number =>
-        mine.filter((me) => (me.finishMs ?? 0) < (herRace(skill, lengths, rand).finishMs ?? 0)).length / mine.length
-      expect(beaten(2)).toBeGreaterThan(0.9)
-      expect(beaten(5)).toBeLessThan(0.35)
-      expect(mean(mine.map((me) => me.gasps))).toBeLessThan(0.1)
-      expect(mine.every((me) => me.turns.every((turn) => turn === 'good'))).toBe(true)
-    }
+  it.each([2, 4, 6])('puts an ordinary player in the middle of the ladder, over %i lengths', (lengths) => {
+    const rand = seededRand(`ordinary ${lengths}`)
+    const races = 200
+    const hers = SKILLS.map((skill) => Array.from({ length: races }, () => timeIn(herRace(skill, lengths, rand))))
+    /** The share of races these times win against each skill in turn. */
+    const beaten = (mine: readonly number[]): number[] =>
+      hers.map((her) => mine.filter((time, run) => time < her[run]).length / races)
+    const mine = Array.from({ length: races }, () => ordinary(lengths, rand))
+    const [one, two, three, four, five] = beaten(mine.map(timeIn))
+    // Clearly ahead of the poor swimmers, about even with a middling one, behind the good ones.
+    expect(one).toBeGreaterThan(0.95)
+    expect(two).toBeGreaterThan(0.9)
+    expect(three).toBeGreaterThan(0.2)
+    expect(three).toBeLessThan(0.7)
+    expect(four).toBeLessThan(0.3)
+    expect(five).toBeLessThan(0.05)
+    expect(mean(mine.map((me) => me.gasps))).toBeLessThan(0.3)
+    expect(mine.every((me) => me.turns.every((turn) => turn === 'good'))).toBe(true)
+
+    // The same player calling no turns is behind a middling swimmer and everyone better.
+    const wide = beaten(Array.from({ length: races }, () => timeIn(ordinary(lengths, rand, false))))
+    expect(wide[2]).toBeLessThan(0.3)
+    expect(wide[3]).toBeLessThan(0.05)
+    expect(wide[4]).toBeLessThan(0.05)
+
+    // A faultless swim beats the best of them, and not by much.
+    const faultless = guided(lengths)
+    const best = [...hers[4]].sort((a, b) => a - b)
+    expect(beaten(Array.from({ length: races }, () => faultless))[4]).toBeGreaterThan(0.8)
+    expect(best[races / 2]).toBeLessThan(faultless * 1.04)
+    // Calling no turns throws that away: the best of them is ahead of perfect strokes alone.
+    const noTurns = timeIn(swum(lengths, PULL_MS, CYCLE_MS, 0.2, null))
+    expect(beaten(Array.from({ length: races }, () => noTurns))[4]).toBeLessThan(0.2)
   })
 
   it('lets a swimmer out of air recover: the gasping ends, with air to swim on', () => {
@@ -462,7 +545,7 @@ describe('Swim Race balance', () => {
     swimmer.air = 0.01
     expect(stroke(swimmer, PULL_MS, null).emptied).toBe(true)
     expect(breathe(swimmer)).toBe(false)
-    for (let clock = STEP; clock <= GASP_MS + STEP; clock += STEP) advance(swimmer, STEP, clock, 6)
+    for (let clock = STEP; clock <= GASP_MS; clock += STEP) advance(swimmer, STEP, clock, 6)
     expect(swimmer.gaspMs).toBe(0)
     expect(swimmer.air).toBeGreaterThanOrEqual(0.5)
     expect(stroke(swimmer, PULL_MS, null).emptied).toBe(false)
@@ -528,5 +611,119 @@ describe('Swim Race wording by the water', () => {
     expect(account).toContain('24.50')
     expect(account).toContain('one turn')
     expect(account).toContain('3 breaths')
+  })
+})
+
+describe('Swim Race clock', () => {
+  /** Three girls swum to the end in frames of this size, from the same seed: their times. */
+  const timesAt = (frameMs: number, lengths = 4): (number | null)[] => {
+    const rand = seededRand('frames')
+    const skills: Skill[] = [1, 3, 5]
+    const race = newRace(lengths, skills.map((skill) => onBlocks(herReaction(skill, rand))), skills)
+    for (let frames = 0; !race.over && frames < 1_000_000; frames++) runRace(race, frameMs, rand)
+    expect(race.over).toBe(true)
+    return race.swimmers.map((swimmer) => swimmer.finishMs)
+  }
+
+  it('swims the same race whatever the frames it is given', () => {
+    const steady = timesAt(1000 / 60)
+    expect(steady.every((time) => time !== null)).toBe(true)
+    for (const frameMs of [STEP_MS, 4, 1000 / 144, 1000 / 30, 50, 7.3]) expect(timesAt(frameMs)).toEqual(steady)
+    // Uneven frames too: what a frame leaves over is owed to the next.
+    const rand = seededRand('frames')
+    const skills: Skill[] = [1, 3, 5]
+    const race = newRace(4, skills.map((skill) => onBlocks(herReaction(skill, rand))), skills)
+    const uneven = seededRand('uneven')
+    while (!race.over) runRace(race, 2 + uneven() * 48, rand)
+    expect(race.swimmers.map((swimmer) => swimmer.finishMs)).toEqual(steady)
+  })
+
+  it('tells what happens as it happens, each swimmer by her place in the water', () => {
+    const rand = seededRand('told')
+    const race = newRace(2, [onBlocks(300), onBlocks(herReaction(4, rand))], [null, 4])
+    const heard: string[] = []
+    while (!race.over) runRace(race, 16, rand, (who, event) => heard.push(`${who}:${event.kind}`))
+    expect(heard.filter((one) => one.startsWith('1:'))).toEqual(
+      expect.arrayContaining(['1:dive', '1:turn', '1:finish'])
+    )
+    // Nobody swims the reader for him: he dives when his time on the blocks is up, and drifts.
+    expect(heard[0]).toBe('1:dive')
+    expect(heard).toContain('0:dive')
+    expect(race.swimmers[0].strokes).toBe(0)
+  })
+
+  it.each([2, 4, 6])('calls time on a swimmer who only drifts, and on nobody who swims, over %i lengths', (lengths) => {
+    expect(limitOf(lengths)).toBe(lengths * LENGTH_LIMIT_MS)
+    const rand = seededRand(`limit ${lengths}`)
+    const race = newRace(lengths, [onBlocks(300), onBlocks(herReaction(1, rand))], [null, 1])
+    while (!race.over) runRace(race, 50, rand)
+    expect(race.clock).toBe(limitOf(lengths))
+    expect(race.swimmers[0].finishMs).toBeNull()
+    expect(race.swimmers[0].dist).toBeLessThan(lengths * LENGTH_M)
+    expect(race.swimmers[1].finishMs).not.toBeNull()
+    runRace(race, 5000, rand)
+    expect(race.clock).toBe(limitOf(lengths))
+    // The poorest of them is home well inside it, every time.
+    for (let run = 0; run < 150; run++) expect(timeIn(herRace(1, lengths, rand))).toBeLessThan(limitOf(lengths) * 0.92)
+  })
+
+  it('places a swimmer who did not finish behind everyone who did, and tells it as that', () => {
+    expect(placesOf([Infinity, 23_000, 24_000])).toEqual([3, 1, 2])
+    expect(placesOf([23_000, Infinity, Infinity])).toEqual([1, 2, 2])
+    expect(outcomeOf([Infinity, 23_000])).toBe('lost')
+    expect(outcomeOf([Infinity, Infinity])).toBe('lost')
+    expect(outcomeOf([23_000, Infinity])).toBe('won')
+    const done = (ms: number | null, dist: number): Swimmer => ({ ...onBlocks(250), blockMs: 0, dist, finishMs: ms, strokes: ms === null ? 0 : 20, worth: ms === null ? 0 : 17 })
+    const all = [
+      { name: 'You', swimmer: done(null, 31) },
+      { name: 'Ana', swimmer: done(23_900, 50) },
+      { name: 'Bea', swimmer: done(26_000, 50) }
+    ]
+    for (const told of [raceSummary(all, 2, 'pool'), raceSummary(all.slice(0, 2), 2, 'pool'), raceSummary(all.slice(0, 1), 2, 'pool')]) {
+      expect(told).toMatch(/^You /)
+      expect(told).toContain('do not finish')
+      expect(told).toContain('19 metres short')
+      expect(told).toContain('50.00 s')
+      expect(told).not.toMatch(/\b0\.00 s|Infinity|NaN|gave up|give up/)
+    }
+    expect(raceSummary(all, 2)).toContain('Ana 23.90 s, Bea 26.00 s, you did not finish')
+    expect(raceSummary([all[1], all[0]].map((entry, at) => ({ ...entry, name: at ? 'Ana' : 'You' })), 2)).toContain('she does not finish')
+    for (const some of [all, all.slice(0, 2), all.slice(0, 1)]) {
+      const account = raceAccount(some, 2, [], 'pool').join('\n')
+      expect(account).toContain('the reader 19 metres short')
+      expect(account).toContain('not given up')
+      expect(account).toContain('barely took a stroke and drifted')
+      expect(account).not.toMatch(/\b0\.00 s|Infinity|NaN|\bYou\b/)
+    }
+    const account = raceAccount(all, 2, [], 'pool').join('\n')
+    expect(account).toContain('1. Ana 23.90 s; 2. Bea 26.00 s; the reader did not finish')
+    expect(raceAccount(all.slice(0, 2), 2, []).join('\n')).toContain('Ana won, the only one to finish')
+    expect(raceAccount([all[0], { name: 'Ana', swimmer: done(null, 40) }], 2, []).join('\n')).toContain('Nobody finished')
+  })
+
+  it('gives every time its unit', () => {
+    const done = (ms: number): Swimmer => ({ ...onBlocks(250), blockMs: 0, dist: 150, finishMs: ms, strokes: 20, worth: 17 })
+    const all = [{ name: 'You', swimmer: done(24_500) }, { name: 'Ana', swimmer: done(63_070) }]
+    expect(raceSummary(all, 6)).toContain('24.50 s to her 1:03.07.')
+    expect(raceSummary(all.slice(0, 1), 6)).toContain('in 24.50 s.')
+    expect(raceAccount(all, 6, []).join('\n')).toContain('1. the reader 24.50 s; 2. Ana 1:03.07')
+  })
+
+  it('keeps an account of a race that may be walked away from: who leads, and the lengths done', () => {
+    const at = (dist: number, finishMs: number | null = null): Swimmer => ({ ...onBlocks(250), blockMs: 0, dist, finishMs })
+    const all = [{ name: 'You', swimmer: at(30) }, { name: 'Ana', swimmer: at(55) }, { name: 'Bea', swimmer: at(100, 51_200) }]
+    const told = raceProgress(all, 4, 52_000, 'pool')
+    expect(told).toHaveLength(2)
+    expect(told[0]).toContain('the reader and Ana and Bea')
+    expect(told[1]).toBe('Unfinished: 52.00 s after the whistle Bea led (finished in 51.20 s), then Ana (on length 3 of 4) and the reader (on length 2 of 4).')
+    expect(raceProgress(all.slice(0, 1), 4, 20_000, 'sea')[1]).toBe('Unfinished: 20.00 s after the whistle the reader was on leg back 1/2.')
+    expect(told.join(' ')).not.toMatch(/\bYou\b/)
+  })
+
+  it('says in its format what the code does about a false start and a swimmer out of time', () => {
+    const format = MINI_GAMES_LIST.find((game) => game.id === 'swim-race')?.format ?? ''
+    expect(format).toContain('before it is called back and held')
+    expect(format).toContain(`${LENGTH_LIMIT_MS / 1000} seconds a length`)
+    expect(format).toContain('did not finish')
   })
 })

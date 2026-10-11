@@ -20,11 +20,31 @@ export function lengthsOf(option: number | undefined): number {
 /** The pull that makes the best stroke, and the time from one stroke's start to the next, in ms. */
 export const PULL_MS = 450
 export const CYCLE_MS = 900
+/**
+ * How far off the best a stroke can be and still be worth everything, as shares of the pull
+ * and of the cycle: a pull under the first is short and over the second is held too long, and
+ * a stroke begun sooner after the last than the third is rushed.
+ */
+export const PULL_SHORT = 0.9
+export const PULL_LONG = 1.15
+export const TEMPO_RUSHED = 0.95
+
+/** The step the water is moved on by, in ms: a race comes out the same at any frame rate. */
+export const STEP_MS = 10
+/** How long a race may take for each of its lengths, in ms: past it, whoever is out did not finish. */
+export const LENGTH_LIMIT_MS = 25_000
+
+/** The longest a race of `lengths` runs, in ms from the whistle. */
+export function limitOf(lengths: number): number {
+  return lengths * LENGTH_LIMIT_MS
+}
 
 /** What a perfect stroke adds to a swimmer's speed, in m/s, and how fast the water takes it back. */
 const KICK = 2.3
 const DRAG_PER_S = 1.1
 const TOP_SPEED = 3.8
+/** What a pull held past the best loses, for each share of the pull it is held on. */
+const LONG_LOSS = 0.8
 /** A swimmer who does nothing still drifts on, so every race ends. */
 const DRIFT = 0.6
 /** Off the blocks. */
@@ -59,7 +79,7 @@ const TURNS: Readonly<Record<TurnGrade, { holdMs: number; push: number }>> = {
   perfect: { holdMs: 0, push: 3.6 },
   good: { holdMs: 0, push: 2.8 },
   early: { holdMs: 450, push: 2.0 },
-  late: { holdMs: 800, push: 1.8 }
+  late: { holdMs: 1100, push: 1.8 }
 }
 
 /** A reaction under this is a sharp start, in ms; a dive before the whistle is held this long. */
@@ -134,16 +154,27 @@ export function swimming(swimmer: Swimmer): boolean {
 
 /**
  * What a stroke is worth, from 0 to 1, by how long it was pulled and how long after the last
- * one it began. A full pull is worth everything and a short one very little; holding on long
- * past the pull loses a little. A stroke begun too soon after the last is rushed and worth
- * less; one begun late is worth all of itself, and costs only the time it waited.
+ * one it began. Only a pull close to the best is worth everything: a short one is worth very
+ * little, and one held on past it loses steadily. A stroke begun sooner than the cycle is
+ * worth less by more than the time it saved, and a rushed one far less, so the even rhythm
+ * is the fastest there is; one begun late is worth all of itself, and costs only the wait.
  */
 export function strokeWorth(pullMs: number, cycleMs: number | null): number {
   const pull = Math.max(0, pullMs) / PULL_MS
-  const pulled = pull < 1 ? Math.pow(pull, 1.2) : pull <= 1.6 ? 1 : Math.max(0.5, 1 - (pull - 1.6) * 0.5)
+  const pulled =
+    pull < PULL_SHORT
+      ? Math.pow(pull / PULL_SHORT, 1.2)
+      : pull <= PULL_LONG
+        ? 1
+        : Math.max(0.5, 1 - (pull - PULL_LONG) * LONG_LOSS)
   if (cycleMs === null) return pulled
   const tempo = Math.max(0, cycleMs) / CYCLE_MS
-  const timed = tempo >= 0.85 ? 1 : Math.pow(tempo / 0.85, 1.2)
+  const timed =
+    tempo >= 1
+      ? 1
+      : tempo >= TEMPO_RUSHED
+        ? Math.pow(tempo, 1.5)
+        : Math.pow(TEMPO_RUSHED, 1.5) * Math.pow(tempo / TEMPO_RUSHED, 3)
   return pulled * timed
 }
 
@@ -284,10 +315,10 @@ export function smoothness(swimmer: Swimmer): number {
 // ── How she swims ──────────────────────────────────────────────────────────────────────────
 
 /** What her stroke is worth when she is fresh, and how far either side of it one may fall. */
-const HER_STROKE: Record<Skill, number> = { 1: 0.68, 2: 0.74, 3: 0.8, 4: 0.86, 5: 0.93 }
-const HER_SPREAD: Record<Skill, number> = { 1: 0.22, 2: 0.18, 3: 0.14, 4: 0.1, 5: 0.06 }
+const HER_STROKE: Record<Skill, number> = { 1: 0.68, 2: 0.78, 3: 0.895, 4: 0.925, 5: 0.985 }
+const HER_SPREAD: Record<Skill, number> = { 1: 0.22, 2: 0.18, 3: 0.12, 4: 0.08, 5: 0.04 }
 /** What her stroke loses for every hundred metres behind her: the unfit fade. */
-const HER_FADE: Record<Skill, number> = { 1: 0.16, 2: 0.11, 3: 0.07, 4: 0.04, 5: 0.02 }
+const HER_FADE: Record<Skill, number> = { 1: 0.16, 2: 0.11, 3: 0.02, 4: 0.015, 5: 0.01 }
 /** How unevenly she keeps the tempo, as a share of the cycle. */
 const HER_TEMPO: Record<Skill, number> = { 1: 0.3, 2: 0.22, 3: 0.14, 4: 0.08, 5: 0.04 }
 /** The air she breathes at, and the chance she puts a due breath off by a stroke. */
@@ -373,15 +404,72 @@ export function herMove(
   return strokeOf(swimmer, herStroke(skill, swimmer.dist, rand))
 }
 
-/** A girl's whole race swum alone at a fixed step: her swimmer as she touches. */
-export function herRace(skill: Skill, lengths: number, rand: () => number = Math.random, stepMs = 16): Swimmer {
-  const swimmer = onBlocks(herReaction(skill, rand))
-  const mind = herMind()
-  for (let clock = stepMs; swimmer.finishMs === null && clock < 600_000; clock += stepMs) {
-    advance(swimmer, stepMs, clock, lengths)
-    herMove(swimmer, mind, skill, stepMs, lengths, rand)
+/** A girl's whole race swum alone, on the race's own step: her swimmer as she touches. */
+export function herRace(skill: Skill, lengths: number, rand: () => number = Math.random): Swimmer {
+  const race = newRace(lengths, [onBlocks(herReaction(skill, rand))], [skill])
+  while (!race.over) runRace(race, STEP_MS, rand)
+  return race.swimmers[0]
+}
+
+// ── The race on its clock ──────────────────────────────────────────────────────────────────
+
+/** Everyone in the water on one clock. Whoever has no skill is swum from outside: the reader. */
+export interface Race {
+  lengths: number
+  /** Since the whistle, in ms, in whole steps; and the time handed in that no step has used yet. */
+  clock: number
+  owed: number
+  swimmers: Swimmer[]
+  skills: (Skill | null)[]
+  minds: HerMind[]
+  /** Everyone is home, or time has been called on whoever is not. */
+  over: boolean
+}
+
+/** A race about to start: `skills` has each swimmer's skill in the swimmers' order, null for one the caller swims. */
+export function newRace(lengths: number, swimmers: Swimmer[], skills: readonly (Skill | null)[]): Race {
+  return {
+    lengths,
+    clock: 0,
+    owed: 0,
+    swimmers,
+    skills: swimmers.map((_, index) => skills[index] ?? null),
+    minds: swimmers.map(() => herMind()),
+    over: false
   }
-  return swimmer
+}
+
+/** What a step of the race brought about, and for whom: a swimmer's own events, or a girl emptied of air. */
+export type RaceEvent = SwimEvent | { kind: 'gasp' }
+
+/**
+ * Moves the race on by `frameMs` of real time, in whole steps of {@link STEP_MS}: what is left
+ * over is owed to the next call, so a race swims the same whatever the frames it is given.
+ * `tell` hears each thing that happens, as it happens. Time is called at the limit.
+ */
+export function runRace(
+  race: Race,
+  frameMs: number,
+  rand: () => number = Math.random,
+  tell?: (who: number, event: RaceEvent, clockMs: number) => void
+): void {
+  if (race.over) return
+  race.owed += Math.max(0, frameMs)
+  const limit = limitOf(race.lengths)
+  // A hair of slack, so steps that add up to a frame in floating point are all taken.
+  while (race.owed >= STEP_MS - 1e-6 && !race.over) {
+    race.owed = Math.max(0, race.owed - STEP_MS)
+    race.clock += STEP_MS
+    race.swimmers.forEach((swimmer, who) => {
+      if (swimmer.finishMs !== null) return
+      for (const event of advance(swimmer, STEP_MS, race.clock, race.lengths)) tell?.(who, event, race.clock)
+      const skill = race.skills[who]
+      if (skill !== null && herMove(swimmer, race.minds[who], skill, STEP_MS, race.lengths, rand)) {
+        tell?.(who, { kind: 'gasp' }, race.clock)
+      }
+    })
+    if (race.swimmers.every((swimmer) => swimmer.finishMs !== null) || race.clock >= limit) race.over = true
+  }
 }
 
 // ── Placing and telling ────────────────────────────────────────────────────────────────────
@@ -394,20 +482,28 @@ export function clockOf(ms: number): string {
   return minutes > 0 ? `${minutes}:${seconds.padStart(5, '0')}` : seconds
 }
 
+/** A time as it is told, with its unit: "23.41 s", and past the minute "1:03.07". */
+export function timeOf(ms: number): string {
+  const clock = clockOf(ms)
+  return clock.includes(':') ? clock : `${clock} s`
+}
+
 /** A time to the hundredth it is judged at. */
 const hundredthsOf = (ms: number): number => Math.round(ms / 10)
 
 /**
  * The place of each time given, in the order given, from 1: equal to the hundredth is the same
- * place, and the next swimmer is as many places back as there are ahead of her.
+ * place, and the next swimmer is as many places back as there are ahead of her. A swimmer who
+ * did not finish has no time, given as `Infinity`, and is placed behind everyone who did.
  */
 export function placesOf(times: readonly number[]): number[] {
   const judged = times.map(hundredthsOf)
   return judged.map((time) => 1 + judged.filter((other) => other < time).length)
 }
 
-/** How the race came out for the reader, whose time is the first. */
+/** How the race came out for the reader, whose time is the first: not to finish is to lose. */
 export function outcomeOf(times: readonly number[]): 'won' | 'lost' | 'draw' {
+  if (!Number.isFinite(times[0])) return 'lost'
   const places = placesOf(times)
   if (places[0] !== 1) return 'lost'
   return places.filter((place) => place === 1).length > 1 ? 'draw' : 'won'
@@ -491,28 +587,46 @@ function finishOrder(all: readonly Finisher[]): { who: Finisher; place: number; 
     .sort((a, b) => a.place - b.place || a.index - b.index)
 }
 
+/** How far short of the finish a swimmer is, in whole metres, and never none while she is out. */
+const shortOf = (swimmer: Swimmer, lengths: number): number =>
+  Math.max(1, Math.round(lengths * LENGTH_M - swimmer.dist))
+
 /** The result as the scene narrates it, to "you". The first finisher is the reader. */
 export function raceSummary(all: readonly Finisher[], lengths: number, water: Water = 'water'): string {
   const [me, ...girls] = all
-  const mine = clockOf(me.swimmer.finishMs ?? 0)
+  const out = me.swimmer.finishMs === null
+  const mine = timeOf(me.swimmer.finishMs ?? 0)
+  const called = `time is called at ${timeOf(limitOf(lengths))} with you still ${shortOf(me.swimmer, lengths)} metres short`
   if (girls.length === 0) {
-    return `You swim ${distanceWords(lengths, water)}, alone against the clock, and ${touch(water)} in ${mine}.`
+    return out
+      ? `You swim ${distanceWords(lengths, water)}, alone against the clock, and do not finish: ${called}.`
+      : `You swim ${distanceWords(lengths, water)}, alone against the clock, and ${touch(water)} in ${mine}.`
   }
   const names = listed(girls.map((girl) => girl.name))
   const course = courseWords(lengths, water)
   const outcome = outcomeOf(all.map((entry) => entry.swimmer.finishMs ?? Infinity))
   const order = finishOrder(all)
   if (girls.length === 1) {
-    const hers = clockOf(girls[0].swimmer.finishMs ?? 0)
+    const her = girls[0].swimmer.finishMs
+    if (out) {
+      return her === null
+        ? `You race ${names} ${course} and neither of you finishes: ${called}, and she is not home either.`
+        : `You race ${names} ${course} and do not finish: she ${touch(water) === 'touch' ? 'touches' : 'finishes'} in ${timeOf(her)}, and ${called}.`
+    }
+    if (her === null) return `You race ${names} ${course} and win in ${mine}: she does not finish before time is called.`
     if (outcome === 'draw') return `You race ${names} ${course} and ${touch(water)} together, ${mine} each: a dead heat.`
     return outcome === 'won'
-      ? `You race ${names} ${course} and win, ${mine} to her ${hers}.`
-      : `You race ${names} ${course} and lose, ${mine} to her ${hers}.`
+      ? `You race ${names} ${course} and win, ${mine} to her ${timeOf(her)}.`
+      : `You race ${names} ${course} and lose, ${mine} to her ${timeOf(her)}.`
   }
   const told = order
-    .map(({ who, index }) => `${index === 0 ? 'you' : who.name} ${clockOf(who.swimmer.finishMs ?? 0)}`)
+    .map(({ who, index }) => {
+      const name = index === 0 ? 'you' : who.name
+      return who.swimmer.finishMs === null ? `${name} did not finish` : `${name} ${timeOf(who.swimmer.finishMs)}`
+    })
     .join(', ')
   const said = `You race ${names} ${course}`
+  if (out) return `${said} and do not finish: ${called}. ${told[0].toUpperCase()}${told.slice(1)}.`
   if (outcome === 'won') return `${said} and win: ${told}.`
   if (outcome === 'draw') {
     const level = order.filter((entry) => entry.place === 1 && entry.index !== 0).map((entry) => entry.who.name)
@@ -557,10 +671,10 @@ function airTold(swimmer: Swimmer): string {
 /** How a swimmer left the blocks, in a phrase. */
 function startTold(swimmer: Swimmer, water: Water): string {
   if (swimmer.falseStart) return `went before the whistle and was held back ${water === 'sea' ? 'at the water\'s edge' : 'on the blocks'}`
-  if (swimmer.reactionMs <= SHARP_START_MS) return `a sharp start, ${clockOf(swimmer.reactionMs)} s off the whistle`
+  if (swimmer.reactionMs <= SHARP_START_MS) return `a sharp start, ${timeOf(swimmer.reactionMs)} off the whistle`
   return swimmer.reactionMs >= 600
-    ? `a slow start, ${clockOf(swimmer.reactionMs)} s off the whistle`
-    : `a fair start, ${clockOf(swimmer.reactionMs)} s off the whistle`
+    ? `a slow start, ${timeOf(swimmer.reactionMs)} off the whistle`
+    : `a fair start, ${timeOf(swimmer.reactionMs)} off the whistle`
 }
 
 /**
@@ -584,26 +698,35 @@ export function raceAccount(
       : `A freestyle race ${where} between the reader and ${listed(girls.map((girl) => girl.name))}: ${distanceWords(lengths, water)}, ${water === 'sea' ? 'first back to the shore' : 'first to touch'} wins.`
   )
   const order = finishOrder(all)
+  const out = all.filter((entry) => entry.swimmer.finishMs === null)
   if (girls.length === 0) {
-    lines.push(`The reader ${touched(water)} in ${clockOf(me.swimmer.finishMs ?? 0)}.`)
+    if (me.swimmer.finishMs !== null) lines.push(`The reader ${touched(water)} in ${timeOf(me.swimmer.finishMs)}.`)
   } else {
     lines.push(
       `Finish: ${order
-        .map(({ who, place, index }) => `${place}. ${named(index, who)} ${clockOf(who.swimmer.finishMs ?? 0)}`)
+        .map(({ who, place, index }) =>
+          who.swimmer.finishMs === null
+            ? `${named(index, who)} did not finish`
+            : `${place}. ${named(index, who)} ${timeOf(who.swimmer.finishMs)}`
+        )
         .join('; ')}.`
     )
     const firsts = order.filter((entry) => entry.place === 1)
-    if (firsts.length > 1) {
+    if (out.length === all.length) {
+      lines.push('Nobody finished, so nobody won.')
+    } else if (order[1].who.swimmer.finishMs === null) {
+      lines.push(`${named(order[0].index, order[0].who)} won, the only one to finish.`)
+    } else if (firsts.length > 1) {
       lines.push(`${listed(firsts.map((entry) => named(entry.index, entry.who)))} ${touched(water)} in the same hundredth: a dead heat for first.`)
     } else if (order.length > 1) {
       const gap = (order[1].who.swimmer.finishMs ?? 0) - (order[0].who.swimmer.finishMs ?? 0)
       const [first, second] = [named(order[0].index, order[0].who), named(order[1].index, order[1].who)]
       lines.push(
         gap < TOUCH_OUT_MS
-          ? `${first} ${water === 'sea' ? 'beat' : 'touched'} ${second} ${water === 'sea' ? 'home' : 'out'} by ${clockOf(gap)} s: it was decided on the last stroke.`
+          ? `${first} ${water === 'sea' ? 'beat' : 'touched'} ${second} ${water === 'sea' ? 'home' : 'out'} by ${timeOf(gap)}: it was decided on the last stroke.`
           : gap > 4000
-            ? `${first} won by a long way, ${clockOf(gap)} s clear of ${second}.`
-            : `${first} won by ${clockOf(gap)} s from ${second}.`
+            ? `${first} won by a long way, ${timeOf(gap)} clear of ${second}.`
+            : `${first} won by ${timeOf(gap)} from ${second}.`
       )
     }
     if (leaders.length > 0) {
@@ -616,6 +739,13 @@ export function raceAccount(
             : `Leading at each turn in order: ${leaders.join(', ')}.`
       )
     }
+  }
+  // Timed out is not walked away: whoever was still out was swimming when time was called.
+  if (out.length > 0) {
+    const short = out.map((entry) => `${named(all.indexOf(entry), entry)} ${shortOf(entry.swimmer, lengths)} metres short`)
+    lines.push(
+      `Time was called at ${timeOf(limitOf(lengths))}, the limit for this distance, with ${listed(short)}: still in the water and swimming, too slow to finish, not given up.`
+    )
   }
   all.forEach((who, index) => {
     const swimmer = who.swimmer
@@ -632,8 +762,35 @@ export function raceAccount(
   const after = water === 'sea' ? 'in the shallows' : water === 'pool' ? 'in the pool at the wall' : 'in the water'
   lines.push(
     girls.length === 0
-      ? `The reader is ${after} at the finish, soaked and out of breath.`
-      : `Everyone is still ${after} at the finish, soaked, hair dripping and out of breath.`
+      ? `The reader is ${out.length > 0 ? 'still out in the water' : `${after} at the finish`}, soaked and out of breath.`
+      : out.length > 0
+        ? 'Everyone is still in the water, soaked, hair dripping and out of breath.'
+        : `Everyone is still ${after} at the finish, soaked, hair dripping and out of breath.`
   )
   return lines
+}
+
+/**
+ * The race so far for the scene's writer, should it be walked away from now: the terms, and
+ * who is where. Said again at each turn, it is all an unfinished race leaves behind.
+ */
+export function raceProgress(all: readonly Finisher[], lengths: number, clockMs: number, water: Water = 'water'): string[] {
+  const where = water === 'sea' ? 'in the sea off the beach' : water === 'pool' ? 'in the stadium pool' : 'in the water'
+  const girls = all.slice(1)
+  const named = (index: number): string => (index === 0 ? 'the reader' : all[index].name)
+  const at = (swimmer: Swimmer): string => {
+    if (swimmer.finishMs !== null) return `finished in ${timeOf(swimmer.finishMs)}`
+    const length = lengthOn(swimmer, lengths)
+    return water === 'sea' ? `on leg ${legLabel(length, lengths, water).toLowerCase()}` : `on length ${length} of ${lengths}`
+  }
+  const order = orderNow(all.map((entry) => entry.swimmer))
+  const terms =
+    girls.length === 0
+      ? `The reader was swimming a freestyle time trial alone ${where}: ${distanceWords(lengths, water)}.`
+      : `A freestyle race ${where} between the reader and ${listed(girls.map((girl) => girl.name))}: ${distanceWords(lengths, water)}.`
+  const stood =
+    girls.length === 0
+      ? `Unfinished: ${timeOf(clockMs)} after the whistle the reader was ${at(all[0].swimmer)}.`
+      : `Unfinished: ${timeOf(clockMs)} after the whistle ${named(order[0])} led (${at(all[order[0]].swimmer)}), then ${listed(order.slice(1).map((index) => `${named(index)} (${at(all[index].swimmer)})`))}.`
+  return [terms, stood]
 }

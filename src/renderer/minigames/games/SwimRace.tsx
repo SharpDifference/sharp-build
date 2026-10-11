@@ -6,35 +6,40 @@ import {
   CYCLE_MS,
   FALSE_START_MS,
   LENGTH_M,
+  PULL_LONG,
   PULL_MS,
+  PULL_SHORT,
   SHARP_START_MS,
   SLOWEST_START_MS,
+  TEMPO_RUSHED,
   TOUCH_OUT_MS,
   TURN_ZONE_M,
-  advance,
   breathe,
   callTurn,
   clockOf,
   courseWords,
-  herMind,
-  herMove,
   herReaction,
   legLabel,
   lengthOn,
   lengthsOf,
+  limitOf,
+  newRace,
   onBlocks,
   orderNow,
   outcomeOf,
   placesOf,
   raceAccount,
+  raceProgress,
   raceSummary,
+  runRace,
   stroke,
   swimming,
+  timeOf,
   toWall,
   turnPlace,
   waterAt,
-  type HerMind,
-  type Swimmer,
+  type Race,
+  type RaceEvent,
   type TurnGrade
 } from '@shared/minigameRules/swimRace'
 import { typingIn, useWindowKeydown } from '../kit'
@@ -45,7 +50,10 @@ import '../../vu_styles/SwimRace.css'
 /** How many times in a race anyone says something, by how talkative the table is to be. */
 const REMARKS = { quiet: 0, some: 2, lots: 5 } as const
 
-/** The most of a frame the race is moved on by, in ms: a stalled frame does not leap. */
+/**
+ * The most of a frame the race is moved on by, in ms: a stalled frame does not leap. What a
+ * frame gives is swum in the rules' own fixed steps, so nobody's time hangs on the frame rate.
+ */
 const FRAME_CAP_MS = 50
 /** How long "take your marks" is held before the whistle, in ms: the least, and the spread. */
 const MARKS_MS = 1200
@@ -80,14 +88,14 @@ interface Live {
   phase: Phase
   /** How long until the whistle, in ms. */
   marksMs: number
-  /** Since the whistle, in ms: it stands still while the window is away. */
-  clock: number
+  /**
+   * Everyone in the water, the reader first and then each girl in her seat's order, on the
+   * race's own clock: it stands still while the window is away.
+   */
+  race: Race
   /** `performance.now()` at the frame the clock was last moved to. */
   frameAt: number
   paused: boolean
-  /** The reader first, then each girl in her seat's order. */
-  swimmers: Swimmer[]
-  minds: HerMind[]
   /** The reader went before the whistle. */
   jumped: boolean
   /** When the pull being held began, and when the last one did, on the race's clock. */
@@ -146,11 +154,9 @@ export function SwimRace({ play }: { play: GamePlay }): JSX.Element {
   const live = useRef<Live>({
     phase: 'ready',
     marksMs: 0,
-    clock: 0,
+    race: newRace(lengths, [], []),
     frameAt: 0,
     paused: false,
-    swimmers: [],
-    minds: [],
     jumped: false,
     pullFrom: null,
     lastPull: null,
@@ -173,8 +179,9 @@ export function SwimRace({ play }: { play: GamePlay }): JSX.Element {
   /** The race's clock at this instant, between frames included. */
   function raceNow(): number {
     const game = live.current
-    if (game.paused || game.phase !== 'racing') return game.clock
-    return game.clock + Math.min(FRAME_CAP_MS, Math.max(0, performance.now() - game.frameAt))
+    const race = game.race
+    if (game.paused || game.phase !== 'racing') return race.clock + race.owed
+    return race.clock + race.owed + Math.min(FRAME_CAP_MS, Math.max(0, performance.now() - game.frameAt))
   }
 
   /** How the race stands, for anything said in the water. */
@@ -186,9 +193,9 @@ export function SwimRace({ play }: { play: GamePlay }): JSX.Element {
     if (game.phase === 'ready' || game.phase === 'marks') {
       return `${terms} They are at the edge of the water, about to dive in.${stake}`
     }
-    const order = orderNow(game.swimmers)
+    const order = orderNow(game.race.swimmers)
       .map((index) => {
-        const swimmer = game.swimmers[index]
+        const swimmer = game.race.swimmers[index]
         return swimmer.finishMs !== null
           ? `${told(index)} (finished in ${clockOf(swimmer.finishMs)})`
           : `${told(index)} (${sea ? `on leg ${legLabel(lengthOn(swimmer, lengths), lengths, water).toLowerCase()}` : `on length ${lengthOn(swimmer, lengths)}`})`
@@ -231,12 +238,22 @@ export function SwimRace({ play }: { play: GamePlay }): JSX.Element {
     if (mounted.current) setFeel((now) => ({ word, count: now.count + 1 }))
   }
 
+  /**
+   * Takes the focus off whatever button has it: with one focused the keys would be that
+   * button's, and Space would press it instead of pulling.
+   */
+  function unfocus(): void {
+    const focused = document.activeElement
+    if (focused instanceof HTMLElement && focused.tagName === 'BUTTON') focused.blur()
+  }
+
   /** Onto the blocks: the first move, and the wait for the whistle. */
   function toMarks(): void {
     const game = live.current
     if (game.phase !== 'ready' || !mounted.current) return
     game.phase = 'marks'
     game.marksMs = MARKS_MS + Math.random() * MARKS_SPREAD_MS
+    unfocus()
     held.current.started()
     setPhase('marks')
   }
@@ -257,7 +274,7 @@ export function SwimRace({ play }: { play: GamePlay }): JSX.Element {
       return
     }
     if (game.phase !== 'racing') return
-    const me = game.swimmers[0]
+    const me = game.race.swimmers[0]
     if (me.blockMs > 0) {
       // The dive: he leaves the blocks with the next frame, at the reaction he showed.
       if (!me.falseStart && me.reactionMs >= SLOWEST_START_MS) {
@@ -276,9 +293,9 @@ export function SwimRace({ play }: { play: GamePlay }): JSX.Element {
     const from = game.pullFrom
     game.pullFrom = null
     if (game.phase !== 'racing' || game.paused) return
-    const me = game.swimmers[0]
+    const me = game.race.swimmers[0]
     if (!swimming(me)) return
-    const pullMs = raceNow() - from
+    const pullMs = Math.max(0, raceNow() - from)
     const cycleMs = game.lastPull === null ? null : from - game.lastPull
     game.lastPull = from
     const gasping = me.gaspMs > 0
@@ -291,30 +308,38 @@ export function SwimRace({ play }: { play: GamePlay }): JSX.Element {
       }
     } else if (gasping) felt('Gasping')
     else if (worth >= CLEAN_STROKE) felt('Smooth')
-    else if (pullMs < PULL_MS * 0.8) felt('Too short')
-    else if (cycleMs !== null && cycleMs < CYCLE_MS * 0.85) felt('Rushed')
+    else if (pullMs < PULL_MS * PULL_SHORT) felt('Too short')
+    else if (cycleMs !== null && cycleMs < CYCLE_MS * TEMPO_RUSHED) felt('Rushed')
+    else if (pullMs > PULL_MS * PULL_LONG) felt('Too long')
     else felt('Heavy')
   }
 
   function takeBreath(): void {
     const game = live.current
     if (!mounted.current || game.phase !== 'racing' || game.paused) return
-    if (breathe(game.swimmers[0])) felt('Breath')
+    if (breathe(game.race.swimmers[0])) felt('Breath')
   }
 
   function turnNow(): void {
     const game = live.current
     if (!mounted.current || game.phase !== 'racing' || game.paused) return
-    const grade = callTurn(game.swimmers[0], lengths)
+    const grade = callTurn(game.race.swimmers[0], lengths)
     if (grade) felt(grade === 'early' ? 'Too early' : grade === 'perfect' ? 'Perfect!' : 'Good')
   }
 
   useWindowKeydown((event) => {
-    // A key typed to her is a character, and a key on a focused button is that button's.
+    // A key typed to her is a character, never a stroke.
     if (typingIn(event) || event.ctrlKey || event.metaKey || event.altKey) return
     const target = event.target
-    if (target instanceof HTMLElement && (target.tagName === 'BUTTON' || target.isContentEditable)) return
+    if (target instanceof HTMLElement && target.isContentEditable) return
     const key = event.key.length === 1 ? event.key.toLowerCase() : event.key
+    if (target instanceof HTMLElement && target.tagName === 'BUTTON') {
+      // Space on a focused button is that button's until the race is on; from the marks on
+      // every swim key is the race's, and the button gives the focus up before it can be pressed.
+      const on = live.current.phase === 'marks' || live.current.phase === 'racing'
+      if (key === ' ' && !on) return
+      if ([' ', 'j', 'w', 's', 'ArrowUp', 'ArrowDown'].includes(key)) target.blur()
+    }
     if (key === ' ' || key === 'j') {
       event.preventDefault()
       if (!event.repeat) pullDown()
@@ -349,21 +374,34 @@ export function SwimRace({ play }: { play: GamePlay }): JSX.Element {
 
     const whistle = (): void => {
       game.phase = 'racing'
-      game.clock = 0
-      game.swimmers = [
-        game.jumped ? onBlocks(FALSE_START_MS, true) : onBlocks(SLOWEST_START_MS),
-        ...girls.map((girl) => onBlocks(herReaction(girl.skill)))
-      ]
-      game.minds = girls.map(() => herMind())
+      game.race = newRace(
+        lengths,
+        [
+          game.jumped ? onBlocks(FALSE_START_MS, true) : onBlocks(SLOWEST_START_MS),
+          ...girls.map((girl) => onBlocks(herReaction(girl.skill)))
+        ],
+        [null, ...girls.map((girl) => girl.skill)]
+      )
       setWhistled(true)
       setPhase('racing')
     }
 
+    const everyone = (): { name: string; swimmer: Race['swimmers'][number] }[] =>
+      game.race.swimmers.map((swimmer, index) => ({ name: names[index], swimmer }))
+
+    /** The race so far, kept with the scene in case it is walked away from. */
+    const keep = (clock: number): void => held.current.progress(raceProgress(everyone(), lengths, clock, water))
+
     const end = (): void => {
       game.finished = true
       game.phase = 'over'
-      const all = game.swimmers.map((swimmer, index) => ({ name: names[index], swimmer }))
-      const times = game.swimmers.map((swimmer) => swimmer.finishMs ?? Infinity)
+      game.pullFrom = null
+      const all = everyone()
+      const times = game.race.swimmers.map((swimmer) => swimmer.finishMs ?? Infinity)
+      // Time was called on whoever is still out.
+      game.race.swimmers.forEach((swimmer, index) => {
+        if (swimmer.finishMs === null) board(index, { time: 'DNF', word: '' })
+      })
       if (girls.length > 0) held.current.situation(standing())
       setPhase('over')
       held.current.finish({
@@ -373,78 +411,83 @@ export function SwimRace({ play }: { play: GamePlay }): JSX.Element {
       })
     }
 
-    /** One swimmer moved on by `dt`, and what came of it told. */
-    const move = (index: number, dt: number, clock: number): void => {
-      const swimmer = game.swimmers[index]
-      if (swimmer.finishMs !== null) return
-      for (const event of advance(swimmer, dt, clock, lengths)) {
-        if (event.kind === 'dive') {
-          if (index !== 0) continue
-          held.current.narrate(
-            swimmer.falseStart
-              ? 'You go before the whistle and are called back; by the time you dive the water ahead is already churning.'
-              : swimmer.reactionMs <= SHARP_START_MS
-                ? `The whistle, and you are ${sea ? 'in and away' : 'off the blocks'} at once: ${clockOf(swimmer.reactionMs)}.`
-                : `The whistle. You dive ${clockOf(swimmer.reactionMs)} after it.`
-          )
-          if (girls.length > 0) held.current.situation(standing())
-        } else if (event.kind === 'turn') {
-          if (game.leaders[event.length - 1] === undefined) game.leaders[event.length - 1] = told(index)
-          board(index, { length: event.length + 1, word: turnWord(event.grade) })
-          if (index === 0) {
-            game.pullFrom = null
-            game.lastPull = null
-            felt(turnWord(event.grade))
-            // The order at the turn, on a race long enough to have a middle.
-            if (lengths >= 4) {
-              if (girls.length === 0) {
-                if (event.length * 2 === lengths) held.current.narrate(`Halfway, in ${clockOf(clock)}.`)
-              } else {
-                const order = orderNow(game.swimmers).map((at) => (at === 0 ? 'you' : names[at]))
-                held.current.narrate(
-                  `${sea ? (event.length % 2 ? 'Round the buoy' : 'Off the shore again') : `Turn ${event.length} of ${lengths - 1}`}: ${order[0]} in front, then ${listed(order.slice(1))}.`
-                )
-              }
+    /** What a step of the race brought about for one swimmer, told. */
+    const tell = (index: number, event: RaceEvent, clock: number): void => {
+      const swimmer = game.race.swimmers[index]
+      if (event.kind === 'gasp') {
+        board(index, { word: 'Gasping' })
+        if (game.race.swimmers[0].finishMs === null) {
+          remark(girls[index - 1].charId, `${names[index]} has just run out of air mid-length and come up gasping, losing speed.`)
+        }
+      } else if (event.kind === 'dive') {
+        if (index !== 0) return
+        held.current.narrate(
+          swimmer.falseStart
+            ? 'You go before the whistle and are called back; by the time you dive the water ahead is already churning.'
+            : swimmer.reactionMs <= SHARP_START_MS
+              ? `The whistle, and you are ${sea ? 'in and away' : 'off the blocks'} at once: ${timeOf(swimmer.reactionMs)}.`
+              : `The whistle. You dive ${timeOf(swimmer.reactionMs)} after it.`
+        )
+        if (girls.length > 0) held.current.situation(standing())
+        keep(clock)
+      } else if (event.kind === 'turn') {
+        if (game.leaders[event.length - 1] === undefined) game.leaders[event.length - 1] = told(index)
+        board(index, { length: event.length + 1, word: turnWord(event.grade) })
+        keep(clock)
+        if (index === 0) {
+          // A pull held into the wall begins again as he comes off it, the wall's hold served.
+          if (game.pullFrom !== null) game.pullFrom = clock + swimmer.wallMs
+          game.lastPull = null
+          felt(turnWord(event.grade))
+          // The order at the turn, on a race long enough to have a middle.
+          if (lengths >= 4) {
+            if (girls.length === 0) {
+              if (event.length * 2 === lengths) held.current.narrate(`Halfway, in ${timeOf(clock)}.`)
+            } else {
+              const order = orderNow(game.race.swimmers).map((at) => (at === 0 ? 'you' : names[at]))
+              held.current.narrate(
+                `${sea ? (event.length % 2 ? 'Round the buoy' : 'Off the shore again') : `Turn ${event.length} of ${lengths - 1}`}: ${order[0]} in front, then ${listed(order.slice(1))}.`
+              )
             }
-          }
-          if (girls.length > 0) {
-            held.current.situation(standing())
-            const whose = index === 0 ? "The reader's" : `${names[index]}'s`
-            const at = sea ? `at ${turnPlace(event.length, water)}` : `at the end of length ${event.length}`
-            // Once he has touched the rest come home at speed: nothing said then would be in step.
-            if (game.swimmers[0].finishMs !== null) continue
-            if (event.grade === 'perfect') {
-              remark(voiceFor(index), `${whose} turn ${at} was perfectly timed: ${sea ? 'tight round and away at full stretch' : 'a tumble and a hard push off the wall'}.`)
-            } else if (event.grade === 'late') {
-              remark(voiceFor(index), `${whose} turn ${at} was botched: ${sea ? 'swung wide and almost stopped' : 'straight into the wall'}, and a scramble to get going again.`)
-            }
-          }
-        } else {
-          const ms = swimmer.finishMs ?? clock
-          board(index, { length: lengths, time: clockOf(ms), word: '' })
-          const before = game.lastTouch
-          game.lastTouch = { ms, who: index }
-          const stillOut = game.swimmers.some((other) => other.finishMs === null)
-          if (index === 0 && stillOut) held.current.narrate(`You touch in ${clockOf(ms)}.`)
-          // A touch-out is worth a word only while someone is still swimming: the last touch
-          // is the result's to tell.
-          if (stillOut && before && ms - before.ms < TOUCH_OUT_MS && girls.length > 0) {
-            remark(
-              voiceFor(index),
-              `${index === 0 ? 'The reader' : names[index]} has just finished ${clockOf(ms - before.ms)} of a second behind ${told(before.who)}: ${sea ? 'beaten home by a stroke' : 'touched out at the wall'}.`
-            )
           }
         }
-      }
-      if (index > 0 && herMove(swimmer, game.minds[index - 1], girls[index - 1].skill, dt, lengths)) {
-        board(index, { word: 'Gasping' })
-        if (game.swimmers[0].finishMs === null) remark(girls[index - 1].charId, `${names[index]} has just run out of air mid-length and come up gasping, losing speed.`)
+        if (girls.length === 0) return
+        held.current.situation(standing())
+        // Once he has touched the rest come home at speed: nothing said then would be in step.
+        if (game.race.swimmers[0].finishMs !== null) return
+        // A turn is worth a word only at a talkative table: a quieter one keeps its few for
+        // someone out of air and for a touch-out.
+        if (held.current.chattiness !== 'lots') return
+        const whose = index === 0 ? "The reader's" : `${names[index]}'s`
+        const at = sea ? `at ${turnPlace(event.length, water)}` : `at the end of length ${event.length}`
+        if (event.grade === 'perfect') {
+          remark(voiceFor(index), `${whose} turn ${at} was perfectly timed: ${sea ? 'tight round and away at full stretch' : 'a tumble and a hard push off the wall'}.`)
+        } else if (event.grade === 'late') {
+          remark(voiceFor(index), `${whose} turn ${at} was botched: ${sea ? 'swung wide and almost stopped' : 'straight into the wall'}, and a scramble to get going again.`)
+        }
+      } else {
+        const ms = swimmer.finishMs ?? clock
+        board(index, { length: lengths, time: clockOf(ms), word: '' })
+        if (index === 0) game.pullFrom = null
+        const before = game.lastTouch
+        game.lastTouch = { ms, who: index }
+        const stillOut = game.race.swimmers.some((other) => other.finishMs === null)
+        if (stillOut) keep(clock)
+        if (index === 0 && stillOut) held.current.narrate(`You touch in ${timeOf(ms)}.`)
+        // A touch-out is worth a word only while someone is still swimming: the last touch
+        // is the result's to tell.
+        if (stillOut && before && ms - before.ms < TOUCH_OUT_MS && girls.length > 0) {
+          remark(
+            voiceFor(index),
+            `${index === 0 ? 'The reader' : names[index]} has just finished ${timeOf(ms - before.ms)} behind ${told(before.who)}: ${sea ? 'beaten home by a stroke' : 'touched out at the wall'}.`
+          )
+        }
       }
     }
 
     const draw = (): void => {
-      const me = game.swimmers[0]
-      game.swimmers.forEach((swimmer, index) => {
+      const me = game.race.swimmers[0]
+      game.race.swimmers.forEach((swimmer, index) => {
         const lane = lanes.current[index]
         if (!lane) return
         const at = Math.min(lengths - 1, Math.floor(swimmer.dist / LENGTH_M + 1e-9))
@@ -456,7 +499,8 @@ export function SwimRace({ play }: { play: GamePlay }): JSX.Element {
       const place = root.current
       if (place && me) {
         const since = game.pullFrom ?? game.lastPull
-        const beat = since === null ? (game.clock % CYCLE_MS) / CYCLE_MS : Math.min(1, (game.clock - since) / CYCLE_MS)
+        const clock = game.race.clock
+        const beat = since === null ? (clock % CYCLE_MS) / CYCLE_MS : Math.min(1, Math.max(0, clock - since) / CYCLE_MS)
         place.style.setProperty('--air', me.air.toFixed(3))
         place.style.setProperty('--beat', beat.toFixed(3))
         const flag = (name: string, on: boolean): void => {
@@ -470,8 +514,8 @@ export function SwimRace({ play }: { play: GamePlay }): JSX.Element {
         flag('low', me.air < 0.25 && me.gaspMs <= 0)
         flag('turn', swimming(me) && me.called === null && lengthOn(me, lengths) < lengths && toWall(me) <= TURN_ZONE_M)
       }
-      if (clockText.current && me) clockText.current.textContent = clockOf(me.finishMs ?? game.clock)
-      const order = orderNow(game.swimmers)
+      if (clockText.current && me) clockText.current.textContent = clockOf(me.finishMs ?? game.race.clock)
+      const order = orderNow(game.race.swimmers)
       const key = order.join('')
       if (key !== game.order) {
         game.order = key
@@ -494,13 +538,10 @@ export function SwimRace({ play }: { play: GamePlay }): JSX.Element {
       }
       if (game.phase !== 'racing') return
       // Once he has touched there is nothing to play: the rest come home quickly.
-      const steps = game.swimmers[0].finishMs !== null ? AFTER_TOUCH : 1
-      for (let step = 0; step < steps; step++) {
-        game.clock += dt
-        for (let index = 0; index < game.swimmers.length; index++) move(index, dt, game.clock)
-      }
+      runRace(game.race, dt * (game.race.swimmers[0].finishMs !== null ? AFTER_TOUCH : 1), Math.random, tell)
       draw()
-      if (game.swimmers.every((swimmer) => swimmer.finishMs !== null)) {
+      // Everyone home, or time called on whoever is not.
+      if (game.race.over) {
         cancelAnimationFrame(frame)
         end()
       }
@@ -519,6 +560,8 @@ export function SwimRace({ play }: { play: GamePlay }): JSX.Element {
       if (document.hidden || !document.hasFocus()) return
       game.paused = false
       game.frameAt = performance.now()
+      // Back from away on the marks: the wait begins again, so the whistle never comes unannounced.
+      if (game.phase === 'marks') game.marksMs = MARKS_MS + Math.random() * MARKS_SPREAD_MS
       setPaused(false)
     }
     const seen = (): void => (document.hidden ? stop() : resume())
@@ -546,8 +589,9 @@ export function SwimRace({ play }: { play: GamePlay }): JSX.Element {
   const over = phase === 'over'
   const racing = phase === 'racing'
   const finalPlaces = over
-    ? placesOf(live.current.swimmers.map((swimmer) => swimmer.finishMs ?? Infinity))
+    ? placesOf(live.current.race.swimmers.map((swimmer) => swimmer.finishMs ?? Infinity))
     : null
+  const timedOut = over && live.current.race.swimmers.some((swimmer) => swimmer.finishMs === null)
   const zone = `${((TURN_ZONE_M / LENGTH_M) * 100).toFixed(1)}%`
 
   return (
@@ -567,7 +611,7 @@ export function SwimRace({ play }: { play: GamePlay }): JSX.Element {
           0.00
         </span>
         <span className="vu-swimrace-call" role="status">
-          {phase === 'marks' ? 'Take your marks…' : racing && whistled ? 'Go!' : over ? 'Finished' : ' '}
+          {phase === 'marks' ? 'Take your marks…' : racing && whistled ? 'Go!' : over ? (timedOut ? 'Time!' : 'Finished') : ' '}
         </span>
       </div>
 
@@ -605,7 +649,8 @@ export function SwimRace({ play }: { play: GamePlay }): JSX.Element {
               Hold <kbd>Space</kbd> for each stroke: let go as the marker crosses from pull to
               glide, press again as it reaches the end. <kbd>W</kbd> breathes before your air runs
               out. <kbd>S</kbd> turns, just as you reach {sea ? 'the buoy or the shore' : 'the wall'}.
-              Dive on the whistle with <kbd>Space</kbd>, not before.
+              Dive on the whistle with <kbd>Space</kbd>, not before. Time is called at{' '}
+              {timeOf(limitOf(lengths))}.
             </p>
             <motion.button
               type="button"
