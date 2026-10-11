@@ -54,6 +54,11 @@ export interface GamePlay {
    * for a move made on the keyboard. Nothing where the text keeps its own time.
    */
   moved: () => void
+  /**
+   * Resolves once the reader has moved past everything the game has said so far: the moment for
+   * the next move at a table read at his own pace. At once where the text keeps its own time.
+   */
+  read: () => Promise<void>
   /** What is riding on the game, as the scene settled it; empty where nothing is. */
   stake: string
   /** How much she is to say for herself, as the player has it set; what that comes to is the game's. */

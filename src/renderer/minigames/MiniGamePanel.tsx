@@ -304,6 +304,7 @@ export function MiniGamePanel({ theme, onClose }: ScenePanelProps): JSX.Element 
       location,
       stepped: Boolean(seated?.game.stepped),
       moved: () => stepTable(),
+      read: () => (seated?.game.stepped ? tableRead() : Promise.resolve()),
       stake: seated?.stake ?? '',
       chattiness,
       options: seated?.options ?? {},
