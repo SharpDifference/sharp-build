@@ -100,3 +100,10 @@ body:has(.vu-minigame-veil) .vu-scene-divider {
 .vu-minigame-leave {
   margin-top: 2px;
 }
+
+/* Room kept in the table's row for the parts of the scene's row it does not offer: the same
+   boxes, drawn as nothing. */
+.vu-minigame-room {
+  visibility: hidden;
+  pointer-events: none;
+}

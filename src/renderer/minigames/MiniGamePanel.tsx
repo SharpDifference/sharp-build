@@ -326,6 +326,10 @@ export function MiniGamePanel({ theme, onClose }: ScenePanelProps): JSX.Element 
               speak()
             }}
           >
+            {/* The scene's row has its tips mark before the well and the gift after Go. Neither
+                is offered at the table, and both keep their room, so the well stands exactly
+                where the scene's does. */}
+            <span className="vu-scene-help vu-minigame-room" aria-hidden="true" />
             <TurnField
               action={remark}
               onAction={setRemark}
@@ -339,6 +343,16 @@ export function MiniGamePanel({ theme, onClose }: ScenePanelProps): JSX.Element 
               }
               multiline
             />
+            <span className="vu-scene-gift vu-minigame-room" aria-hidden="true">
+              <span className="vu-scene-giftseat">
+                <span className="vu-deadnote">
+                  <span className="vu-scene-rule" />
+                  <span className="vu-scene-giftbtn">
+                    <svg width="20" height="20" />
+                  </span>
+                </span>
+              </span>
+            </span>
           </div>
         )}
       </motion.div>,
