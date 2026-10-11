@@ -449,9 +449,7 @@ export function MiniGamePanel({ theme, onClose }: ScenePanelProps): JSX.Element 
           aria-modal="true"
           aria-label={seated.game.name}
           // A move of his own in the game is moving on too.
-          onPointerDownCapture={() => {
-            if (waiting) stepTable()
-          }}
+          onPointerDownCapture={() => stepTable()}
           initial={{ y: -18, scale: 0.96 }}
           animate={{ y: 0, scale: 1 }}
           transition={{ duration: 0.24, ease: 'easeOut' }}
@@ -491,7 +489,12 @@ export function MiniGamePanel({ theme, onClose }: ScenePanelProps): JSX.Element 
                     summary: `You walk away from the game of ${seated.game.name}${
                       tableNames.length > 0 ? ` with ${listed(tableNames)}` : ''
                     } before it is over.`,
-                    ...(soFar.current.length > 0 ? { account: soFar.current } : {})
+                    // What the game said of itself so far, or failing that how it last stood.
+                    ...(soFar.current.length > 0
+                      ? { account: soFar.current }
+                      : situation.current
+                        ? { account: [`How it stood when he left: ${situation.current}`] }
+                        : {})
                   })
                 : onClose()
             }

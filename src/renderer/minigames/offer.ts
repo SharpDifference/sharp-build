@@ -105,17 +105,23 @@ export function withOffer(
 
   const described = games.flatMap((game) => [
     `- ${game.name} (id "${game.id}"): ${game.blurb}.`,
-    `  How it is played: ${game.format}`,
     ...(several
       ? [
           game.players.max <= 1
-            ? '  The reader plays it with one girl.'
+            ? '  The reader plays it with one girl, or with her beside him where it is his alone to play.'
             : `  The reader plays it with ${fewestWith(game) === game.players.max ? game.players.max : `${fewestWith(game)} to ${game.players.max}`} girls at once.`
         ]
       : []),
     ...(game.options ?? []).map(
       (option) =>
-        `  Option "${option.id}": ${option.describe}. From ${option.min} to ${option.max}; ${option.default} is the standard game.`
+        `  Option "${option.id}" (${option.label ?? option.describe}): ${
+          option.values
+            ? Array.from(
+                { length: option.max - option.min + 1 },
+                (_, i) => `${option.min + i} is ${option.values?.[option.min + i] ?? option.min + i}`
+              ).join(', ')
+            : `${option.min} to ${option.max}`
+        }; ${option.default} is the standard game.`
     ),
     `  ${RATE[suggestRate(game, location, busy, keen)]}`
   ])

@@ -1,7 +1,7 @@
 import { create } from 'zustand'
 import { gamesOffered, gameSwitchOn, listed, type MiniGameDef } from '@shared/minigames'
 import { modById, optionKey } from '@shared/mods'
-import { charKeyOf } from '@shared/types'
+import { charKeyOf, READER_SPEAKER } from '@shared/types'
 import { useGameStore } from '../stores/gameStore'
 import { submitAction, takeTurnFromReply } from '../stores/gameLoop'
 import { advance } from '../stores/loop/hooks'
@@ -31,6 +31,12 @@ export function useGamesOffered(): MiniGameDef[] {
   useModsStore((s) => s.switches)
   // Read so a game retuned on its page is offered as retuned.
   usePrefsStore((s) => s.byGame)
+  // A game is played inside a scene. Before the reader's first action there is none yet, only
+  // the slot's landing, and a game narrated onto it would pass for a scene already running.
+  const under = useGameStore((state) =>
+    state.currentSceneTranscript.some((line) => line.speaker === READER_SPEAKER)
+  )
+  if (!under) return []
   return gamesOffered({ location, girls }, gameIsOn)
     .filter((game) => Boolean(gameComponent(game.id)))
     .map(tunedGame)
@@ -111,33 +117,10 @@ function reachTurn(): boolean {
 }
 
 /**
- * Every line of move-by-move narration the tables of this scene have said, as it stands in the
- * log. The scene's closing bookkeeping reads the log, not the transcript a finished game is taken
- * back off, and a game's worth of card turns there is a lot for it to think through for nothing:
- * {@link withoutTableNarration} takes them out of what it is sent.
+ * Every line of move-by-move narration a table has said and not yet taken back, as the very
+ * objects on the scene's records: what {@link compactTable} removes, wherever they have got to.
  */
-const narrated = new Set<string>()
-
-/** A new game entered: nothing said at any earlier table is this one's. */
-export function forgetTableNarration(): void {
-  narrated.clear()
-}
-
-/**
- * A request's prompt without the move-by-move narration of the games played in the scene: the
- * lines exactly as the tables said them, whoever the prompt names as their speaker. What a game
- * came to is still there, in the result that went into the scene.
- */
-export function withoutTableNarration(prompt: string): string {
-  if (narrated.size === 0) return prompt
-  return prompt
-    .split('\n')
-    .filter((line) => {
-      const said = line.replace(/^\s*[A-Z][A-Z ]*:\s*/, '').trim()
-      return !narrated.has(said)
-    })
-    .join('\n')
-}
+let moveLines = new Set<object>()
 
 /**
  * Puts lines on the transcript and on the box at once, the box turning to the first of them.
@@ -145,7 +128,7 @@ export function withoutTableNarration(prompt: string): string {
  */
 function playLines(text: string, speaker = '', moves = false): void {
   const lines = splitOverflow({ speaker, text }, boxFits)
-  if (moves) for (const line of lines) narrated.add(line.text.trim())
+  if (moves) for (const line of lines) moveLines.add(line)
   const game = useGameStore.getState()
   game.appendSceneLines(lines)
   game.appendPendingLines(lines)
@@ -174,8 +157,6 @@ function holdFor(text: string, spoken: boolean): number {
 
 let sitting = 0
 let heldUntil = 0
-/** How long the scene's transcript was when the table opened, or -1 with no table open. */
-let openedAt = -1
 
 /**
  * A table read at the reader's own pace. A line stays on the box until he steps past it, and the
@@ -225,26 +206,26 @@ export function openTable(readerPaced = false): void {
   unread = false
   chain = Promise.resolve()
   stepTable()
-  openedAt = useGameStore.getState().currentSceneTranscript.length
 }
 
 /**
- * Takes a finished game's move-by-move narration back off the scene's transcript, leaving what
- * was said across the table. The narration was for the reader, who has read it and still has it
- * in the chat log; the transcript is what every later request quotes, the scene's closing
- * bookkeeping included, and a few games' worth of card turns is a lot of scene to send each
- * time. What the scene needs of the game goes in once, with its result.
+ * Takes a finished game's move-by-move narration back off the scene: off the transcript, which
+ * every later request quotes; off the log, which the scene's closing bookkeeping reads and a
+ * rewind walks; and off whatever was still waiting to be shown. A few games' worth of card turns
+ * is a lot of scene to send and to think through for nothing, and the three records must go on
+ * agreeing line for line. What was said across the table stays, and what the game came to goes
+ * in once, with its result.
  */
 export function compactTable(): void {
-  const from = openedAt
-  openedAt = -1
-  const transcript = useGameStore.getState().currentSceneTranscript
-  if (from < 0 || from >= transcript.length) return
+  const gone = moveLines
+  moveLines = new Set()
+  if (gone.size === 0) return
+  const kept = <T extends object>(lines: readonly T[]): T[] => lines.filter((line) => !gone.has(line))
+  const game = useGameStore.getState()
   useGameStore.setState({
-    currentSceneTranscript: [
-      ...transcript.slice(0, from),
-      ...transcript.slice(from).filter((line) => line.speaker !== '')
-    ]
+    currentSceneTranscript: kept(game.currentSceneTranscript),
+    sceneLog: kept(game.sceneLog),
+    pendingLines: kept(game.pendingLines)
   })
 }
 
@@ -262,6 +243,19 @@ export function tableQuietIn(): number {
 
 /** Resolves once the line is on the box, which is after everything said before it. */
 function show(text: string, speaker: string): Promise<void> {
+  // A line too long for the box is several, each given the box in its turn: put on together,
+  // only the first would be shown and every later line would run one behind.
+  const parts = splitOverflow({ speaker, text }, boxFits)
+  if (parts.length > 1) {
+    return parts.reduce<Promise<void>>(
+      (said, part) => said.then(() => showOne(part.text, speaker)),
+      Promise.resolve()
+    )
+  }
+  return showOne(text, speaker)
+}
+
+function showOne(text: string, speaker: string): Promise<void> {
   const at = sitting
   if (stepped) {
     // Behind whatever is still being read, and on the box as soon as he steps past it.
@@ -379,7 +373,11 @@ export function fileResult(result: PlayResult, played: PlayedWith): void {
             `The reader and ${who} have just played ${played.game.name} for real, at the table, between your last lines and now. It is over and settled: do not replay it or change how it came out.`,
             ...(result.account ?? []),
             ...(played.stake
-              ? [`Riding on it, as they agreed: ${played.stake} It is owed now.`]
+              ? [
+                  result.outcome === 'won' || result.outcome === 'lost'
+                    ? `Riding on it, as they agreed: ${played.stake} It is owed now.`
+                    : `Riding on it, as they agreed: ${played.stake} Nobody won outright, so what becomes of it is theirs to settle.`
+                ]
               : []),
             `Open on the result, then let ${who} react to it in character: how the game went, anything in it worth a remark, and the stake if there was one.`
           ]

@@ -16,12 +16,7 @@ import { gameComponent } from '../minigames/play'
 import { answerOf, withProposal, type Asked } from '../minigames/proposal'
 import { useTableStore } from '../minigames/session'
 import { skillOf } from '../minigames/skill'
-import {
-  forgetTableNarration,
-  gameIsOn,
-  nameOf,
-  withoutTableNarration
-} from '../minigames/table'
+import { gameIsOn, nameOf } from '../minigames/table'
 import { registerHooks } from '../mods/hooks'
 import { useGameStore } from '../stores/gameStore'
 import { useModsStore } from '../stores/modsStore'
@@ -77,8 +72,6 @@ registerHooks(MINI_GAMES, {
   },
 
   requests: {
-    // The scene's closing bookkeeping is not sent the games' move-by-move narration.
-    ledger: (request) => ({ ...request, user: withoutTableNarration(request.user) }),
     scene: (request, ctx) => {
       // The turn that carries the reader's own proposal asks for her answer to it and nothing
       // else: its words are in what the request was built from, so a turn retried or rewound
@@ -133,7 +126,6 @@ registerHooks(MINI_GAMES, {
   // Nothing in hand belongs to the game being entered. Its scene is not loaded yet, so whether
   // she had just agreed at the point it stands on is asked later, by the seat, at the reader's turn.
   gameEntered: () => {
-    forgetTableNarration()
     useTableStore.getState().setProposal(null)
     useTableStore.getState().dropAgreed()
     useTableStore.getState().setPlayed(null)
