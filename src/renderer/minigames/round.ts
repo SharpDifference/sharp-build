@@ -57,7 +57,7 @@ function request(
   const names = Object.keys(ask.fields)
   return {
     system: [
-      'You run one round of a game inside an interactive visual novel, a college dating sim. The reader is the main character and is spoken to as "you". The girls are written in their own voices and as they are with him in this scene.',
+      'You run one round of a game inside an interactive visual novel, a college dating sim. Everyone in it is an adult. The reader is the main character and is spoken to as "you". The girls are written in their own voices and as they are with him in this scene: how close each is to him is what the scene so far shows, and no further.',
       'Answer in JSON only.'
     ].join('\n'),
     user: [
@@ -68,7 +68,9 @@ function request(
       '',
       `THE GAME: ${gameName}`,
       ...(situation ? [situation] : []),
-      ...(stake ? [`Riding on it: ${stake}`] : []),
+      ...(stake
+        ? [`Riding on it: ${stake} What is riding on a game changes nothing about what anyone would say or do in it.`]
+        : []),
       '',
       'THIS ROUND',
       ask.brief,
