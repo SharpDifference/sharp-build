@@ -4,6 +4,8 @@ import { motion } from 'motion/react'
 import {
   CHAT_OPTIONS,
   defaultOptions,
+  groupsFor,
+  listed,
   MINI_GAMES,
   MINI_GAMES_LIST,
   type Chattiness,
@@ -47,11 +49,16 @@ import {
 } from './table'
 import '../vu_styles/MiniGames.css'
 
-/** One thing the table can be opened for: a game alone, or a game a girl is asked to play. */
+/** One thing the table can be opened for: a game alone, or one a girl or several are asked to play. */
 interface Offer {
   game: MiniGameDef
-  /** The girl to ask, or null for a game played alone. */
-  charId: string | null
+  /** The girls to ask; none for a game played alone. */
+  charIds: string[]
+}
+
+/** What the reader calls the girls asked, in a row. */
+function namesOf(charIds: readonly string[]): string {
+  return listed(charIds.map(nameOf))
 }
 
 /** A game being played: against whom, and for what. */
@@ -106,21 +113,24 @@ export function MiniGamePanel({ theme, onClose }: ScenePanelProps): JSX.Element 
   const offers = useMemo<Offer[]>(
     () =>
       offered.flatMap((game) => [
-        ...(game.players.max >= 1 ? girls.map((charId): Offer => ({ game, charId })) : []),
-        ...(game.players.min === 0 ? [{ game, charId: null }] : [])
+        ...(game.players.max >= 1 && game.players.min <= 1
+          ? girls.map((charId): Offer => ({ game, charIds: [charId] }))
+          : []),
+        ...groupsFor(game, girls).map((charIds): Offer => ({ game, charIds })),
+        ...(game.players.min === 0 ? [{ game, charIds: [] }] : [])
       ]),
     [offered, girls]
   )
 
   const [sitting, setSitting] = useState<Sitting | null>(() => sittingOf(agreed))
-  const [asking, setAsking] = useState<(Offer & { charId: string }) | null>(null)
+  const [asking, setAsking] = useState<Offer | null>(null)
   const [words, setWords] = useState('')
   // An agreed game is under way from the moment the table opens: she is sitting at it.
   const [underWay, setUnderWay] = useState(agreed !== null)
   const [result, setResult] = useState<PlayResult | null>(null)
 
   // The one thing on offer, alone, is the game: nothing to pick.
-  const only = offers.length === 1 && offers[0].charId === null ? offers[0].game : null
+  const only = offers.length === 1 && offers[0].charIds.length === 0 ? offers[0].game : null
   const seated = useMemo<Sitting | null>(
     () =>
       sitting ??
@@ -132,19 +142,24 @@ export function MiniGamePanel({ theme, onClose }: ScenePanelProps): JSX.Element 
   // Her skill, judged when she agreed and ready by now more often than not.
   useEffect(() => {
     if (!agreed) return
-    const character = useGameStore.getState().characters[agreed.charId]
     const game = MINI_GAMES_LIST.find((entry) => entry.id === agreed.gameId)
-    if (!character || !game) return
+    const characters = agreed.charIds
+      .map((charId) => useGameStore.getState().characters[charId])
+      .filter((character) => character !== undefined)
+    if (characters.length === 0 || !game) return
     let live = true
-    void skillOf(character, game).then((skill) => {
-      if (!live) return
-      const opponent: Opponent = {
-        charId: agreed.charId,
-        name: nameOf(agreed.charId),
-        skill: skill.level,
-        style: skill.style
-      }
-      setSitting((now) => (now ? { ...now, opponents: [opponent] } : now))
+    void Promise.all(
+      characters.map(async (character): Promise<Opponent> => {
+        const skill = await skillOf(character, game)
+        return {
+          charId: character.charId,
+          name: nameOf(character.charId),
+          skill: skill.level,
+          style: skill.style
+        }
+      })
+    ).then((opponents) => {
+      if (live) setSitting((now) => (now ? { ...now, opponents } : now))
     })
     return () => {
       live = false
@@ -181,15 +196,32 @@ export function MiniGamePanel({ theme, onClose }: ScenePanelProps): JSX.Element 
   // What the reader says at the table, whenever he likes. The game is not held for it; one
   // remark is out at a time, so her answers come back in the order he spoke.
   const [remark, setRemark] = useState('')
-  const [answering, setAnswering] = useState(false)
+  // Who is answering him, by what he calls her; null with nobody answering.
+  const [answering, setAnswering] = useState<string | null>(null)
+  // With several at the table, whose turn it is to answer a remark that names nobody.
+  const turnToAnswer = useRef(0)
+  /** How the game stands as one girl is told it: the game's own words, and who else is playing. */
+  function situationFor(charId: string): string {
+    const others = (seated?.opponents ?? []).filter((girl) => girl.charId !== charId)
+    return others.length === 0
+      ? situation.current
+      : `${situation.current} Also playing: ${listed(others.map((girl) => girl.name))}.`
+  }
   function speak(): void {
-    const her = seated?.opponents?.[0]
-    if (!her || answering || !remark.trim() || result) return
+    const table = seated?.opponents ?? []
+    if (table.length === 0 || answering !== null || !remark.trim() || result) return
+    // The girl he names answers; where he names nobody, they take it in turns.
+    const said = remark.toLowerCase()
+    const her =
+      table.find((girl) => girl.name !== 'her' && said.includes(girl.name.toLowerCase())) ??
+      table[turnToAnswer.current++ % table.length]
     begin()
     const words = remark
     setRemark('')
-    setAnswering(true)
-    void readerSaysAtTable(her.charId, situation.current, words).finally(() => setAnswering(false))
+    setAnswering(her.name)
+    void readerSaysAtTable(her.charId, situationFor(her.charId), words).finally(() =>
+      setAnswering(null)
+    )
   }
 
   const play = useMemo<GamePlay>(
@@ -205,7 +237,7 @@ export function MiniGamePanel({ theme, onClose }: ScenePanelProps): JSX.Element 
       },
       say: (charId, cue) => {
         begin()
-        return sayAtTable(charId, situation.current, cue)
+        return sayAtTable(charId, situationFor(charId), cue)
       },
       situation: (text) => {
         situation.current = text
@@ -220,7 +252,7 @@ export function MiniGamePanel({ theme, onClose }: ScenePanelProps): JSX.Element 
     compactTable()
     if (!seated) return
     // Whoever sat down, judged yet or not: she was at the table either way.
-    const names = seated.opponents?.map((opponent) => opponent.name) ?? (agreed ? [nameOf(agreed.charId)] : [])
+    const names = seated.opponents?.map((opponent) => opponent.name) ?? (agreed?.charIds ?? []).map(nameOf)
     fileResult(ended, { game: seated.game, names, stake: seated.stake })
     onClose()
   }
@@ -235,25 +267,30 @@ export function MiniGamePanel({ theme, onClose }: ScenePanelProps): JSX.Element 
   }, [result])
 
   function pick(offer: Offer): void {
-    if (offer.charId === null) {
+    if (offer.charIds.length === 0) {
       setSitting({ game: offer.game, opponents: NO_ONE, stake: '', options: defaultOptions(offer.game) })
       return
     }
-    setWords(`I ask ${nameOf(offer.charId)} if she wants to play a game of ${offer.game.name}.`)
-    setAsking({ game: offer.game, charId: offer.charId })
+    setWords(
+      `I ask ${namesOf(offer.charIds)} if ${offer.charIds.length > 1 ? 'they want' : 'she wants'} to play a game of ${offer.game.name}.`
+    )
+    setAsking(offer)
   }
 
   function ask(): void {
     if (!asking || !words.trim()) return
-    const { game, charId } = asking
+    const { game, charIds } = asking
     onClose()
-    proposeGame(game.id, charId, words)
+    proposeGame(game.id, charIds, words)
   }
 
   if (!host || nothing) return null
 
-  const title = asking ? `Ask ${nameOf(asking.charId)}` : 'Play a game'
+  const title = asking ? `Ask ${namesOf(asking.charIds)}` : 'Play a game'
   const against = seated?.opponents?.[0]
+  /** Everyone at the table, judged yet or not, as the reader calls them. */
+  const tableNames =
+    seated?.opponents?.map((girl) => girl.name) ?? (agreed?.charIds ?? []).map(nameOf)
 
   /**
    * Where a table hangs so it covers nobody who matters. One girl alone stands in the middle, so
@@ -261,10 +298,12 @@ export function MiniGamePanel({ theme, onClose }: ScenePanelProps): JSX.Element 
    * it hangs over one who is not playing, the middle one unless she is the one at the table.
    */
   const onStage = slots.filter(Boolean).length
-  const playing = against?.charId ?? agreed?.charId
+  const playing = seated?.opponents?.map((girl) => girl.charId) ?? agreed?.charIds ?? []
+  // With all three at the table there is nobody to spare, and it keeps the middle.
   const aside =
     (seated?.game.surface ?? 'table') === 'table' &&
-    (onStage === 1 || (onStage >= 3 && playing !== undefined && slots[1] === playing))
+    (onStage === 1 ||
+      (onStage >= 3 && playing.length < onStage && playing.includes(slots[1] ?? '')))
 
   if (seated && Game) {
     return createPortal(
@@ -291,7 +330,9 @@ export function MiniGamePanel({ theme, onClose }: ScenePanelProps): JSX.Element 
           {seated.opponents ? (
             <Game play={play} />
           ) : (
-            <p className="vu-empty">She is getting settled…</p>
+            <p className="vu-empty">
+              {tableNames.length > 1 ? 'They are getting settled…' : 'She is getting settled…'}
+            </p>
           )}
           {/* Standing through the result's beat, dead, so the table does not jump as it ends. */}
           <motion.button
@@ -305,7 +346,7 @@ export function MiniGamePanel({ theme, onClose }: ScenePanelProps): JSX.Element 
                 ? leave({
                     outcome: 'abandoned',
                     summary: `You walk away from the game of ${seated.game.name}${
-                      against ? ` with ${against.name}` : agreed ? ` with ${nameOf(agreed.charId)}` : ''
+                      tableNames.length > 0 ? ` with ${listed(tableNames)}` : ''
                     } before it is over.`
                   })
                 : onClose()
@@ -337,11 +378,15 @@ export function MiniGamePanel({ theme, onClose }: ScenePanelProps): JSX.Element 
               onAction={setRemark}
               onSubmit={speak}
               sending={false}
-              submitDead={answering || !remark.trim() || result !== null}
+              submitDead={answering !== null || !remark.trim() || result !== null}
               inputDead={result !== null}
               focus={!seated.game.keys}
               placeholder={
-                answering ? `${against.name} is answering…` : `Say something to ${against.name}…`
+                answering !== null
+                  ? `${answering} is answering…`
+                  : tableNames.length > 1
+                    ? 'Say something to the table…'
+                    : `Say something to ${against.name}…`
               }
               multiline
             />
@@ -413,7 +458,7 @@ export function MiniGamePanel({ theme, onClose }: ScenePanelProps): JSX.Element 
           ) : (
             <ul className="vu-rows">
               {offers.map((offer) => (
-                <li key={`${offer.game.id}:${offer.charId ?? 'alone'}`}>
+                <li key={`${offer.game.id}:${offer.charIds.join('+') || 'alone'}`}>
                   <motion.button
                     type="button"
                     className="vu-row vu-minigame-pick"
@@ -425,7 +470,7 @@ export function MiniGamePanel({ theme, onClose }: ScenePanelProps): JSX.Element 
                     </span>
                     <span className="vu-minigame-pickname">{offer.game.name}</span>
                     <span className="vu-minigame-pickblurb">
-                      {offer.charId ? `ask ${nameOf(offer.charId)} to play` : 'play alone'}
+                      {offer.charIds.length > 0 ? `ask ${namesOf(offer.charIds)} to play` : 'play alone'}
                     </span>
                   </motion.button>
                 </li>
@@ -454,7 +499,7 @@ export function MiniGamePanel({ theme, onClose }: ScenePanelProps): JSX.Element 
                 {...gestures(!words.trim(), lift, press)}
                 onClick={ask}
               >
-                Ask {nameOf(asking.charId)}
+                Ask {namesOf(asking.charIds)}
               </motion.button>
             </>
           ) : (

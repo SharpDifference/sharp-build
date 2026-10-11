@@ -6,12 +6,12 @@ import {
   type MiniGameDef
 } from '@shared/minigames'
 import { optionOn } from '@shared/mods'
-import type { Character } from '@shared/types'
+import { charKeyOf, type Character } from '@shared/types'
 import { MiniGamePanel } from '../minigames/MiniGamePanel'
 import { MiniGameSeat } from '../minigames/MiniGameSeat'
 import { agreedOf, withOffer } from '../minigames/offer'
 import { gameComponent } from '../minigames/play'
-import { answerOf, withProposal } from '../minigames/proposal'
+import { answerOf, withProposal, type Asked } from '../minigames/proposal'
 import { useTableStore } from '../minigames/session'
 import { skillOf } from '../minigames/skill'
 import { nameOf } from '../minigames/table'
@@ -27,16 +27,29 @@ function gamesWith(cast: readonly Character[], location: string | null): MiniGam
   )
 }
 
-/** She said yes: the table is hers to sit at once her reply is read, and her skill is judged now. */
+/** The girls he asked who are still in the scene, as the proposal's turn names them. */
+function askedOf(charIds: readonly string[], cast: readonly Character[]): Asked[] {
+  return cast
+    .filter((member) => charIds.includes(member.charId))
+    .map((member) => ({
+      charId: member.charId,
+      key: charKeyOf(member.firstName, member.lastName),
+      name: nameOf(member.charId)
+    }))
+}
+
+/** They said yes: the table is theirs to sit at once the reply is read, and skill is judged now. */
 function agree(
   game: MiniGameDef,
-  character: Character,
+  characters: readonly Character[],
   stake: string,
   options: Record<string, number>
 ): void {
-  useTableStore.getState().setAgreed({ gameId: game.id, charId: character.charId, stake, options })
-  // Judged while the reader reads her answer, so the table opens with her ready.
-  void skillOf(character, game)
+  useTableStore
+    .getState()
+    .setAgreed({ gameId: game.id, charIds: characters.map((c) => c.charId), stake, options })
+  // Judged while the reader reads the answer, so the table opens with everyone ready.
+  for (const character of characters) void skillOf(character, game)
 }
 
 registerHooks(MINI_GAMES, {
@@ -60,7 +73,8 @@ registerHooks(MINI_GAMES, {
       const { proposal } = useTableStore.getState()
       if (proposal && ctx.query.includes(proposal.text)) {
         const game = MINI_GAMES_LIST.find((entry) => entry.id === proposal.gameId)
-        return game ? withProposal(request, game, nameOf(proposal.charId)) : request
+        const asked = askedOf(proposal.charIds, ctx.cast)
+        return game && asked.length > 0 ? withProposal(request, game, asked) : request
       }
       // Every other turn the reader takes with a girl carries the standing offer. A scene's
       // closing is not one: it has no action of his, and nothing more is going to be played.
@@ -84,17 +98,21 @@ registerHooks(MINI_GAMES, {
     if (proposal) {
       const game = MINI_GAMES_LIST.find((entry) => entry.id === proposal.gameId)
       if (!game) return
-      const { accepted, stake, options } = answerOf(reply, game)
-      const character = cast.find((member) => member.charId === proposal.charId)
-      // A yes from a scene that then ended, or from a girl who has left, is no game.
-      if (accepted && !ending && character) agree(game, character, stake, options)
+      // A girl who has left since is not asked; a yes from a scene that then ended is no game.
+      const { accepted, charIds, stake, options } = answerOf(
+        reply,
+        game,
+        askedOf(proposal.charIds, cast)
+      )
+      const characters = cast.filter((member) => charIds.includes(member.charId))
+      if (accepted && !ending && characters.length > 0) agree(game, characters, stake, options)
       return
     }
 
     // No proposal of his own was out: the two of them may still have agreed in the scene.
     if (ending) return
     const agreed = agreedOf(reply, gamesWith(cast, useGameStore.getState().sceneLocation), cast)
-    if (agreed) agree(agreed.game, agreed.character, agreed.stake, agreed.options)
+    if (agreed) agree(agreed.game, agreed.characters, agreed.stake, agreed.options)
   },
 
   // A turn the reader takes instead lets an agreed game go; his own proposal is not that turn.

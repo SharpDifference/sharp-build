@@ -8,17 +8,19 @@ import { useGameStore } from '../stores/gameStore'
  * was agreed at, so a game reloaded there still has its table to open.
  */
 
-/** A game the reader has asked a girl to play, in the words he asked with. */
+/** A game the reader has asked a girl, or several, to play, in the words he asked with. */
 export interface Proposal {
   gameId: string
-  charId: string
+  /** Everyone he asked. */
+  charIds: string[]
   text: string
 }
 
 /** A game she said yes to, and what the two of them put on it. */
 export interface Agreed {
   gameId: string
-  charId: string
+  /** Everyone who is in, in the order they sit. */
+  charIds: string[]
   /** What is riding on the game, as the scene settled it; empty where nothing is. */
   stake: string
   /** How the game is to be played, by the options it declares. */
@@ -73,10 +75,15 @@ export function keptAgreed(): Agreed | null {
     const { playthrough, at, agreed } = JSON.parse(raw) as {
       playthrough?: unknown
       at?: unknown
-      agreed?: Agreed
+      agreed?: Agreed & { charId?: string }
     }
     const mark = sceneMark()
     if (!agreed || playthrough !== mark.playthrough || at !== mark.at) return null
+    // One kept before a table seated more than one girl names only her.
+    if (!Array.isArray(agreed.charIds)) {
+      if (typeof agreed.charId !== 'string') return null
+      return { ...agreed, charIds: [agreed.charId] }
+    }
     return agreed
   } catch {
     return null

@@ -1,4 +1,4 @@
-import { gamesOffered, type MiniGameDef } from '@shared/minigames'
+import { gamesOffered, listed, type MiniGameDef } from '@shared/minigames'
 import { charKeyOf } from '@shared/types'
 import { useGameStore } from '../stores/gameStore'
 import { submitAction, takeTurnFromReply } from '../stores/gameLoop'
@@ -44,13 +44,13 @@ export function useAtTurn(): boolean {
 }
 
 /**
- * Asks a girl to play, as the reader's turn in the scene: over a reply still being read it is an
+ * Asks a girl to play, or several at once, as the reader's turn in the scene: over a reply still being read it is an
  * interjection. Her answer comes back with the reply. False where no turn could be taken.
  */
-export function proposeGame(gameId: string, charId: string, words: string): boolean {
+export function proposeGame(gameId: string, charIds: readonly string[], words: string): boolean {
   const text = words.trim()
-  if (!text || !takeTurnFromReply()) return false
-  useTableStore.getState().setProposal({ gameId, charId, text })
+  if (!text || charIds.length === 0 || !takeTurnFromReply()) return false
+  useTableStore.getState().setProposal({ gameId, charIds: [...charIds], text })
   void submitAction(text)
   return true
 }
@@ -217,7 +217,7 @@ export async function readerSaysAtTable(
   const text = words.trim()
   if (!text) return
   useGameStore.getState().logPlayerAction(text, true)
-  await sayAtTable(charId, situation, `The reader says to her: "${text}"`)
+  await sayAtTable(charId, situation, `The reader says across the table: "${text}"`)
 }
 
 /** Who a game was played with and for what, as far as filing its result goes. */
@@ -244,7 +244,7 @@ export function fileResult(result: PlayResult, played: PlayedWith): void {
   if (!reachTurn()) return
 
   if (played.names.length > 0) {
-    const who = played.names.join(' and ')
+    const who = listed(played.names)
     useTableStore.getState().setPlayed({
       text: result.summary,
       brief: [

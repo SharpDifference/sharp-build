@@ -178,6 +178,32 @@ export function settledOptions(game: MiniGameDef, given: unknown): Record<string
   )
 }
 
+/** Names in a row, as a sentence has them: "Ana", "Ana and Bea", "Ana, Bea and Cy". */
+export function listed(names: readonly string[]): string {
+  if (names.length <= 1) return names[0] ?? ''
+  return `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}`
+}
+
+/** The fewest girls a game with anyone in it is played with. */
+export function fewestWith(game: MiniGameDef): number {
+  return Math.max(1, game.players.min)
+}
+
+/**
+ * The tables of more than one girl a game could be asked for among the girls here: everyone, or
+ * where the game seats fewer than are here, each way of filling its seats. None for a game one
+ * girl plays, or with too few here.
+ */
+export function groupsFor(game: MiniGameDef, girls: readonly string[]): string[][] {
+  const size = seatsFor(game, girls.length)
+  if (size < 2 || size < game.players.min) return []
+  const pick = (from: readonly string[], n: number): string[][] =>
+    n === 0
+      ? [[]]
+      : from.flatMap((girl, i) => pick(from.slice(i + 1), n - 1).map((rest) => [girl, ...rest]))
+  return pick(girls, size)
+}
+
 /** How many of the girls here a game seats: all of them, up to its `max`. */
 export function seatsFor(game: MiniGameDef, girls: number): number {
   return Math.min(girls, game.players.max)
