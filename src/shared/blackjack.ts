@@ -64,9 +64,21 @@ export function tableWinner(hands: readonly (readonly Card[])[]): number | null 
   return marks.indexOf(best)
 }
 
-/** The top card and the deck without it; a fresh deck is cut where the old one has run out. */
-export function drawCard(deck: readonly Card[], rand: () => number = Math.random): [Card, Card[]] {
-  const from = deck.length > 0 ? deck : freshDeck(rand)
+/**
+ * The top card and the deck without it; a fresh deck is cut where the old one has run out, less
+ * the cards `inPlay` on the table, so that none of them turns up twice.
+ */
+export function drawCard(
+  deck: readonly Card[],
+  rand: () => number = Math.random,
+  inPlay: readonly Card[] = []
+): [Card, Card[]] {
+  const from =
+    deck.length > 0
+      ? deck
+      : freshDeck(rand).filter(
+          (card) => !inPlay.some((held) => held.rank === card.rank && held.suit === card.suit)
+        )
   return [from[0], from.slice(1)]
 }
 
@@ -100,11 +112,6 @@ export function soundAt(
   return total <= (soft ? 17 : 14) ? 'hit' : 'stand'
 }
 
-/** The right move for her heads-up, where she plays last against the reader's hand alone. */
-export function soundMove(hers: readonly Card[], mine: readonly Card[]): Move {
-  return soundAt(hers, [mine])
-}
-
 /** How often she gets a decision wrong where there is one to get wrong, by skill. */
 const SLIP: Record<Skill, number> = { 1: 0.42, 2: 0.3, 3: 0.18, 4: 0.08, 5: 0 }
 
@@ -134,16 +141,6 @@ export function girlMove(
   return rand() < slip / 2 ? 'hit' : 'stand'
 }
 
-/** Her move heads-up, against the reader's hand alone. */
-export function herMove(
-  hers: readonly Card[],
-  mine: readonly Card[],
-  skill: Skill,
-  rand: () => number = Math.random
-): Move {
-  return girlMove(hers, [mine], [], skill, rand)
-}
-
 /**
  * Whether the game is over, from the hands each seat has won: every hand played, or the leader
  * too far ahead for anyone to catch.
@@ -151,11 +148,6 @@ export function herMove(
 export function gameOver(won: readonly number[], played: number, hands: number): boolean {
   const [first, second = 0] = [...won].sort((a, b) => b - a)
   return played >= hands || first - second > hands - played
-}
-
-/** Whether the match is over: every hand played, or one of them too far ahead to be caught. */
-export function matchOver(mine: number, hers: number, played: number, hands: number): boolean {
-  return gameOver([mine, hers], played, hands)
 }
 
 /** How a game came out for the reader: his alone, shared at the top, or somebody else's. */
@@ -178,14 +170,6 @@ export interface HerMoveMade {
   sound: Move
 }
 
-/** One finished hand heads-up: the cards each ended with, and how each got there. */
-export interface HandPlayed {
-  mine: readonly Card[]
-  hers: readonly Card[]
-  hits: readonly HitMade[]
-  herMoves: readonly HerMoveMade[]
-}
-
 /** A girl's side of a finished hand: the cards she ended with, and the moves she made. */
 export interface SeatPlayed {
   cards: readonly Card[]
@@ -197,11 +181,6 @@ export interface TableHand {
   mine: readonly Card[]
   hits: readonly HitMade[]
   girls: readonly SeatPlayed[]
-}
-
-/** A heads-up hand as a table of one girl. */
-function seated(hand: HandPlayed): TableHand {
-  return { mine: hand.mine, hits: hand.hits, girls: [{ cards: hand.hers, moves: hand.herMoves }] }
 }
 
 /** Everyone's cards in a finished hand, by seat. */
@@ -217,12 +196,6 @@ export function tableWon(hands: readonly TableHand[], girls: number): number[] {
     if (winner !== null) won[winner]++
   }
   return won
-}
-
-/** Hands won by each over the hands played so far. */
-export function handsWon(hands: readonly HandPlayed[]): { mine: number; hers: number } {
-  const [mine, hers] = tableWon(hands.map(seated), 1)
-  return { mine, hers }
 }
 
 /**
@@ -256,11 +229,6 @@ export function cardsWord(cards: readonly Card[]): string {
 /** A hand's total as the narration says it. */
 export function totalWord(cards: readonly Card[]): string {
   return isNatural(cards) ? '21 in two cards' : String(handTotal(cards).total)
-}
-
-/** The deal of a hand heads-up, as the scene's narration says it. `up` is her card that shows. */
-export function dealLine(name: string, no: number, mine: readonly Card[], up: Card): string {
-  return tableDeal([name], no, mine, [up])
 }
 
 /** The deal of a hand, as the scene's narration says it. `ups` is each girl's card that shows. */
@@ -430,11 +398,6 @@ function girlTold(names: readonly string[], hand: TableHand, at: number): string
   return `${drew}stood on ${total}${note}`
 }
 
-/** Hand `no` of a match heads-up, counted from one, as the account tells it. */
-export function handTold(name: string, hand: HandPlayed, no: number): HandTold {
-  return tableTold([name], seated(hand), no)
-}
-
 /**
  * Hand `no` of a game, counted from one, as the account tells it: each seat's play in the order
  * it was made, and who took the hand.
@@ -465,14 +428,6 @@ export function tableTold(names: readonly string[], hand: TableHand, no: number)
       close ||
       (heads ? busts > 0 : marks[0] < 0 || busts > 1 || winner === null)
   }
-}
-
-/**
- * How a match against her went heads-up, hand by hand, for the scene's writer: what each did on
- * what total, with bad play told apart from bad luck, and the count of hands at the end.
- */
-export function matchAccount(name: string, hands: readonly HandPlayed[], agreed: number): string[] {
-  return tableAccount([name], hands.map(seated), agreed)
 }
 
 /**

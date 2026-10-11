@@ -154,6 +154,29 @@
   gap: 0;
 }
 
+/* A long hand there is a fan: each card shows its corner past the next, the hand's cards
+   sharing what the column has beyond one card's width. */
+.vu-blackjack-girls[data-several] .vu-blackjack-hand[data-many] > .vu-blackjack-seat + .vu-blackjack-seat {
+  margin-left: calc(min(32px, 94px / (var(--vu-blackjack-cards, 3) - 1)) - 56px);
+}
+
+/* In a fan a card is read by its corner: rank over suit at the top left, small enough to show. */
+.vu-blackjack-girls[data-several] .vu-blackjack-hand[data-many] .vu-blackjack-card {
+  align-items: flex-start;
+  justify-content: flex-start;
+  gap: 1px;
+  padding: 4px 0 0 4px;
+}
+
+.vu-blackjack-girls[data-several] .vu-blackjack-hand[data-many] .vu-blackjack-rank {
+  font-size: 17px;
+  letter-spacing: -0.04em;
+}
+
+.vu-blackjack-girls[data-several] .vu-blackjack-hand[data-many] .vu-blackjack-suit {
+  font-size: 13px;
+}
+
 .vu-blackjack-girls[data-several] :is(.vu-blackjack-card, .vu-blackjack-back) {
   width: 56px;
   height: 78px;

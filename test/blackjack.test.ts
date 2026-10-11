@@ -1,29 +1,22 @@
 import { describe, expect, it } from 'vitest'
 import {
-  dealLine,
   drawCard,
   gameOutcome,
   gameOver,
   girlMove,
-  handTold,
   handTotal,
   handWinner,
-  handsWon,
-  herMove,
   isNatural,
-  matchAccount,
-  matchOver,
   matchSummary,
   remarkBy,
   resultLine,
   soundAt,
-  soundMove,
   tableAccount,
+  tableDeal,
   tableSummary,
   tableTold,
   tableWinner,
   tableWon,
-  type HandPlayed,
   type Move,
   type TableHand
 } from '../src/shared/blackjack'
@@ -55,38 +48,38 @@ describe('Blackjack', () => {
 
   it('has the best player draw until she is ahead and no further', () => {
     const his = hand(10, 8)
-    expect(soundMove(hand(10, 7), his)).toBe('hit')
-    expect(soundMove(hand(10, 9), his)).toBe('stand')
+    expect(soundAt(hand(10, 7), [his])).toBe('hit')
+    expect(soundAt(hand(10, 9), [his])).toBe('stand')
     // Level: worth a card on fourteen, not on eighteen.
-    expect(soundMove(hand(10, 4), hand(8, 6))).toBe('hit')
-    expect(soundMove(hand(10, 8), his)).toBe('stand')
+    expect(soundAt(hand(10, 4), [hand(8, 6)])).toBe('hit')
+    expect(soundAt(hand(10, 8), [his])).toBe('stand')
     // He has bust, or holds a two-card 21 she cannot catch: she leaves her hand alone.
-    expect(soundMove(hand(2, 3), hand(10, 6, 9))).toBe('stand')
-    expect(soundMove(hand(10, 6), hand(14, 13))).toBe('stand')
-    expect(herMove(hand(10, 7), his, 5, never)).toBe('hit')
+    expect(soundAt(hand(2, 3), [hand(10, 6, 9)])).toBe('stand')
+    expect(soundAt(hand(10, 6), [hand(14, 13)])).toBe('stand')
+    expect(girlMove(hand(10, 7), [his], [], 5, never)).toBe('hit')
   })
 
   it('has a weak player lose her nerve or overreach, and only where a person would', () => {
     const his = hand(10, 8)
     // Behind on a hand a card could break: she may stand on it.
-    expect(herMove(hand(10, 5), his, 1, () => 0)).toBe('stand')
-    expect(herMove(hand(10, 5), his, 1, () => 0.9)).toBe('hit')
+    expect(girlMove(hand(10, 5), [his], [], 1, () => 0)).toBe('stand')
+    expect(girlMove(hand(10, 5), [his], [], 1, () => 0.9)).toBe('hit')
     // The same roll does not catch a better player.
-    expect(herMove(hand(10, 5), his, 4, () => 0.2)).toBe('hit')
+    expect(girlMove(hand(10, 5), [his], [], 4, () => 0.2)).toBe('hit')
     // Behind on a hand no card can break: nobody stands.
-    expect(herMove(hand(5, 4), his, 1, never)).toBe('hit')
+    expect(girlMove(hand(5, 4), [his], [], 1, never)).toBe('hit')
     // Ahead on a middling hand she may draw again; on a strong one she never does.
-    expect(herMove(hand(10, 6), hand(10, 5), 1, () => 0)).toBe('hit')
-    expect(herMove(hand(10, 10), his, 1, never)).toBe('stand')
-    expect(herMove(hand(10, 2), hand(10, 6, 9), 1, never)).toBe('stand')
+    expect(girlMove(hand(10, 6), [hand(10, 5)], [], 1, () => 0)).toBe('hit')
+    expect(girlMove(hand(10, 10), [his], [], 1, never)).toBe('stand')
+    expect(girlMove(hand(10, 2), [hand(10, 6, 9)], [], 1, never)).toBe('stand')
   })
 
   it('ends the match once the lead cannot be caught', () => {
-    expect(matchOver(2, 0, 2, 3)).toBe(true)
-    expect(matchOver(1, 0, 2, 3)).toBe(false)
-    expect(matchOver(1, 1, 3, 3)).toBe(true)
+    expect(gameOver([2, 0], 2, 3)).toBe(true)
+    expect(gameOver([1, 0], 2, 3)).toBe(false)
+    expect(gameOver([1, 1], 3, 3)).toBe(true)
     // Two pushes and a hand in hand: one behind with one to play is still alive.
-    expect(matchOver(0, 1, 4, 5)).toBe(false)
+    expect(gameOver([0, 1], 4, 5)).toBe(false)
   })
 
   it('knows a two-card 21 from any other, and calls level hands a push', () => {
@@ -104,6 +97,18 @@ describe('Blackjack', () => {
     expect(rest.map((c) => c.rank)).toEqual([9])
     const [, fresh] = drawCard([], () => 0.5)
     expect(fresh.length).toBe(51)
+    // A deck cut mid-hand leaves out every card on the table.
+    const held: Card[] = [
+      { rank: 14, suit: 'spades' },
+      { rank: 10, suit: 'hearts' },
+      { rank: 2, suit: 'clubs' }
+    ]
+    const [first, others] = drawCard([], () => 0.5, held)
+    const cut = [first, ...others]
+    expect(cut.length).toBe(49)
+    for (const card of held) {
+      expect(cut.some((c) => c.rank === card.rank && c.suit === card.suit)).toBe(false)
+    }
   })
 
   it('slips more often the weaker she is, and never at her best', () => {
@@ -118,8 +123,8 @@ describe('Blackjack', () => {
       let wrong = 0
       for (let i = 0; i < 400; i++) {
         // Behind on fifteen, where a card is right, and ahead on sixteen, where it is not.
-        if (herMove(hand(10, 5), his, skill, rand) !== 'hit') wrong++
-        if (herMove(hand(10, 6), hand(10, 5), skill, rand) !== 'stand') wrong++
+        if (girlMove(hand(10, 5), [his], [], skill, rand) !== 'hit') wrong++
+        if (girlMove(hand(10, 6), [hand(10, 5)], [], skill, rand) !== 'stand') wrong++
       }
       return wrong
     })
@@ -128,18 +133,22 @@ describe('Blackjack', () => {
   })
 
   it('counts the hands each has won, pushes to nobody', () => {
-    const played = (mine: Card[], hers: Card[]): HandPlayed => ({ mine, hers, hits: [], herMoves: [] })
+    const played = (mine: Card[], hers: Card[]): TableHand => ({
+      mine,
+      hits: [],
+      girls: [{ cards: hers, moves: [] }]
+    })
     const hands = [
       played(hand(10, 10), hand(10, 9)),
       played(hand(10, 8), hand(10, 8)),
       played(hand(10, 6, 9), hand(5, 5))
     ]
-    expect(handsWon(hands)).toEqual({ mine: 1, hers: 1 })
-    expect(matchOver(1, 1, 3, 3)).toBe(true)
+    expect(tableWon(hands, 1)).toEqual([1, 1])
+    expect(gameOver([1, 1], 3, 3)).toBe(true)
   })
 
   it('says the deal, the result and the match as the scene narrates them', () => {
-    expect(dealLine('Mio', 2, hand(13, 6), hand(9)[0])).toBe(
+    expect(tableDeal(['Mio'], 2, hand(13, 6), hand(9))).toBe(
       'Hand 2. You are dealt a king and a six: 16. Mio shows a nine, her other card face down.'
     )
     expect(resultLine('Mio', hand(10, 6, 9), hand(5, 5))).toBe("The hand is Mio's.")
@@ -155,53 +164,49 @@ describe('Blackjack', () => {
 
   it('tells bad play from bad luck in the account', () => {
     // He drew on a hard eighteen and went over; she never had to play.
-    const reckless: HandPlayed = {
+    const reckless: TableHand = {
       mine: hand(10, 8, 9),
-      hers: hand(10, 2),
       hits: [{ total: 18, soft: false }],
-      herMoves: []
+      girls: [{ cards: hand(10, 2), moves: [] }]
     }
     // He stood on twenty; she drew to 21 from behind: one point in it.
-    const beaten: HandPlayed = {
+    const beaten: TableHand = {
       mine: hand(10, 10),
-      hers: hand(10, 6, 5),
       hits: [],
-      herMoves: [
+      girls: [{ cards: hand(10, 6, 5), moves: [
         { move: 'hit', total: 16, sound: 'hit' },
         { move: 'stand', total: 21, sound: 'stand' }
-      ]
+      ] }]
     }
     // She stood on fifteen while still behind his eighteen.
-    const timid: HandPlayed = {
+    const timid: TableHand = {
       mine: hand(10, 8),
-      hers: hand(10, 5),
       hits: [],
-      herMoves: [{ move: 'stand', total: 15, sound: 'hit' }]
+      girls: [{ cards: hand(10, 5), moves: [{ move: 'stand', total: 15, sound: 'hit' }] }]
     }
     // She was ahead on sixteen, drew anyway and went over.
-    const greedy: HandPlayed = {
+    const greedy: TableHand = {
       mine: hand(10, 5),
-      hers: hand(10, 6, 10),
       hits: [],
-      herMoves: [{ move: 'hit', total: 16, sound: 'stand' }]
+      girls: [{ cards: hand(10, 6, 10), moves: [{ move: 'hit', total: 16, sound: 'stand' }] }]
     }
-    const first = handTold('Mio', reckless, 1)
+    const first = tableTold(['Mio'], reckless, 1)
     expect(first.line).toContain('hit on 18 and bust with 27, a reckless call')
     expect(first.line).toContain('Mio had only to turn her card, holding 12')
     expect(first.notable).toBe(true)
-    const second = handTold('Mio', beaten, 2)
+    const second = tableTold(['Mio'], beaten, 2)
     expect(second.line).toContain('the reader stood on 20')
     expect(second.line).toContain('Mio hit on 16 and stood on 21')
     expect(second.line).toContain('Mio won it by a single point')
-    expect(handTold('Mio', timid, 3).line).toContain('a mistake: she was still behind his 18')
-    expect(handTold('Mio', greedy, 4).line).toContain('she was already ahead on 16 and threw the hand away')
+    expect(tableTold(['Mio'], timid, 3).line).toContain('a mistake: she was still behind his 18')
+    expect(tableTold(['Mio'], greedy, 4).line).toContain('she was already ahead on 16 and threw the hand away')
 
-    const account = matchAccount('Mio', [reckless, beaten], 3)
+    const account = tableAccount(['Mio'], [reckless, beaten], 3)
     expect(account[0]).toContain('over 3 hands')
     expect(account).toHaveLength(5)
     expect(account[3]).toBe('The match stopped there: the lead could no longer be caught.')
     expect(account[4]).toBe('Final count of hands: the reader 0, Mio 2.')
-    const full = matchAccount('Mio', [timid, greedy, beaten], 3)
+    const full = tableAccount(['Mio'], [timid, greedy, beaten], 3)
     expect(full).toHaveLength(5)
     expect(full[4]).toBe('Final count of hands: the reader 2, Mio 1.')
   })
