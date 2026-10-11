@@ -388,6 +388,13 @@ export function MiniGamePanel({ theme, onClose }: ScenePanelProps): JSX.Element 
                 event.preventDefault()
                 ask()
               }}
+              // Enter asks, as it sends a turn in the scene; Shift+Enter still breaks a line.
+              onKeyDown={(event) => {
+                if (event.key !== 'Enter' || event.shiftKey) return
+                event.preventDefault()
+                event.stopPropagation()
+                ask()
+              }}
             >
               <TextField
                 id="minigame-ask-text"
