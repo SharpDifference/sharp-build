@@ -1,4 +1,4 @@
-import { MINI_GAMES, SUGGEST_OFTEN } from '../minigames'
+import { CHAT_OPTIONS, MINI_GAMES, SUGGEST_OFTEN } from '../minigames'
 import type { ModDef } from '../mods'
 
 const def: ModDef = {
@@ -17,6 +17,34 @@ const def: ModDef = {
       label: 'Girls suggest games often',
       hint: 'Off: each game says how readily a girl brings it up, by place.\nOn: she is keen to play any game, wherever it can be played.\nNever in a class or on a shift, either way.',
       default: false
+    },
+    {
+      id: CHAT_OPTIONS.quiet,
+      label: 'Quiet',
+      hint: 'She plays, and speaks when you speak to her.',
+      default: false,
+      group: 'talk'
+    },
+    {
+      id: CHAT_OPTIONS.some,
+      label: 'Some',
+      hint: 'A remark at the moments worth one.',
+      default: true,
+      group: 'talk'
+    },
+    {
+      id: CHAT_OPTIONS.lots,
+      label: 'Lots',
+      hint: 'She has something to say about most of what happens. Games run slower.',
+      default: false,
+      group: 'talk'
+    }
+  ],
+  optionGroups: [
+    {
+      id: 'talk',
+      label: 'How much she talks during a game',
+      hint: 'Each thing she says is written as it happens, and takes a moment.'
     }
   ]
 }

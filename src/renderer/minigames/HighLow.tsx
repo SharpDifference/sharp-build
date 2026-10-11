@@ -27,8 +27,8 @@ const SUIT_MARK: Record<Suit, string> = { spades: '♠', hearts: '♥', diamonds
 /** A count of calls as the narration says it. */
 const NUMBER: Record<number, string> = { 2: 'Two', 3: 'Three', 4: 'Four', 5: 'Five' }
 
-/** How many times in a game she says something about a call. */
-const REMARKS = 3
+/** How many times in a game she says something about a call, by how talkative she is to be. */
+const REMARKS = { quiet: 0, some: 3, lots: 8 } as const
 
 /** How long she takes over a call: long enough for the reader's own to be read first. */
 const HER_PAUSE_MS = 1700
@@ -117,7 +117,7 @@ export function HighLow({ play }: { play: GamePlay }): JSX.Element {
    * call, which the scene's own reply answers.
    */
   function remark(all: readonly Made[]): void {
-    if (!her || remarks.current >= REMARKS) return
+    if (!her || remarks.current >= REMARKS[play.chattiness]) return
     const told = callTold(her.name, deck, all, all.length - 1)
     const lead = (calls: readonly Made[]): number =>
       Math.sign(
@@ -126,7 +126,8 @@ export function HighLow({ play }: { play: GamePlay }): JSX.Element {
     // Judged after a call each, so a lead is one both have had the turns to hold.
     const turned =
       all.length % 2 === 0 && lead(all) !== 0 && lead(all) !== lead(all.slice(0, all.length - 2))
-    if (!told.notable && !turned) return
+    // Talkative, she has a word for an ordinary call too.
+    if (!told.notable && !turned && play.chattiness !== 'lots') return
     remarks.current++
     const cue = turned
       ? `${told.line} That puts ${lead(all) > 0 ? 'the reader' : her.name} ahead.`

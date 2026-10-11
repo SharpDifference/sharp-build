@@ -10,6 +10,23 @@
 /** The framework's mod id. A pack names it in its `requires`. */
 export const MINI_GAMES = 'mini-games'
 
+/**
+ * How much a girl says for herself during a game, the player's to choose. What each level comes
+ * to is the game's own call; she always answers when the reader speaks to her.
+ *
+ * - `quiet`: she plays, and speaks when spoken to.
+ * - `some`: a remark at the moments worth one.
+ * - `lots`: she has something to say about most of what happens.
+ */
+export type Chattiness = 'quiet' | 'some' | 'lots'
+
+/** The framework's options that set it: one of the three is on. */
+export const CHAT_OPTIONS: Readonly<Record<Chattiness, string>> = {
+  quiet: 'talk-quiet',
+  some: 'talk-some',
+  lots: 'talk-lots'
+}
+
 /** The framework's option that has every game suggested often, wherever it can be played. */
 export const SUGGEST_OFTEN = 'suggest-often'
 

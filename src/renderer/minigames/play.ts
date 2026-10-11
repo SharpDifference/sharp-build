@@ -1,4 +1,5 @@
 import type { ComponentType } from 'react'
+import type { Chattiness } from '@shared/minigames'
 
 /**
  * What a mini-game is to the framework while it is being played: a component handed a
@@ -38,6 +39,8 @@ export interface GamePlay {
   opponents: readonly Opponent[]
   /** What is riding on the game, as the scene settled it; empty where nothing is. */
   stake: string
+  /** How much she is to say for herself, as the player has it set; what that comes to is the game's. */
+  chattiness: Chattiness
   /** How this game is to be played: every option the game declares, settled or at its default. */
   options: Readonly<Record<string, number>>
   /** The first move is made: from here, leaving the table is walking away from a game. */

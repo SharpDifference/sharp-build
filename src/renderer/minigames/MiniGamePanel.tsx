@@ -1,12 +1,20 @@
 import { useEffect, useMemo, useRef, useState, type JSX } from 'react'
 import { createPortal } from 'react-dom'
 import { motion } from 'motion/react'
-import { defaultOptions, MINI_GAMES_LIST, type MiniGameDef } from '@shared/minigames'
+import {
+  CHAT_OPTIONS,
+  defaultOptions,
+  MINI_GAMES,
+  MINI_GAMES_LIST,
+  type Chattiness,
+  type MiniGameDef
+} from '@shared/minigames'
 import { TextField } from '../components/TextField'
 import { TitleTab } from '../components/TitleTab'
 import { useModalShell } from '../components/useModalShell'
 import type { ScenePanelProps } from '../mods/hooks'
 import { useGameStore } from '../stores/gameStore'
+import { useModOption } from '../stores/modsStore'
 import {
   gestures,
   lift,
@@ -81,6 +89,10 @@ function sittingOf(agreed: Agreed | null): Sitting | null {
 export function MiniGamePanel({ theme, onClose }: ScenePanelProps): JSX.Element | null {
   const offered = useGamesOffered()
   const girls = usePresentGirls()
+  // How much she says for herself, as the player has it in the Mods screen.
+  const quiet = useModOption(MINI_GAMES, CHAT_OPTIONS.quiet)
+  const lots = useModOption(MINI_GAMES, CHAT_OPTIONS.lots)
+  const chattiness: Chattiness = quiet ? 'quiet' : lots ? 'lots' : 'some'
   // Who is standing where on the stage: left, middle, right.
   const slots = useGameStore((s) => s.slots)
   // The game she agreed to, taken off the table's own state as the panel opens on it.
@@ -182,6 +194,7 @@ export function MiniGamePanel({ theme, onClose }: ScenePanelProps): JSX.Element 
     () => ({
       opponents: seated?.opponents ?? [],
       stake: seated?.stake ?? '',
+      chattiness,
       options: seated?.options ?? {},
       started: () => begin(),
       narrate: (text) => {
@@ -197,7 +210,7 @@ export function MiniGamePanel({ theme, onClose }: ScenePanelProps): JSX.Element 
       },
       finish: (ended) => setResult(ended)
     }),
-    [seated?.opponents, seated?.stake, seated?.options]
+    [seated?.opponents, seated?.stake, seated?.options, chattiness]
   )
 
   function leave(ended: PlayResult): void {
