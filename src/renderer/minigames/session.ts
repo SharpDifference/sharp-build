@@ -1,9 +1,11 @@
 import { create } from 'zustand'
+import { useGameStore } from '../stores/gameStore'
 
 /**
  * What stands between a game being asked for and being played: the reader's proposal while the
- * turn carrying it is out, and the game a girl agreed to until the table opens on it. Neither is
- * saved: a game not yet begun is simply asked for again.
+ * turn carrying it is out, and the game a girl agreed to until the table opens on it. The save
+ * knows nothing of either. An agreed game is kept beside it, against the point of the scene it
+ * was agreed at, so a game reloaded there still has its table to open.
  */
 
 /** A game the reader has asked a girl to play, in the words he asked with. */
@@ -40,11 +42,53 @@ interface TableState {
   setAgreed: (agreed: Agreed | null) => void
 }
 
+/** Where the agreed game is kept across a reload. */
+const KEPT = 'vu-minigames:agreed'
+
+/** The point of a scene an agreement belongs to: the playthrough, and how far its scene had got. */
+function sceneMark(): { playthrough: string | null; at: number } {
+  const game = useGameStore.getState()
+  return { playthrough: game.playthroughId, at: game.currentSceneTranscript.length }
+}
+
+function keep(agreed: Agreed | null): void {
+  try {
+    if (agreed) localStorage.setItem(KEPT, JSON.stringify({ ...sceneMark(), agreed }))
+    else localStorage.removeItem(KEPT)
+  } catch {
+    // Kept for this sitting only.
+  }
+}
+
+/**
+ * The game she agreed to at exactly the point the loaded scene stands at, or null: one agreed in
+ * another playthrough, or before lines the scene has since gained or lost, is not this scene's.
+ */
+export function keptAgreed(): Agreed | null {
+  try {
+    const raw = localStorage.getItem(KEPT)
+    if (!raw) return null
+    const { playthrough, at, agreed } = JSON.parse(raw) as {
+      playthrough?: unknown
+      at?: unknown
+      agreed?: Agreed
+    }
+    const mark = sceneMark()
+    if (!agreed || playthrough !== mark.playthrough || at !== mark.at) return null
+    return agreed
+  } catch {
+    return null
+  }
+}
+
 export const useTableStore = create<TableState>((set) => ({
   proposal: null,
   agreed: null,
   played: null,
   setPlayed: (played) => set({ played }),
   setProposal: (proposal) => set({ proposal }),
-  setAgreed: (agreed) => set({ agreed })
+  setAgreed: (agreed) => {
+    keep(agreed)
+    set({ agreed })
+  }
 }))
