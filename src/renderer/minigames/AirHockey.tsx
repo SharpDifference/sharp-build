@@ -18,6 +18,7 @@ import {
   matchSituation,
   matchSummary,
   scoreOf,
+  stalled,
   swingAt,
   type Point,
   type Side
@@ -73,7 +74,11 @@ export function AirHockey({ play }: { play: GamePlay }): JSX.Element {
   const over = matchOver(goals, toWin)
 
   // The match is on from the moment she takes her end, and the serve is said.
+  const opened = useRef(false)
   useEffect(() => {
+    // Said the once, however many times the table is mounted.
+    if (opened.current) return
+    opened.current = true
     if (her)
       play.narrate(
         `${her.name} takes the far end of the table and the puck drops on your side. First to ${NUMBER[toWin] ?? toWin}.`
@@ -101,17 +106,43 @@ export function AirHockey({ play }: { play: GamePlay }): JSX.Element {
     // The table stands still until this time, and for as long as she is speaking.
     let stillUntil = 0
     let speaking = false
+    // Which of her remarks the table is standing still for, and the clock that lets it go.
+    let remarked = 0
+    let hold: ReturnType<typeof setTimeout> | undefined
     let serveTo: Side | null = null
     let ended = false
     let gone = false
 
     const follow = (event: PointerEvent): void => {
-      const box = field.current?.getBoundingClientRect()
-      if (!box || box.width === 0 || box.height === 0) return
-      // Through the element's own box, so the stage's scale does not come into it.
+      const svg = field.current
+      if (!svg) return
+      // Through the drawing's own mapping, so the stage's scale and the surface's lean are both
+      // undone exactly.
+      try {
+        const map = svg.getScreenCTM()?.inverse()
+        if (map) {
+          const at = new DOMPoint(event.clientX, event.clientY).matrixTransform(map)
+          if (Number.isFinite(at.x) && Number.isFinite(at.y)) {
+            hand = { x: at.x, y: at.y }
+            return
+          }
+        }
+      } catch {
+        // A drawing with no size has no mapping: its box below, or nothing.
+      }
+      const box = svg.getBoundingClientRect()
+      if (box.width === 0 || box.height === 0) return
       hand = {
         x: ((event.clientX - box.left) / box.width) * TABLE_W,
         y: ((event.clientY - box.top) / box.height) * TABLE_H
+      }
+    }
+    // A finger put down on the table keeps the mallet wherever it then goes.
+    const keep = (event: PointerEvent): void => {
+      try {
+        field.current?.setPointerCapture(event.pointerId)
+      } catch {
+        // A pointer already gone has nothing to keep.
       }
     }
 
@@ -137,11 +168,18 @@ export function AirHockey({ play }: { play: GamePlay }): JSX.Element {
       if (!swing && now.chattiness !== 'lots') return
       remarks++
       speaking = true
-      const hold = setTimeout(() => (speaking = false), REMARK_WAIT_MS)
-      void now.say(her.charId, swing ? swing.cue : goalCue(her.name, scored, toWin)).finally(() => {
+      const mine = ++remarked
+      // Only the remark the table is waiting on may let it go: a late one changes nothing.
+      const done = (): void => {
+        if (mine !== remarked) return
         clearTimeout(hold)
         speaking = false
-      })
+      }
+      clearTimeout(hold)
+      hold = setTimeout(done, REMARK_WAIT_MS)
+      void now
+        .say(her.charId, swing ? swing.cue : goalCue(her.name, scored, toWin))
+        .then(done, done)
     }
 
     const goal = (by: Side, at: number): void => {
@@ -164,20 +202,24 @@ export function AirHockey({ play }: { play: GamePlay }): JSX.Element {
       setWaiting(true)
     }
 
+    // The serve: the puck with `to`, her mallet back at her end, his where it was.
+    const serve = (to: Side): void => {
+      const reader = table.reader
+      table = freshTable(to)
+      table.reader = reader
+      mind = freshMind()
+      owed = 0
+    }
+
     const tick = (at: number): void => {
       if (gone || ended) return
       frame = requestAnimationFrame(tick)
-      const passed = Math.min((at - last) / 1000, MAX_FRAME_S)
+      const passed = Math.max(0, Math.min((at - last) / 1000, MAX_FRAME_S))
       last = at
       if (at < stillUntil || speaking) return
       if (serveTo) {
-        // The serve: the puck with whoever conceded, her mallet back at her end, his where it was.
-        const reader = table.reader
-        table = freshTable(serveTo)
-        table.reader = reader
-        mind = freshMind()
+        serve(serveTo)
         serveTo = null
-        owed = 0
         setWaiting(false)
         draw()
         return
@@ -191,6 +233,9 @@ export function AirHockey({ play }: { play: GamePlay }): JSX.Element {
           goal(by, at)
           return
         }
+        // A puck nobody is going to play is served again, to whoever's half it lies in.
+        const lying = stalled(table, mind)
+        if (lying) serve(lying)
       }
       draw()
     }
@@ -198,10 +243,14 @@ export function AirHockey({ play }: { play: GamePlay }): JSX.Element {
     draw()
     window.addEventListener('pointermove', follow)
     window.addEventListener('pointerdown', follow)
+    const surface = field.current
+    surface?.addEventListener('pointerdown', keep)
     frame = requestAnimationFrame(tick)
     return () => {
       gone = true
       cancelAnimationFrame(frame)
+      clearTimeout(hold)
+      surface?.removeEventListener('pointerdown', keep)
       window.removeEventListener('pointermove', follow)
       window.removeEventListener('pointerdown', follow)
     }
@@ -260,7 +309,7 @@ export function AirHockey({ play }: { play: GamePlay }): JSX.Element {
       <div className="vu-airhockey-side vu-airhockey-side--notes">
         <p className="vu-airhockey-note">first to {toWin}</p>
         <p className="vu-airhockey-note vu-airhockey-note--state">
-          {over ? 'game over' : waiting ? 'goal' : goals.length === 0 ? 'your serve' : 'in play'}
+          {over ? 'game over' : waiting ? 'goal' : 'in play'}
         </p>
         <p className="vu-airhockey-note">your mallet follows the pointer</p>
       </div>

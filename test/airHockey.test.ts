@@ -4,6 +4,7 @@ import {
   MALLET_R,
   MAX_SPEED,
   PUCK_R,
+  STALL_S,
   STEP,
   TABLE_H,
   TABLE_W,
@@ -21,6 +22,7 @@ import {
   playAt,
   scoreOf,
   servedPuck,
+  stalled,
   stepTable,
   swingAt,
   type Point,
@@ -242,6 +244,54 @@ describe('air hockey: her play', () => {
   })
 })
 
+describe('air hockey: a puck nobody plays', () => {
+  /** Runs a match step by step with his hand held at `hand`, for `seconds`. */
+  function wait(table: Table, hand: Point, seconds: number): Side | null {
+    const mind = freshMind()
+    const random = seeded(3)
+    for (let t = 0; t < seconds; t += STEP) {
+      if (advance(table, mind, hand, 3, random)) return null
+      const to = stalled(table, mind)
+      if (to) return to
+    }
+    return null
+  }
+
+  it('leaves a serve nobody has touched where it is', () => {
+    expect(wait(freshTable('reader'), homeOf('reader'), STALL_S * 3)).toBeNull()
+  })
+
+  it('serves again a puck left lying in his half, to him', () => {
+    const table = freshTable('reader')
+    table.puck = { x: 40, y: TABLE_H - 60, vx: 0, vy: 0 }
+    expect(wait(table, { x: TABLE_W - MALLET_R, y: TABLE_H - MALLET_R }, STALL_S + 1)).toBe('reader')
+  })
+
+  it('serves again a puck held in a corner under his mallet', () => {
+    const table = freshTable('reader')
+    table.puck = { x: PUCK_R, y: TABLE_H - PUCK_R, vx: 0, vy: 0 }
+    const corner = { x: MALLET_R, y: TABLE_H - MALLET_R }
+    table.reader = { ...corner, vx: 0, vy: 0 }
+    expect(wait(table, corner, STALL_S + 1)).toBe('reader')
+  })
+
+  it('has her fetch a puck at rest anywhere in her half', () => {
+    for (const x of [PUCK_R, 60, TABLE_W / 2, 240, TABLE_W - PUCK_R])
+      for (const y of [PUCK_R, 40, 100, 150]) {
+        const table = freshTable('her')
+        table.puck = { x, y, vx: 0, vy: 0 }
+        const mind = freshMind()
+        const random = seeded(x + y)
+        let out = false
+        for (let t = 0; t < STALL_S && !out; t += STEP)
+          out =
+            advance(table, mind, homeOf('reader'), 1, random) !== null ||
+            table.puck.y > TABLE_H / 2 + PUCK_R
+        expect(out, `${x}, ${y}`).toBe(true)
+      }
+  })
+})
+
 describe('air hockey: the match', () => {
   const R: Side = 'reader'
   const H: Side = 'her'
@@ -299,6 +349,17 @@ describe('air hockey: the match', () => {
     expect(account).toContain('A comeback: Mia was 2 goals down at one point and still won.')
     expect(account).toContain('It went to the last goal: at 2–2 either of them could have won it.')
     expect(account).toContain('Final score: the reader 2, Mia 3.')
+  })
+
+  it('does not call a match one-sided that the loser led, nor a levelling a comeback twice', () => {
+    const turned: Side[] = ['her', 'her', 'reader', 'reader', 'reader', 'reader', 'reader']
+    const told = matchAccount('Mia', turned, 5).join(' ')
+    expect(told).toContain('comeback')
+    expect(told).not.toContain('never close')
+    // Two down, level, ahead, one down, level again: the second levelling is no comeback.
+    const again: Side[] = ['her', 'her', 'reader', 'reader', 'reader', 'her', 'her', 'reader']
+    expect(swingAt('Mia', again.slice(0, 4), 9)?.kind).toBe('level')
+    expect(swingAt('Mia', again, 9)).toBeNull()
   })
 
   it('tells a lead that was pegged back but never lost, and a one-sided game', () => {

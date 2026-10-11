@@ -26,6 +26,9 @@ export const READER_SPEED = 2600
 /** How far up from its end wall a served puck is put, and where a mallet waits. */
 const SERVE_FROM = 110
 const HOME_FROM = 50
+/** How long a puck may lie where it is before it is served again, and how far counts as moving. */
+export const STALL_S = 5
+const STALL_REACH = 12
 /** First to this many, where nothing else was agreed. */
 export const GOALS_TO_WIN = 5
 
@@ -229,10 +232,32 @@ export interface Mind {
   to: Point
   /** How long until she looks again. */
   wait: number
+  /** Where the puck was when it last got anywhere, and how long it has lain about there since. */
+  from: Point | null
+  still: number
 }
 
 export function freshMind(): Mind {
-  return { to: homeOf('her'), wait: 0 }
+  return { to: homeOf('her'), wait: 0, from: null, still: 0 }
+}
+
+/** Whose half the puck is in. */
+export function halfOf(puck: Point): Side {
+  return puck.y < TABLE_H / 2 ? 'her' : 'reader'
+}
+
+/**
+ * Who the puck is to be served to again, having lain in one place too long: pinned to a wall,
+ * left at the line where neither will fetch it, or just not played. Null while it is still in
+ * play. A serve nobody has touched yet is left to wait for whoever it is with.
+ */
+export function stalled(table: Table, mind: Mind): Side | null {
+  if (mind.still < STALL_S) return null
+  const side = halfOf(table.puck)
+  const serve = servedPuck(side)
+  const { puck } = table
+  if (puck.x === serve.x && puck.y === serve.y && puck.vx === 0 && puck.vy === 0) return null
+  return side
 }
 
 /** Where a puck going straight would be across the table after `time`, the side walls folded in. */
@@ -304,7 +329,13 @@ export function advance(
     mind.to = herAim(table, skill, random)
     mind.wait = play.reaction
   }
-  return stepTable(table, readerTo, mind.to, play.speed, dt)
+  const by = stepTable(table, readerTo, mind.to, play.speed, dt)
+  const { puck } = table
+  if (!mind.from || Math.hypot(puck.x - mind.from.x, puck.y - mind.from.y) > STALL_REACH) {
+    mind.from = { x: puck.x, y: puck.y }
+    mind.still = 0
+  } else mind.still += dt
+  return by
 }
 
 /** The count after some goals: the reader's, then hers. */
@@ -364,9 +395,13 @@ export function swingAt(name: string, goals: readonly Side[], toWin: number): Sw
   const now = mine - hers
   const before = marginAt(goals, goals.length - 1)
   const count = `It is the reader ${mine}, ${name} ${hers}, first to ${toWin}.`
-  // The furthest the one who just scored has been behind.
-  const depths = goals.map((_, i) => marginAt(goals, i + 1) * (byHer ? -1 : 1))
-  const deepest = -Math.min(0, ...depths)
+  // The furthest the one who just scored has been behind since it was last level.
+  let deepest = 0
+  for (let i = goals.length - 1; i > 0; i--) {
+    const margin = marginAt(goals, i) * (byHer ? -1 : 1)
+    if (margin === 0) break
+    deepest = Math.max(deepest, -margin)
+  }
 
   if (now === 0 && deepest >= 2)
     return {
@@ -463,7 +498,8 @@ export function matchAccount(name: string, goals: readonly Side[], toWin: number
       lines.push(
         `It went to the last goal: at ${lost}–${lost} either of them could have won it.`
       )
-    else if (toWin - lost >= 3) lines.push(`It was one-sided: ${called(loser)} was never close.`)
+    else if (toWin - lost >= 3 && deepest === 0)
+      lines.push(`It was one-sided: ${called(loser)} was never close.`)
   }
 
   lines.push(`Final score: the reader ${mine}, ${name} ${hers}.`)
