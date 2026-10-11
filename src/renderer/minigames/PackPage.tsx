@@ -1,4 +1,4 @@
-import { useState, type JSX } from 'react'
+import { useEffect, useRef, useState, type JSX } from 'react'
 import { motion } from 'motion/react'
 import { locationDefOf, ROOM_LOCATION } from '@shared/locations'
 import {
@@ -64,8 +64,14 @@ function sentence(text: string): string {
 function GamePage({ game, onBack }: { game: MiniGameDef; onBack: () => void }): JSX.Element {
   const prefs = usePrefsStore((s) => s.byGame[game.id])
   const setPrefs = usePrefsStore((s) => s.set)
+  // The page opens below the pack's own heading, in a pane that scrolls: it is brought to the
+  // pane's top, so the way back and the game's name are the first things read.
+  const page = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    page.current?.scrollIntoView({ block: 'start' })
+  }, [])
   return (
-    <div className="vu-minigame-page">
+    <div className="vu-minigame-page" ref={page}>
       <motion.button
         id="minigame-page-back"
         className="vu-pill vu-minigame-page-back"

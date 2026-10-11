@@ -174,3 +174,8 @@ body:has(.vu-minigame-veil) .vu-scene-divider {
 .vu-minigame-fact {
   display: contents;
 }
+
+/* Brought to the top of the pane it scrolls in, clear of the pane's own padding. */
+.vu-minigame-page {
+  scroll-margin-top: 20px;
+}
