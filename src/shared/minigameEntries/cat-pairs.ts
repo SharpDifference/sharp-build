@@ -12,6 +12,7 @@ const CAT_PAIRS: MiniGameDef = {
   options: [
     {
       id: 'pairs',
+      label: 'Pairs on the table',
       describe: 'how many pairs of cats are laid out, which is how long the game is',
       min: 6,
       max: 12,
@@ -19,6 +20,7 @@ const CAT_PAIRS: MiniGameDef = {
     },
     {
       id: 'cats',
+      label: 'Café cat swaps cards',
       describe:
         'whether a café cat is let near the table to swap face-down cards now and then: 1 with the cat, 0 for a plain game with no swaps',
       min: 0,
@@ -32,7 +34,7 @@ const CAT_PAIRS: MiniGameDef = {
   suggestAt: { cat_cafe: 'often', cutetea: 'sometimes' },
   players: { min: 0, max: 3 },
   surface: 'table',
-  controls: 'Click two cards to turn them.',
+  controls: 'On your turn, click two face-down cards to turn them.',
   skillBrief:
     'A good player remembers where every card that has been turned lies, follows the cards a cat moves, and never turns a card blind when a pair is known; a poor one forgets what was shown a turn ago and mostly guesses.'
 }

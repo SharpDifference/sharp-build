@@ -9,20 +9,21 @@
 }
 
 /* Three rows however many pairs there are; a short last row keeps to the left, so a place's
-   column and row follow from its number alone. */
+   column and row follow from its number alone. The card's size and the gap are set by the
+   component, which moves a swapped card by the same numbers. */
 .vu-catpairs-grid {
   position: relative;
   display: grid;
-  grid-template-columns: repeat(var(--vu-catpairs-cols), 84px);
-  grid-auto-rows: 106px;
-  gap: 10px;
+  grid-template-columns: repeat(var(--vu-catpairs-cols), var(--vu-catpairs-w));
+  grid-auto-rows: var(--vu-catpairs-h);
+  gap: var(--vu-catpairs-gap);
   justify-content: start;
 }
 
 .vu-catpairs-place {
   position: relative;
-  width: 84px;
-  height: 106px;
+  width: var(--vu-catpairs-w);
+  height: var(--vu-catpairs-h);
 }
 
 /* The two cards a cat is moving ride over the rest and are marked, which says the swap even to
@@ -86,8 +87,8 @@
 
 .vu-catpairs-cat {
   flex: none;
-  width: 62px;
-  height: 62px;
+  width: calc(var(--vu-catpairs-w) - 22px);
+  height: calc(var(--vu-catpairs-w) - 22px);
   overflow: visible;
 }
 
@@ -177,9 +178,9 @@
 }
 
 .vu-catpairs-catname {
-  max-width: 78px;
-  color: var(--vu-text-body);
-  font: 700 10.5px var(--font-body);
+  max-width: calc(var(--vu-catpairs-w) - 8px);
+  color: var(--vu-text);
+  font: 700 11px var(--font-body);
   line-height: 1.05;
   text-align: center;
 }

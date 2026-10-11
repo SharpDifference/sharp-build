@@ -235,7 +235,54 @@ describe('Cat Pairs', () => {
       { at: 2, cat: 4 }
     ])
     expect(catMoved(memory, 2, 9, 1, () => 0.5)).toEqual(memory)
+    // Following a swap of a card she holds with one she never saw teaches her nothing new.
+    expect(catMoved([{ at: 2, cat: 1 }], 2, 9, 5, never)).toEqual([{ at: 9, cat: 1 }])
     expect(cleared(memory, [2, 5])).toEqual([{ at: 9, cat: 4 }])
+  })
+
+  it('never has her go for a card on knowledge she could not have, swaps and all', () => {
+    for (let seed = 1; seed <= 40; seed++) {
+      const rand = seeded(seed)
+      const skills: Skill[] = [1, 3, 5]
+      let game = newGame(3, 12, true, rand)
+      let memories: Memory[] = skills.map(() => [])
+      // Every cat each place has ever been shown to hold or, by a swap, could be believed to.
+      const shown = new Set<string>()
+      const see = (at: number): void => {
+        shown.add(`${at}:${game.cards[at]}`)
+        memories = memories.map((memory, i) => observe(memory, at, game.cards[at], skills[i], rand))
+      }
+      for (let guard = 0; !isOver(game) && guard < 5000; guard++) {
+        const seat = game.turn
+        const first = herFirst(game, memories[seat], rand)
+        see(first)
+        const second = herSecond(game, memories[seat], first, skills[seat], rand)
+        expect(second).not.toBe(first)
+        expect(game.taken[first]).toBeNull()
+        expect(game.taken[second]).toBeNull()
+        see(second)
+        game = playTurn(game, first, second)
+        if (turnsMade(game).at(-1)!.run > 0) {
+          memories = memories.map((memory) => cleared(memory, [first, second]))
+        } else if (catDue(game)) {
+          const [a, b] = catPick(game, rand)
+          for (const key of [...shown]) {
+            const [at, cat] = key.split(':').map(Number)
+            if (at === a) shown.add(`${b}:${cat}`)
+            if (at === b) shown.add(`${a}:${cat}`)
+          }
+          memories = memories.map((memory, i) => catMoved(memory, a, b, skills[i], rand))
+          game = catSwap(game, a, b)
+          // The one who always follows holds nothing false after the swap.
+          for (const held of memories[2]) expect(game.cards[held.at]).toBe(held.cat)
+        }
+        // Whatever each holds, right or stale, was shown to the table at some time.
+        for (const memory of memories) {
+          for (const held of memory) expect(shown.has(`${held.at}:${held.cat}`)).toBe(true)
+        }
+      }
+      expect(isOver(game)).toBe(true)
+    }
   })
 
   it('clears a table alone in fewer turns the better she is, with and without the cat', () => {

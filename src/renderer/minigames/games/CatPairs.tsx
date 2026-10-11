@@ -57,9 +57,17 @@ const SAY_WAIT_MS = 3000
 /** The least the cards lie there once the wait for her line is over. */
 const AFTER_REMARK_MS = 400
 
-/** A card's width and height with the gap to the next, which is how far a swapped card travels per place. */
-const STEP_X = 94
-const STEP_Y = 116
+/** The gap between two cards, in pixels. */
+const GAP = 10
+
+/**
+ * A card's width and height in pixels, by how many columns the table has: smaller on the widest
+ * tables, so that the longest game is no wider than a middling one. The grid is laid from these
+ * and a swapped card travels by them, so the two cannot disagree.
+ */
+function cardSize(cols: number): { w: number; h: number } {
+  return cols >= 8 ? { w: 66, h: 88 } : cols === 7 ? { w: 74, h: 96 } : { w: 84, h: 106 }
+}
 
 /** Where the table is in a turn: cards to be picked, two lying face up, a cat crossing, or done. */
 type Phase = 'pick' | 'show' | 'cat' | 'over'
@@ -184,6 +192,8 @@ export function CatPairs({ play }: { play: GamePlay }): JSX.Element {
   const begun = useRef(false)
   // Which remark the table is waiting on, and the timer that ends the wait.
   const awaited = useRef(0)
+  // Her line is still being written or shown, however long the table waited: no other is asked for.
+  const saying = useRef(false)
   const sayCap = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
   // When the two cards now face up were turned.
   const shownAt = useRef(0)
@@ -199,6 +209,10 @@ export function CatPairs({ play }: { play: GamePlay }): JSX.Element {
   const left = faceDown(game).length / 2
   const myTurn = phase === 'pick' && game.turn === 0
   const cols = Math.ceil(game.cards.length / 3)
+  const card = cardSize(cols)
+  // How far it is from one place to the next, along a row and down a column.
+  const stepX = card.w + GAP
+  const stepY = card.h + GAP
 
   // With girls at the table the game is on from the moment they sit down, and says so.
   useEffect(() => {
@@ -221,7 +235,7 @@ export function CatPairs({ play }: { play: GamePlay }): JSX.Element {
    * whoever has spoken least.
    */
   function remark(now: Game): void {
-    if (!seated || remarks.current >= REMARKS[play.chattiness]) return
+    if (!seated || saying.current || remarks.current >= REMARKS[play.chattiness]) return
     const made = turnsMade(now).at(-1)
     if (!made) return
     const told = turnTold(names, made)
@@ -246,9 +260,14 @@ export function CatPairs({ play }: { play: GamePlay }): JSX.Element {
     setSpeaking(true)
     clearTimeout(sayCap.current)
     sayCap.current = setTimeout(release, SAY_WAIT_MS)
+    saying.current = true
+    const said = (): void => {
+      saying.current = false
+      release()
+    }
     void Promise.resolve()
       .then(() => play.say(girls[by].charId, cue))
-      .then(release, release)
+      .then(said, said)
   }
 
   /** The player whose turn it is turns the card at `at`: the first of two, or the one that settles the turn. */
@@ -369,15 +388,22 @@ export function CatPairs({ play }: { play: GamePlay }): JSX.Element {
     if (!swap || !swap.includes(at)) return { x: 0, y: 0 }
     const to = swap[0] === at ? swap[1] : swap[0]
     return {
-      x: ((to % cols) - (at % cols)) * STEP_X,
-      y: (Math.floor(to / cols) - Math.floor(at / cols)) * STEP_Y
+      x: ((to % cols) - (at % cols)) * stepX,
+      y: (Math.floor(to / cols) - Math.floor(at / cols)) * stepY
     }
   }
 
   const owner = (seat: number): string => (seat === 0 ? 'you' : names[seat - 1])
   return (
     <div className="vu-catpairs">
-      <div className="vu-catpairs-grid" style={{ '--vu-catpairs-cols': cols } as CSSProperties}>
+      <div className="vu-catpairs-grid" style={
+          {
+            '--vu-catpairs-cols': cols,
+            '--vu-catpairs-w': `${card.w}px`,
+            '--vu-catpairs-h': `${card.h}px`,
+            '--vu-catpairs-gap': `${GAP}px`
+          } as CSSProperties
+        }>
         {game.cards.map((cat, at) => {
           const takenBy = game.taken[at]
           const faceUp = takenBy !== null || up.includes(at)
@@ -437,7 +463,7 @@ export function CatPairs({ play }: { play: GamePlay }): JSX.Element {
           <motion.span
             className="vu-catpairs-walker"
             aria-hidden="true"
-            style={{ top: Math.floor(swap[0] / cols) * STEP_Y + 26 }}
+            style={{ top: Math.floor(swap[0] / cols) * stepY + (card.h - 44) / 2 }}
             initial={{ left: '-6%', opacity: 0 }}
             animate={{ left: '98%', opacity: [0, 1, 1, 0] }}
             transition={{ duration: CAT_MS / 1000, ease: 'linear' }}
