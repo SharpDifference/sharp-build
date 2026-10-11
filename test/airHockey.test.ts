@@ -1,0 +1,337 @@
+import { describe, expect, it } from 'vitest'
+import {
+  GOAL_W,
+  MALLET_R,
+  MAX_SPEED,
+  PUCK_R,
+  STEP,
+  TABLE_H,
+  TABLE_W,
+  advance,
+  freshMind,
+  freshTable,
+  goalLine,
+  herAim,
+  homeOf,
+  inHalf,
+  matchAccount,
+  matchOver,
+  matchSituation,
+  matchSummary,
+  playAt,
+  scoreOf,
+  servedPuck,
+  stepTable,
+  swingAt,
+  type Point,
+  type Side,
+  type Table
+} from '../src/shared/airHockey'
+import { MINI_GAMES, MINI_GAMES_LIST, gamesOffered, suggestRate } from '../src/shared/minigames'
+import { MODS } from '../src/shared/mods'
+
+/** Air hockey's rules: the table's physics, how she plays at her skill, and how a match is told. */
+
+/** A table with the puck where the test wants it and both mallets out of its way. */
+function tableWith(puck: Partial<Table['puck']>): Table {
+  const table = freshTable('reader')
+  table.reader = { x: MALLET_R, y: TABLE_H - MALLET_R, vx: 0, vy: 0 }
+  table.her = { x: MALLET_R, y: MALLET_R, vx: 0, vy: 0 }
+  table.puck = { x: TABLE_W / 2, y: TABLE_H / 2, vx: 0, vy: 0, ...puck }
+  return table
+}
+
+/** Runs the table with both mallets held where they are until a goal or `seconds` pass. */
+function run(table: Table, seconds: number): Side | null {
+  for (let t = 0; t < seconds; t += STEP) {
+    const goal = stepTable(table, table.reader, table.her, 0)
+    if (goal) return goal
+  }
+  return null
+}
+
+/** The same numbers every time: a small generator, seeded. */
+function seeded(seed: number): () => number {
+  let state = seed >>> 0
+  return () => {
+    state = (state + 0x6d2b79f5) >>> 0
+    let t = state
+    t = Math.imul(t ^ (t >>> 15), t | 1)
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61)
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296
+  }
+}
+
+/**
+ * A plain opponent for her at the reader's end: a hand that moves at a fixed pace, gets behind a
+ * puck in its half and pushes it up the table, and otherwise waits in front of its goal.
+ */
+function scripted(table: Table, hand: Point, pace: number): Point {
+  const { puck } = table
+  const want =
+    puck.y > TABLE_H / 2
+      ? table.reader.y > puck.y + 6
+        ? { x: puck.x, y: puck.y - 14 }
+        : { x: puck.x, y: puck.y + 45 }
+      : { x: TABLE_W / 2 + (puck.x - TABLE_W / 2) * 0.4, y: TABLE_H - 50 }
+  const far = Math.hypot(want.x - hand.x, want.y - hand.y)
+  const part = far > pace * STEP ? (pace * STEP) / far : 1
+  return inHalf('reader', {
+    x: hand.x + (want.x - hand.x) * part,
+    y: hand.y + (want.y - hand.y) * part
+  })
+}
+
+/** Plays her at `skill` against the scripted hand for `seconds`, and returns the goals. */
+function simulate(skill: number, seconds: number, seed: number): { mine: number; hers: number } {
+  const random = seeded(seed)
+  let table = freshTable('reader')
+  let mind = freshMind()
+  let hand: Point = homeOf('reader')
+  const goals: Side[] = []
+  for (let t = 0; t < seconds; t += STEP) {
+    hand = scripted(table, hand, 420)
+    const goal = advance(table, mind, hand, skill, random)
+    if (!goal) continue
+    goals.push(goal)
+    table = freshTable(goal === 'her' ? 'reader' : 'her')
+    mind = freshMind()
+    hand = homeOf('reader')
+  }
+  return scoreOf(goals)
+}
+
+describe('air hockey: the table', () => {
+  it('bounces the puck off the side walls and keeps it on the table', () => {
+    const table = tableWith({ vx: 600, vy: 0 })
+    let turned = false
+    for (let t = 0; t < 2; t += STEP) {
+      expect(stepTable(table, table.reader, table.her, 0)).toBeNull()
+      expect(table.puck.x).toBeGreaterThanOrEqual(PUCK_R)
+      expect(table.puck.x).toBeLessThanOrEqual(TABLE_W - PUCK_R)
+      if (table.puck.vx < 0) turned = true
+    }
+    expect(turned).toBe(true)
+  })
+
+  it('bounces the puck off an end wall beside the mouth', () => {
+    const table = tableWith({ x: PUCK_R + 4, y: 60, vx: 0, vy: -500 })
+    expect(run(table, 0.5)).toBeNull()
+    expect(table.puck.vy).toBeGreaterThan(0)
+    expect(table.puck.y).toBeGreaterThanOrEqual(PUCK_R)
+  })
+
+  it('scores for the reader through the top mouth and for her through the bottom', () => {
+    expect(run(tableWith({ vy: -500 }), 2)).toBe('reader')
+    expect(run(tableWith({ vy: 500 }), 2)).toBe('her')
+    // Just inside a post is a goal; just outside is the wall.
+    const inside = TABLE_W / 2 + GOAL_W / 2 - PUCK_R - 1
+    expect(run(tableWith({ x: inside, vy: -500 }), 2)).toBe('reader')
+    const wide = tableWith({ x: inside + 3, vy: -500 })
+    expect(run(wide, 0.6)).toBeNull()
+    expect(wide.puck.vy).toBeGreaterThan(0)
+  })
+
+  it('slows the puck as it slides, and never lets it past its top speed', () => {
+    const sliding = tableWith({ x: 40, y: TABLE_H / 2, vx: 200, vy: 0 })
+    run(sliding, 0.5)
+    expect(Math.abs(sliding.puck.vx)).toBeLessThan(200)
+
+    // A mallet thrown through a resting puck as fast as a hand can move it.
+    const table = freshTable('reader')
+    let fastest = 0
+    for (let t = 0; t < 0.3; t += STEP) {
+      if (stepTable(table, { x: TABLE_W / 2, y: TABLE_H / 2 }, table.her, 0)) break
+      fastest = Math.max(fastest, Math.hypot(table.puck.vx, table.puck.vy))
+    }
+    expect(fastest).toBeGreaterThan(MAX_SPEED * 0.9)
+    expect(fastest).toBeLessThanOrEqual(MAX_SPEED + 1e-6)
+  })
+
+  it('gives the puck the speed of the mallet that hits it', () => {
+    const table = freshTable('reader')
+    // Up through the puck, off to one side of it: it leaves going up and away to the other.
+    table.reader.x = table.puck.x + 12
+    table.reader.y = table.puck.y + 60
+    for (let i = 0; i < 20 && table.puck.vy === 0; i++)
+      stepTable(table, { x: table.puck.x + 12, y: TABLE_H / 2 }, table.her, 0)
+    expect(table.puck.vy).toBeLessThan(0)
+    expect(table.puck.vx).toBeLessThan(0)
+  })
+
+  it('keeps each mallet to its own half', () => {
+    const table = freshTable('reader')
+    for (let i = 0; i < 240; i++) stepTable(table, { x: -50, y: 0 }, { x: 900, y: 900 }, 2000)
+    expect(table.reader).toMatchObject({ x: MALLET_R, y: TABLE_H / 2 + MALLET_R })
+    expect(table.her).toMatchObject({ x: TABLE_W - MALLET_R, y: TABLE_H / 2 - MALLET_R })
+  })
+
+  it('serves the puck at rest in the half of whoever is to hit it', () => {
+    const mine = servedPuck('reader')
+    const hers = servedPuck('her')
+    expect(mine).toMatchObject({ x: TABLE_W / 2, vx: 0, vy: 0 })
+    expect(mine.y).toBeGreaterThan(TABLE_H / 2)
+    expect(hers.y).toBeLessThan(TABLE_H / 2)
+    expect(freshTable('her').her).toMatchObject(homeOf('her'))
+  })
+})
+
+describe('air hockey: her play', () => {
+  it('is quicker, faster and surer the better she is', () => {
+    for (let skill = 2; skill <= 5; skill++) {
+      const [worse, better] = [playAt(skill - 1), playAt(skill)]
+      expect(better.reaction).toBeLessThan(worse.reaction)
+      expect(better.speed).toBeGreaterThan(worse.speed)
+      expect(better.error).toBeLessThan(worse.error)
+      expect(better.guard).toBeGreaterThan(worse.guard)
+    }
+    // Never as fast as the puck, so a hard shot can always beat her.
+    expect(playAt(5).speed).toBeLessThan(MAX_SPEED)
+    expect(playAt(9)).toBe(playAt(5))
+    expect(playAt(0)).toBe(playAt(1))
+  })
+
+  it('aims inside her own half, and off by no more than her skill allows', () => {
+    const table = freshTable('reader')
+    table.puck = { x: 250, y: 300, vx: 0, vy: 0 }
+    table.her.x = 60
+    const steady = herAim(table, 5, () => 0.5)
+    // The best of them goes all the way back in front of her goal, shaded to the puck's side.
+    expect(steady.y).toBe(homeOf('her').y)
+    expect(steady.x).toBeGreaterThan(TABLE_W / 2)
+    // The worst only drifts that way from where she stands.
+    expect(herAim(table, 1, () => 0.5).x).toBeLessThan(steady.x)
+    for (const roll of [0, 0.25, 0.75, 0.999]) {
+      const aim = herAim(table, 5, () => roll)
+      expect(Math.abs(aim.x - steady.x)).toBeLessThanOrEqual(playAt(5).error + 1e-9)
+      expect(aim).toEqual(inHalf('her', aim))
+    }
+  })
+
+  it('gets behind a puck in her half and drives it down the table', () => {
+    const table = freshTable('her')
+    const mind = freshMind()
+    let lowest = 0
+    for (let t = 0; t < 3; t += STEP) {
+      // The reader's mallet kept in a corner: nothing to stop it.
+      if (advance(table, mind, { x: 0, y: TABLE_H }, 5, () => 0.5)) break
+      lowest = Math.max(lowest, table.puck.y)
+    }
+    expect(lowest).toBeGreaterThan(TABLE_H / 2)
+  })
+
+  it('concedes less and scores more against the same opponent the better she is', () => {
+    const totals = [1, 3, 5].map((skill) => {
+      let mine = 0
+      let hers = 0
+      for (let seed = 1; seed <= 6; seed++) {
+        const result = simulate(skill, 120, seed)
+        mine += result.mine
+        hers += result.hers
+      }
+      return { mine, hers }
+    })
+    const [weak, fair, sharp] = totals
+    expect(weak.mine).toBeGreaterThan(fair.mine)
+    expect(fair.mine).toBeGreaterThan(sharp.mine)
+    expect(sharp.hers - sharp.mine).toBeGreaterThan(weak.hers - weak.mine)
+    // The weakest loses to a plain opponent; the best beats it, and is still scored on.
+    expect(weak.mine).toBeGreaterThan(weak.hers)
+    expect(sharp.hers).toBeGreaterThan(sharp.mine)
+    expect(sharp.mine).toBeGreaterThan(0)
+  })
+})
+
+describe('air hockey: the match', () => {
+  const R: Side = 'reader'
+  const H: Side = 'her'
+
+  it('counts the goals and ends at the number played to', () => {
+    expect(scoreOf([R, H, R])).toEqual({ mine: 2, hers: 1 })
+    expect(matchOver([R, H, R], 3)).toBe(false)
+    expect(matchOver([R, H, R, R], 3)).toBe(true)
+    expect(matchOver([H, H, H], 3)).toBe(true)
+  })
+
+  it('narrates a goal with who scored and the count', () => {
+    expect(goalLine('Mia', [R])).toBe('You score. 1–0 to you.')
+    expect(goalLine('Mia', [R, H])).toBe('Mia scores. 1–1, all level.')
+    expect(goalLine('Mia', [R, H, H])).toBe('Mia scores. 2–1 to Mia.')
+    expect(matchSummary('Mia', [R, R, H, R])).toBe('You beat Mia at air hockey, 3–1.')
+    expect(matchSummary('Mia', [H, H, H])).toBe('Mia beat you at air hockey, 3–0.')
+  })
+
+  it('marks the goals that turn a match, and no others', () => {
+    expect(swingAt('Mia', [R], 5)).toBeNull()
+    expect(swingAt('Mia', [H], 5)?.kind).toBe('lead')
+    expect(swingAt('Mia', [R, H], 5)).toBeNull()
+    expect(swingAt('Mia', [R, H, H], 5)?.kind).toBe('lead')
+    expect(swingAt('Mia', [R, R], 5)?.kind).toBe('behind')
+    expect(swingAt('Mia', [R, R, R], 5)).toBeNull()
+    expect(swingAt('Mia', [R, R, H, H], 5)?.kind).toBe('level')
+    expect(swingAt('Mia', [H, H, R, R], 5)?.cue).toContain('The reader has just scored to pull level')
+    expect(swingAt('Mia', [H, H, H, H], 5)?.kind).toBe('match-point')
+    expect(swingAt('Mia', [R, H, R, H, R, R], 5)?.cue).toContain('needs one more goal')
+  })
+
+  it('keeps the state of the match in a line', () => {
+    expect(matchSituation('Mia', [], 5)).toContain('Nobody has scored yet.')
+    const line = matchSituation('Mia', [R, H, H], 7, 'Loser buys the drinks.')
+    expect(line).toContain('first to 7')
+    expect(line).toContain('the reader 1, Mia 2')
+    expect(line).toContain('Mia scored the last goal.')
+    expect(line).toContain('Riding on it: Loser buys the drinks.')
+  })
+
+  it('tells a shutout as one', () => {
+    const account = matchAccount('Mia', [R, R, R], 3).join('\n')
+    expect(account).toContain('fast, physical game')
+    expect(account).toContain('The goals, in order: the reader, the reader, the reader.')
+    expect(account).toContain('The reader scored first and led from then to the end.')
+    expect(account).toContain('A shutout: Mia did not score once.')
+    expect(account).toContain('Final score: the reader 3, Mia 0.')
+    expect(account).not.toContain('comeback')
+  })
+
+  it('tells a comeback and a close finish', () => {
+    const account = matchAccount('Mia', [R, R, H, H, H], 3).join('\n')
+    expect(account).toContain('the lead changed hands once')
+    expect(account).toContain('A comeback: Mia was 2 goals down at one point and still won.')
+    expect(account).toContain('It went to the last goal: at 2–2 either of them could have won it.')
+    expect(account).toContain('Final score: the reader 2, Mia 3.')
+  })
+
+  it('tells a lead that was pegged back but never lost, and a one-sided game', () => {
+    const level = matchAccount('Mia', [H, R, H, H, R, H, H], 5).join('\n')
+    expect(level).toContain('Mia scored first and was never behind, though it was level along the way.')
+    expect(level).toContain('It was one-sided: the reader was never close.')
+    expect(level).not.toContain('shutout')
+  })
+})
+
+describe('air hockey: the pack', () => {
+  const def = MINI_GAMES_LIST.find((game) => game.id === 'air-hockey')
+
+  it('is found among the games, against one girl, on the board', () => {
+    expect(def).toBeDefined()
+    expect(def?.players).toEqual({ min: 1, max: 1 })
+    expect(def?.surface).toBe('board')
+    expect(def?.options).toEqual([expect.objectContaining({ id: 'goals', min: 3, max: 9, default: 5 })])
+  })
+
+  it('is offered at the arcade with a girl there, and not alone or in her room', () => {
+    const on = (): boolean => true
+    const ids = (location: string, girls: number): string[] =>
+      gamesOffered({ location, girls }, on).map((game) => game.id)
+    expect(ids('btb_arcade', 1)).toContain('air-hockey')
+    expect(ids('btb_arcade', 0)).not.toContain('air-hockey')
+    expect(ids('room', 1)).not.toContain('air-hockey')
+    expect(suggestRate(def!, 'btb_arcade', false)).toBe('often')
+    expect(suggestRate(def!, 'pier_44', false)).toBe('rarely')
+  })
+
+  it('comes as a mod of its own that requires the framework', () => {
+    const mod = MODS.find((entry) => entry.id === def?.modId)
+    expect(mod?.requires).toEqual([MINI_GAMES])
+  })
+})
