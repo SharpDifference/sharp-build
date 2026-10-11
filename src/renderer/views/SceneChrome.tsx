@@ -362,7 +362,8 @@ export function SceneChrome(props: SceneChromeProps): JSX.Element {
         >
           <CalendarIcon />
         </RailSeat>
-        {/* The mods' own seats, each deciding for itself whether it stands. */}
+        {/* The mods' own seats, each deciding for itself whether it stands. They arrive on the
+            rail with the Calendar, the last of the game's own gated seats, hence its reveal. */}
         {scenePlays().map(({ modId, play }) => (
           <play.Seat
             key={modId}

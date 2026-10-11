@@ -292,7 +292,15 @@ export function afterDmReply(ctx: {
 }
 
 export function afterSceneReply(ctx: SceneReplied): void {
-  for (const hooks of active()) hooks.afterSceneReply?.(ctx)
+  // Called in the middle of a turn, with the autosave and the turn's release still to come: a
+  // mod that throws here costs its own reading of the reply and nothing of the scene's.
+  for (const hooks of active()) {
+    try {
+      hooks.afterSceneReply?.(ctx)
+    } catch (error) {
+      console.warn('[mods] afterSceneReply failed', error)
+    }
+  }
 }
 
 /** Every mod's place on the scene screen, each under its mod's id. */

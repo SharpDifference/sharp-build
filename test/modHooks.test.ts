@@ -159,3 +159,22 @@ describe('the scene hooks', () => {
     expect(seen.mock.calls).toEqual([['kept']])
   })
 })
+
+describe('a mod that throws reading a scene reply', () => {
+  it('costs the scene nothing, and the mods after it still read the reply', async () => {
+    const hooks = await fresh({}, ['throws', 'reads'])
+    const seen: string[] = []
+    hooks.registerHooks('throws', {
+      afterSceneReply: () => {
+        throw new Error('broken mod')
+      }
+    })
+    hooks.registerHooks('reads', { afterSceneReply: () => void seen.push('read') })
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    expect(() =>
+      hooks.afterSceneReply({ reply: { lines: [] }, cast: [], solo: false, ending: false })
+    ).not.toThrow()
+    warn.mockRestore()
+    expect(seen).toEqual(['read'])
+  })
+})
