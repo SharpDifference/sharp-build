@@ -129,11 +129,34 @@ function holdFor(text: string, spoken: boolean): number {
 
 let sitting = 0
 let heldUntil = 0
+/** How long the scene's transcript was when the table opened, or -1 with no table open. */
+let openedAt = -1
 
 /** A new table: nothing is waiting, and nothing from the last one may speak. */
 export function openTable(): void {
   sitting++
   heldUntil = 0
+  openedAt = useGameStore.getState().currentSceneTranscript.length
+}
+
+/**
+ * Takes a finished game's move-by-move narration back off the scene's transcript, leaving what
+ * was said across the table. The narration was for the reader, who has read it and still has it
+ * in the chat log; the transcript is what every later request quotes, the scene's closing
+ * bookkeeping included, and a few games' worth of card turns is a lot of scene to send each
+ * time. What the scene needs of the game goes in once, with its result.
+ */
+export function compactTable(): void {
+  const from = openedAt
+  openedAt = -1
+  const transcript = useGameStore.getState().currentSceneTranscript
+  if (from < 0 || from >= transcript.length) return
+  useGameStore.setState({
+    currentSceneTranscript: [
+      ...transcript.slice(0, from),
+      ...transcript.slice(from).filter((line) => line.speaker !== '')
+    ]
+  })
 }
 
 /** The table is cleared; lines still waiting on the box are dropped. */

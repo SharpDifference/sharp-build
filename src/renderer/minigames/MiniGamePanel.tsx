@@ -32,6 +32,7 @@ import { useTableStore, type Agreed } from './session'
 import { skillOf } from './skill'
 import {
   closeTable,
+  compactTable,
   fileResult,
   nameOf,
   narrateAtTable,
@@ -216,6 +217,7 @@ export function MiniGamePanel({ theme, onClose }: ScenePanelProps): JSX.Element 
 
   function leave(ended: PlayResult): void {
     closeTable()
+    compactTable()
     if (!seated) return
     // Whoever sat down, judged yet or not: she was at the table either way.
     const names = seated.opponents?.map((opponent) => opponent.name) ?? (agreed ? [nameOf(agreed.charId)] : [])
