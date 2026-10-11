@@ -43,7 +43,6 @@ const TYPED_MAX = 240
 const REMARK_CAP_MS = 2800
 
 /** How long a line of narration takes to write itself on the box and be read, at the box's pace. */
-const readMs = (text: string): number => 900 + text.length * 18
 
 /**
  * Where a turn stands.
@@ -140,7 +139,6 @@ export function TruthOrDare({ play }: { play: GamePlay }): JSX.Element {
   /** A line of narration, waited out: on the box behind everything before it, and then read. */
   async function narrated(text: string): Promise<void> {
     await latest.current.narrate(text).catch(() => undefined)
-    if (on()) await pause(readMs(text))
   }
 
   /** A girl's line in words already written, waited out. Never rejects. */

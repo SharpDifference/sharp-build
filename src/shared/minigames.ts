@@ -112,6 +112,12 @@ export interface MiniGameDef {
    * asks for something to be typed ({@link GamePlay.ask}), and not a line to the table besides.
    */
   typed?: boolean
+  /**
+   * Read at the reader's own pace: a line the game puts in the dialogue box stays until he moves
+   * on, by a click, a key, or playing his move, and only then does the next one arrive. For a
+   * game of words; one played against a clock leaves it unset, and its lines keep their own time.
+   */
+  stepped?: boolean
   /** How it is played, for the player: the keys or the pointer, in a sentence. Shown on its page. */
   controls?: string
   /** What makes someone good at it, in a sentence, for judging how well a girl plays. */

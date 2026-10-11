@@ -45,7 +45,10 @@ import {
   readerSaysAtTable,
   sayAtTable,
   speakAtTable,
+  stepTable,
   tableQuietIn,
+  tableRead,
+  useStepStore,
   proposeGame,
   takeTurnForGame,
   useGamesOffered,
@@ -202,7 +205,7 @@ export function MiniGamePanel({ theme, onClose }: ScenePanelProps): JSX.Element 
     if (begun.current) return
     begun.current = true
     takeTurnForGame()
-    openTable()
+    openTable(Boolean(seated?.game.stepped))
     setUnderWay(true)
   }
 
@@ -246,11 +249,31 @@ export function MiniGamePanel({ theme, onClose }: ScenePanelProps): JSX.Element 
     []
   )
 
+  // Something is waiting on the reader to step past the line on the box.
+  const waiting = useStepStore((s) => s.waiting)
+  useEffect(() => {
+    if (!waiting) return
+    // Space and Enter step on, as they do through a scene's own lines; a field keeps its keys,
+    // and a button under focus answers for itself.
+    const onKey = (event: KeyboardEvent): void => {
+      if (event.repeat || (event.key !== ' ' && event.key !== 'Enter')) return
+      const target = event.target as HTMLElement | null
+      if (target?.closest('input, textarea, button, [contenteditable="true"]')) return
+      event.preventDefault()
+      event.stopPropagation()
+      stepTable()
+    }
+    window.addEventListener('keydown', onKey, true)
+    return () => window.removeEventListener('keydown', onKey, true)
+  }, [waiting])
+
   function speak(): void {
     // What the game asked for is the game's, not a word across the table.
     if (answerTo.current) {
       const text = remark.trim()
       if (!text || result) return
+      // Answering is moving on: the line he answered needs no step of its own.
+      stepTable()
       const resolve = answerTo.current
       answerTo.current = null
       setAsked(null)
@@ -346,7 +369,17 @@ export function MiniGamePanel({ theme, onClose }: ScenePanelProps): JSX.Element 
   // A finished game stands for a beat, then clears itself: there is nothing to answer.
   useEffect(() => {
     if (!result) return
-    // After whatever the table is still saying has been read.
+    // After whatever the table is still saying has been read: by its own time, or, at a table
+    // read at the reader's pace, once he has stepped past the last of it.
+    if (seated?.game.stepped) {
+      let live = true
+      void tableRead().then(() => {
+        if (live) leave(result)
+      })
+      return () => {
+        live = false
+      }
+    }
     const timer = setTimeout(() => leave(result), tableQuietIn() + RESULT_BEAT_MS)
     return () => clearTimeout(timer)
     // The result is set once, and what `leave` reads has settled by then.
@@ -401,6 +434,10 @@ export function MiniGamePanel({ theme, onClose }: ScenePanelProps): JSX.Element 
         exit={{ opacity: 0 }}
         transition={{ duration: 0.2 }}
         {...overlayProps}
+        // A click on the scene around the table steps on, as a click through a scene's lines does.
+        onClick={(event) => {
+          if (waiting && event.target === event.currentTarget) stepTable()
+        }}
       >
         <motion.div
           id="minigame-table"
@@ -408,6 +445,10 @@ export function MiniGamePanel({ theme, onClose }: ScenePanelProps): JSX.Element 
           role="dialog"
           aria-modal="true"
           aria-label={seated.game.name}
+          // A move of his own in the game is moving on too.
+          onPointerDownCapture={() => {
+            if (waiting) stepTable()
+          }}
           initial={{ y: -18, scale: 0.96 }}
           animate={{ y: 0, scale: 1 }}
           transition={{ duration: 0.24, ease: 'easeOut' }}
@@ -419,6 +460,19 @@ export function MiniGamePanel({ theme, onClose }: ScenePanelProps): JSX.Element 
             <p className="vu-empty">
               {tableNames.length > 1 ? 'They are getting settled…' : 'She is getting settled…'}
             </p>
+          )}
+          {/* The way on, at a table read at the reader's own pace, while something waits on it. */}
+          {seated.game.stepped && (
+            <motion.button
+              id="minigame-next"
+              className="vu-btn vu-btn--primary vu-paper vu-btn--panel vu-minigame-next"
+              type="button"
+              disabled={!waiting}
+              {...gestures(!waiting, lift, press)}
+              onClick={() => stepTable()}
+            >
+              Continue
+            </motion.button>
           )}
           {/* Standing through the result's beat, dead, so the table does not jump as it ends. */}
           <motion.button

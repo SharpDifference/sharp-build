@@ -47,6 +47,7 @@ const TRUTH_OR_DARE: MiniGameDef = {
   surface: 'table',
   // Played in words: the line under the dialogue box is the game's, live when it asks for typing.
   typed: true,
+  stepped: true,
   controls:
     'Pick Truth or Dare on your turn, and type in the line under the dialogue box when the game asks: your answer, what you do for a dare, or your question or dare for her. A suggestion can be tapped instead of typing one, and Back out passes on your turn.',
   skillBrief:

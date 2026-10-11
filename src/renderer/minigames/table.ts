@@ -1,3 +1,4 @@
+import { create } from 'zustand'
 import { gamesOffered, gameSwitchOn, listed, type MiniGameDef } from '@shared/minigames'
 import { modById, optionKey } from '@shared/mods'
 import { charKeyOf } from '@shared/types'
@@ -176,10 +177,54 @@ let heldUntil = 0
 /** How long the scene's transcript was when the table opened, or -1 with no table open. */
 let openedAt = -1
 
+/**
+ * A table read at the reader's own pace. A line stays on the box until he steps past it, and the
+ * next waits for that; `chain` is everything waiting its turn, in order.
+ */
+let stepped = false
+/** A line is on the box that he has not stepped past. */
+let unread = false
+let chain: Promise<void> = Promise.resolve()
+let release: (() => void) | null = null
+
+/** Whether something is waiting on the reader to step on: what the table shows a way on for. */
+export const useStepStore = create<{ waiting: boolean }>(() => ({ waiting: false }))
+
+/** Resolves once the reader has stepped past the line on the box; at once with none there. */
+function stepPast(): Promise<void> {
+  if (!unread) return Promise.resolve()
+  return new Promise((resolve) => {
+    release = resolve
+    useStepStore.setState({ waiting: true })
+  })
+}
+
+/**
+ * The reader moves on: a click, a key, or a move of his own in the game. The line on the box
+ * counts as read, and whatever was waiting behind it arrives.
+ */
+export function stepTable(): void {
+  unread = false
+  const waiting = release
+  release = null
+  if (useStepStore.getState().waiting) useStepStore.setState({ waiting: false })
+  waiting?.()
+}
+
+/** Resolves once everything the table has said has been read past, at the reader's own pace. */
+export function tableRead(): Promise<void> {
+  chain = chain.then(stepPast)
+  return chain
+}
+
 /** A new table: nothing is waiting, and nothing from the last one may speak. */
-export function openTable(): void {
+export function openTable(readerPaced = false): void {
   sitting++
   heldUntil = 0
+  stepped = readerPaced
+  unread = false
+  chain = Promise.resolve()
+  stepTable()
   openedAt = useGameStore.getState().currentSceneTranscript.length
 }
 
@@ -206,6 +251,8 @@ export function compactTable(): void {
 /** The table is cleared; lines still waiting on the box are dropped. */
 export function closeTable(): void {
   sitting++
+  stepped = false
+  stepTable()
 }
 
 /** How long until everything the table has said so far has had its time on the box. */
@@ -216,6 +263,15 @@ export function tableQuietIn(): number {
 /** Resolves once the line is on the box, which is after everything said before it. */
 function show(text: string, speaker: string): Promise<void> {
   const at = sitting
+  if (stepped) {
+    // Behind whatever is still being read, and on the box as soon as he steps past it.
+    chain = chain.then(stepPast).then(() => {
+      if (at !== sitting) return
+      playLines(text, speaker, speaker === '')
+      unread = true
+    })
+    return chain
+  }
   const now = performance.now()
   const wait = Math.max(0, heldUntil - now)
   heldUntil = Math.max(now, heldUntil) + holdFor(text, speaker !== '')
@@ -246,7 +302,8 @@ export async function sayAtTable(charId: string, situation: string, cue: string)
   const line = await tableLine(character, situation, cue)
   if (!line || at !== sitting) return
   await show(line, charKeyOf(character.firstName, character.lastName))
-  await new Promise((resolve) => setTimeout(resolve, holdFor(line, true)))
+  // At the reader's own pace the line is his to leave; otherwise it is given its time.
+  if (!stepped) await new Promise((resolve) => setTimeout(resolve, holdFor(line, true)))
 }
 
 /** A girl's line at the table in words already written, shown as hers and given its time. */
@@ -255,7 +312,8 @@ export async function speakAtTable(charId: string, text: string): Promise<void> 
   const line = text.trim()
   if (!character || !line) return
   await show(line, charKeyOf(character.firstName, character.lastName))
-  await new Promise((resolve) => setTimeout(resolve, holdFor(line, true)))
+  // At the reader's own pace the line is his to leave; otherwise it is given its time.
+  if (!stepped) await new Promise((resolve) => setTimeout(resolve, holdFor(line, true)))
 }
 
 /** The reader's own words as part of a game: onto the scene as his, with nobody asked to answer. */
