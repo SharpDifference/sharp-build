@@ -7,6 +7,7 @@ import {
   SPENT_EFFORT,
   STEP_S,
   account,
+  clockText,
   courseOf,
   effortAt,
   falseStartPenaltyS,
@@ -17,6 +18,7 @@ import {
   noStrides,
   outcomeOf,
   paced,
+  penaltyShownS,
   placesNow,
   placesOf,
   readerPacing,
@@ -93,8 +95,8 @@ describe('Foot Race strides', () => {
     const strides = tapped(6, 2)
     const last = strides.lastAt as number
     expect(effortAt(strides, last + 0.1)).toBeGreaterThan(0.8)
-    expect(effortAt(strides, last + 0.5)).toBeLessThan(0.35)
-    expect(effortAt(strides, last + 3)).toBeLessThan(0.06)
+    expect(effortAt(strides, last + 0.5)).toBeLessThan(0.4)
+    expect(effortAt(strides, last + 3)).toBeLessThan(0.07)
     expect(effortAt(noStrides(), 5)).toBe(0)
   })
 })
@@ -319,6 +321,70 @@ describe('Foot Race finish', () => {
     expect(versusSummary(course, [told('', 60), told('Ana', 61.2)])).toContain('and win.')
     expect(soloSummary(course, told('', 62.31))).toContain('1:02.31')
     expect(account(course, [told('', 62.31)]).join('\n')).not.toContain('undefined')
+  })
+})
+
+/** The reader at the keys: off the mark at `react`, then alternating at `rate` strides a second, a little unevenly. */
+function tapper(course: Course, rate: number, rand: () => number, react = 0.3): Runner {
+  let runner = freshRunner()
+  let strides = noStrides()
+  let next = react
+  let side: Side = 'left'
+  for (let i = 0; runner.finishedAt === null && i * STEP_S < course.limitS; i++) {
+    const at = i * STEP_S
+    while (next <= at) {
+      strides = stride(strides, side, next)
+      side = side === 'left' ? 'right' : 'left'
+      next += (1 + (rand() - 0.5) * 0.2) / rate
+    }
+    runner = stepRunner(runner, effortAt(strides, at), course, at)
+  }
+  return runner
+}
+
+describe('Foot Race at the keyboard', () => {
+  const average = (skill: Skill, course: Course): number => {
+    const rand = seededRand('average')
+    let total = 0
+    for (let i = 0; i < 100; i++) total += herRace(herPlan(skill, course, rand), course).finishedAt as number
+    return total / 100
+  }
+
+  it('lets an ordinary five strides a second beat a middling girl in the sprint, and four and a half stay with her', () => {
+    const course = courseOf(1)
+    const her = average(3, course)
+    expect(tapper(course, 5, seededRand('five')).finishedAt).toBeLessThan(her)
+    expect(tapper(course, 4.5, seededRand('four')).finishedAt).toBeLessThan(her + 0.6)
+    expect(tapper(course, 4.5, seededRand('four')).finishedAt).toBeLessThan(average(2, course))
+  })
+
+  it('rewards pace, not faster tapping, in the longer races', () => {
+    for (const distance of [2, 3]) {
+      const course = courseOf(distance)
+      const steady = tapper(course, 3.8, seededRand('steady'))
+      expect(steady.finishedAt).toBeLessThan(average(3, course))
+      expect(steady.spentAt === null || steady.spentAt > 0.88).toBe(true)
+      // Flat out all the way is slower than a pace anyone can hold.
+      expect(tapper(course, MAX_CADENCE, seededRand('flat')).finishedAt).toBeGreaterThan(steady.finishedAt as number)
+      expect((course.band[1] * MAX_CADENCE)).toBeLessThan(4.5)
+    }
+  })
+
+  it('never has the running clock read sixty seconds in a minute', () => {
+    expect(clockText(courseOf(1), 59.97)).toBe('59.9')
+    expect(clockText(courseOf(1), 119.97)).toBe('1:59.9')
+    expect(clockText(courseOf(1), 60)).toBe('1:00.0')
+    expect(clockText(courseOf(2), 10)).toBe('24.0')
+    expect(clockText(courseOf(1), -1)).toBe('0.0')
+  })
+
+  it('tells a hold in the blocks as the board clock has it', () => {
+    expect(penaltyShownS(courseOf(1), 1)).toBe(0)
+    expect(penaltyShownS(courseOf(1), 2)).toBe(0.5)
+    expect(penaltyShownS(courseOf(2), 2)).toBe(1.2)
+    expect(penaltyShownS(courseOf(3), 9)).toBeCloseTo(4.95, 1)
+    const lines = account(courseOf(2), [told('', 61.2, { falseStarts: 2 }), told('Ana', 60)]).join(' ')
+    expect(lines).toContain('until the clock read 1.2 s')
   })
 })
 

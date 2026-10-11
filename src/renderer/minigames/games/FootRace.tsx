@@ -10,6 +10,7 @@ import {
   courseOf,
   effortAt,
   falseStartPenaltyS,
+  penaltyShownS,
   freshRunner,
   halfwayLine,
   herPlan,
@@ -245,11 +246,11 @@ export function FootRace({ play }: { play: GamePlay }): JSX.Element {
     toPhase('recall')
     if (seat === 0) {
       game.release = falseStartPenaltyS(count)
-      setHeld(game.release)
+      setHeld(penaltyShownS(course, count))
       latest.current.narrate(
         count === 1
           ? 'You go before the gun: a false start. A warning, and back to your marks.'
-          : `You go before the gun again. Back to your marks: you will be held ${game.release.toFixed(1)} s after the gun.`
+          : `You go before the gun again. Back to your marks: you will be held until the clock reads ${penaltyShownS(course, count).toFixed(1)} s.`
       )
       remark(
         null,
@@ -281,7 +282,8 @@ export function FootRace({ play }: { play: GamePlay }): JSX.Element {
     if (game.phase === 'ready') begin()
     else if (game.phase === 'set') falseStart(0)
     else if (game.phase === 'running') {
-      const at = game.raceT + game.owed
+      // To the moment of the key, not of the last frame: cadence is read from the gaps.
+      const at = game.raceT + game.owed + Math.min(FRAME_CAP_S, Math.max(0, (performance.now() - game.lastNow) / 1000))
       // Held in the blocks, or already home: the foot counts for nothing.
       if (at < game.release || game.runners[0].finishedAt !== null) return
       game.reaction ??= at - game.release
@@ -418,7 +420,7 @@ export function FootRace({ play }: { play: GamePlay }): JSX.Element {
         : runner.finishedAt !== null
           ? timeText(shownTime(course, runner.finishedAt))
           : game.over
-            ? 'did not finish'
+            ? 'DNF'
             : game.raceT > 0.6
               ? ordinal(order[seat])
               : ''
@@ -427,7 +429,8 @@ export function FootRace({ play }: { play: GamePlay }): JSX.Element {
     const me = game.runners[0]
     const time = clockText(course, running ? (me.finishedAt ?? game.raceT) : 0)
     if (clock.current && clock.current.textContent !== time) clock.current.textContent = time
-    const run = `${Math.round(running ? me.pos : 0)} m`
+    const flat = game.phase === 'running' && me.spent && me.finishedAt === null
+    const run = `${Math.round(running ? me.pos : 0)} m${flat ? ' · spent' : ''}`
     if (gone.current && gone.current.textContent !== run) gone.current.textContent = run
     if (tank.current) {
       tank.current.style.transform = `scaleX(${(running ? me.stamina : 1).toFixed(3)})`
@@ -477,6 +480,8 @@ export function FootRace({ play }: { play: GamePlay }): JSX.Element {
       game.paused = false
       game.lastNow = performance.now()
       setPaused(false)
+      // Back from away mid-call: the starter begins again, so the gun never comes unannounced.
+      if (game.phase === 'marks' || game.phase === 'set') toPhase('marks')
     }
     const seen = (): void => (document.hidden ? stop() : resume())
     document.addEventListener('visibilitychange', seen)
@@ -598,7 +603,7 @@ export function FootRace({ play }: { play: GamePlay }): JSX.Element {
           </div>
           <p className="vu-footrace-note">
             <span ref={gone} />
-            {held > 0 && !over ? ` · held ${held.toFixed(1)} s after the gun` : ''}
+            {held > 0 && !over ? ` · held until ${held.toFixed(1)} s on the clock` : ''}
           </p>
         </div>
         <motion.button

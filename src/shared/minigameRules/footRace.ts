@@ -16,7 +16,7 @@ export type Skill = 1 | 2 | 3 | 4 | 5
 export const STEP_S = 1 / 60
 
 /** The cadence, in strides a second, that is flat out. */
-export const MAX_CADENCE = 6.5
+export const MAX_CADENCE = 5.5
 /** The cadence the first stride out of the blocks is taken for. */
 const FIRST_CADENCE = 3.2
 /** How far a clean stride moves the cadence toward the pace it was taken at. */
@@ -210,6 +210,11 @@ export function falseStartPenaltyS(falseStarts: number): number {
   return Math.min(1.5, Math.max(0, falseStarts - 1) * 0.5)
 }
 
+/** The reader's hold as the board's clock has it, in seconds: what it reads when he is let go. */
+export function penaltyShownS(course: Course, falseStarts: number): number {
+  return Math.round(falseStartPenaltyS(falseStarts) * course.clockScale * 10) / 10
+}
+
 /** How a reaction to the gun reads, in a word. */
 export function reactionWord(reactionS: number): string {
   return reactionS < 0.2 ? 'razor sharp' : reactionS < 0.3 ? 'sharp' : reactionS < 0.45 ? 'fair' : 'slow'
@@ -326,9 +331,10 @@ export function timeText(shown: number | null): string {
 
 /** The clock as it runs: tenths only, so it can be read. */
 export function clockText(course: Course, playS: number): string {
-  const shown = Math.max(0, playS) * course.clockScale
-  const minutes = Math.floor(shown / 60)
-  const rest = shown - minutes * 60
+  // Whole tenths, cut and never rounded up, so the clock cannot read 60.0 or 1:60.0.
+  const tenths = Math.floor(Math.max(0, playS) * course.clockScale * 10 + 1e-9)
+  const minutes = Math.floor(tenths / 600)
+  const rest = (tenths - minutes * 600) / 10
   return minutes > 0 ? `${minutes}:${rest < 10 ? '0' : ''}${rest.toFixed(1)}` : rest.toFixed(1)
 }
 
@@ -498,10 +504,10 @@ export function account(course: Course, told: readonly Told[]): string[] {
   told.forEach((one, seat) => {
     if (one.falseStarts === 0) return
     const name = who(told, seat, reader)
-    const penalty = seat === 0 ? falseStartPenaltyS(one.falseStarts) : 0
+    const penalty = seat === 0 ? penaltyShownS(course, one.falseStarts) : 0
     lines.push(
       penalty > 0
-        ? `${name} went before the gun ${one.falseStarts} times: a warning, then held ${penalty.toFixed(1)} s in the blocks as a penalty.`
+        ? `${name} went before the gun ${one.falseStarts} times: a warning, then held in the blocks until the clock read ${penalty.toFixed(1)} s as a penalty.`
         : `${name} went before the gun once, a false start, and was warned.`
     )
   })
@@ -510,7 +516,7 @@ export function account(course: Course, told: readonly Told[]): string[] {
       one.reactionS === null ? null : `${who(told, seat, reader)} ${one.reactionS.toFixed(2)} s (${reactionWord(one.reactionS)})`
     )
     .filter((line) => line !== null)
-  if (starts.length > 0) lines.push(`Reaction to the gun: ${starts.join(', ')}.`)
+  if (starts.length > 0) lines.push(`Reaction off the mark, in real seconds: ${starts.join(', ')}.`)
 
   if (names.length > 0 && told.every((one) => one.placeAtHalf > 0)) {
     const half = told.map((_, seat) => seat).sort((a, b) => told[a].placeAtHalf - told[b].placeAtHalf || a - b)
