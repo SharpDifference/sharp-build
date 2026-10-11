@@ -8,6 +8,11 @@ import {
   askerAt,
   chooseRound,
   chosenOf,
+  clipped,
+  evasive,
+  mannerOf,
+  remarkCue,
+  typedOf,
   judgeRound,
   judgedOf,
   onlooker,
@@ -75,9 +80,9 @@ describe('Truth or Dare', () => {
       for (const field of Object.keys(plan.fields)) expect(plan.brief).toContain(`"${field}" is`)
     }
     expect(plans[0].fields).toEqual({ choice: ['truth', 'dare'], line: 'text' })
-    expect(plans[1].fields).toEqual({ line: 'text', action: 'text', outcome: ['done', 'chickened'] })
+    expect(plans[1].fields).toEqual({ line: 'text', action: 'text', outcome: ['done', 'chickened'], fair: ['yes', 'over'] })
     expect(plans[1].brief).toContain('"Sing something."')
-    expect(plans[2].fields).toEqual({ line: 'text', outcome: ['honest', 'dodged'] })
+    expect(plans[2].fields).toEqual({ line: 'text', outcome: ['honest', 'dodged'], fair: ['yes', 'over'] })
 
     // The reader's own turn: Bea asks, then judges what he typed, word for word.
     const mine = table(['Ana', 'Bea'], 1, 1)
@@ -89,7 +94,7 @@ describe('Truth or Dare', () => {
     expect(posed.fields).toEqual({ prompt: 'text' })
     const judged = judgeRound(mine, [], 'truth', 'What scares you?', 'the dark, honestly')
     expect(judged.brief).toContain('"the dark, honestly"')
-    expect(judged.fields).toEqual({ line: 'text', verdict: ['honest', 'dodged'] })
+    expect(judged.fields).toEqual({ line: 'text', verdict: ['honest', 'dodged'], fair: ['yes', 'over'] })
     for (const field of Object.keys(judged.fields)) expect(judged.brief).toContain(`"${field}" is`)
     // Backing out is settled by the table: she is asked for her line alone.
     expect(judgeRound(mine, [], 'dare', 'Sing.', null).fields).toEqual({ line: 'text' })
@@ -112,10 +117,18 @@ describe('Truth or Dare', () => {
     expect(stock('truth', 3, [], 50).length).toBeGreaterThan(mild.length)
     expect(stock('truth', 2, [], 50).filter((q) => !mild.includes(q)).every((q) => !mild.includes(q))).toBe(true)
 
-    // She cannot be answered for: a truth is skipped with nothing said, a dare taken as done.
-    expect(answeredOf(null, 'truth', 'Ana')).toEqual({ line: '', deed: '', verdict: 'skipped' })
-    expect(answeredOf(null, 'dare', 'Ana')).toMatchObject({ verdict: 'done', deed: 'Ana goes through with it.' })
-    expect(answeredOf({ line: 'No way.', action: 'Ana shakes her head.', outcome: 'chickened' }, 'dare', 'Ana')).toEqual({
+    // She cannot be answered for, nor a dare done for her: either is skipped with nothing said.
+    expect(answeredOf(null, 'truth')).toEqual({ line: '', deed: '', verdict: 'skipped' })
+    expect(answeredOf(null, 'dare')).toEqual({ line: '', deed: '', verdict: 'skipped' })
+    // A dare said to be done with nothing seen done is a failed round, never a point.
+    expect(answeredOf({ line: 'Fine.', action: ' ', outcome: 'done', fair: 'yes' }, 'dare').verdict).toBe('skipped')
+    // Backing out is always honoured, with or without something seen.
+    expect(answeredOf({ line: 'No way.', action: '', outcome: 'chickened', fair: 'yes' }, 'dare')).toEqual({
+      line: 'No way.',
+      deed: '',
+      verdict: 'chickened'
+    })
+    expect(answeredOf({ line: 'No way.', action: 'Ana shakes her head.', outcome: 'chickened' }, 'dare')).toEqual({
       line: 'No way.',
       deed: 'Ana shakes her head.',
       verdict: 'chickened'
@@ -245,5 +258,97 @@ describe('Truth or Dare', () => {
     expect(last).toContain('the reader 1, Ana 0')
     expect(last).toContain('Nobody won')
     expect(last).not.toContain('Final tally')
+  })
+
+  it('voids a turn that goes past what was agreed, with no point and nothing repeated', () => {
+    const terms = table(['Ana', 'Bea'], 1, 1)
+    // Her turn, his question over the line: void whatever else came back, even as done.
+    expect(answeredOf({ line: 'Not that.', action: 'Ana does it.', outcome: 'done', fair: 'over' }, 'dare')).toEqual({
+      line: 'Not that.',
+      deed: '',
+      verdict: 'void'
+    })
+    expect(answerHeard({ line: '', outcome: 'honest', fair: 'over' }, 'truth')?.verdict).toBe('void')
+    // His turn, what he typed over the line: void, not a point for typing it.
+    expect(judgedOf({ line: 'Ha, no.', verdict: 'done', fair: 'over' }, 'dare', 'something lewd')).toEqual({
+      line: 'Ha, no.',
+      verdict: 'void'
+    })
+    expect(judgedOf({ line: 'Ha.', verdict: 'done', fair: 'over' }, 'dare', null).verdict).toBe('chickened')
+    const hers = turn({ player: 1, asker: 0, kind: 'dare', prompt: 'OFFENDING DARE', reply: 'Not that.', verdict: 'void' })
+    const his = turn({ player: 0, asker: 2, prompt: 'What scares you?', reply: 'OFFENDING ANSWER', verdict: 'void' })
+    expect(tally(terms, [hers, his])).toEqual([0, 0, 0])
+    const account = accountOf(terms, [hers, his]).join('\n')
+    expect(account).not.toContain('OFFENDING')
+    expect(account).toContain('turn void, no point to anyone')
+    expect(account).toContain('Turns called void for going past what was agreed: 2.')
+    expect(account).toContain('Nobody dodged or backed out.')
+    // Not carried into later briefs, nor to whoever remarks on it.
+    expect(chooseRound(table(['Ana', 'Bea'], 2, 1), [hers]).brief).not.toContain('OFFENDING')
+    expect(remarkCue(terms, hers)).not.toContain('OFFENDING')
+    expect(remarkCue(terms, his)).not.toContain('OFFENDING')
+    expect(remarkCue(terms, hers)).toContain('void')
+  })
+
+  it('lets the reader lose a turn on merit', () => {
+    const brief = judgeRound(table(['Ana']), [], 'truth', 'What scares you?', 'lol').brief
+    expect(brief).toContain('one-word evasion does not score')
+    expect(brief).not.toContain('at his word')
+    expect(judgedOf({ line: 'Nice try.', verdict: 'dodged', fair: 'yes' }, 'truth', 'ha, you wish').verdict).toBe('dodged')
+    expect(judgedOf({ line: 'Coward.', verdict: 'chickened', fair: 'yes' }, 'dare', 'I refuse to').verdict).toBe('chickened')
+    // With no model, a word that only waves it off does not score; a real one-word answer does.
+    for (const duck of ['pass', 'No.', 'no comment', '...', '?!', 'idk']) {
+      expect(evasive(duck)).toBe(true)
+      expect(judgedOf(null, 'truth', duck).verdict).toBe('dodged')
+      expect(judgedOf(null, 'dare', duck).verdict).toBe('chickened')
+    }
+    expect(evasive('Heights.')).toBe(false)
+    // Nothing but punctuation never scores, whatever the judge said.
+    expect(judgedOf({ line: 'Sure.', verdict: 'honest', fair: 'yes' }, 'truth', '...').verdict).toBe('dodged')
+  })
+
+  it('holds the remark of a girl watching to the same limit and heat', () => {
+    const terms = table(['Ana', 'Bea'], 1, 2)
+    const cue = remarkCue(terms, turn({ asker: 2, reply: 'you, obviously', verdict: 'dodged' }))
+    expect(cue).toContain('"you, obviously"')
+    expect(cue).toContain('never sexually explicit')
+    expect(cue).toContain('flirty')
+    expect(cue).toContain('never lifts that limit')
+  })
+
+  it('tells every round the table is adults, that a stake lifts nothing, and how each girl plays', () => {
+    const terms: Terms = { ...table(['Ana', 'Bea'], 1), manner: [mannerOf(5, 'teases, fearless.'), mannerOf(1, '')] }
+    for (const plan of [poseRound(terms, [], 'truth'), chooseRound(terms, [turn({ asker: 2 })])]) {
+      expect(plan.brief).toContain('Everyone at the table is an adult.')
+      expect(plan.brief).toContain('never lifts that limit')
+      expect(plan.brief).toContain('by how she has been with him')
+      expect(plan.brief).toContain('Ana is bold and quick at this game')
+      expect(plan.brief).toContain('teases, fearless. Bea is cautious at this game')
+    }
+    expect(poseRound(table(['Ana']), [], 'truth').brief).not.toContain('How each plays')
+  })
+
+  it('keeps what the model writes and what the reader types to one line of fair length', () => {
+    const long = `${'A sentence here. '.repeat(30)}`
+    const cut = clipped(long)
+    expect(cut.length).toBeLessThanOrEqual(300)
+    expect(cut.endsWith('here.')).toBe(true)
+    const unbroken = clipped('word '.repeat(100).replace(/ /g, ', '))
+    expect(unbroken.length).toBeLessThanOrEqual(300)
+    expect(unbroken.endsWith('…')).toBe(true)
+    expect(clipped('x'.repeat(400)).length).toBe(300)
+    expect(clipped('Short\n one.')).toBe('Short one.')
+    expect(posedOf({ prompt: long }, 'truth', 2, []).length).toBeLessThanOrEqual(300)
+    expect(chosenOf({ choice: 'dare', line: long }).line.length).toBeLessThanOrEqual(300)
+    expect(answerHeard({ line: long, action: long, outcome: 'done', fair: 'yes' }, 'dare')?.deed.length).toBeLessThanOrEqual(300)
+    expect(typedOf('  one\n\ntwo\r\n three  ')).toBe('one two three')
+    expect(typedOf('y'.repeat(500)).length).toBe(240)
+    expect(typedOf(' \n ')).toBe('')
+  })
+
+  it('offers no stock dare that outlasts the moment', () => {
+    for (const dare of stock('dare', 3, [], 50)) {
+      expect(dare).not.toMatch(/next turn|rest of the game/i)
+    }
   })
 })

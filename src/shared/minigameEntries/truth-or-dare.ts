@@ -8,7 +8,7 @@ const TRUTH_OR_DARE: MiniGameDef = {
   blurb:
     'the party game: on your turn you pick truth or dare, and the player before you asks the question or sets the dare',
   format:
-    'Turns go round the table, the reader first and then each girl in the order they sit, everyone getting the same number of turns. Whoever\'s turn it is picks truth or dare, and the player just before them in that order asks the question or sets the dare: with one girl the two simply ask each other. A truth is answered out loud and a dare is done on the spot, right here, in a moment; nobody leaves the table for one. Anyone may back out of a turn. A truth answered straight or a dare done scores a point; dodging the question or backing out scores nothing. The most points wins and a shared top is a draw. How far the questions and dares go is settled before the first turn and holds for the whole game.',
+    'Turns go round the table, the reader first and then each girl in the order they sit, everyone getting the same number of turns. Whoever\'s turn it is picks truth or dare, and the player just before them in that order asks the question or sets the dare: with one girl the two simply ask each other. A truth is answered out loud and a dare is done on the spot, right here, in a moment; nobody leaves the table for one. Anyone may back out of a turn. A truth answered straight or a dare done scores a point; dodging the question or backing out scores nothing, and a question or dare that goes past what was agreed is void and scores for nobody. The most points wins and a shared top is a draw. How far the questions and dares go is settled before the first turn and holds for the whole game.',
   options: [
     {
       id: 'rounds',
@@ -51,7 +51,7 @@ const TRUTH_OR_DARE: MiniGameDef = {
   controls:
     'Pick Truth or Dare on your turn, and type in the line under the dialogue box when the game asks: your answer, what you do for a dare, or your question or dare for her. A suggestion can be tapped instead of typing one, and Back out passes on your turn.',
   skillBrief:
-    'A good player answers straight, goes through with dares and asks questions that land; a poor one dodges, backs out and asks safe ones.'
+    'Nerve and quickness at this game: a good player answers straight, goes through with dares and asks questions that land; a poor one dodges, backs out and asks safe ones.'
 }
 
 export default TRUTH_OR_DARE

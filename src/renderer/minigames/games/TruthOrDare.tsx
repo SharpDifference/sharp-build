@@ -4,6 +4,7 @@ import { listed } from '@shared/minigameKit'
 import {
   HEAT_WORD,
   READER,
+  VOID_LINE,
   accountOf,
   answerHeard,
   answerRound,
@@ -15,6 +16,7 @@ import {
   heatOf,
   judgeRound,
   judgedOf,
+  mannerOf,
   onlooker,
   outcomeOf,
   playerAt,
@@ -28,6 +30,7 @@ import {
   summaryOf,
   tally,
   turnsIn,
+  typedOf,
   type Kind,
   type Terms,
   type Turn
@@ -36,13 +39,14 @@ import { gestures, lift, press, quietLift, quietPress } from '../kit'
 import type { GamePlay, RoundAsk } from '../kit'
 import '../../vu_styles/TruthOrDare.css'
 
-/** The most of what the reader typed that is taken for a question, a dare or an answer. */
-const TYPED_MAX = 240
-
-/** How long play waits on a watching girl's remark before going on without it. */
+/** How long play waits on a watching girl's remark, where the text keeps its own time. */
 const REMARK_CAP_MS = 2800
 
-/** How long a line of narration takes to write itself on the box and be read, at the box's pace. */
+/** How long a round is waited on once one has already timed out this game. */
+const SHORT_PATIENCE_MS = 10000
+
+/** A round that came back empty after this long is taken as the model not answering. */
+const TIMED_OUT_MS = 9500
 
 /**
  * Where a turn stands.
@@ -80,11 +84,13 @@ export function TruthOrDare({ play }: { play: GamePlay }): JSX.Element {
   const [terms] = useState<Terms>(() => ({
     names: play.opponents.map((girl) => girl.name),
     rounds: play.options.rounds ?? 2,
-    heat: heatOf(play.options.heat)
+    heat: heatOf(play.options.heat),
+    manner: play.opponents.map((girl) => mannerOf(girl.skill, girl.style))
   }))
   const [girls] = useState(() => play.opponents.map((girl) => girl.charId))
   const [log, setLog] = useState<Turn[]>([])
-  const [phase, setPhase] = useState<Phase>('wait')
+  // The reader goes first: the table opens on his pick, with nothing said until he makes it.
+  const [phase, setPhase] = useState<Phase>('pick')
   const [now, setNow] = useState<Now>(BLANK)
   /** What the reader is waiting on, in words; empty where a line is simply being read. */
   const [waiting, setWaiting] = useState('')
@@ -100,8 +106,10 @@ export function TruthOrDare({ play }: { play: GamePlay }): JSX.Element {
   const played = useRef<Turn[]>([])
   const turnNow = useRef<Now>(BLANK)
   /** Where the turn stands, for a press that lands twice before a render. */
-  const at = useRef<Phase>('wait')
+  const at = useRef<Phase>('pick')
   const remarks = useRef(0)
+  /** A round has timed out this game: later ones are waited on less, and none is asked twice. */
+  const slow = useRef(false)
 
   /** A remark from a girl watching is still being written: no second one is asked for. */
   const saying = useRef(false)
@@ -150,8 +158,14 @@ export function TruthOrDare({ play }: { play: GamePlay }): JSX.Element {
   async function round(plan: RoundAsk, wait: string): Promise<Record<string, string> | null> {
     stand('wait')
     setWaiting(wait)
-    const got = await latest.current.round(plan).catch(() => null)
-    if (on()) setWaiting('')
+    const since = performance.now()
+    const asked = latest.current.round(plan).catch(() => null)
+    const got = await (slow.current
+      ? Promise.race([asked, pause(SHORT_PATIENCE_MS).then(() => null)])
+      : asked)
+    if (!on()) return null
+    if (got === null && performance.now() - since >= TIMED_OUT_MS) slow.current = true
+    setWaiting('')
     return got
   }
 
@@ -202,8 +216,9 @@ export function TruthOrDare({ play }: { play: GamePlay }): JSX.Element {
     const posed = await round(poseRound(terms, done, chosen.kind), `${askerName} is thinking…`)
     if (!on()) return
     const prompt = posedOf(posed, chosen.kind, terms.heat, done)
-    show({ ...turnNow.current, prompt })
     await speak(asker, prompt)
+    if (!on()) return
+    show({ ...turnNow.current, prompt })
     await herAnswer(chosen.kind, prompt)
   }
 
@@ -217,14 +232,19 @@ export function TruthOrDare({ play }: { play: GamePlay }): JSX.Element {
     tell(`${name} picked ${kind} and was ${kind === 'truth' ? 'asked' : 'dared'}: "${prompt}"`)
     let got = await round(plan, `${name} is thinking…`)
     if (!on()) return
-    // A truth nobody can answer for her: a round that failed is asked for once more.
-    if (kind === 'truth' && !answerHeard(got, kind)) {
+    // Nobody can answer or do it for her: a round that failed is asked for once more, unless
+    // the model has already been found not to be answering.
+    if (!answerHeard(got, kind) && !slow.current) {
       got = await round(plan, `${name} is still thinking…`)
       if (!on()) return
     }
-    const answered = answeredOf(got, kind, name)
+    const answered = answeredOf(got, kind)
     if (answered.verdict === 'skipped') {
       await narrated(skippedLine(name))
+    } else if (answered.verdict === 'void') {
+      await speak(player, answered.line)
+      if (!on()) return
+      await narrated(VOID_LINE)
     } else {
       // What she says, and then what she is seen to do, each given its time.
       await speak(player, answered.line)
@@ -249,7 +269,8 @@ export function TruthOrDare({ play }: { play: GamePlay }): JSX.Element {
     setLog(played.current)
     tell('')
     // One remark out at a time; one passed over for that is not counted against the table.
-    const watcher = saying.current
+    const watcher =
+      saying.current || slow.current
       ? null
       : onlooker(terms, played.current, latest.current.chattiness, remarks.current)
     if (watcher !== null) {
@@ -261,8 +282,10 @@ export function TruthOrDare({ play }: { play: GamePlay }): JSX.Element {
         .then(() => {
           saying.current = false
         })
-      // Her line is the model's and may be slow: play goes on, and it lands when it comes.
-      await Promise.race([said, pause(REMARK_CAP_MS)])
+      // At the reader's own pace her line is waited for, so it is on the box before the next
+      // turn opens and is never about a turn gone by: the framework caps how long it may take.
+      // Where the text keeps its own time play goes on after a beat, and it lands when it comes.
+      await (latest.current.stepped ? said : Promise.race([said, pause(REMARK_CAP_MS)]))
     }
     await open()
   }
@@ -272,6 +295,16 @@ export function TruthOrDare({ play }: { play: GamePlay }): JSX.Element {
     if (at.current !== 'pick' || !on()) return
     // Taken at once, so a second press finds nothing to pick.
     stand('wait')
+    // His first pick is the first move: the game is said to be on only now, so that until then
+    // the table can still be left as one never started.
+    if (!opened.current) {
+      opened.current = true
+      const each = terms.rounds === 1 ? 'one turn each' : `${terms.rounds} turns each`
+      await narrated(
+        `Truth or Dare with ${listed(terms.names)}: ${each}, kept ${HEAT_WORD[terms.heat]}. You go first.`
+      )
+      if (!on()) return
+    }
     const done = played.current
     const asker = askerAt(terms, done.length)
     const askerName = seatName(terms, asker)
@@ -283,9 +316,10 @@ export function TruthOrDare({ play }: { play: GamePlay }): JSX.Element {
     const got = await round(poseRound(terms, done, kind), `${askerName} is thinking…`)
     if (!on()) return
     const prompt = posedOf(got, kind, terms.heat, done)
-    show({ ...turnNow.current, prompt })
     await speak(asker, prompt)
     if (!on()) return
+    // Kept on the surface only once it is on the box: never ahead of her saying it.
+    show({ ...turnNow.current, prompt })
     tell(`The reader picked ${kind} and was ${kind === 'truth' ? 'asked' : 'dared'}: "${prompt}"`)
     stand('answer')
     void typing('answer', kind === 'truth' ? 'Your answer…' : 'What you do…')
@@ -300,8 +334,10 @@ export function TruthOrDare({ play }: { play: GamePlay }): JSX.Element {
     const turn = played.current.length
     const sent = await latest.current.ask(placeholder).catch(() => null)
     if (sent === null || !on() || at.current !== want || played.current.length !== turn) return
-    const words = sent.trim().slice(0, TYPED_MAX)
-    if (want === 'ask') void put(words)
+    const words = typedOf(sent)
+    // Sent with nothing in it, he is asked again: the turn still wants his words.
+    if (!words) void typing(want, placeholder)
+    else if (want === 'ask') void put(words)
     else void answer(words)
   }
 
@@ -345,6 +381,8 @@ export function TruthOrDare({ play }: { play: GamePlay }): JSX.Element {
     if (!on()) return
     const judged = judgedOf(got, kind, reply)
     await speak(asker, judged.line)
+    if (!on()) return
+    if (judged.verdict === 'void') await narrated(VOID_LINE)
     await close({
       player: READER,
       asker,
@@ -367,17 +405,10 @@ export function TruthOrDare({ play }: { play: GamePlay }): JSX.Element {
     await herAnswer(kind, prompt)
   }
 
-  // The table opens on the game under way: it is said once, read, and then the reader's turn is
-  // first. Nothing is asked of him while the line is still arriving.
+  // The table opens on the reader's pick and says nothing yet: the game is under way from his
+  // first press, and until then nothing is asked of the scene.
   useEffect(() => {
     live.current = true
-    if (!opened.current) {
-      opened.current = true
-      const each = terms.rounds === 1 ? 'one turn each' : `${terms.rounds} turns each`
-      void narrated(
-        `Truth or Dare with ${listed(terms.names)}: ${each}, kept ${HEAT_WORD[terms.heat]}. You go first.`
-      ).then(open)
-    }
     const running = pauses.current
     return () => {
       live.current = false
@@ -411,7 +442,7 @@ export function TruthOrDare({ play }: { play: GamePlay }): JSX.Element {
           ? kind === 'dare'
             ? `${seatName(terms, asker)} dared you: say what you do below`
             : `${seatName(terms, asker)} asked you a truth: answer below`
-          : waiting || '…'
+          : waiting || (play.stepped ? 'Continue to go on' : '…')
   // What was put to the reader stays in sight until his turn is over: the box moves on.
   const kept = !over && player === READER ? now.prompt : ''
 
