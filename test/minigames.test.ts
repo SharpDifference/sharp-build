@@ -78,5 +78,8 @@ describe('gamesOffered', () => {
     expect(suggestRate(cabinetGame, 'pub', false)).toBe('rarely')
     expect(suggestRate(cards, null, false)).toBe('sometimes')
     expect(suggestRate(cabinetGame, 'arcade', true)).toBe('never')
+    // The player's own switch lifts every game to often, and still not into a busy scene.
+    expect(suggestRate(cabinetGame, 'pub', false, true)).toBe('often')
+    expect(suggestRate(cabinetGame, 'pub', true, true)).toBe('never')
   })
 })

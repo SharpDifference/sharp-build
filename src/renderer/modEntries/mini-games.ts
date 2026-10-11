@@ -1,4 +1,11 @@
-import { gamesOffered, MINI_GAMES, MINI_GAMES_LIST, type MiniGameDef } from '@shared/minigames'
+import {
+  gamesOffered,
+  MINI_GAMES,
+  MINI_GAMES_LIST,
+  SUGGEST_OFTEN,
+  type MiniGameDef
+} from '@shared/minigames'
+import { optionOn } from '@shared/mods'
 import type { Character } from '@shared/types'
 import { MiniGamePanel } from '../minigames/MiniGamePanel'
 import { MiniGameSeat } from '../minigames/MiniGameSeat'
@@ -10,7 +17,7 @@ import { skillOf } from '../minigames/skill'
 import { nameOf } from '../minigames/table'
 import { registerHooks } from '../mods/hooks'
 import { useGameStore } from '../stores/gameStore'
-import { modIsOn } from '../stores/modsStore'
+import { modIsOn, useModsStore } from '../stores/modsStore'
 
 /** The games a girl in this scene could be played at, each with a component to play it with. */
 function gamesWith(cast: readonly Character[], location: string | null): MiniGameDef[] {
@@ -63,7 +70,8 @@ registerHooks(MINI_GAMES, {
       if (games.length === 0) return request
       const scene = useGameStore.getState()
       const busy = Boolean(scene.sceneClass || scene.sceneJob || scene.sceneProject)
-      return withOffer(request, games, ctx.cast, location, busy)
+      const keen = optionOn(useModsStore.getState().switches, MINI_GAMES, SUGGEST_OFTEN)
+      return withOffer(request, games, ctx.cast, location, busy, keen)
     }
   },
 

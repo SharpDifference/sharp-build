@@ -10,6 +10,9 @@
 /** The framework's mod id. A pack names it in its `requires`. */
 export const MINI_GAMES = 'mini-games'
 
+/** The framework's option that has every game suggested often, wherever it can be played. */
+export const SUGGEST_OFTEN = 'suggest-often'
+
 /**
  * How much of the stage a game is drawn on. The scene stays lit behind every one of them.
  *
@@ -121,11 +124,18 @@ export function gamesOffered(
 
 /**
  * How readily a girl suggests a game in the scene at hand: the place's own rate where the game
- * names one, the game's otherwise. `busy` is a scene with something else going on, a class or a
+ * names one, the game's otherwise, unless the player has every game come up often. `busy` is a scene with something else going on, a class or a
  * shift, where nobody suggests a game whatever it is.
  */
-export function suggestRate(game: MiniGameDef, location: string | null, busy: boolean): SuggestRate {
+export function suggestRate(
+  game: MiniGameDef,
+  location: string | null,
+  busy: boolean,
+  /** The player has asked for games to come up often: every game does, where one may at all. */
+  keen = false
+): SuggestRate {
   if (busy) return 'never'
+  if (keen) return 'often'
   return (location && game.suggestAt?.[location]) || game.suggest || 'sometimes'
 }
 

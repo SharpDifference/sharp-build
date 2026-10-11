@@ -54,7 +54,8 @@ export function withOffer(
   games: readonly MiniGameDef[],
   cast: readonly Character[],
   location: string | null,
-  busy: boolean
+  busy: boolean,
+  keen: boolean
 ): StructuredRequest {
   const schema = request.schema.schema as {
     required?: string[]
@@ -94,7 +95,7 @@ export function withOffer(
       (option) =>
         `  Option "${option.id}": ${option.describe}. From ${option.min} to ${option.max}; ${option.default} is the standard game.`
     ),
-    `  ${RATE[suggestRate(game, location, busy)]}`
+    `  ${RATE[suggestRate(game, location, busy, keen)]}`
   ])
 
   return {
