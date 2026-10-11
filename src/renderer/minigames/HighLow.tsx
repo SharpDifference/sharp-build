@@ -17,6 +17,7 @@ import {
   type Suit
 } from '@shared/highLow'
 import { gestures, lift, press } from '../views/motion'
+import { BunnyMark } from '../views/screenIcons'
 import type { GamePlay } from './play'
 import '../vu_styles/HighLow.css'
 
@@ -116,7 +117,10 @@ export function HighLow({ play }: { play: GamePlay }): JSX.Element {
   return (
     <div className="vu-highlow">
       <div className="vu-highlow-table">
-        <span className="vu-highlow-deck" aria-hidden="true" />
+        {/* The deck face down, the app's own mark on its back. */}
+        <span className="vu-highlow-deck" aria-hidden="true">
+          <BunnyMark />
+        </span>
         {/* Keyed on the count, so each card turned lands on the last as a new one. */}
         <motion.div
           key={made.length}

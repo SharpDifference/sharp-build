@@ -45,7 +45,10 @@
 
 /* The deck face down: the card's own box, filled in the accent. */
 .vu-highlow-deck {
-  display: block;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--vu-accent-ink);
   width: 124px;
   height: 172px;
   border: 3.5px solid var(--vu-border);
@@ -84,4 +87,11 @@
 /* Her turn, or the game over: the calls stand back. */
 .vu-highlow-calls[data-waiting] {
   opacity: 0.35;
+}
+
+/* The mark on the card back: a third of the card's width, quiet against the accent. */
+.vu-highlow-deck svg {
+  width: 52px;
+  height: 52px;
+  opacity: 0.85;
 }
