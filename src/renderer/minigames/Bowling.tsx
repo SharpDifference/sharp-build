@@ -14,6 +14,7 @@ import {
   resolvePins,
   rollsOf,
   sheetOf,
+  soloAccount,
   soloSummary,
   tableOf,
   totalsOf,
@@ -41,6 +42,8 @@ const SETTLE_MS = 800
  * quicker trip down the lane and less time over the fallen pins.
  */
 const BRISK = { afterReaderMs: 1200, betweenMs: 700, run: 0.7, settleMs: 500 } as const
+/** The longest a girl's ball waits on a remark being written: her line may come over the next throw. */
+const SAY_CAP_MS = 2500
 /** Two stops closer together than this are one press, heard twice. */
 const PRESS_GAP_MS = 180
 
@@ -85,6 +88,14 @@ export function Bowling({ play }: { play: GamePlay }): JSX.Element {
   // One of them is saying something about the last ball: the next girl's ball waits for it.
   const [speaking, setSpeaking] = useState(false)
   const remarks = useRef(0)
+  // Remarks asked for and not yet on the box, and the cap on the wait for the last of them.
+  const saying = useRef(0)
+  const sayCap = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
+  // When the last ball was counted, for the beat before a girl's.
+  const landedAt = useRef(0)
+  // The terms are said once and the result handed over once, whatever is run twice.
+  const opened = useRef(false)
+  const finished = useRef(false)
   // How many remarks each girl has made, in her seat's order.
   const spoken = useRef<number[]>([])
   const girls = play.opponents
@@ -112,11 +123,14 @@ export function Bowling({ play }: { play: GamePlay }): JSX.Element {
     live.current = true
     return () => {
       live.current = false
+      clearTimeout(sayCap.current)
     }
   }, [])
 
   // With company the game is on from the moment a ball is picked up, and the terms are said.
   useEffect(() => {
+    if (opened.current) return
+    opened.current = true
     if (several) play.narrate(`${listed(names)} pick out a ball each and wave you up first. ${frames} frames each, everyone bowling in turn.`)
     else if (girls[0]) play.narrate(`${girls[0].name} picks out a ball and waves you up first. ${frames} frames each, taking turns.`)
     // Once, as the table opens.
@@ -149,6 +163,8 @@ export function Bowling({ play }: { play: GamePlay }): JSX.Element {
 
   /** The ball has stopped and the pins are counted: onto the sheet, into the scene, and on. */
   function land(ball: Ball): void {
+    if (!live.current || finished.current) return
+    landedAt.current = performance.now()
     const all = [...balls, ball]
     const told = ballTold(names, all, all.length - 1, frames)
     setBalls(all)
@@ -160,8 +176,13 @@ export function Bowling({ play }: { play: GamePlay }): JSX.Element {
       return
     }
 
+    finished.current = true
     if (girls.length === 0) {
-      play.finish({ outcome: 'played', summary: soloSummary(all, frames) })
+      play.finish({
+        outcome: 'played',
+        summary: soloSummary(all, frames),
+        account: soloAccount(all, frames)
+      })
       return
     }
     const totals = totalsOf(all, frames, girls.length)
@@ -191,20 +212,33 @@ export function Bowling({ play }: { play: GamePlay }): JSX.Element {
    * Has one girl say something about the ball just thrown, where it is worth it: a strike, a
    * gutter ball, a split picked up, a turkey, or the last frame coming with the game still open.
    * A few times a game at most between all of them, one voice a ball, and never on the last
-   * ball, which the scene's own reply answers.
+   * ball, which the scene's own reply answers. Nobody starts on a ball while the last remark
+   * is still being written, and the game waits on one only so long.
    */
   function remark(all: readonly Ball[], told: BallTold): void {
     if (girls.length === 0 || remarks.current >= REMARKS[play.chattiness]) return
+    if (saying.current > 0) return
     const decider = lastFrameCue(names, all, frames)
     // Talkative, they have a word for an ordinary frame too.
     if (!told.notable && !decider && !(play.chattiness === 'lots' && told.closed)) return
     const seat = speakerFor(all)
     remarks.current++
     spoken.current[seat] = (spoken.current[seat] ?? 0) + 1
+    saying.current++
     setSpeaking(true)
-    void play.say(girls[seat].charId, decider ? `${told.cue} ${decider}` : told.cue).finally(() => {
+    const heard = (): void => {
+      clearTimeout(sayCap.current)
       if (live.current) setSpeaking(false)
-    })
+    }
+    clearTimeout(sayCap.current)
+    sayCap.current = setTimeout(heard, SAY_CAP_MS)
+    void play
+      .say(girls[seat].charId, decider ? `${told.cue} ${decider}` : told.cue)
+      .catch(() => undefined)
+      .finally(() => {
+        saying.current--
+        heard()
+      })
   }
 
   // How the game stands, for anything said at the table.
@@ -228,7 +262,9 @@ export function Bowling({ play }: { play: GamePlay }): JSX.Element {
     if (!her || rolling || speaking) return
     const afterReader = balls.length > 0 && balls[balls.length - 1].who === 0
     const pause = !several ? HER_PAUSE_MS : afterReader ? BRISK.afterReaderMs : BRISK.betweenMs
-    const timer = setTimeout(() => bowl(herThrow(table.standing, her.skill), table.who), pause)
+    // The beat runs from the ball before hers, so time spent on a remark is not waited out twice.
+    const left = Math.max(300, pause - (performance.now() - landedAt.current))
+    const timer = setTimeout(() => bowl(herThrow(table.standing, her.skill), table.who), left)
     return () => clearTimeout(timer)
     // A girl's turn comes round once per ball landed, which the count alone says.
   }, [herTurn, balls.length, rolling === null, speaking])
@@ -426,6 +462,10 @@ export function Bowling({ play }: { play: GamePlay }): JSX.Element {
             className="vu-btn vu-btn--outline vu-paper vu-btn--panel"
             {...gestures(waiting, lift, press)}
             onClick={stop}
+            // Enter held on the button is one press, as Space is.
+            onKeyDown={(event) => {
+              if (event.repeat) event.preventDefault()
+            }}
           >
             {prompt}
           </motion.button>

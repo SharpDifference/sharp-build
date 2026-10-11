@@ -572,6 +572,29 @@ export function soloSummary(balls: readonly Ball[], frames: number): string {
   return tally.gutters > 1 ? `${said}. The gutters saw a lot of you.` : `${said}.`
 }
 
+/**
+ * How a game played alone went, for the scene's writer: each frame with what was worth telling
+ * in it and the score as it ran, what was thrown in strikes, spares and gutter balls, and how
+ * much of it was aim and how much was luck.
+ */
+export function soloAccount(balls: readonly Ball[], frames: number): string[] {
+  const side = balls.filter((ball) => ball.who === 0)
+  const rolls = side.map((ball) => ball.fallen.length)
+  const sheet = sheetOf(rolls, frames)
+  const tally = tallyOf(balls, 0, frames)
+  return [
+    `The reader bowled ${times(frames, 'frame')} alone, scored as ten-pin is: a strike counts the next two balls as well, a spare the next one.`,
+    ...Array.from(
+      { length: frames },
+      (_, frame) =>
+        `Frame ${frame + 1}: ${frameTold(side, rolls, frame, frames)}. Running score ${sheet[frame].sofar}.`
+    ),
+    `The reader: ${times(tally.strikes, 'strike')}, ${times(tally.spares, 'spare')}, ${times(tally.gutters, 'gutter ball')}${tally.splits ? `, ${times(tally.splits, 'split')} left` : ''}.`,
+    aimTold('The reader', tally),
+    `Final score: ${tally.total} of a possible ${frames * 30}${tally.total === frames * 30 ? ', a perfect game' : ''}.`
+  ]
+}
+
 /** Everyone in the order they finished, by where each sits in `totals`: level scores keep their bowling order. */
 function standingOrder(totals: readonly number[]): number[] {
   return totals.map((_, who) => who).sort((a, b) => totals[b] - totals[a] || a - b)

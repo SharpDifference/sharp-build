@@ -10,6 +10,7 @@ import {
   rackOf,
   resolvePins,
   sheetOf,
+  soloAccount,
   tableOf,
   tallyOf,
   totalOf,
@@ -89,6 +90,71 @@ describe('Bowling scoring', () => {
     expect(tableOf([first, second, ball(true, 10)], 3, 1)).toMatchObject({ who: 0, frame: 1 })
     // Alone, every frame is the reader's.
     expect(tableOf([first, second], 3, 0)).toMatchObject({ who: 0, frame: 1 })
+  })
+})
+
+describe('Bowling scoring at every length', () => {
+  /** Ten-pin scored the long way, frame by frame, from a finished game's rolls. */
+  function scored(rolls: number[], frames: number): number {
+    let sum = 0
+    let i = 0
+    for (let frame = 0; frame < frames; frame++) {
+      if (rolls[i] === 10) {
+        sum += 10 + rolls[i + 1] + rolls[i + 2]
+        i += 1
+      } else if (rolls[i] + rolls[i + 1] === 10) {
+        sum += 10 + rolls[i + 2]
+        i += 2
+      } else {
+        sum += rolls[i] + rolls[i + 1]
+        i += 2
+      }
+    }
+    return sum
+  }
+
+  it('plays games of 3 to 10 frames to the right ball and the right total', () => {
+    const rand = seeded(11)
+    for (let frames = 3; frames <= 10; frames++) {
+      for (let game = 0; game < 200; game++) {
+        const rolls: number[] = []
+        let left = 10
+        for (let rack = rackOf(rolls, frames); !rack.done; rack = rackOf(rolls, frames)) {
+          if (rack.fresh) left = 10
+          // Strikes and spares often enough to reach every bonus ball.
+          const took = rand() < 0.35 ? left : Math.floor(rand() * (left + 1))
+          left -= took
+          rolls.push(took)
+          expect(rolls.length).toBeLessThanOrEqual(2 * frames + 1)
+        }
+        const sheet = sheetOf(rolls, frames)
+        expect(totalOf(rolls, frames)).toBe(scored(rolls, frames))
+        expect(sheet[frames - 1].total).toBe(scored(rolls, frames))
+        expect(sheet.every((frame) => frame.total !== null)).toBe(true)
+        expect(sheet.flatMap((frame) => frame.marks)).toHaveLength(rolls.length)
+        // One ball short, the last frame's total is not yet known.
+        expect(sheetOf(rolls.slice(0, -1), frames)[frames - 1].total).toBeNull()
+      }
+    }
+  })
+})
+
+describe('Bowling alone', () => {
+  it('gives the scene an account of a solo game: every frame, the marks, the aim and the luck', () => {
+    const balls: Ball[] = [
+      ball(false, 10, ALL_PINS, POCKET),
+      ball(false, 10, ALL_PINS, WIDE),
+      ball(false, 0, ALL_PINS, GUTTER),
+      ball(false, 4, ALL_PINS, POCKET)
+    ]
+    const account = soloAccount(balls, 3)
+    expect(account).toHaveLength(7)
+    expect(account[1]).toContain('a strike off a good ball')
+    expect(account[2]).toContain('lucky')
+    expect(account[3]).toContain('a gutter ball')
+    expect(account[4]).toContain('2 strikes')
+    expect(account[5]).toContain('1 strike came off loose balls')
+    expect(account[6]).toContain(`Final score: ${totalOf([10, 10, 0, 4], 3)}`)
   })
 })
 
