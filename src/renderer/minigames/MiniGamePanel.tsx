@@ -14,6 +14,7 @@ import { TitleTab } from '../components/TitleTab'
 import { useModalShell } from '../components/useModalShell'
 import type { ScenePanelProps } from '../mods/hooks'
 import { useGameStore } from '../stores/gameStore'
+import { TurnField } from '../views/Dialogue'
 import { useModOption } from '../stores/modsStore'
 import {
   gestures,
@@ -290,58 +291,6 @@ export function MiniGamePanel({ theme, onClose }: ScenePanelProps): JSX.Element 
           ) : (
             <p className="vu-empty">She is getting settled…</p>
           )}
-          {/* A word across the table, for a game with someone to say it to. */}
-          {seated.opponents && seated.opponents.length > 0 && (
-            <form
-              className="vu-minigame-say"
-              onSubmit={(event) => {
-                event.preventDefault()
-                speak()
-              }}
-            >
-              <input
-                id="minigame-say"
-                className="vu-minigame-sayfield"
-                type="text"
-                value={remark}
-                maxLength={200}
-                placeholder={answering ? `${seated.opponents[0].name} is answering…` : 'Say something…'}
-                disabled={result !== null}
-                autoComplete="off"
-                onChange={(event) => setRemark(event.target.value)}
-                // Sent from the key itself: the scene's own Enter is answered before a form's
-                // submit would be, and must not hear this one.
-                onKeyDown={(event) => {
-                  if (event.key !== 'Enter') return
-                  event.preventDefault()
-                  event.stopPropagation()
-                  speak()
-                }}
-              />
-              <motion.button
-                id="minigame-say-send"
-                className="vu-minigame-saysend"
-                type="submit"
-                aria-label="Say it"
-                disabled={answering || !remark.trim() || result !== null}
-                {...gestures(answering || !remark.trim() || result !== null, quietLift, quietPress)}
-              >
-                <svg
-                  viewBox="0 0 24 24"
-                  width="18"
-                  height="18"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2.75"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  aria-hidden="true"
-                >
-                  <path d="M9 6l6 6-6 6" />
-                </svg>
-              </motion.button>
-            </form>
-          )}
           {/* Standing through the result's beat, dead, so the table does not jump as it ends. */}
           <motion.button
             id="minigame-walk"
@@ -363,6 +312,35 @@ export function MiniGamePanel({ theme, onClose }: ScenePanelProps): JSX.Element 
             {underWay ? 'Walk away' : 'Not now'}
           </motion.button>
         </motion.div>
+
+        {/* A word across the table, for a game with someone to say it to: the scene's own well,
+            where the scene's own stands, and Go beside it. Enter sends from here, the scene's
+            own listener being shut out while a table is up. */}
+        {against && (
+          <div
+            className="vu-turn vu-scene-row"
+            data-well="out"
+            onKeyDown={(event) => {
+              if (event.key !== 'Enter' || event.shiftKey) return
+              event.stopPropagation()
+              speak()
+            }}
+          >
+            <TurnField
+              action={remark}
+              onAction={setRemark}
+              onSubmit={speak}
+              sending={false}
+              submitDead={answering || !remark.trim() || result !== null}
+              inputDead={result !== null}
+              focus
+              placeholder={
+                answering ? `${against.name} is answering…` : `Say something to ${against.name}…`
+              }
+              multiline
+            />
+          </div>
+        )}
       </motion.div>,
       host
     )
