@@ -8,6 +8,7 @@ import {
   groupsFor,
   listed,
   MINI_GAMES,
+  playersWords,
   type Chattiness,
   type MiniGameDef
 } from '@shared/minigames'
@@ -57,6 +58,11 @@ interface Offer {
   game: MiniGameDef
   /** The girls to ask; none for a game played alone. */
   charIds: string[]
+}
+
+/** One way of playing a game, as its row says it. */
+function wayWords(offer: Offer): string {
+  return offer.charIds.length > 0 ? `Ask ${namesOf(offer.charIds)} to play` : 'Play alone'
 }
 
 /** What the reader calls the girls asked, in a row. */
@@ -125,6 +131,14 @@ export function MiniGamePanel({ theme, onClose }: ScenePanelProps): JSX.Element 
       ]),
     [offered, girls]
   )
+
+  // The list is a game to a row; one opened shows who can be asked to play it.
+  const byGame = useMemo(
+    () =>
+      offered.map((game) => ({ game, ways: offers.filter((offer) => offer.game.id === game.id) })),
+    [offered, offers]
+  )
+  const [openGame, setOpenGame] = useState<string | null>(null)
 
   const [sitting, setSitting] = useState<Sitting | null>(() => sittingOf(agreed))
   const [asking, setAsking] = useState<Offer | null>(null)
@@ -460,7 +474,7 @@ export function MiniGamePanel({ theme, onClose }: ScenePanelProps): JSX.Element 
       >
         <TitleTab>{title}</TitleTab>
 
-        <div className="vu-minigame-body">
+        <div className="vu-minigame-body" data-list={!asking}>
           {asking ? (
             <form
               className="vu-minigame-ask"
@@ -490,24 +504,48 @@ export function MiniGamePanel({ theme, onClose }: ScenePanelProps): JSX.Element 
             </form>
           ) : (
             <ul className="vu-rows">
-              {offers.map((offer) => (
-                <li key={`${offer.game.id}:${offer.charIds.join('+') || 'alone'}`}>
-                  <motion.button
-                    type="button"
-                    className="vu-row vu-minigame-pick"
-                    {...gestures(false, rowLift, rowPress)}
-                    onClick={() => pick(offer)}
-                  >
-                    <span className="vu-minigame-pickicon" aria-hidden="true">
-                      {offer.game.icon}
-                    </span>
-                    <span className="vu-minigame-pickname">{offer.game.name}</span>
-                    <span className="vu-minigame-pickblurb">
-                      {offer.charIds.length > 0 ? `ask ${namesOf(offer.charIds)} to play` : 'play alone'}
-                    </span>
-                  </motion.button>
-                </li>
-              ))}
+              {byGame.map(({ game, ways }) => {
+                const open = openGame === game.id
+                return (
+                  <li key={game.id} className="vu-minigame-game">
+                    <motion.button
+                      type="button"
+                      id={`minigame-game-${game.id}`}
+                      className="vu-row vu-minigame-pick"
+                      aria-expanded={ways.length > 1 ? open : undefined}
+                      {...gestures(false, rowLift, rowPress)}
+                      // A game there is only one way to play is picked outright.
+                      onClick={() =>
+                        ways.length === 1 ? pick(ways[0]) : setOpenGame(open ? null : game.id)
+                      }
+                    >
+                      <span className="vu-minigame-pickicon" aria-hidden="true">
+                        {game.icon}
+                      </span>
+                      <span className="vu-minigame-pickname">{game.name}</span>
+                      <span className="vu-minigame-pickblurb">
+                        {ways.length === 1 ? wayWords(ways[0]) : playersWords(game)}
+                      </span>
+                    </motion.button>
+                    {open && ways.length > 1 && (
+                      <ul className="vu-rows vu-minigame-ways">
+                        {ways.map((offer) => (
+                          <li key={offer.charIds.join('+') || 'alone'}>
+                            <motion.button
+                              type="button"
+                              className="vu-row vu-minigame-way"
+                              {...gestures(false, rowLift, rowPress)}
+                              onClick={() => pick(offer)}
+                            >
+                              {wayWords(offer)}
+                            </motion.button>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </li>
+                )
+              })}
             </ul>
           )}
         </div>

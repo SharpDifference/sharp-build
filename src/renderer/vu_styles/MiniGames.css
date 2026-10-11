@@ -9,6 +9,32 @@
   padding: 4px 6px 10px;
 }
 
+/* The list of games scrolls inside the panel once it is longer than the panel can be, padded for
+   what a hovered row lifts past its own box. */
+.vu-minigame-body[data-list='true'] {
+  max-height: 560px;
+  margin: -4px -6px;
+  padding: 8px 12px 14px;
+  overflow: hidden auto;
+}
+
+/* A game opened in the list: who can be asked to play it, a step in from the game's own row. */
+.vu-minigame-game {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.vu-minigame-ways {
+  margin: 0 0 6px 58px;
+}
+
+.vu-minigame-way {
+  color: var(--vu-text-body);
+  font: 500 15px var(--font-body);
+  text-align: left;
+}
+
 /* One game in the list where the scene offers several: its mark, its name, and what it is. */
 .vu-minigame-pick {
   gap: 16px;
