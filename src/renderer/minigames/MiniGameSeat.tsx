@@ -1,7 +1,7 @@
 import { useEffect, useRef, type JSX } from 'react'
 import type { SceneSeatProps } from '../mods/hooks'
 import { DiceIcon } from '../views/screenIcons'
-import { useTableStore } from './session'
+import { keptAgreed, useTableStore } from './session'
 import { useAtTurn, useGamesOffered, useTableOpen } from './table'
 
 /**
@@ -18,7 +18,13 @@ export function MiniGameSeat({ Seat, visible, open }: SceneSeatProps): JSX.Eleme
   const opener = useRef(open)
   opener.current = open
   useEffect(() => {
-    if (agreed && atTurn && visible) opener.current()
+    if (!atTurn || !visible) return
+    // In hand, or kept beside the save for exactly this point of the scene: a game reloaded
+    // between her yes and the table.
+    const due = agreed ?? keptAgreed()
+    if (!due) return
+    if (!agreed) useTableStore.getState().setAgreed(due)
+    opener.current()
   }, [agreed, atTurn, visible])
 
   const state = !visible || offered.length === 0 ? 'gone' : tableOpen ? 'shown' : 'dim'

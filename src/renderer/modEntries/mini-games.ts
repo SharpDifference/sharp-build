@@ -2,7 +2,7 @@ import { MINI_GAMES, MINI_GAMES_LIST } from '@shared/minigames'
 import { MiniGamePanel } from '../minigames/MiniGamePanel'
 import { MiniGameSeat } from '../minigames/MiniGameSeat'
 import { answerOf, withProposal } from '../minigames/proposal'
-import { keptAgreed, useTableStore } from '../minigames/session'
+import { useTableStore } from '../minigames/session'
 import { skillOf } from '../minigames/skill'
 import { nameOf } from '../minigames/table'
 import { registerHooks } from '../mods/hooks'
@@ -50,10 +50,11 @@ registerHooks(MINI_GAMES, {
 
   // A turn the reader takes instead lets an agreed game go; his own proposal is not that turn.
   playerActs: () => useTableStore.getState().setAgreed(null),
-  // A game loaded where she had just agreed still has its table to open; any other has none.
+  // Nothing in hand belongs to the game being entered. Its scene is not loaded yet, so whether
+  // she had just agreed at the point it stands on is asked later, by the seat, at the reader's turn.
   gameEntered: () => {
     useTableStore.getState().setProposal(null)
-    useTableStore.getState().setAgreed(keptAgreed())
+    useTableStore.getState().dropAgreed()
     useTableStore.getState().setPlayed(null)
   }
 })

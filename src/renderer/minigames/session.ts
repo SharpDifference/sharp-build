@@ -40,6 +40,8 @@ interface TableState {
   setPlayed: (played: Played | null) => void
   setProposal: (proposal: Proposal | null) => void
   setAgreed: (agreed: Agreed | null) => void
+  /** Lets go of the agreed game in hand, leaving what is kept beside the save where it is. */
+  dropAgreed: () => void
 }
 
 /** Where the agreed game is kept across a reload. */
@@ -90,5 +92,6 @@ export const useTableStore = create<TableState>((set) => ({
   setAgreed: (agreed) => {
     keep(agreed)
     set({ agreed })
-  }
+  },
+  dropAgreed: () => set({ agreed: null })
 }))
