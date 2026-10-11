@@ -221,7 +221,7 @@ describe('Bowling against her', () => {
 })
 
 describe('Bowling on offer', () => {
-  it('is in the build and offered where there are lanes, most readily at the arcade', () => {
+  it('is in the build and offered where there are lanes, most readily at the alley', () => {
     const bowling = MINI_GAMES_LIST.find((game) => game.id === 'bowling')
     expect(bowling).toBeDefined()
     if (!bowling) return
@@ -229,7 +229,9 @@ describe('Bowling on offer', () => {
     expect(gamesOffered({ location: 'btb_arcade', girls: 0 }, on)).toContain(bowling)
     expect(gamesOffered({ location: 'btb_arcade', girls: 1 }, on)).toContain(bowling)
     expect(gamesOffered({ location: 'kendall_library', girls: 1 }, on)).not.toContain(bowling)
-    expect(suggestRate(bowling, 'btb_arcade', false)).toBe('often')
+    expect(gamesOffered({ location: 'bowling_alley', girls: 1 }, on)).toContain(bowling)
+    expect(suggestRate(bowling, 'bowling_alley', false)).toBe('often')
+    expect(suggestRate(bowling, 'btb_arcade', false)).toBe('sometimes')
     expect(bowling.options?.[0]).toMatchObject({ id: 'frames', min: 3, max: 10, default: 5 })
   })
 })
