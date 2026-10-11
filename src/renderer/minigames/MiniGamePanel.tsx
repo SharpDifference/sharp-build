@@ -7,14 +7,14 @@ import { useModalShell } from '../components/useModalShell'
 import type { ScenePanelProps } from '../mods/hooks'
 import { gestures, lift, panelUnderTab, press, rowLift, rowPress, veilIn } from '../views/motion'
 import { gameComponent, type GamePlay, type PlayResult } from './play'
-import { fileResult, useGamesOffered } from './table'
+import { fileResult, takeTurnForGame, useGamesOffered } from './table'
 import '../vu_styles/MiniGames.css'
 
 /**
  * The table a game is played at, over the scene: the list of games where there is a choice, then
- * the game itself. The framework owns the way out. Before the first move it is free; once a game
- * is under way, leaving is walking away from it and is said in the scene; once it is over, the
- * one answer takes the result back to the scene.
+ * the game itself. The framework owns the way out. Before the first move it is free, and the
+ * reply being read is left as it was; once a game is under way, leaving is walking away from it
+ * and is said in the scene; once it is over, the one answer takes the result back to the scene.
  */
 export function MiniGamePanel({ theme, onClose }: ScenePanelProps): JSX.Element | null {
   const offered = useGamesOffered()
@@ -40,7 +40,11 @@ export function MiniGamePanel({ theme, onClose }: ScenePanelProps): JSX.Element 
 
   const play = useMemo<GamePlay>(
     () => ({
-      started: () => setUnderWay(true),
+      // The first move is the reader's turn taken: what the reply had left to say is dropped.
+      started: () => {
+        takeTurnForGame()
+        setUnderWay(true)
+      },
       finish: (ended) => setResult(ended)
     }),
     []
