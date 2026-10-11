@@ -22,6 +22,9 @@ import '../vu_styles/HighLow.css'
 
 const SUIT_MARK: Record<Suit, string> = { spades: '♠', hearts: '♥', diamonds: '♦', clubs: '♣' }
 
+/** A count of calls as the narration says it. */
+const NUMBER: Record<number, string> = { 2: 'Two', 3: 'Three', 4: 'Four', 5: 'Five' }
+
 /** How long she takes over a call: long enough for the reader's own to be read first. */
 const HER_PAUSE_MS = 1700
 
@@ -71,7 +74,7 @@ export function HighLow({ play }: { play: GamePlay }): JSX.Element {
 
   // Against her the game is on from the moment she sits down, and the deal is said.
   useEffect(() => {
-    if (her) play.narrate(`${her.name} cuts the deck and turns the top card: ${rankWord(deck[0].rank)}. ${sudden ? 'Sudden death: a call each until one of you is ahead' : each === 1 ? 'One call each' : `${each} calls each`}, yours first.`)
+    if (her) play.narrate(`${her.name} cuts the deck and turns the top card: ${rankWord(deck[0].rank)}. ${sudden ? 'Sudden death: a call each until one of you is ahead' : each === 1 ? 'One call each' : `${NUMBER[each] ?? each} calls each`}, yours first.`)
     // Once, as the table opens.
   }, [])
 

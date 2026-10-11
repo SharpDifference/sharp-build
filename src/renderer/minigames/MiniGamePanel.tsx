@@ -76,6 +76,9 @@ function sittingOf(agreed: Agreed | null): Sitting | null {
 export function MiniGamePanel({ theme, onClose }: ScenePanelProps): JSX.Element | null {
   const offered = useGamesOffered()
   const girls = usePresentGirls()
+  // One girl on the stage stands in the middle of it, where a table would cover her face: the
+  // table hangs to one side of her. Two stand either side of the middle, which is then free.
+  const aside = useGameStore((s) => s.slots.filter(Boolean).length === 1)
   // The game she agreed to, taken off the table's own state as the panel opens on it.
   const [agreed] = useState(() => useTableStore.getState().agreed)
   useEffect(() => {
@@ -206,7 +209,7 @@ export function MiniGamePanel({ theme, onClose }: ScenePanelProps): JSX.Element 
   if (seated && Game) {
     return createPortal(
       <motion.div
-        className="vu-veil vu-minigame-veil"
+        className={`vu-veil vu-minigame-veil${aside && (seated.game.surface ?? 'table') === 'table' ? ' vu-minigame-veil--aside' : ''}`}
         data-theme={theme}
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}

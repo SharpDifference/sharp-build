@@ -47,6 +47,12 @@
   background: none;
 }
 
+/* A table beside a girl standing alone in the middle of the stage, clear of her face. */
+.vu-minigame-veil--aside {
+  place-items: start start;
+  padding-left: 15%;
+}
+
 /* The scene's own hint that the action box can be hovered open is put away while a game is
    played: the box is the table's until it clears. */
 body:has(.vu-minigame-veil) .vu-scene-divider {
