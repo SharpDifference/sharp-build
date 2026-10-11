@@ -29,6 +29,7 @@ import {
   openTable,
   readerSaysAtTable,
   sayAtTable,
+  tableQuietIn,
   proposeGame,
   takeTurnForGame,
   useGamesOffered,
@@ -80,9 +81,8 @@ function sittingOf(agreed: Agreed | null): Sitting | null {
 export function MiniGamePanel({ theme, onClose }: ScenePanelProps): JSX.Element | null {
   const offered = useGamesOffered()
   const girls = usePresentGirls()
-  // One girl on the stage stands in the middle of it, where a table would cover her face: the
-  // table hangs to one side of her. Two stand either side of the middle, which is then free.
-  const aside = useGameStore((s) => s.slots.filter(Boolean).length === 1)
+  // Who is standing where on the stage: left, middle, right.
+  const slots = useGameStore((s) => s.slots)
   // The game she agreed to, taken off the table's own state as the panel opens on it.
   const [agreed] = useState(() => useTableStore.getState().agreed)
   useEffect(() => {
@@ -212,7 +212,8 @@ export function MiniGamePanel({ theme, onClose }: ScenePanelProps): JSX.Element 
   // A finished game stands for a beat, then clears itself: there is nothing to answer.
   useEffect(() => {
     if (!result) return
-    const timer = setTimeout(() => leave(result), RESULT_BEAT_MS)
+    // After whatever the table is still saying has been read.
+    const timer = setTimeout(() => leave(result), tableQuietIn() + RESULT_BEAT_MS)
     return () => clearTimeout(timer)
     // The result is set once, and what `leave` reads has settled by then.
   }, [result])
@@ -238,10 +239,21 @@ export function MiniGamePanel({ theme, onClose }: ScenePanelProps): JSX.Element 
   const title = asking ? `Ask ${nameOf(asking.charId)}` : 'Play a game'
   const against = seated?.opponents?.[0]
 
+  /**
+   * Where a table hangs so it covers nobody who matters. One girl alone stands in the middle, so
+   * it goes beside her. Two stand either side of the middle, which is free. Three leave no room:
+   * it hangs over one who is not playing, the middle one unless she is the one at the table.
+   */
+  const onStage = slots.filter(Boolean).length
+  const playing = against?.charId ?? agreed?.charId
+  const aside =
+    (seated?.game.surface ?? 'table') === 'table' &&
+    (onStage === 1 || (onStage >= 3 && playing !== undefined && slots[1] === playing))
+
   if (seated && Game) {
     return createPortal(
       <motion.div
-        className={`vu-veil vu-minigame-veil${aside && (seated.game.surface ?? 'table') === 'table' ? ' vu-minigame-veil--aside' : ''}`}
+        className={`vu-veil vu-minigame-veil${aside ? ' vu-minigame-veil--aside' : ''}`}
         data-theme={theme}
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}

@@ -109,11 +109,24 @@ function playLines(text: string, speaker = ''): void {
 }
 
 /**
- * The table's turn at the dialogue box. A line someone speaks is given a moment on the box
- * before anything replaces it, so what follows waits behind it, in order. A table that has
- * closed says nothing more: whatever was still waiting is dropped with it.
+ * The table's turn at the dialogue box. Every line is given the box for as long as it takes to
+ * type itself out and be read, so nothing is replaced half-written: what follows waits behind
+ * it, in order. A table that has closed says nothing more: whatever was still waiting is dropped
+ * with it.
  */
-const SPOKEN_HOLD_MS = 1900
+
+/** The box's own pace: its arrival, and each character it types. */
+const BOX_ARRIVAL_MS = 350
+const BOX_TYPE_MS = 18
+/** What a line is left on the box for once it is written: longer for something said. */
+const NARRATED_BEAT_MS = 550
+const SPOKEN_BEAT_MS = 1300
+
+/** How long a line holds the box: written out in full, then a beat to read it. */
+function holdFor(text: string, spoken: boolean): number {
+  return BOX_ARRIVAL_MS + text.length * BOX_TYPE_MS + (spoken ? SPOKEN_BEAT_MS : NARRATED_BEAT_MS)
+}
+
 let sitting = 0
 let heldUntil = 0
 
@@ -128,11 +141,17 @@ export function closeTable(): void {
   sitting++
 }
 
-function show(text: string, speaker: string, hold: number): Promise<void> {
+/** How long until everything the table has said so far has had its time on the box. */
+export function tableQuietIn(): number {
+  return Math.max(0, heldUntil - performance.now())
+}
+
+/** Resolves once the line is on the box, which is after everything said before it. */
+function show(text: string, speaker: string): Promise<void> {
   const at = sitting
   const now = performance.now()
   const wait = Math.max(0, heldUntil - now)
-  heldUntil = Math.max(now, heldUntil) + hold
+  heldUntil = Math.max(now, heldUntil) + holdFor(text, speaker !== '')
   return new Promise((resolve) => {
     const put = (): void => {
       if (at === sitting) playLines(text, speaker)
@@ -145,12 +164,13 @@ function show(text: string, speaker: string, hold: number): Promise<void> {
 
 /** A line from the table in the scene's dialogue box, once the turn is the table's. */
 export function narrateAtTable(text: string): void {
-  void show(text, '', 0)
+  void show(text, '')
 }
 
 /**
  * A girl's line at the table, written by the model from the game's cue and shown in the scene's
- * dialogue box as hers. Resolves once it is on the box, or once it is clear there will be none.
+ * dialogue box as hers. Resolves once it has been on the box long enough to read, or once it is
+ * clear there will be none.
  */
 export async function sayAtTable(charId: string, situation: string, cue: string): Promise<void> {
   const at = sitting
@@ -158,7 +178,8 @@ export async function sayAtTable(charId: string, situation: string, cue: string)
   if (!character) return
   const line = await tableLine(character, situation, cue)
   if (!line || at !== sitting) return
-  await show(line, charKeyOf(character.firstName, character.lastName), SPOKEN_HOLD_MS)
+  await show(line, charKeyOf(character.firstName, character.lastName))
+  await new Promise((resolve) => setTimeout(resolve, holdFor(line, true)))
 }
 
 /**
