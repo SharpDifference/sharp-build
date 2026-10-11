@@ -1,0 +1,33 @@
+/* The mini-game panel: the table a game is played at, over a scene. The veil, the sheet, the
+   rows, the buttons and the foot are base.css's; what a game draws inside is its own file's. */
+
+.vu-minigame-body {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 360px;
+  padding: 4px 6px 10px;
+}
+
+/* One game in the list where the scene offers several: its mark, its name, and what it is. */
+.vu-minigame-pick {
+  gap: 16px;
+  text-align: left;
+}
+
+.vu-minigame-pickicon {
+  flex: none;
+  font-size: 26px;
+}
+
+.vu-minigame-pickname {
+  flex: none;
+  color: var(--vu-text);
+  font: 400 24px var(--font-display);
+}
+
+.vu-minigame-pickblurb {
+  color: var(--vu-text-body);
+  font: 500 15px var(--font-body);
+  line-height: 1.5;
+}

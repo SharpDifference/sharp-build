@@ -1,0 +1,127 @@
+/* High-Low: the deck, the card face up, the two calls, and the trail of calls made. Drawn inside
+   the mini-game panel; the buttons are base.css's. */
+
+.vu-highlow {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  align-items: center;
+  gap: 18px;
+}
+
+.vu-highlow-count {
+  margin: 0;
+  color: var(--vu-text-muted);
+  font: 700 14px var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+.vu-highlow-table {
+  display: flex;
+  align-items: center;
+  gap: 34px;
+}
+
+/* A card is a container: a rounded rectangle on the surface, its rank over its suit. */
+.vu-highlow-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  width: 132px;
+  height: 184px;
+  border: 3.5px solid var(--vu-border);
+  border-radius: 16px;
+  background: var(--vu-surface);
+  color: var(--vu-text);
+}
+
+.vu-highlow-card--red {
+  color: var(--vu-accent);
+}
+
+.vu-highlow-rank {
+  font: 400 68px var(--font-display);
+  line-height: 1;
+}
+
+.vu-highlow-suit {
+  font-size: 44px;
+  line-height: 1;
+}
+
+.vu-highlow-card--small {
+  gap: 0;
+  width: 44px;
+  height: 60px;
+  border-width: 2px;
+  border-radius: 8px;
+}
+
+.vu-highlow-card--small .vu-highlow-rank {
+  font-size: 22px;
+}
+
+.vu-highlow-card--small .vu-highlow-suit {
+  font-size: 16px;
+}
+
+/* The deck face down: the card's own box, filled in the accent. */
+.vu-highlow-deck {
+  display: block;
+  width: 132px;
+  height: 184px;
+  border: 3.5px solid var(--vu-border);
+  border-radius: 16px;
+  background: var(--vu-accent);
+  box-shadow: 6px 6px 0 var(--vu-accent-shadow);
+}
+
+.vu-highlow-said {
+  min-height: 24px;
+  margin: 0;
+  color: var(--vu-text);
+  font: 500 17px var(--font-body);
+}
+
+.vu-highlow-calls {
+  display: flex;
+  gap: 34px;
+}
+
+.vu-highlow-calls[data-over] {
+  visibility: hidden;
+}
+
+/* A call swells about its own centre, as an answer in a foot does. */
+.vu-highlow-calls > button {
+  transform-origin: center;
+}
+
+/* Holds the height of a call's column from the first deal, so the panel never resizes. */
+.vu-highlow-trail {
+  display: flex;
+  gap: 14px;
+  min-height: 100px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.vu-highlow-turn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  color: var(--vu-text-muted);
+  font: 700 12px var(--font-mono);
+}
+
+.vu-highlow-turn--right .vu-highlow-turnmark {
+  color: var(--vu-good);
+}
+
+.vu-highlow-turnmark {
+  color: var(--vu-danger);
+}
