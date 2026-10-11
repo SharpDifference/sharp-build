@@ -2,7 +2,7 @@ import type { MiniGameDef } from '../minigames'
 
 const ROLLER_DERBY: MiniGameDef = {
   id: 'roller-derby',
-  modId: 'roller-derby',
+  modId: 'morrowkiln-sports',
   name: 'Rink Race',
   icon: '🛼',
   blurb:

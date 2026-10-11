@@ -2,7 +2,7 @@ import type { MiniGameDef } from '../minigames'
 
 const TRUTH_OR_DARE: MiniGameDef = {
   id: 'truth-or-dare',
-  modId: 'truth-or-dare',
+  modId: 'morrowkiln-party-games',
   name: 'Truth or Dare',
   icon: '🍾',
   blurb:

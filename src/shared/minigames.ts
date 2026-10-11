@@ -7,6 +7,8 @@
  * model. What it looks like and how it plays is the pack's own component, in the renderer.
  */
 
+import type { ModDef } from './mods'
+
 /** The framework's mod id. A pack names it in its `requires`. */
 export const MINI_GAMES = 'mini-games'
 
@@ -116,6 +118,50 @@ export const MINI_GAMES_LIST: readonly MiniGameDef[] = Object.keys(ENTRIES)
   .sort()
   .map((file) => ENTRIES[file])
 
+/**
+ * A pack's entry on the Mods screen: one mod for all of its games, needing the framework, with
+ * a switch for each game among its options so a player keeps the ones he wants.
+ */
+export function packMod(pack: {
+  id: string
+  name: string
+  author: string
+  version: string
+  blurb: string
+  games: readonly MiniGameDef[]
+}): ModDef {
+  return {
+    id: pack.id,
+    name: pack.name,
+    author: pack.author,
+    version: pack.version,
+    scope: 'anytime',
+    defaultOn: true,
+    blurb: pack.blurb,
+    offNote: 'A game already played stays in the story and in her memories.',
+    requires: [MINI_GAMES],
+    options: pack.games.map((game) => ({
+      id: game.id,
+      label: `${game.icon} ${game.name}`,
+      hint: `${game.blurb.charAt(0).toUpperCase()}${game.blurb.slice(1).replace(/\.$/, '')}.`,
+      default: true
+    }))
+  }
+}
+
+/**
+ * Whether a game's own switch is on: its option in the mod that brings it, where that mod gives
+ * it one. A pack that declares no switch for a game has it on whenever the pack is.
+ */
+export function gameSwitchOn(
+  game: MiniGameDef,
+  mod: ModDef | undefined,
+  optionSet: (optionId: string) => boolean | undefined
+): boolean {
+  const option = mod?.options?.find((entry) => entry.id === game.id)
+  return option ? (optionSet(game.id) ?? option.default) : true
+}
+
 /** Where a scene stands, as far as a game cares. */
 export interface PlaySpot {
   /** The scene's location id, or null where it has none the game knows. */
@@ -130,12 +176,12 @@ export interface PlaySpot {
  */
 export function gamesOffered(
   spot: PlaySpot,
-  isOn: (modId: string) => boolean,
+  isOn: (modId: string, game: MiniGameDef) => boolean,
   games: readonly MiniGameDef[] = MINI_GAMES_LIST
 ): MiniGameDef[] {
   return games.filter(
     (game) =>
-      isOn(game.modId) &&
+      isOn(game.modId, game) &&
       (!game.locations || (spot.location !== null && game.locations.includes(spot.location))) &&
       spot.girls >= game.players.min
   )

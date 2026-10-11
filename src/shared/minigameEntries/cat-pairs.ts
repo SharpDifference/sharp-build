@@ -2,7 +2,7 @@ import type { MiniGameDef } from '../minigames'
 
 const CAT_PAIRS: MiniGameDef = {
   id: 'cat-pairs',
-  modId: 'cat-pairs',
+  modId: 'morrowkiln-card-games',
   name: 'Cat Pairs',
   icon: '🐾',
   blurb:

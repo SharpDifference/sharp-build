@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { seededRand } from '../src/shared/hash'
 import { gamesOffered, MINI_GAMES, MINI_GAMES_LIST, settledOptions, suggestRate } from '../src/shared/minigames'
-import FOOT_RACE_MOD from '../src/shared/modEntries/foot-race'
+import FOOT_RACE_MOD from '../src/shared/modEntries/morrowkiln-sports'
 import {
   MAX_CADENCE,
   SPENT_EFFORT,

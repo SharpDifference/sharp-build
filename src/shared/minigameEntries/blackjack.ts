@@ -2,7 +2,7 @@ import type { MiniGameDef } from '../minigames'
 
 const BLACKJACK: MiniGameDef = {
   id: 'blackjack',
-  modId: 'blackjack',
+  modId: 'morrowkiln-card-games',
   name: 'Blackjack',
   icon: '♠️',
   blurb:

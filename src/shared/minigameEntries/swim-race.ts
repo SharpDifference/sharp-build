@@ -2,7 +2,7 @@ import type { MiniGameDef } from '../minigames'
 
 const SWIM_RACE: MiniGameDef = {
   id: 'swim-race',
-  modId: 'swim-race',
+  modId: 'morrowkiln-sports',
   name: 'Swim Race',
   icon: '🏊',
   blurb:

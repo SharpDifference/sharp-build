@@ -84,11 +84,11 @@ const onTable = (ball: Ball): boolean =>
   ball.y <= TABLE_H - BALL_R + 1e-6
 
 describe('the pack', () => {
-  it('is a mod that requires the framework and brings the one game', () => {
-    const mod = MODS.find((m) => m.id === 'pool')
+  it('comes in a mod that requires the framework', () => {
+    const mod = MODS.find((m) => m.id === 'morrowkiln-arcade-games')
     expect(mod?.requires).toContain(MINI_GAMES)
     const game = MINI_GAMES_LIST.find((g) => g.id === 'pool')
-    expect(game?.modId).toBe('pool')
+    expect(game?.modId).toBe('morrowkiln-arcade-games')
     expect(game?.players).toEqual({ min: 0, max: 1 })
   })
 })

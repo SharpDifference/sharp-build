@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { seededRand } from '../src/shared/hash'
 import { gamesOffered, MINI_GAMES, MINI_GAMES_LIST, suggestRate } from '../src/shared/minigames'
-import SWIM_MOD from '../src/shared/modEntries/swim-race'
+import SWIM_MOD from '../src/shared/modEntries/morrowkiln-sports'
 import {
   BREATH_GAP_MS,
   CYCLE_MS,

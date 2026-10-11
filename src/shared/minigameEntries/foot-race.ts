@@ -2,7 +2,7 @@ import type { MiniGameDef } from '../minigames'
 
 const FOOT_RACE: MiniGameDef = {
   id: 'foot-race',
-  modId: 'foot-race',
+  modId: 'morrowkiln-sports',
   name: 'Foot Race',
   icon: '🏃',
   blurb: 'a race on foot over a measured distance, side by side in lanes, from a starting call to the line',

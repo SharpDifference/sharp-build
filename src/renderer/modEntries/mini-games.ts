@@ -14,15 +14,15 @@ import { gameComponent } from '../minigames/play'
 import { answerOf, withProposal, type Asked } from '../minigames/proposal'
 import { useTableStore } from '../minigames/session'
 import { skillOf } from '../minigames/skill'
-import { nameOf } from '../minigames/table'
+import { gameIsOn, nameOf } from '../minigames/table'
 import { registerHooks } from '../mods/hooks'
 import { useGameStore } from '../stores/gameStore'
-import { modIsOn, useModsStore } from '../stores/modsStore'
+import { useModsStore } from '../stores/modsStore'
 
 /** The games a girl in this scene could be played at, each with a component to play it with. */
 function gamesWith(cast: readonly Character[], location: string | null): MiniGameDef[] {
   if (cast.length === 0) return []
-  return gamesOffered({ location, girls: cast.length }, (modId) => modIsOn(modId)).filter(
+  return gamesOffered({ location, girls: cast.length }, gameIsOn).filter(
     (game) => game.players.max >= 1 && Boolean(gameComponent(game.id))
   )
 }

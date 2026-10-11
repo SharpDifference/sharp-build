@@ -2,7 +2,7 @@ import type { MiniGameDef } from '../minigames'
 
 const BOWLING: MiniGameDef = {
   id: 'bowling',
-  modId: 'bowling',
+  modId: 'morrowkiln-arcade-games',
   name: 'Bowling',
   icon: '🎳',
   blurb:

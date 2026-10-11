@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { seededRand } from '../src/shared/hash'
 import { gamesOffered, MINI_GAMES, MINI_GAMES_LIST, settledOptions } from '../src/shared/minigames'
-import ROLLER_DERBY_MOD from '../src/shared/modEntries/roller-derby'
+import ROLLER_DERBY_MOD from '../src/shared/modEntries/morrowkiln-sports'
 import {
   BEAT_MS,
   DOWN_MS,

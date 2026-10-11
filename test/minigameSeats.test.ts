@@ -117,3 +117,27 @@ describe('the standing offer with several girls here', () => {
     expect(agreedOf(reply, [game(0, 1)], CAST.slice(0, 1))?.characters.map((c) => c.charId)).toEqual(['a'])
   })
 })
+
+describe('a pack of games', () => {
+  it('is one mod with a switch for each game, on until switched off', async () => {
+    const { packMod, gameSwitchOn, MINI_GAMES } = await import('../src/shared/minigames')
+    const cards = game(0, 1)
+    const mod = packMod({ id: 'pack', name: 'Pack', author: 'a', version: '1', blurb: 'b', games: [cards] })
+    expect(mod.requires).toEqual([MINI_GAMES])
+    expect(mod.options?.map((option) => option.id)).toEqual(['cards'])
+    expect(gameSwitchOn(cards, mod, () => undefined)).toBe(true)
+    expect(gameSwitchOn(cards, mod, () => false)).toBe(false)
+    // A pack that gives a game no switch has it on with the pack.
+    expect(gameSwitchOn(cards, { ...mod, options: [] }, () => false)).toBe(true)
+  })
+
+  it('brings every game in the build through a pack, and none through the framework', async () => {
+    const { MINI_GAMES_LIST, MINI_GAMES } = await import('../src/shared/minigames')
+    const { MODS } = await import('../src/shared/mods')
+    for (const entry of MINI_GAMES_LIST) {
+      expect(entry.modId).not.toBe(MINI_GAMES)
+      const mod = MODS.find((candidate) => candidate.id === entry.modId)
+      expect(mod?.options?.some((option) => option.id === entry.id)).toBe(true)
+    }
+  })
+})

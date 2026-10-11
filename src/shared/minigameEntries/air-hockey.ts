@@ -2,7 +2,7 @@ import type { MiniGameDef } from '../minigames'
 
 const AIR_HOCKEY: MiniGameDef = {
   id: 'air-hockey',
-  modId: 'air-hockey',
+  modId: 'morrowkiln-arcade-games',
   name: 'Air Hockey',
   icon: '🏒',
   blurb:

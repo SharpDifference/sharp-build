@@ -235,45 +235,46 @@ A pack touches none of the left column and edits no file of the framework or the
 
 ### The files a pack adds
 
-For a game with the id `high-low`, in a mod with the same id:
+A pack is one mod and any number of games. For the game `high-low`, in the pack
+`morrowkiln-card-games`:
 
 | File | What it is |
 | --- | --- |
-| `src/shared/modEntries/high-low.ts` | The mod's entry, named for the mod's id, as any mod's. |
-| `src/shared/minigameEntries/high-low.ts` | The game on paper, named for the game's id: its `MiniGameDef`, default export. |
+| `src/shared/modEntries/morrowkiln-card-games.ts` | The pack's entry on the Mods screen, named for the mod's id, as any mod's. One per pack. |
+| `src/renderer/modEntries/morrowkiln-card-games.ts` | Named for the mod's id: hands the framework each game's component. One per pack. |
+| `src/shared/minigameEntries/high-low.ts` | The game on paper, named for the game's id: its `MiniGameDef`, default export. Its `modId` is the pack's id. |
 | `src/shared/highLow.ts` | The rules, pure: no React, no stores, nothing from the renderer. |
-| `src/renderer/modEntries/high-low.ts` | Named for the mod's id: hands the framework the component. |
 | `src/renderer/minigames/HighLow.tsx` | The component the game is played with. |
 | `src/renderer/vu_styles/HighLow.css` | What it looks like, imported by the component. |
 | `test/highLow.test.ts` | Tests of the rules file. |
 
 All three folders of entries are read by glob (`MODS` in `src/shared/mods.ts`, `MINI_GAMES_LIST`
 in `src/shared/minigames.ts`, `src/renderer/mods/index.ts`), so nothing is registered by hand and
-two packs never edit the same line.
+two packs never edit the same line. The framework itself brings no game: a build with the
+framework and somebody else's pack, and none of these, is a whole one.
 
-The mod's entry requires the framework, and takes its id from the game so the two cannot drift:
+The pack's entry is made by `packMod`, which requires the framework and gives every game a
+switch of its own among the mod's options, on until the player turns it off:
 
 ```ts
-import { MINI_GAMES } from '../minigames'
+import { packMod } from '../minigames'
 import HIGH_LOW from '../minigameEntries/high-low'
-import type { ModDef } from '../mods'
+import BLACKJACK from '../minigameEntries/blackjack'
 
-const def: ModDef = {
-  id: HIGH_LOW.modId,
-  name: 'High-Low',
+export default packMod({
+  id: 'morrowkiln-card-games',
+  name: "Morrowkiln's Card Games",
   author: 'morrowkiln',
   version: '0.1.0',
-  scope: 'anytime',
-  defaultOn: true,
-  blurb: 'A deck of cards and one question: is the next card higher or lower? Playable anywhere.',
-  requires: [MINI_GAMES]
-}
-export default def
+  blurb: 'Cards on the table: quick ones for anywhere, and longer ones for an evening in.',
+  games: [HIGH_LOW, BLACKJACK]
+})
 ```
 
-`scope` is `anytime`: no save depends on a game. With the framework off the pack is off too.
+Its `scope` is `anytime`: no save depends on a game. With the framework off the pack is off too.
+Name a pack for who made it and what is in it, so two people's card games sit side by side.
 
-The renderer's entry is the whole of the registration:
+The renderer's entry is the whole of the registration, a line per game:
 
 ```ts
 import HIGH_LOW from '@shared/minigameEntries/high-low'

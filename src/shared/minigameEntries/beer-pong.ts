@@ -2,7 +2,7 @@ import type { MiniGameDef } from '../minigames'
 
 const BEER_PONG: MiniGameDef = {
   id: 'beer-pong',
-  modId: 'beer-pong',
+  modId: 'morrowkiln-party-games',
   name: 'Beer Pong',
   icon: '🍺',
   blurb:

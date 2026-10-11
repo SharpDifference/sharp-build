@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { seededRand } from '../src/shared/hash'
 import { gamesOffered, MINI_GAMES, MINI_GAMES_LIST, suggestRate } from '../src/shared/minigames'
-import PARADISO_MOD from '../src/shared/modEntries/paradiso'
+import PARADISO_MOD from '../src/shared/modEntries/morrowkiln-arcade-games'
 import {
   MIN_LANE_GAP_MS,
   WINDOWS,

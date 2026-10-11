@@ -2,7 +2,7 @@ import type { MiniGameDef } from '../minigames'
 
 const PARADISO: MiniGameDef = {
   id: 'paradiso',
-  modId: 'paradiso',
+  modId: 'morrowkiln-arcade-games',
   name: 'PARADISO',
   icon: '💃',
   blurb:

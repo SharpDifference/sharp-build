@@ -1,4 +1,5 @@
-import { gamesOffered, listed, type MiniGameDef } from '@shared/minigames'
+import { gamesOffered, gameSwitchOn, listed, type MiniGameDef } from '@shared/minigames'
+import { modById, optionKey } from '@shared/mods'
 import { charKeyOf } from '@shared/types'
 import { useGameStore } from '../stores/gameStore'
 import { submitAction, takeTurnFromReply } from '../stores/gameLoop'
@@ -13,13 +14,20 @@ import { tableLine } from './talk'
 
 /** Where the framework meets the scene: what is on offer in it, and how a result goes into it. */
 
+/** A game can be played: the pack that brings it is on, and so is the game's own switch in it. */
+export function gameIsOn(modId: string, game: MiniGameDef): boolean {
+  if (!modIsOn(modId)) return false
+  const { options } = useModsStore.getState().switches
+  return gameSwitchOn(game, modById(modId), (optionId) => options[optionKey(modId, optionId)])
+}
+
 /** The games on offer in the scene on screen, each with a component to play it with. */
 export function useGamesOffered(): MiniGameDef[] {
   const location = useGameStore((s) => s.sceneLocation)
   const girls = useGameStore((s) => s.cast.filter((id) => !s.departed.includes(id)).length)
   // Read so a switch moved mid-scene is answered at once.
   useModsStore((s) => s.switches)
-  return gamesOffered({ location, girls }, (modId) => modIsOn(modId)).filter((game) =>
+  return gamesOffered({ location, girls }, gameIsOn).filter((game) =>
     Boolean(gameComponent(game.id))
   )
 }

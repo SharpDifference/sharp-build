@@ -2,7 +2,7 @@ import type { MiniGameDef } from '../minigames'
 
 const HIGH_LOW: MiniGameDef = {
   id: 'high-low',
-  modId: 'high-low',
+  modId: 'morrowkiln-card-games',
   name: 'High-Low',
   icon: '🃏',
   blurb:

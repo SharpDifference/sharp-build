@@ -2,7 +2,7 @@ import type { MiniGameDef } from '../minigames'
 
 const POOL: MiniGameDef = {
   id: 'pool',
-  modId: 'pool',
+  modId: 'morrowkiln-arcade-games',
   name: 'Pool',
   icon: '🎱',
   blurb:
