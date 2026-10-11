@@ -10,12 +10,13 @@
   min-width: 0;
 }
 
-/* The cabinet: the board, and whatever is said over it. */
+/* The cabinet: the board, and whatever is said over it. The board is 300 by 353 of its own units,
+   taller than wide so that no row's art reaches the next; the cabinet keeps that shape. */
 .vu-whack-cabinet {
   position: relative;
   flex: none;
-  width: 420px;
-  height: 420px;
+  width: 374px;
+  height: 440px;
   border-radius: 28px;
   background: var(--vu-recessed);
 }
@@ -137,6 +138,11 @@
 .vu-whack-flash[data-swing='hit'],
 .vu-whack-flash[data-swing='gold'] {
   fill: var(--vu-good);
+}
+
+.vu-whack-flash[data-swing='resting'] {
+  fill: var(--vu-text-muted);
+  font-size: 13px;
 }
 
 .vu-whack-flash[data-swing='decoy'],

@@ -3,6 +3,7 @@ import { motion } from 'motion/react'
 import {
   BOPPED,
   DUCKED,
+  HAND_MS,
   HOLES,
   emptyTally,
   endLine,
@@ -14,11 +15,12 @@ import {
   outcomeOf,
   paceName,
   paceOf,
+  readerSwing,
   secondsOf,
   soloAccount,
   soloSummary,
+  standingAccount,
   startLine,
-  swingAt,
   tallied,
   versusAccount,
   versusSummary,
@@ -34,7 +36,6 @@ import {
   pointIn,
   press,
   remarkBudget,
-  sayCapped,
   typingIn,
   useAway,
   useOnTable,
@@ -44,13 +45,18 @@ import {
 import type { GamePlay } from '../kit'
 import '../../vu_styles/WhackABun.css'
 
-/** The keys for the nine holes, as they lie on the number pad and on the left of the letters. */
+/**
+ * The keys for the nine holes, by where they are on the keyboard and not by what they type: the
+ * number pad whatever NumLock says, the number row, and the block of nine letter keys at the left,
+ * which is Q W E, A S D, Z X C on one layout and something else on another.
+ */
 const KEYS: Readonly<Record<string, number>> = {
-  '7': 0, '8': 1, '9': 2, '4': 3, '5': 4, '6': 5, '1': 6, '2': 7, '3': 8,
-  q: 0, w: 1, e: 2, a: 3, s: 4, d: 5, z: 6, x: 7, c: 8
+  Numpad7: 0, Numpad8: 1, Numpad9: 2, Numpad4: 3, Numpad5: 4, Numpad6: 5, Numpad1: 6, Numpad2: 7, Numpad3: 8,
+  Digit7: 0, Digit8: 1, Digit9: 2, Digit4: 3, Digit5: 4, Digit6: 5, Digit1: 6, Digit2: 7, Digit3: 8,
+  KeyQ: 0, KeyW: 1, KeyE: 2, KeyA: 3, KeyS: 4, KeyD: 5, KeyZ: 6, KeyX: 7, KeyC: 8
 }
-/** What is printed by each hole: its two keys. */
-const KEY_HINTS = ['7 Q', '8 W', '9 E', '4 A', '5 S', '6 D', '1 Z', '2 X', '3 C']
+/** What is printed by each hole: its place on the number pad, which reads the same on any keyboard. */
+const KEY_HINTS = ['7', '8', '9', '4', '5', '6', '1', '2', '3']
 
 /** How many times in a round anything is said, by how talkative the girls are to be: the whole table's. */
 const REMARKS = { quiet: 0, some: 3, lots: 6 } as const
@@ -58,8 +64,6 @@ const REMARKS = { quiet: 0, some: 3, lots: 6 } as const
 const REMARK_GAP_MS = 5000
 /** Nothing is said this close to the buzzer: the scene's own reply answers the result, in ms. */
 const QUIET_END_MS = 3500
-/** How long a line is given to arrive before another may be asked for, in ms. */
-const SAY_CAP_MS = 7000
 /** The runs worth a word as they are reached, and the ones more that the talkative remark on. */
 const RUNS_TOLD = [10, 20]
 const RUNS_TOLD_LOTS = [5, 10, 20]
@@ -73,8 +77,21 @@ const FRAME_CAP_MS = 50
 /** How long what a swing came to is shown over its hole, in ms. */
 const FLASH_MS = 450
 
-/** The board as it is drawn: three cells of this size each way, and how near a hole a click has to be. */
+/** A click or a key within this long of the window coming back is the one that brought it back, in ms. */
+const RETURN_MS = 250
+
+/**
+ * The board as it is drawn, in the SVG's own units. A hole's art, about the middle of its group,
+ * runs from 55 above (a carrot's leaves; what a swing came to is written just under that) to 50
+ * below (the key printed under the lip), 105 in all, and 39 either side. So the holes are 100
+ * apart across and 114 down, the first row's middle 65 from the top and 60 kept under the last:
+ * 10 clear above and below, and 9 between one row's key and the next row's leaves.
+ */
 const CELL = 100
+const ROW = 114
+const HEAD = 65
+const BOARD_H = HEAD + ROW * 2 + 60
+/** How near the middle of a hole a click has to be. */
 const REACH = 46
 
 const WORD: Readonly<Record<Swing, string>> = {
@@ -96,6 +113,9 @@ interface Seat {
 
 const freshSeat = (): Seat => ({ tally: emptyTally(), last: null, count: 0 })
 
+/** What is written over a hole: what a swing came to, or that the mallet was not back for it. */
+type Tone = Swing | 'resting'
+
 /** One hole of the reader's board as it is drawn. */
 interface Hole {
   /** What is in it, or was last: kept while it ducks. */
@@ -103,7 +123,7 @@ interface Hole {
   up: boolean
   /** What the last swing here came to, while it is shown. */
   flash: string
-  tone: Swing | null
+  tone: Tone | null
 }
 
 const emptyHoles = (): Hole[] => Array.from({ length: HOLES }, () => ({ kind: 'bun', up: false, flash: '', tone: null }))
@@ -124,7 +144,11 @@ interface Live {
   herFrom: number[]
   /** What each hole last held, and what is shown over it until when. */
   kinds: Kind[]
-  flash: { text: string; tone: Swing; until: number }[]
+  flash: { text: string; tone: Tone; until: number }[]
+  /** When the reader's mallet is back from his last swing, in ms into the round. */
+  freeAt: number
+  /** The last quarter of the round the scene was told the standing at. */
+  quarter: number
   /** What was last drawn, as one string: the board is set again only when it changes. */
   drawn: string
   halfway: number[] | null
@@ -228,7 +252,9 @@ export function WhackABun({ play }: { play: GamePlay }): JSX.Element {
     seats: [freshSeat(), ...girls.map(freshSeat)],
     herFrom: girls.map(() => 0),
     kinds: Array<Kind>(HOLES).fill('bun'),
-    flash: Array.from({ length: HOLES }, () => ({ text: '', tone: 'hit' as Swing, until: -Infinity })),
+    flash: Array.from({ length: HOLES }, () => ({ text: '', tone: 'hit' as Tone, until: -Infinity })),
+    freeAt: 0,
+    quarter: 0,
     drawn: '',
     halfway: null,
     leader: -1,
@@ -239,6 +265,9 @@ export function WhackABun({ play }: { play: GamePlay }): JSX.Element {
   const onTable = useOnTable()
   const away = useAway()
   const gone = useRef(away)
+  // When the window last came back, by `performance.now()`: what brought it back is not a swing.
+  const backAt = useRef(-Infinity)
+  if (gone.current && !away) backAt.current = performance.now()
   gone.current = away
   const still = useReducedMotion()
   const held = useRef(play)
@@ -273,7 +302,8 @@ export function WhackABun({ play }: { play: GamePlay }): JSX.Element {
   /**
    * Has one girl say something about what just happened, and never holds the round for it: one
    * line on its way at a time, a few a round between all of them, none near the buzzer. A remark
-   * not made spends nothing. Of the reader's doings the girl who has said least speaks.
+   * not made spends nothing. Of the reader's doings the girl who has said least speaks. Another
+   * is asked for only once this one has truly come or been given up, however long that takes.
    */
   function remark(place: number, cue: string): void {
     const game = live.current
@@ -288,9 +318,13 @@ export function WhackABun({ play }: { play: GamePlay }): JSX.Element {
     game.lastRemarkAt = game.at
     game.spoken[seat]++
     held.current.situation(standing())
-    void sayCapped(held.current, girls[seat].charId, cue, SAY_CAP_MS).then(() => {
-      game.speaking = false
-    })
+    const charId = girls[seat].charId
+    void Promise.resolve()
+      .then(() => held.current.say(charId, cue))
+      .catch(() => undefined)
+      .then(() => {
+        game.speaking = false
+      })
   }
 
   /** One thing happening at one cabinet: counted, and remarked on where it is worth it. */
@@ -348,21 +382,34 @@ export function WhackABun({ play }: { play: GamePlay }): JSX.Element {
     held.current.started()
     if (girls.length === 0) held.current.narrate(startLine(pattern, names))
     else held.current.situation(standing())
+    held.current.progress(standingAccount(pattern, game.at, game.seats[0].tally, rivals()))
     setCount(Math.ceil(COUNT_IN_MS / 1000))
     setPhase('count')
   }
 
-  /** The mallet down on a hole: a bop, a carrot, an empty hole, or nothing at all a moment late. */
+  /**
+   * The mallet down on a hole: a bop, a carrot, an empty hole, or nothing at all a moment late.
+   * It is then away for a moment, as the girls' are, and a swing before it is back is none: the
+   * hole says so, unless it is still saying what the last swing came to.
+   */
   function swing(hole: number): void {
     const game = live.current
     if (game.over || !game.begun || game.at < 0 || gone.current || !onTable()) return
-    const found = swingAt(pops, game.done, hole, game.at)
+    if (performance.now() - backAt.current < RETURN_MS) return
+    const found = readerSwing(pops, game.done, hole, game.at, game.freeAt)
+    if (found === 'resting') {
+      if (game.flash[hole].until > game.at) return
+      game.flash[hole] = { text: 'wait', tone: 'resting', until: game.freeAt }
+      draw(game.at)
+      return
+    }
+    game.freeAt = game.at + HAND_MS
     if (found === 'late') return
     const what = found === 'stray' ? 'stray' : BOPPED[pops[found].kind]
     if (found !== 'stray') game.done[found] = true
     const gained = land(0, what)
     game.flash[hole] = {
-      text: what === 'stray' ? 'miss' : gained > 0 ? `+${gained}` : gained < 0 ? `−${-gained}` : '−0',
+      text: gained > 0 ? `+${gained}` : gained < 0 ? `−${-gained}` : what === 'stray' ? 'miss' : '−0',
       tone: what,
       until: game.at + FLASH_MS
     }
@@ -384,9 +431,10 @@ export function WhackABun({ play }: { play: GamePlay }): JSX.Element {
   useWindowKeydown((event) => {
     // A key typed to her is a character, never a swing.
     if (typingIn(event) || event.ctrlKey || event.metaKey || event.altKey) return
-    const hole = KEYS[event.key.length === 1 ? event.key.toLowerCase() : event.key]
+    const hole = KEYS[event.code]
     if (hole === undefined) return
     event.preventDefault()
+    // A key held down is one swing.
     if (event.repeat) return
     if (live.current.begun) swing(hole)
     else begin()
@@ -463,12 +511,13 @@ export function WhackABun({ play }: { play: GamePlay }): JSX.Element {
       if (!game.halfway && at >= lengthMs / 2) {
         game.halfway = scores()
         held.current.narrate(halfwayLine(game.seats[0].tally, rivals()))
-        if (girls.length > 0) {
-          held.current.situation(standing())
-          held.current.progress([
-            `They were halfway through a round of Whack-a-Bun, ${seconds} seconds at a ${paceName(pace)} pace, the reader on ${game.halfway[0]} and ${girls.map((girl, seat) => `${girl.name} on ${game.halfway?.[seat + 1]}`).join(', ')}.`
-          ])
-        }
+        if (girls.length > 0) held.current.situation(standing())
+      }
+      // At each quarter the scene is told how it stands, for a round walked away from.
+      const quarter = Math.min(3, Math.floor((at * 4) / lengthMs))
+      if (quarter > game.quarter) {
+        game.quarter = quarter
+        held.current.progress(standingAccount(pattern, at, game.seats[0].tally, rivals()))
       }
 
       if (at >= lengthMs) {
@@ -496,7 +545,7 @@ export function WhackABun({ play }: { play: GamePlay }): JSX.Element {
       <div className="vu-whack-cabinet">
         <svg
           className="vu-whack-board"
-          viewBox={`0 0 ${CELL * 3} ${CELL * 3}`}
+          viewBox={`0 0 ${CELL * 3} ${BOARD_H}`}
           role="img"
           aria-label="Your cabinet: nine holes, three rows of three"
           onPointerDown={(event) => {
@@ -504,10 +553,10 @@ export function WhackABun({ play }: { play: GamePlay }): JSX.Element {
             const point = pointIn(event.currentTarget, event)
             if (!point) return
             const column = Math.floor(point.x / CELL)
-            const row = Math.floor(point.y / CELL)
+            const row = Math.round((point.y - HEAD) / ROW)
             if (column < 0 || column > 2 || row < 0 || row > 2) return
             // A click between two holes is a click on neither.
-            if (Math.hypot(point.x - (column + 0.5) * CELL, point.y - (row + 0.5) * CELL) > REACH) return
+            if (Math.hypot(point.x - (column + 0.5) * CELL, point.y - (HEAD + row * ROW)) > REACH) return
             event.preventDefault()
             swing(row * 3 + column)
           }}
@@ -519,7 +568,7 @@ export function WhackABun({ play }: { play: GamePlay }): JSX.Element {
             </clipPath>
           </defs>
           {holes.map((hole, index) => (
-            <g key={index} transform={`translate(${(index % 3) * CELL + CELL / 2} ${Math.floor(index / 3) * CELL + CELL / 2 + 6})`}>
+            <g key={index} transform={`translate(${(index % 3) * CELL + CELL / 2} ${HEAD + Math.floor(index / 3) * ROW})`}>
               <ellipse className="vu-whack-hole" cx="0" cy="26" rx="36" ry="12" />
               <g clipPath="url(#vu-whack-rim)">
                 <g className="vu-whack-critter" data-up={(hole.up && !covered) || undefined}>
@@ -545,8 +594,9 @@ export function WhackABun({ play }: { play: GamePlay }): JSX.Element {
               <BunnyMark />
             </span>
             <p className="vu-whack-how">
-              Bop each bunny before it ducks: click it, or press its hole on the keys. A crowned
-              golden one is worth triple. Leave the carrots alone.
+              Bop each bunny before it ducks: click it, or press its hole on the number pad, or on
+              the block of nine letter keys at the left of the keyboard. A crowned golden one is
+              worth triple. Leave the carrots alone, and the empty holes.
             </p>
             <p className="vu-whack-terms">
               {seconds} seconds · {paceName(pace)}
@@ -595,7 +645,7 @@ export function WhackABun({ play }: { play: GamePlay }): JSX.Element {
             <Card key={place} who={place === 0 ? 'You' : names[place - 1]} seat={seat} first={first === place} />
           ))}
         </div>
-        <p className="vu-whack-legend">bunny 10 · golden ×3 · carrot −20 · 5 in a row ×1.5 · 10 in a row ×2</p>
+        <p className="vu-whack-legend">bunny 10 · golden ×3 · carrot −20 · empty hole −5 · 5 in a row ×1.5 · 10 in a row ×2</p>
       </div>
     </div>
   )

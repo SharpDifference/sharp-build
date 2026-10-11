@@ -192,6 +192,8 @@ export type Swing = 'hit' | 'gold' | 'decoy' | 'miss' | 'slipped' | 'stray'
 export const BUN_POINTS = 10
 export const GOLD_TIMES = 3
 export const DECOY_COST = 20
+/** What a swing at an empty hole costs: little, but swinging at everything is not a way to play. */
+export const STRAY_COST = 5
 /** Every this many hits in a row the bonus goes up a step, and how many steps there are. */
 export const STREAK_STEP = 5
 const STREAK_STEPS = 2
@@ -223,9 +225,9 @@ export function emptyTally(): Tally {
 }
 
 /**
- * A tally with one more thing on it. A hit scores at the run it makes; a carrot costs its points,
- * never below nothing; a bunny away, a carrot or an empty hole ends the run. A golden bunny that
- * got away costs nothing but itself.
+ * A tally with one more thing on it. A hit scores at the run it makes; a carrot costs its points
+ * and an empty hole its few, never below nothing; a bunny away, a carrot or an empty hole ends
+ * the run. A golden bunny that got away costs nothing but itself.
  */
 export function tallied(tally: Tally, swing: Swing): Tally {
   if (swing === 'slipped') return tally
@@ -243,7 +245,7 @@ export function tallied(tally: Tally, swing: Swing): Tally {
   }
   return {
     ...tally,
-    score: swing === 'decoy' ? Math.max(0, tally.score - DECOY_COST) : tally.score,
+    score: Math.max(0, tally.score - (swing === 'decoy' ? DECOY_COST : swing === 'stray' ? STRAY_COST : 0)),
     streak: 0,
     misses: tally.misses + (swing === 'miss' ? 1 : 0),
     decoys: tally.decoys + (swing === 'decoy' ? 1 : 0),
@@ -306,8 +308,63 @@ export const HANDS: Readonly<Record<Skill, Hand>> = {
   5: { reactMs: 450, spreadMs: 80, lapse: 0.02, flail: 0.1, fallFor: 0.04 }
 }
 
-/** From one bop to the next, at the least, in ms: the mallet has to get there. */
+/**
+ * From one swing to the next, at the least, in ms: the mallet has to get there. It holds for the
+ * girls' hands and for the reader's alike.
+ */
 export const HAND_MS = 220
+
+/**
+ * What a swing of the reader's at `hole` at `at` ms comes to, his mallet free again from
+ * `freeAt`: `resting` where it is still coming back from his last swing, which is no swing at
+ * all; otherwise what {@link swingAt} finds. Whatever it finds, the mallet is then away for
+ * {@link HAND_MS}.
+ */
+export function readerSwing(
+  pops: readonly Pop[],
+  done: readonly boolean[],
+  hole: number,
+  at: number,
+  freeAt: number
+): number | 'late' | 'stray' | 'resting' {
+  return at < freeAt ? 'resting' : swingAt(pops, done, hole, at)
+}
+
+/** A key or a click of the reader's: when, in ms from the start of the round, and at which hole. */
+export interface Press {
+  at: number
+  hole: number
+}
+
+/**
+ * A whole round as a run of the reader's presses plays it, in the order it happens: each press a
+ * swing where the mallet is free and nothing where it is not, and whatever was never bopped gone
+ * as it ducks. It is the reader's game as his cabinet counts it, for a round played out in one go.
+ */
+export function pressPlay(pattern: Pattern, presses: readonly Press[]): Move[] {
+  const { pops, lengthMs } = pattern
+  const done: boolean[] = []
+  const moves: Move[] = []
+  let freeAt = 0
+  for (const press of [...presses].sort((a, b) => a.at - b.at)) {
+    if (press.at < 0 || press.at >= lengthMs) continue
+    const found = readerSwing(pops, done, press.hole, press.at, freeAt)
+    if (found === 'resting') continue
+    freeAt = press.at + HAND_MS
+    if (found === 'late') continue
+    if (found === 'stray') {
+      moves.push({ at: press.at, pop: -1, swing: 'stray' })
+      continue
+    }
+    done[found] = true
+    moves.push({ at: press.at, pop: found, swing: BOPPED[pops[found].kind] })
+  }
+  pops.forEach((pop, index) => {
+    const ducked = DUCKED[pop.kind]
+    if (!done[index] && ducked) moves.push({ at: pop.at + pop.upMs, pop: index, swing: ducked })
+  })
+  return moves.sort((a, b) => a.at - b.at)
+}
 
 /** One thing that happens at a cabinet, and when. `pop` is its place in the pattern, -1 for a swing at nothing. */
 export interface Move {
@@ -381,12 +438,14 @@ export function leaderOf(scores: readonly number[]): number {
 }
 
 /** How the reader went about a round. */
-export type ReaderPlay = 'sharp' | 'wild' | 'cautious' | 'steady'
+export type ReaderPlay = 'sharp' | 'wild' | 'slow' | 'cautious' | 'steady'
 
 /**
  * How the reader played, from his count and what the pattern offered: wild where a good share of
  * his swings went on carrots and empty holes, sharp where he got nearly everything and wasted
- * little, cautious where he wasted little and let a lot go.
+ * little, slow where a lot of bunnies got away from him. Cautious is kept for a round that shows
+ * it: carrots came up and he hit none of them, with hardly a swing at nothing, and some bunnies
+ * went by. Whether he let one go or was late for it the count cannot say, so it is not said.
  */
 export function readerPlay(pattern: Pattern, tally: Tally): ReaderPlay {
   const counts = countsOf(pattern)
@@ -398,7 +457,8 @@ export function readerPlay(pattern: Pattern, tally: Tally): ReaderPlay {
   const waste = swings > 0 ? wasted / swings : 0
   if (waste >= 0.2 && wasted >= 3) return 'wild'
   if (got >= 0.8) return 'sharp'
-  if (got < 0.6) return 'cautious'
+  if (got < 0.6) return 'slow'
+  if (counts.decoy >= 2 && tally.decoys === 0 && tally.strays <= 1) return 'cautious'
   return 'steady'
 }
 
@@ -423,6 +483,31 @@ export function halfwayLine(mine: Tally, rivals: readonly Rival[]): string {
   const lead = leaderOf(scoresOf(mine, rivals))
   const ahead = lead < 0 ? 'level at the top' : lead === 0 ? 'you are ahead' : `${rivals[lead - 1].name} is ahead`
   return `Halfway: you ${mine.score}, ${rivals.map((rival) => `${rival.name} ${rival.tally.score}`).join(', ')}; ${ahead}.`
+}
+
+/**
+ * How a round stands at `at` ms, as the scene's writer is told it should the reader walk away
+ * there: the terms, how far in it was, and the scores.
+ */
+export function standingAccount(pattern: Pattern, at: number, mine: Tally, rivals: readonly Rival[]): string[] {
+  const left = Math.max(0, Math.ceil((pattern.lengthMs - at) / 1000))
+  const terms = `${pattern.seconds} seconds at a ${paceName(pattern.pace)} pace`
+  const where = at <= 0 ? 'had only just begun' : `had ${left} of its ${pattern.seconds} seconds left`
+  if (rivals.length === 0) {
+    return [
+      `The reader was playing a round of Whack-a-Bun alone at the arcade, ${terms}, and it ${where}.`,
+      at <= 0
+        ? 'Nothing was scored yet.'
+        : `He had ${mine.score} points: ${mine.hits + mine.golds} bunnies bopped, ${mine.misses} away, ${mine.decoys} carrots hit, best run ${mine.best} in a row.`
+    ]
+  }
+  const lead = leaderOf(scoresOf(mine, rivals))
+  return [
+    `The reader and ${listed(rivals.map((rival) => rival.name))} were playing a round of Whack-a-Bun at the arcade, a cabinet each, ${terms}, and it ${where}.`,
+    at <= 0
+      ? 'Nothing was scored yet.'
+      : `The score then: the reader ${mine.score}, ${rivals.map((rival) => `${rival.name} ${rival.tally.score}`).join(', ')}; ${lead < 0 ? 'nobody alone in front' : lead === 0 ? 'the reader ahead' : `${rivals[lead - 1].name} ahead`}.`
+  ]
 }
 
 /** The buzzer, as the scene's narration says it. The scores are the result's to say. */
@@ -469,7 +554,8 @@ function playedLine(who: string, pattern: Pattern, tally: Tally): string {
 const PLAYED: Readonly<Record<ReaderPlay, string>> = {
   sharp: 'The reader played sharp: nearly everything bopped and hardly a swing wasted.',
   wild: 'The reader played wild: swinging at everything, carrots and empty holes included, which kept breaking his run.',
-  cautious: 'The reader played cautious: little wasted, but a lot of bunnies let go.',
+  slow: 'The reader was slow: a lot of bunnies had ducked before his mallet got to them.',
+  cautious: 'The reader played carefully: not one carrot hit and hardly a swing wasted, though some bunnies got away.',
   steady: 'The reader played steadily: most of the bunnies, the odd one away.'
 }
 
@@ -482,7 +568,7 @@ const CLOSE_BUNS = 3
  */
 export function soloAccount(pattern: Pattern, mine: Tally): string[] {
   return [
-    `The reader played one round of Whack-a-Bun alone at the arcade, ${pattern.seconds} seconds at a ${paceName(pattern.pace)} pace: bunnies to bop for 10, golden ones for triple, carrots that cost 20 if hit.`,
+    `The reader played one round of Whack-a-Bun alone at the arcade, ${pattern.seconds} seconds at a ${paceName(pattern.pace)} pace: bunnies to bop for 10, golden ones for triple, carrots that cost 20 if hit, 5 off for a swing at an empty hole.`,
     playedLine('The reader', pattern, mine),
     PLAYED[readerPlay(pattern, mine)]
   ]
@@ -508,7 +594,7 @@ export function versusAccount(
   const won = leaderOf(scores)
   const cap = (text: string): string => text.charAt(0).toUpperCase() + text.slice(1)
   return [
-    `They played one round of Whack-a-Bun at the arcade, the reader and ${listed(rivals.map((rival) => rival.name))} at a cabinet each with the same pattern at the same time, ${pattern.seconds} seconds at a ${paceName(pattern.pace)} pace: bunnies to bop for 10, golden ones for triple, carrots that cost 20 if hit.`,
+    `They played one round of Whack-a-Bun at the arcade, the reader and ${listed(rivals.map((rival) => rival.name))} at a cabinet each with the same pattern at the same time, ${pattern.seconds} seconds at a ${paceName(pattern.pace)} pace: bunnies to bop for 10, golden ones for triple, carrots that cost 20 if hit, 5 off for a swing at an empty hole.`,
     playedLine('The reader', pattern, mine),
     ...rivals.map((rival) => playedLine(rival.name, pattern, rival.tally)),
     led < 0

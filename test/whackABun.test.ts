@@ -6,6 +6,7 @@ import {
   HOLES,
   LATE_GRACE_MS,
   MOST_UP,
+  STRAY_COST,
   countsOf,
   emptyTally,
   handPlay,
@@ -13,14 +14,19 @@ import {
   leaderOf,
   makePattern,
   mostUp,
+  soloAccount,
   multiplierOf,
   outcomeOf,
+  pressPlay,
   readerPlay,
+  readerSwing,
+  standingAccount,
   swingAt,
   tallied,
   tallyOf,
   type Hand,
   type Pattern,
+  type Press,
   type Skill,
   type Swing
 } from '../src/shared/minigameRules/whackABun'
@@ -117,6 +123,10 @@ describe('Whack-a-Bun scoring', () => {
   it('takes a carrot off the score, never below nothing, and counts everything', () => {
     expect(count(['hit', 'hit', 'hit', 'decoy']).score).toBe(30 - DECOY_COST)
     expect(count(['hit', 'decoy']).score).toBe(0)
+    // An empty hole costs a little as well as the run.
+    expect(count(['hit', 'hit', 'stray']).score).toBe(20 - STRAY_COST)
+    expect(count(['stray', 'stray']).score).toBe(0)
+    expect(count(['hit', 'miss', 'slipped']).score).toBe(10)
     expect(count(['hit', 'gold', 'miss', 'decoy', 'stray', 'slipped', 'stray'])).toMatchObject({
       hits: 1,
       golds: 1,
@@ -159,6 +169,44 @@ describe('a swing at a hole', () => {
   it('counts for nothing a moment late, or on a bunny already bopped', () => {
     expect(swingAt(pops, [], 4, 1800 + LATE_GRACE_MS)).toBe('late')
     expect(swingAt(pops, [true], 4, 1400)).toBe('late')
+  })
+})
+
+describe("the reader's mallet", () => {
+  const pattern: Pattern = {
+    seconds: 30,
+    pace: 2,
+    lengthMs: 30000,
+    pops: [
+      { at: 1000, hole: 4, upMs: 800, kind: 'bun' },
+      { at: 1100, hole: 2, upMs: 800, kind: 'bun' },
+      { at: 3000, hole: 0, upMs: 800, kind: 'decoy' },
+      { at: 5000, hole: 7, upMs: 600, kind: 'gold' }
+    ]
+  }
+
+  it('is away for a moment after any swing, and a swing while it is away is none', () => {
+    expect(readerSwing(pattern.pops, [], 4, 1200, 0)).toBe(0)
+    expect(readerSwing(pattern.pops, [], 4, 1200, 1201)).toBe('resting')
+    expect(readerSwing(pattern.pops, [], 8, 1200, 1201)).toBe('resting')
+    expect(readerSwing(pattern.pops, [], 8, 1200, 1200)).toBe('stray')
+  })
+
+  it('plays a run of presses: the second of two too close together is lost, whatever the first found', () => {
+    const play = (presses: Press[]) => pressPlay(pattern, presses)
+    // Both bopped with the mallet's time between them.
+    expect(tallyOf(play([{ at: 1200, hole: 4 }, { at: 1200 + HAND_MS, hole: 2 }]))).toMatchObject({ hits: 2, misses: 0, score: 20 })
+    // Too soon after a bop: the second is not swung at, and gets away.
+    expect(tallyOf(play([{ at: 1200, hole: 4 }, { at: 1200 + HAND_MS - 1, hole: 2 }]))).toMatchObject({ hits: 1, misses: 1, strays: 0 })
+    // Too soon after an empty hole, the same; and a press while resting does not put the rest off.
+    const after = play([{ at: 1200, hole: 8 }, { at: 1300, hole: 4 }, { at: 1200 + HAND_MS, hole: 2 }])
+    expect(after.map((move) => move.swing)).toEqual(['stray', 'hit', 'miss', 'slipped'])
+    // A moment late counts for nothing but still takes the mallet away.
+    const late = play([{ at: 1800 + LATE_GRACE_MS, hole: 4 }, { at: 1850 + LATE_GRACE_MS, hole: 2 }])
+    expect(tallyOf(late)).toMatchObject({ hits: 0, misses: 2, strays: 0 })
+    // Nothing pressed: every bunny away, the carrot left alone, the golden one only slipped.
+    expect(play([]).map((move) => move.swing)).toEqual(['miss', 'miss', 'slipped'])
+    expect(tallyOf(play([{ at: 3100, hole: 0 }, { at: 5100, hole: 7 }, { at: 31000, hole: 1 }]))).toMatchObject({ decoys: 1, golds: 1, strays: 0 })
   })
 })
 
@@ -223,12 +271,36 @@ describe('how the reader played', () => {
   const counts = countsOf(pattern)
   const targets = counts.bun + counts.gold
 
-  it('tells sharp from wild from cautious', () => {
+  it('tells sharp from wild from slow, and calls him cautious only on the carrots he left', () => {
     const got = (hits: number, extra: Partial<ReturnType<typeof emptyTally>> = {}) => ({ ...emptyTally(), hits, ...extra })
+    expect(counts.decoy).toBeGreaterThanOrEqual(2)
     expect(readerPlay(pattern, got(targets - 2))).toBe('sharp')
     expect(readerPlay(pattern, got(targets - 2, { strays: 6, decoys: 3 }))).toBe('wild')
-    expect(readerPlay(pattern, got(Math.floor(targets / 2)))).toBe('cautious')
-    expect(readerPlay(pattern, got(Math.floor(targets * 0.7), { strays: 1 }))).toBe('steady')
+    // Too slow is slow, however few carrots he hit on the way.
+    expect(readerPlay(pattern, got(Math.floor(targets / 2)))).toBe('slow')
+    expect(readerPlay(pattern, got(Math.floor(targets / 2), { misses: Math.ceil(targets / 2) }))).toBe('slow')
+    expect(readerPlay(pattern, got(Math.floor(targets * 0.7), { strays: 1 }))).toBe('cautious')
+    expect(readerPlay(pattern, got(Math.floor(targets * 0.7), { decoys: 1 }))).toBe('steady')
+    expect(readerPlay(pattern, got(Math.floor(targets * 0.7), { strays: 2 }))).toBe('steady')
+  })
+
+  it('says slow, not cautious, of a reader the bunnies got away from', () => {
+    const slow = soloAccount(pattern, { ...emptyTally(), hits: 3, misses: counts.bun - 3 }).join(' ')
+    expect(slow).toContain('was slow')
+    expect(slow).not.toMatch(/cautious|careful|bunnies let go/)
+  })
+
+  it('gives a round walked away from its account: the terms, the time left and the scores', () => {
+    const mine = { ...emptyTally(), score: 40, hits: 4, best: 4 }
+    const rivals = [{ name: 'Mia', tally: { ...emptyTally(), score: 60 } }]
+    expect(standingAccount(pattern, 0, mine, rivals).join(' ')).toMatch(/Mia.*only just begun.*Nothing was scored/)
+    const mid = standingAccount(pattern, 7500, mine, rivals).join(' ')
+    expect(mid).toContain('23 of its 30 seconds left')
+    expect(mid).toContain('the reader 40, Mia 60; Mia ahead')
+    const alone = standingAccount(pattern, 15000, mine, []).join(' ')
+    expect(alone).toContain('alone')
+    expect(alone).toContain('40 points')
+    expect(standingAccount(pattern, 15000, mine, [])).toHaveLength(2)
   })
 })
 
@@ -260,6 +332,37 @@ describe('Whack-a-Bun balance', () => {
     expect(at[2].won).toBeLessThan(0.65)
     expect(at[3].lost).toBeGreaterThan(0.6)
     expect(at[4].lost).toBeGreaterThan(0.85)
+  })
+
+  /** Every key in turn, round and round, one every `everyMs`: no eyes on the board at all. */
+  function roll(pattern: Pattern, everyMs: number): Press[] {
+    const presses: Press[] = []
+    for (let n = 0; n * everyMs < pattern.lengthMs; n++) presses.push({ at: n * everyMs, hole: n % 9 })
+    return presses
+  }
+
+  it('gives mashing nothing: all nine keys rolled scores far below a careful reader and loses to a 2 and up', () => {
+    const rounds = 300
+    for (const pace of [2, 3]) {
+      for (const everyMs of [15, 30, 60, 110, 220]) {
+        const rand = seeded(pace * 100 + everyMs)
+        let rolled = 0
+        let careful = 0
+        const lost = [0, 0, 0, 0, 0]
+        for (let round = 0; round < rounds; round++) {
+          const pattern = makePattern(`m${round}`, pace, 30)
+          const score = tallyOf(pressPlay(pattern, roll(pattern, everyMs))).score
+          rolled += score
+          careful += tallyOf(handPlay(pattern, READER, rand)).score
+          SKILLS.forEach((skill, i) => {
+            if (score < tallyOf(herGame(pattern, skill, rand)).score) lost[i]++
+          })
+        }
+        const note = `pace ${pace}, a key every ${everyMs} ms`
+        expect(rolled / rounds, note).toBeLessThan((careful / rounds) * 0.4)
+        for (const i of [0, 1, 2, 3, 4]) expect(lost[i] / rounds, `${note}, skill ${i + 1}`).toBeGreaterThan(0.9)
+      }
+    }
   })
 
   it('and holds at the other paces and lengths', () => {
