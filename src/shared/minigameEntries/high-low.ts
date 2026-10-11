@@ -20,9 +20,10 @@ const HIGH_LOW: MiniGameDef = {
     },
     {
       id: 'sudden',
-      label: 'Sudden death (0 off, 1 on)',
+      label: 'Sudden death',
       describe:
         'sudden death, which is how a tiebreak or a death match is played: 1 to play it, 0 for a normal game. In sudden death the two make one call each, again and again, until one of them is ahead after both have had the same number of calls; "calls" is then ignored',
+      values: { 0: 'A normal game', 1: 'Sudden death' },
       min: 0,
       max: 1,
       default: 0

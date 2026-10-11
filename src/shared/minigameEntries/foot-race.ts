@@ -14,6 +14,7 @@ const FOOT_RACE: MiniGameDef = {
       describe:
         'how far the race is: 1 is a 100 metre sprint, all start and leg speed; 2 is 400 metres, one lap; 3 is 800 metres, two laps, a race of pacing',
       label: 'Distance',
+      values: { 1: '100 m', 2: '400 m', 3: '800 m' },
       min: 1,
       max: 3,
       default: 1

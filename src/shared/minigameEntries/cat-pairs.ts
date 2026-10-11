@@ -21,6 +21,7 @@ const CAT_PAIRS: MiniGameDef = {
     {
       id: 'cats',
       label: 'Café cat swaps cards',
+      values: { 0: 'No cat', 1: 'With the cat' },
       describe:
         'whether a café cat is let near the table to swap face-down cards now and then: 1 with the cat, 0 for a plain game with no swaps',
       min: 0,

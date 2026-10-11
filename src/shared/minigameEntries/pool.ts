@@ -15,6 +15,7 @@ const POOL: MiniGameDef = {
       label: 'Racks to win',
       describe:
         'how many racks win the match: 1 is a single rack, 2 is best of three racks (first to two)',
+      values: { 1: 'A single rack', 2: 'Best of three' },
       min: 1,
       max: 2,
       default: 1

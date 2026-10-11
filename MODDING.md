@@ -335,6 +335,7 @@ theme-role variables (`--vu-accent`, `--vu-text`, `--vu-text-muted`, `--vu-text-
 | `surface` | `table` (the default), `board` or `screen`. |
 | `keys` | `true` for a game played on the keyboard. |
 | `skillBrief` | What makes someone good at it, in a sentence. |
+| `options[].label`, `options[].values` | An option's name on the game's page, and what its values are called where a number alone says nothing (`{ 1: '100 m', 2: '400 m' }`). The page lists them under "Ways to play". |
 | `controls` | How it is played, for the player: the keys or the pointer, in a sentence. Shown on the game's page. |
 
 The framework draws a pack's page on the Mods screen from these: the pack's games, each with its

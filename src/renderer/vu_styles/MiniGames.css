@@ -169,3 +169,8 @@ body:has(.vu-minigame-veil) .vu-scene-divider {
   color: var(--vu-text-body);
   font: 400 14px/1.45 var(--font-body);
 }
+
+/* A fact kept as a pair, so a list built by a loop still falls into the two columns. */
+.vu-minigame-fact {
+  display: contents;
+}

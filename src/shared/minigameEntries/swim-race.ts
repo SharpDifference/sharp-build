@@ -15,6 +15,7 @@ const SWIM_RACE: MiniGameDef = {
       label: 'Race distance',
       describe:
         'how far the race is: 1 is two lengths of the pool (at the beach, once out to the buoy and back), a sprint, 2 is four lengths (twice out and back), 3 is six lengths (three times out and back), a long swim that tells on anyone unfit',
+      values: { 1: 'Two lengths', 2: 'Four lengths', 3: 'Six lengths' },
       min: 1,
       max: 3,
       default: 1

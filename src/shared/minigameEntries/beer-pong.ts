@@ -13,6 +13,7 @@ const BEER_PONG: MiniGameDef = {
     {
       id: 'cups',
       label: 'Cups a side',
+      values: { 1: 'Six cups', 2: 'Ten cups' },
       describe: 'how many cups each side racks: 1 is six cups, the usual quick game, and 2 is ten cups, the full long one',
       min: 1,
       max: 2,

@@ -24,6 +24,7 @@ const TRUTH_OR_DARE: MiniGameDef = {
       label: 'How far it goes',
       describe:
         'how far the questions and dares may go: 1 is mild, harmless fun between friends ("keep it clean", "nothing weird"); 2 is flirty, with teasing, crushes and a little closeness; 3 is bold, frank about attraction and daring, a kiss at most and never explicit ("no holding back", "make it spicy"). Pick what was said out loud, and no higher than she would be comfortable with given how close she and the reader are',
+      values: { 1: 'Mild', 2: 'Flirty', 3: 'Bold' },
       min: 1,
       max: 3,
       default: 2

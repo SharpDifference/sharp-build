@@ -53,6 +53,11 @@ export interface GameOption {
   describe: string
   /** What it is called on the game's page, in a few words for the player; `describe` where absent. */
   label?: string
+  /**
+   * What a value is called, where a number alone says nothing (1 is "100 m", 0 is "a plain
+   * game"): by value, for the game's page. A value with no name is shown as its number.
+   */
+  values?: Readonly<Record<number, string>>
   min: number
   max: number
   /** What it is where nothing was said, and for a game played alone. */

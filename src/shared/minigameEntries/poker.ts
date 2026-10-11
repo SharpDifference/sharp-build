@@ -23,6 +23,7 @@ const POKER: MiniGameDef = {
       label: 'Starting chips',
       describe:
         'how deep everyone starts, in tens of big blinds: 1 is 100 chips (short and fast), 2 is 200, 3 is 300, 4 is 400, 5 is 500 (deep)',
+      values: { 1: '100 chips', 2: '200 chips', 3: '300 chips', 4: '400 chips', 5: '500 chips' },
       min: 1,
       max: 5,
       default: 2

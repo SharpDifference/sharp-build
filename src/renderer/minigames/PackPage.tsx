@@ -5,6 +5,7 @@ import {
   listed,
   MINI_GAMES_LIST,
   playersWords,
+  type GameOption,
   type MiniGameDef,
   type SuggestRate
 } from '@shared/minigames'
@@ -39,6 +40,21 @@ const RATES: readonly { value: SuggestRate | ''; label: string }[] = [
   { value: 'rarely', label: 'Rarely' },
   { value: 'never', label: 'Never: only when you ask' }
 ]
+
+/** What one value of an option is called: its own name, or the number. */
+function valueName(option: GameOption, value: number): string {
+  return option.values?.[value] ?? String(value)
+}
+
+/** Every way an option can be set, as a line: the named ones each by name, a plain range as one. */
+function waysOf(option: GameOption): string {
+  const usual = valueName(option, option.default)
+  if (!option.values) return `Any number from ${option.min} to ${option.max}. Usually ${usual}.`
+  const names = Array.from({ length: option.max - option.min + 1 }, (_, i) =>
+    valueName(option, option.min + i)
+  )
+  return `${names.join(', ')}. Usually ${usual.charAt(0).toLowerCase()}${usual.slice(1)}.`
+}
 
 function sentence(text: string): string {
   const trimmed = text.trim()
@@ -76,6 +92,24 @@ function GamePage({ game, onBack }: { game: MiniGameDef; onBack: () => void }): 
         )}
       </dl>
 
+      {(game.options ?? []).length > 0 && (
+        <>
+          <hr className="vu-rule" />
+          <h4 className="vu-mods-label">Ways to play</h4>
+          <p className="vu-mods-option-hint">
+            Say which you want when you ask her, in your own words. She can ask for one too.
+          </p>
+          <dl className="vu-minigame-facts">
+            {(game.options ?? []).map((option) => (
+              <div key={option.id} className="vu-minigame-fact">
+                <dt>{option.label ?? option.id}</dt>
+                <dd>{waysOf(option)}</dd>
+              </div>
+            ))}
+          </dl>
+        </>
+      )}
+
       <hr className="vu-rule" />
       <h4 className="vu-mods-label">How you like it</h4>
       {(game.options ?? []).map((option) => (
@@ -92,10 +126,10 @@ function GamePage({ game, onBack }: { game: MiniGameDef; onBack: () => void }): 
             setPrefs(game.id, { ...prefs, options })
           }}
           options={[
-            { value: '', label: `As the game has it (${option.default})` },
+            { value: '', label: `As the game has it (${valueName(option, option.default)})` },
             ...Array.from({ length: option.max - option.min + 1 }, (_, i) => ({
               value: String(option.min + i),
-              label: String(option.min + i)
+              label: valueName(option, option.min + i)
             }))
           ]}
         />

@@ -15,6 +15,7 @@ const PARADISO: MiniGameDef = {
       label: 'Difficulty',
       describe:
         'how hard the song is, from 1, slow with a step on most beats, to 5, fast and crowded with steps between the beats and two pads at once',
+      values: { 1: '1 · easy', 2: '2', 3: '3', 4: '4', 5: '5 · hard' },
       min: 1,
       max: 5,
       default: 2
