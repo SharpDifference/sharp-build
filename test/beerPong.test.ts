@@ -5,11 +5,14 @@ import {
   canRerack,
   herRerack,
   herTarget,
+  dropped,
+  handScatter,
   herThrow,
   landingOf,
   newGame,
   outcomeOf,
   rackOf,
+  readerThrow,
   rerack,
   resolve,
   scatterOf,
@@ -223,6 +226,60 @@ describe('Beer Pong drink', () => {
     expect(sober[0]).toBeGreaterThan(0.05)
     expect(sober[4]).toBeLessThan(0.9)
     expect(rate(4, 1)).toBeLessThan(sober[3] - 0.08)
+  })
+})
+
+describe('Beer Pong, the reader and whole games', () => {
+  it('lets a well-stopped throw drop about as often as a good player\'s, and still often enough at the cap', () => {
+    const rack = rackOf(6)
+    const dead = throwAt({ x: rack[4].x, y: rack[4].y })
+    const rate = (tipsy: number): number => {
+      const rand = seeded(23)
+      let made = 0
+      for (let i = 0; i < 4000; i++) if (dropped(resolve(landingOf(readerThrow(dead, tipsy, rand)), rack, rand).kind)) made++
+      return made / 4000
+    }
+    expect(handScatter(1)).toBeGreaterThan(handScatter(0))
+    expect(rate(0)).toBeGreaterThan(0.4)
+    expect(rate(0)).toBeLessThan(0.65)
+    expect(rate(1)).toBeGreaterThan(0.25)
+    expect(rate(1)).toBeLessThan(rate(0))
+  })
+
+  it('always ends, and the drinks are the cups sunk, whoever is playing', () => {
+    for (const girls of [1, 2, 3]) {
+      for (const cups of [6, 10]) {
+        for (let seed = 1; seed <= 40; seed++) {
+          const rand = seeded(seed * 97 + girls * 7 + cups)
+          let game = newGame(girls, cups)
+          while (game.winner === null && game.log.length < 3000) {
+            const side = game.turn
+            if (herRerack(game, side)) game = rerack(game, side)
+            // Whoever is up is on the side throwing, and there is always someone.
+            expect(game.sides[side].members).toContain(throwerOf(game))
+            const skill = ((seed + throwerOf(game)) % 5) + 1
+            game = throwBall(game, herThrow(game.sides[side === 0 ? 1 : 0].cups, skill as Skill, tipsyOf(game, side), rand), rand)
+          }
+          expect(game.winner).not.toBeNull()
+          const made = (side: number): number => game.log.filter((shot) => shot.side === side && dropped(shot.kind)).length
+          const drunk = (side: 0 | 1): number[] => game.sides[side].members.map((who) => game.drinks[who])
+          for (const side of [0, 1] as const) {
+            expect(drunk(side).reduce((sum, each) => sum + each, 0)).toBe(made(side === 0 ? 1 : 0))
+            expect(Math.max(...drunk(side)) - Math.min(...drunk(side))).toBeLessThanOrEqual(1)
+            expect(game.reracks.filter((rack) => rack.side === side).length).toBeLessThanOrEqual(1)
+          }
+          for (const rack of game.reracks) expect([2, 3, 4]).toContain(rack.cups)
+          // The balls come back once a turn at most, and a redemption is the last of a game or the start of an overtime.
+          const backs = new Map<number, number>()
+          for (const shot of game.log) if (shot.ballsBack) backs.set(shot.turn, (backs.get(shot.turn) ?? 0) + 1)
+          for (const count of backs.values()) expect(count).toBe(1)
+          expect(game.log.filter((shot) => shot.overtime).length).toBe(game.overtimes)
+          expect(game.log.filter((shot) => shot.final).length).toBe(1)
+          expect(game.log[game.log.length - 1]).toMatchObject({ final: true, redemption: true })
+          expect(accountOf(['Ana', 'Bea', 'Cy'].slice(0, girls), game).length).toBeLessThanOrEqual(26)
+        }
+      }
+    }
   })
 })
 

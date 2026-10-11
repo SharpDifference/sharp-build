@@ -15,6 +15,7 @@ import {
   herThrow,
   newGame,
   outcomeOf,
+  readerThrow,
   rerack,
   shotTold,
   sidesTold,
@@ -53,8 +54,8 @@ const PRESS_GAP_MS = 180
 
 /** The two things a throw is made of, in the order they are stopped, and each one's sweep. */
 const STAGES = [
-  { label: 'Set your aim', sweepMs: 1400 },
-  { label: 'Set the arc', sweepMs: 1300 }
+  { label: 'Set your aim', sweepMs: 1200 },
+  { label: 'Set the arc', sweepMs: 1100 }
 ] as const
 
 /** The table as it is drawn, from above, in cup widths: the reader's end at the bottom. */
@@ -88,7 +89,8 @@ interface Flight {
  * Beer Pong: the table from above, a rack of cups at each end. A throw is two stops, each a
  * click or Space: a marker sweeping across the cups, then one sweeping up the table for the
  * arc; then the ball flies and the rules say where it ends. The girls' throws are the rules' own
- * at their skill. Every cup a side drinks makes its sweeps quicker and less steady. What happens
+ * at their skill. The reader's ball strays a little from his stops, as a hand does, and every cup
+ * his side drinks makes his sweeps quicker and his hand less steady. What happens
  * is said in the scene's dialogue box; the surface shows the table, the sides and the drink.
  */
 export function BeerPong({ play }: { play: GamePlay }): JSX.Element {
@@ -163,7 +165,7 @@ export function BeerPong({ play }: { play: GamePlay }): JSX.Element {
       setStage(1)
       return
     }
-    launch({ aim: aim.current, power: swept.current })
+    launch(readerThrow({ aim: aim.current, power: swept.current }, tipsy))
   }
 
   /** The reader has the cups he is throwing at pulled together, once. */
@@ -427,6 +429,7 @@ export function BeerPong({ play }: { play: GamePlay }): JSX.Element {
                 <span className="vu-beerpong-drinks">
                   {members.map((member) => (
                     <span key={member} data-up={(!over && who === member) || undefined}>
+                      {!over && who === member ? '\u25B8 ' : ''}
                       {person(member)} {game.drinks[member]} ({drinkState(game.drinks[member])})
                     </span>
                   ))}
@@ -436,6 +439,7 @@ export function BeerPong({ play }: { play: GamePlay }): JSX.Element {
                   <span className="vu-beerpong-tipsytrack">
                     <span className="vu-beerpong-tipsyfill" style={{ width: `${level * 100}%` }} />
                   </span>
+                  <span className="vu-beerpong-tipsylabel">{Math.round(level * 100)}%</span>
                 </span>
               </div>
             )

@@ -147,12 +147,20 @@ export function tipsiness(drunk: number, members: number): number {
 
 /** How much faster the reader's sweeps run at a tipsiness. */
 export function sweepSpeed(tipsy: number): number {
-  return 1 + 0.4 * tipsy
+  return 1 + 0.25 * tipsy
 }
 
 /** How far the reader's marker wobbles about its sweep, as a share of the sweep. */
 export function sweepWobble(tipsy: number): number {
-  return 0.06 * tipsy
+  return 0.03 * tipsy
+}
+
+/** How far the reader's ball strays from where his two stops put it, in cup widths, sober. */
+export const HAND = 0.6
+
+/** How far the reader's ball strays at a tipsiness: a hand is never quite the eye, and less so with drink. */
+export function handScatter(tipsy: number): number {
+  return HAND * (1 + 0.3 * tipsy)
 }
 
 /** How far her ball strays at a skill and a tipsiness. */
@@ -189,6 +197,13 @@ export function herThrow(cups: readonly Cup[], skill: Skill, tipsy: number, rand
   const target = herTarget(cups, skill)
   const stray = scatterOf(skill, tipsy)
   return throwAt({ x: target.x + bell(rand) * stray, y: target.y + bell(rand) * stray })
+}
+
+/** The reader's throw as it leaves his hand: where his two stops put it, less what the hand and the drink take off it. */
+export function readerThrow(stopped: Throw, tipsy: number, rand: () => number = Math.random): Throw {
+  const meant = landingOf(stopped)
+  const stray = handScatter(tipsy)
+  return throwAt({ x: meant.x + bell(rand) * stray, y: meant.y + bell(rand) * stray })
 }
 
 /** One side of the table. */
