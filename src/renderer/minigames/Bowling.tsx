@@ -9,30 +9,38 @@ import {
   ballX,
   herThrow,
   lastFrameCue,
+  outcomeOf,
   pathOf,
   resolvePins,
   rollsOf,
   sheetOf,
   soloSummary,
   tableOf,
-  totalOf,
+  totalsOf,
   versusAccount,
   versusSummary,
   type Ball,
   type BallTold,
   type Throw
 } from '@shared/bowling'
+import { listed } from '@shared/minigames'
 import { gestures, lift, press } from '../views/motion'
 import type { GamePlay } from './play'
 import '../vu_styles/Bowling.css'
 
-/** How many times in a game she says something about a ball, by how talkative she is to be. */
+/** How many times in a game anything is said about a ball, by how talkative the girls are to be: the whole table's, however many of them are bowling. */
 const REMARKS = { quiet: 0, some: 3, lots: 8 } as const
 
 /** How long she takes over a ball: long enough for the reader's own to be read first. */
 const HER_PAUSE_MS = 1700
 /** How long the pins stand as they fell before the rack is reset. */
 const SETTLE_MS = 800
+/**
+ * The same with more than one girl bowling, so a frame's worth of their balls is not a long
+ * wait: a shorter beat after the reader's ball and a shorter one still between their own, a
+ * quicker trip down the lane and less time over the fallen pins.
+ */
+const BRISK = { afterReaderMs: 1200, betweenMs: 700, run: 0.7, settleMs: 500 } as const
 /** Two stops closer together than this are one press, heard twice. */
 const PRESS_GAP_MS = 180
 
@@ -65,23 +73,29 @@ interface Rolling extends Ball {
 /**
  * Bowling: a lane from above, the pins at the far end. A throw is three stops, each a click or
  * Space: where the ball is set down, how hard, and how much hook; then it rolls and the rules
- * say what falls. Alone the reader bowls every frame; against a girl they take alternate frames,
- * the reader first, and her throws are the rules' own at her skill. What happens is said in the
- * scene's dialogue box; the surface shows the lane and the sheet.
+ * say what falls. Alone the reader bowls every frame; with girls everyone bowls each frame in
+ * turn, the reader first, and each girl's throws are the rules' own at her skill. What happens is
+ * said in the scene's dialogue box; the surface shows the lane and the sheet.
  */
 export function Bowling({ play }: { play: GamePlay }): JSX.Element {
   const [balls, setBalls] = useState<Ball[]>([])
   const [rolling, setRolling] = useState<Rolling | null>(null)
   // Which of the three stops is next.
   const [stage, setStage] = useState(0)
-  // She is saying something about the last ball: her own next one waits for it.
+  // One of them is saying something about the last ball: the next girl's ball waits for it.
   const [speaking, setSpeaking] = useState(false)
   const remarks = useRef(0)
-  const her = play.opponents[0]
+  // How many remarks each girl has made, in her seat's order.
+  const spoken = useRef<number[]>([])
+  const girls = play.opponents
+  const names = girls.map((girl) => girl.name)
+  const several = girls.length > 1
   const frames = play.options.frames ?? 5
 
-  const table = tableOf(balls, frames, Boolean(her))
-  const herTurn = table.hers && !table.over
+  const table = tableOf(balls, frames, girls.length)
+  // The girl whose ball is next, if it is one of theirs.
+  const her = table.over || table.who === 0 ? undefined : girls[table.who - 1]
+  const herTurn = her !== undefined
   const waiting = table.over || herTurn || rolling !== null
 
   // What the sweeps write to, between renders.
@@ -101,19 +115,20 @@ export function Bowling({ play }: { play: GamePlay }): JSX.Element {
     }
   }, [])
 
-  // Against her the game is on from the moment she picks up a ball, and the terms are said.
+  // With company the game is on from the moment a ball is picked up, and the terms are said.
   useEffect(() => {
-    if (her) play.narrate(`${her.name} picks out a ball and waves you up first. ${frames} frames each, taking turns.`)
+    if (several) play.narrate(`${listed(names)} pick out a ball each and wave you up first. ${frames} frames each, everyone bowling in turn.`)
+    else if (girls[0]) play.narrate(`${girls[0].name} picks out a ball and waves you up first. ${frames} frames each, taking turns.`)
     // Once, as the table opens.
   }, [])
 
   /** Sends a ball down the lane: what it takes is settled now and shown when it gets there. */
-  function bowl(thrown: Throw, hers: boolean): void {
+  function bowl(thrown: Throw, who: number): void {
     const path = pathOf(thrown)
     const fallen = path.gutter
       ? []
       : resolvePins(path.arriveX, path.angle, thrown.power, table.standing)
-    setRolling({ hers, thrown, before: table.standing, fallen, hit: false })
+    setRolling({ who, thrown, before: table.standing, fallen, hit: false })
   }
 
   /** The reader stops whatever is sweeping; the third stop is the throw. */
@@ -126,7 +141,7 @@ export function Bowling({ play }: { play: GamePlay }): JSX.Element {
     if (stage === 0) aim.current.position = swept.current * 2 - 1
     else if (stage === 1) aim.current.power = swept.current
     else {
-      bowl({ ...aim.current, hook: swept.current * 2 - 1 }, false)
+      bowl({ ...aim.current, hook: swept.current * 2 - 1 }, 0)
       return
     }
     setStage(stage + 1)
@@ -135,68 +150,87 @@ export function Bowling({ play }: { play: GamePlay }): JSX.Element {
   /** The ball has stopped and the pins are counted: onto the sheet, into the scene, and on. */
   function land(ball: Ball): void {
     const all = [...balls, ball]
-    const told = ballTold(her?.name ?? '', all, all.length - 1, frames)
+    const told = ballTold(names, all, all.length - 1, frames)
     setBalls(all)
     setRolling(null)
     setStage(0)
     play.narrate(told.narration)
-    if (!tableOf(all, frames, Boolean(her)).over) {
+    if (!tableOf(all, frames, girls.length).over) {
       remark(all, told)
       return
     }
 
-    const mine = totalOf(rollsOf(all, false), frames)
-    if (!her) {
+    if (girls.length === 0) {
       play.finish({ outcome: 'played', summary: soloSummary(all, frames) })
       return
     }
-    const hers = totalOf(rollsOf(all, true), frames)
+    const totals = totalsOf(all, frames, girls.length)
     play.finish({
-      outcome: mine > hers ? 'won' : mine < hers ? 'lost' : 'draw',
-      summary: versusSummary(her.name, mine, hers),
-      account: versusAccount(her.name, all, frames)
+      outcome: outcomeOf(totals),
+      summary: versusSummary(names, totals),
+      account: versusAccount(names, all, frames)
     })
   }
 
   /**
-   * Has her say something about the ball just thrown, where it is worth it: a strike, a gutter
-   * ball, a split picked up, a turkey, or the last frame coming with the game still open. A few
-   * times a game at most, and never on the last ball, which the scene's own reply answers.
+   * Which girl has something to say about a ball: whoever bowled it, if one of them did; of the
+   * reader's, the girl who has said least so far, and among those the one nearest him in score.
+   */
+  function speakerFor(all: readonly Ball[]): number {
+    const bowler = all[all.length - 1].who
+    if (bowler > 0) return bowler - 1
+    const totals = totalsOf(all, frames, girls.length)
+    const said = (seat: number): number => spoken.current[seat] ?? 0
+    const apart = (seat: number): number => Math.abs(totals[seat + 1] - totals[0])
+    return girls
+      .map((_, seat) => seat)
+      .sort((a, b) => said(a) - said(b) || apart(a) - apart(b) || a - b)[0]
+  }
+
+  /**
+   * Has one girl say something about the ball just thrown, where it is worth it: a strike, a
+   * gutter ball, a split picked up, a turkey, or the last frame coming with the game still open.
+   * A few times a game at most between all of them, one voice a ball, and never on the last
+   * ball, which the scene's own reply answers.
    */
   function remark(all: readonly Ball[], told: BallTold): void {
-    if (!her || remarks.current >= REMARKS[play.chattiness]) return
-    const decider = lastFrameCue(her.name, all, frames)
-    // Talkative, she has a word for an ordinary frame too.
+    if (girls.length === 0 || remarks.current >= REMARKS[play.chattiness]) return
+    const decider = lastFrameCue(names, all, frames)
+    // Talkative, they have a word for an ordinary frame too.
     if (!told.notable && !decider && !(play.chattiness === 'lots' && told.closed)) return
+    const seat = speakerFor(all)
     remarks.current++
+    spoken.current[seat] = (spoken.current[seat] ?? 0) + 1
     setSpeaking(true)
-    void play.say(her.charId, decider ? `${told.cue} ${decider}` : told.cue).finally(() => {
+    void play.say(girls[seat].charId, decider ? `${told.cue} ${decider}` : told.cue).finally(() => {
       if (live.current) setSpeaking(false)
     })
   }
 
   // How the game stands, for anything said at the table.
   useEffect(() => {
-    if (!her) return
-    const [mine, hers] = [totalOf(rollsOf(balls, false), frames), totalOf(rollsOf(balls, true), frames)]
+    if (girls.length === 0) return
+    const totals = totalsOf(balls, frames, girls.length)
     play.situation(
       [
-        `The game is ten-pin bowling, ${frames} frames each, taking alternate frames.`,
-        `The score is the reader ${mine}, ${her.name} ${hers}.`,
+        `The game is ten-pin bowling, ${frames} frames each, ${several ? 'everyone bowling each frame in turn, the reader first' : 'taking alternate frames'}.`,
+        `The score is the reader ${totals[0]}, ${names.map((name, seat) => `${name} ${totals[seat + 1]}`).join(', ')}.`,
         table.over
           ? 'The last ball has just been bowled.'
-          : `It is frame ${table.frame + 1} of ${frames} and ${herTurn ? `${her.name}'s` : "the reader's"} ball, with ${table.standing.length === 10 ? 'all ten pins' : `${table.standing.length} pin${table.standing.length === 1 ? '' : 's'}`} standing.`,
+          : `It is frame ${table.frame + 1} of ${frames} and ${her ? `${her.name}'s` : "the reader's"} ball, with ${table.standing.length === 10 ? 'all ten pins' : `${table.standing.length} pin${table.standing.length === 1 ? '' : 's'}`} standing.`,
         ...(play.stake ? [`Riding on it: ${play.stake}`] : [])
       ].join(' ')
     )
   }, [balls])
 
-  // Her ball, after a beat: thrown at what is standing, at her skill.
+  // A girl's ball, after a beat: thrown at what is standing, at her own skill.
   useEffect(() => {
-    if (!her || !herTurn || rolling || speaking) return
-    const timer = setTimeout(() => bowl(herThrow(table.standing, her.skill), true), HER_PAUSE_MS)
+    if (!her || rolling || speaking) return
+    const afterReader = balls.length > 0 && balls[balls.length - 1].who === 0
+    const pause = !several ? HER_PAUSE_MS : afterReader ? BRISK.afterReaderMs : BRISK.betweenMs
+    const timer = setTimeout(() => bowl(herThrow(table.standing, her.skill), table.who), pause)
     return () => clearTimeout(timer)
-    // Her turn comes round once per ball landed, which the count alone says.
+    // A girl's turn comes round once per ball landed, which the count alone says.
   }, [herTurn, balls.length, rolling === null, speaking])
 
   // The sweep under the reader's hand: the ball along the foul line, then the two meters.
@@ -234,7 +268,9 @@ export function Bowling({ play }: { play: GamePlay }): JSX.Element {
     const path = pathOf(thrown)
     // A reader who asked for less motion is shown where the ball went, not the trip.
     const still = window.matchMedia('(prefers-reduced-motion: reduce)').matches
-    const runMs = still ? 1 : 1700 - 900 * thrown.power
+    // With several girls bowling, theirs are shown at a brisker pace than the reader's own.
+    const brisk = several && rolling.who > 0
+    const runMs = still ? 1 : (1700 - 900 * thrown.power) * (brisk ? BRISK.run : 1)
     const deckMs = still ? 1 : runMs * 0.32
     const began = performance.now()
     let frame = 0
@@ -257,8 +293,8 @@ export function Bowling({ play }: { play: GamePlay }): JSX.Element {
         frame = requestAnimationFrame(tick)
         return
       }
-      const { hers, before, fallen } = rolling
-      timer = setTimeout(() => land({ hers, thrown, before, fallen }), SETTLE_MS)
+      const { who, before, fallen } = rolling
+      timer = setTimeout(() => land({ who, thrown, before, fallen }), brisk ? BRISK.settleMs : SETTLE_MS)
     }
     frame = requestAnimationFrame(tick)
     return () => {
@@ -294,16 +330,13 @@ export function Bowling({ play }: { play: GamePlay }): JSX.Element {
   // The rack as it is shown: mid-throw the one thrown at, with what fell lying where it stood.
   const standing = rolling ? rolling.before : table.over ? [] : table.standing
   const down = rolling?.hit ? rolling.fallen : []
-  const bowlers = [
-    { hers: false, name: 'You' },
-    ...(her ? [{ hers: true, name: her.name }] : [])
-  ]
+  const bowlers = ['You', ...names]
   const prompt = table.over
     ? 'Game over'
     : rolling
       ? '…'
       : herTurn
-        ? `${her?.name ?? 'She'} is up`
+        ? `${her.name} is up`
         : STAGES[stage].label
 
   return (
@@ -338,7 +371,7 @@ export function Bowling({ play }: { play: GamePlay }): JSX.Element {
       </svg>
 
       <div className="vu-bowling-side">
-        <table className="vu-bowling-sheet">
+        <table className="vu-bowling-sheet" data-tight={bowlers.length > 2 || undefined}>
           <thead>
             <tr>
               <th />
@@ -350,13 +383,15 @@ export function Bowling({ play }: { play: GamePlay }): JSX.Element {
             </tr>
           </thead>
           <tbody>
-            {bowlers.map((bowler) => (
-              <tr key={bowler.name} data-up={(!table.over && table.hers === bowler.hers) || undefined}>
-                <th scope="row">{bowler.name}</th>
-                {sheetOf(rollsOf(balls, bowler.hers), frames).map((frame, i) => (
+            {bowlers.map((name, who) => (
+              <tr key={who} data-up={(!table.over && table.who === who) || undefined}>
+                <th scope="row" title={name}>
+                  {name}
+                </th>
+                {sheetOf(rollsOf(balls, who), frames).map((frame, i) => (
                   <td
                     key={i}
-                    data-now={(!table.over && table.hers === bowler.hers && table.frame === i) || undefined}
+                    data-now={(!table.over && table.who === who && table.frame === i) || undefined}
                   >
                     <span className="vu-bowling-marks">{frame.marks.join(' ') || ' '}</span>
                     <span className="vu-bowling-total">{frame.total ?? ' '}</span>

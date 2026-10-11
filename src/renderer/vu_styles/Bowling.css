@@ -96,8 +96,16 @@
   font: 400 19px var(--font-display);
 }
 
-/* Whoever is up is named in full ink. */
+/* Whoever is up is named in full ink on a tinted plate, an accent bar at its leading edge. */
+.vu-bowling-sheet tbody th {
+  padding: 0 6px;
+  border-radius: 10px;
+  box-shadow: inset 3px 0 0 transparent;
+}
+
 .vu-bowling-sheet tr[data-up] th {
+  background: var(--vu-tint);
+  box-shadow: inset 3px 0 0 var(--vu-accent);
   color: var(--vu-text);
 }
 
@@ -106,6 +114,24 @@
   border-radius: 10px;
   background: var(--vu-recessed);
   text-align: center;
+}
+
+/* Three bowlers or four: shorter rows, so the sheet stands no taller than the lane beside it. */
+.vu-bowling-sheet[data-tight] {
+  border-spacing: 4px 3px;
+}
+
+.vu-bowling-sheet[data-tight] tbody th {
+  font-size: 16px;
+}
+
+.vu-bowling-sheet[data-tight] td {
+  padding: 2px;
+}
+
+.vu-bowling-sheet[data-tight] .vu-bowling-marks,
+.vu-bowling-sheet[data-tight] .vu-bowling-total {
+  line-height: 1.25;
 }
 
 /* The frame being bowled. */
