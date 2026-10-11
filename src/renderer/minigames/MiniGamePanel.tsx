@@ -143,7 +143,10 @@ export function MiniGamePanel({ theme, onClose }: ScenePanelProps): JSX.Element 
   )
 
   function leave(ended: PlayResult): void {
-    fileResult(ended, seated?.stake)
+    if (!seated) return
+    // Whoever sat down, judged yet or not: she was at the table either way.
+    const names = seated.opponents?.map((opponent) => opponent.name) ?? (agreed ? [nameOf(agreed.charId)] : [])
+    fileResult(ended, { game: seated.game, names, stake: seated.stake })
     onClose()
   }
 

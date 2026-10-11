@@ -7,6 +7,7 @@ import {
   herCall,
   rankMark,
   soloSummary,
+  versusAccount,
   versusSummary,
   type Call,
   type Card,
@@ -81,7 +82,8 @@ export function HighLow({ play }: { play: GamePlay }): JSX.Element {
     const [a, b] = [right(false), right(true)]
     play.finish({
       outcome: a > b ? 'won' : a < b ? 'lost' : 'draw',
-      summary: versusSummary(her.name, a, b)
+      summary: versusSummary(her.name, a, b),
+      account: versusAccount(her.name, deck, next)
     })
   }
 

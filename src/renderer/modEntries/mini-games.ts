@@ -10,6 +10,16 @@ import { registerHooks } from '../mods/hooks'
 registerHooks(MINI_GAMES, {
   scenePlay: { Seat: MiniGameSeat, Panel: MiniGamePanel },
 
+  prompts: {
+    // What a game just played has to say, on the one turn that reports it.
+    scene: {
+      lines: (ctx) => {
+        const { played } = useTableStore.getState()
+        return played && ctx.query.includes(played.text) ? ['', ...played.brief, ''] : []
+      }
+    }
+  },
+
   requests: {
     // Only the turn that carries the proposal asks for her answer: its own words are in what
     // the request was built from, so a turn retried or rewound never picks up a stale one.
@@ -23,6 +33,7 @@ registerHooks(MINI_GAMES, {
 
   afterSceneReply: ({ reply, cast, ending }) => {
     const table = useTableStore.getState()
+    table.setPlayed(null)
     const { proposal } = table
     if (!proposal) return
     table.setProposal(null)
@@ -41,5 +52,6 @@ registerHooks(MINI_GAMES, {
   gameEntered: () => {
     useTableStore.getState().setProposal(null)
     useTableStore.getState().setAgreed(null)
+    useTableStore.getState().setPlayed(null)
   }
 })

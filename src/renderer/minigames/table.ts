@@ -74,16 +74,48 @@ export function takeTurnForGame(): boolean {
   return takeTurnFromReply()
 }
 
+/** Who a game was played with and for what, as far as filing its result goes. */
+export interface PlayedWith {
+  game: MiniGameDef
+  /** What the reader calls each girl who played. */
+  names: readonly string[]
+  stake: string
+}
+
 /**
- * Puts a finished game into the scene as narration, over whatever of the reply was still unread: on the transcript, where the next reply, the
- * scene's summary and its bookkeeping all read it, and on the box, where the reader does. Reading
- * past it reaches the decision point again, which writes the scene with the game in it.
+ * Puts a finished game into the scene, over whatever of the reply was still unread.
+ *
+ * A game played alone is a line of narration: on the transcript, where the next reply, the
+ * scene's summary and its bookkeeping all read it, and on the box, where the reader does; reading
+ * past it is his turn again.
+ *
+ * A game played with a girl is the reader's turn itself: the result goes out as his action, so
+ * her reaction is the next thing written, and what the game has to say about how it went rides
+ * with that one request.
  */
-export function fileResult(result: PlayResult, stake = ''): void {
+export function fileResult(result: PlayResult, played: PlayedWith): void {
   // The game's first move took the turn; a result filed without one takes it here.
   if (!takeTurnForGame()) return
-  const riding = stake ? ` Riding on it: ${stake}` : ''
-  const line: SceneLine = { speaker: '', text: `${result.summary}${riding}` }
+
+  if (played.names.length > 0) {
+    const who = played.names.join(' and ')
+    useTableStore.getState().setPlayed({
+      text: result.summary,
+      brief: [
+        'MINI-GAME RESULT',
+        `The reader and ${who} have just played ${played.game.name} for real, at the table, between your last lines and now. It is over and settled: do not replay it or change how it came out.`,
+        ...(result.account ?? []),
+        ...(played.stake
+          ? [`Riding on it, as they agreed: ${played.stake} It is owed now.`]
+          : []),
+        `Open on the result, then let ${who} react to it in character: how the game went, anything in it worth a remark, and the stake if there was one.`
+      ]
+    })
+    void submitAction(result.summary)
+    return
+  }
+
+  const line: SceneLine = { speaker: '', text: result.summary }
   const lines = splitOverflow(line, boxFits)
   const game = useGameStore.getState()
   game.appendSceneLines(lines)

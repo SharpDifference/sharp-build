@@ -13,6 +13,13 @@ export interface PlayResult {
   outcome: PlayOutcome
   /** What happened, in a sentence or two of the scene's own narration ("You ..."). */
   summary: string
+  /**
+   * What the game wants the scene's writer to know about how it went, for a game played with a
+   * girl: the moves, the turns of luck, whatever she might bring up. One line each. The reader is
+   * not shown it; she reacts to it in the reply that follows the game. What goes in is the
+   * game's own call.
+   */
+  account?: readonly string[]
 }
 
 /** A girl at the table. */

@@ -21,9 +21,19 @@ export interface Agreed {
   stake: string
 }
 
+/** A game just played with a girl, while the turn that tells the scene about it is out. */
+export interface Played {
+  /** The turn's own words: the result as the scene is told it. */
+  text: string
+  /** What rides with that turn's prompt and is never shown: the account, and the stake. */
+  brief: readonly string[]
+}
+
 interface TableState {
   proposal: Proposal | null
   agreed: Agreed | null
+  played: Played | null
+  setPlayed: (played: Played | null) => void
   setProposal: (proposal: Proposal | null) => void
   setAgreed: (agreed: Agreed | null) => void
 }
@@ -31,6 +41,8 @@ interface TableState {
 export const useTableStore = create<TableState>((set) => ({
   proposal: null,
   agreed: null,
+  played: null,
+  setPlayed: (played) => set({ played }),
   setProposal: (proposal) => set({ proposal }),
   setAgreed: (agreed) => set({ agreed })
 }))

@@ -91,3 +91,44 @@ export function versusSummary(name: string, mine: number, hers: number): string 
   if (mine < hers) return `You play High-Low with ${name} and lose, ${mine} calls to ${hers}.`
   return `You play High-Low with ${name} and it ends level, ${mine} calls each.`
 }
+
+/** One call of a finished game, as the account tells it. */
+export interface CallMade {
+  hers: boolean
+  call: Call
+  right: boolean
+}
+
+/**
+ * How a game against her went, call by call, for the scene's writer: who called what on which
+ * card and what came, with the calls worth a remark marked: a long shot that landed, a safe one
+ * that failed, the same card turning up twice. `deck` is the deck as it was dealt.
+ */
+export function versusAccount(
+  name: string,
+  deck: readonly Card[],
+  calls: readonly CallMade[]
+): string[] {
+  const lines = calls.map((made, i) => {
+    const shown = deck[i]
+    const next = deck[i + 1]
+    const { call: favoured, edge } = oddsCall(shown, deck.slice(0, i + 1))
+    const note =
+      next.rank === shown.rank
+        ? ', the same card again'
+        : made.right && made.call !== favoured && edge >= 0.3
+          ? ', a long shot that came in'
+          : !made.right && made.call === favoured && edge >= 0.5
+            ? ', a safe call that failed'
+            : ''
+    const who = made.hers ? name : 'The reader'
+    return `${who} called ${made.call} on a ${rankMark(shown.rank)} and a ${rankMark(next.rank)} came: ${made.right ? 'right' : 'a miss'}${note}.`
+  })
+  const count = (side: boolean): number =>
+    calls.filter((made) => made.hers === side && made.right).length
+  return [
+    `Each called ${CALLS_EACH} times, in turn, on whether the next card would be higher or lower.`,
+    ...lines,
+    `Final count: the reader ${count(false)}, ${name} ${count(true)}.`
+  ]
+}

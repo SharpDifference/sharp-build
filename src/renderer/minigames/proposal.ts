@@ -37,7 +37,7 @@ export function withProposal(
       'MINI-GAME',
       `The reader has just asked ${name} to play ${game.name}: ${game.blurb}.`,
       `${name} decides for herself, in character and in this moment: she may jump at it, need talking into it, or say no.`,
-      `Fill the "${FIELD}" field first. "answer" is "accept" only if she agrees to play right now, and "decline" otherwise. "stake" is what the two of them have settled is riding on the game, in one sentence, or "" if nothing is.`,
+      `Fill the "${FIELD}" field first. "answer" is "accept" only if she agrees to play right now, and "decline" otherwise. "stake" is what the two of them have settled is riding on the game, in one sentence written the way your narration is, with the reader as "you" ("If you win, she ..."), or "" if nothing is.`,
       'If she accepts, write her saying yes and the two of them getting set up, and stop there. Do NOT play the game, deal a card, or say who wins: the game is played for real straight after your lines, and you will be told how it went. Do not send end_scene.',
       'If she declines, carry the scene on from her answer as you normally would.'
     ].join('\n'),
