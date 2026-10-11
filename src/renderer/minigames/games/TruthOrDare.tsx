@@ -21,7 +21,6 @@ import {
   poseRound,
   posedOf,
   remarkCue,
-  scored,
   seatName,
   situationOf,
   skippedLine,
@@ -31,15 +30,13 @@ import {
   turnsIn,
   type Kind,
   type Terms,
-  type Turn,
-  type Verdict
+  type Turn
 } from '@shared/minigameRules/truthOrDare'
-import { TextField } from '../kit'
 import { gestures, lift, press, quietLift, quietPress } from '../kit'
 import type { GamePlay, RoundAsk } from '../kit'
 import '../../vu_styles/TruthOrDare.css'
 
-/** The most the reader may type for a question, a dare or an answer. */
+/** The most of what the reader typed that is taken for a question, a dare or an answer. */
 const TYPED_MAX = 240
 
 /** How long play waits on a watching girl's remark before going on without it. */
@@ -52,37 +49,32 @@ const readMs = (text: string): number => 900 + text.length * 18
  * Where a turn stands.
  *
  * - `pick`: the reader chooses truth or dare.
- * - `ask`: the reader types the question or the dare for the girl whose turn it is.
+ * - `ask`: the reader types the question or the dare for the girl whose turn it is, or taps one.
  * - `answer`: the reader types his answer, or what he does, or backs out.
+ *
+ * In `ask` and `answer` the scene's own line under the dialogue box is live: it is where he types.
  * - `wait`: a round is out or a line is on its way; nothing of the reader's is live.
  * - `over`: the last turn is played.
  */
 type Phase = 'pick' | 'ask' | 'answer' | 'wait' | 'over'
 
-/** The turn being played, as far as it has got: what the surface shows of it. */
+/**
+ * The turn being played, as far as the surface shows it: what was picked, and what was put. The
+ * rest of a turn is said on the dialogue box and nowhere else.
+ */
 interface Now {
   kind: Kind | null
   prompt: string
-  reply: string
-  deed: string
-  verdict: Verdict | null
 }
 
-const BLANK: Now = { kind: null, prompt: '', reply: '', deed: '', verdict: null }
-
-const VERDICT_MARK: Record<Verdict, string> = {
-  honest: 'answered straight · a point',
-  dodged: 'dodged · no point',
-  done: 'done · a point',
-  chickened: 'backed out · no point',
-  skipped: 'skipped · no point either way'
-}
+const BLANK: Now = { kind: null, prompt: '' }
 
 /**
  * Truth or Dare: turns go round the table, the reader first. Whoever's turn it is picks truth or
  * dare and the player before them puts it. The girls' picks, questions, answers and verdicts are
- * the model's, a round at a time; the reader types his own into the game's field. The surface
- * shows the tally, whose turn it is and the turn so far.
+ * the model's, a round at a time; the reader types his own into the scene's line under the dialogue
+ * box. Everything said is said there, once; the surface is the scorecard: the tally, whose turn
+ * it is, what is wanted now, and the buttons that apply.
  */
 export function TruthOrDare({ play }: { play: GamePlay }): JSX.Element {
   // The table as it was when the game opened: who sits where does not change under a game.
@@ -97,7 +89,6 @@ export function TruthOrDare({ play }: { play: GamePlay }): JSX.Element {
   const [now, setNow] = useState<Now>(BLANK)
   /** What the reader is waiting on, in words; empty where a line is simply being read. */
   const [waiting, setWaiting] = useState('')
-  const [typed, setTyped] = useState('')
 
   // The framework's handle is read through a ref: a turn's chain of rounds outlives a render.
   const latest = useRef(play)
@@ -185,7 +176,6 @@ export function TruthOrDare({ play }: { play: GamePlay }): JSX.Element {
       return
     }
     show(BLANK)
-    setTyped('')
     const player = playerAt(terms, turn)
     if (player === READER) {
       tell('The reader is picking truth or dare.')
@@ -206,6 +196,7 @@ export function TruthOrDare({ play }: { play: GamePlay }): JSX.Element {
     if (asker === READER) {
       tell(`${name} picked ${chosen.kind}; the reader is ${putting}.`)
       stand('ask')
+      void typing('ask', chosen.kind === 'truth' ? `Ask ${name} a question…` : `Dare ${name} to…`)
       return
     }
     const askerName = seatName(terms, asker)
@@ -234,7 +225,6 @@ export function TruthOrDare({ play }: { play: GamePlay }): JSX.Element {
       if (!on()) return
     }
     const answered = answeredOf(got, kind, name)
-    show({ kind, prompt, reply: answered.line, deed: answered.deed, verdict: answered.verdict })
     if (answered.verdict === 'skipped') {
       await narrated(skippedLine(name))
     } else {
@@ -289,7 +279,9 @@ export function TruthOrDare({ play }: { play: GamePlay }): JSX.Element {
     const askerName = seatName(terms, asker)
     show({ ...BLANK, kind })
     latest.current.readerSays(kind === 'truth' ? 'Truth.' : 'Dare.')
-    tell(`The reader picked ${kind}; ${askerName} is ${kind === 'truth' ? 'asking the question' : 'setting the dare'}.`)
+    tell(
+      `The reader picked ${kind}; ${askerName} is ${kind === 'truth' ? 'asking the question' : 'setting the dare'}.`
+    )
     const got = await round(poseRound(terms, done, kind), `${askerName} is thinking…`)
     if (!on()) return
     const prompt = posedOf(got, kind, terms.heat, done)
@@ -298,6 +290,35 @@ export function TruthOrDare({ play }: { play: GamePlay }): JSX.Element {
     if (!on()) return
     tell(`The reader picked ${kind} and was ${kind === 'truth' ? 'asked' : 'dared'}: "${prompt}"`)
     stand('answer')
+    void typing('answer', kind === 'truth' ? 'Your answer…' : 'What you do…')
+  }
+
+  /**
+   * Has the reader type what the turn wants of him, in the scene's own line, and plays it. Nothing
+   * comes of it where the asking ended first: the table closed, or he tapped a button instead,
+   * which has already moved the turn on.
+   */
+  async function typing(want: 'ask' | 'answer', placeholder: string): Promise<void> {
+    const turn = played.current.length
+    const sent = await latest.current.ask(placeholder).catch(() => null)
+    if (sent === null || !on() || at.current !== want || played.current.length !== turn) return
+    const words = sent.trim().slice(0, TYPED_MAX)
+    if (want === 'ask') void put(words)
+    else void answer(words)
+  }
+
+  /** A suggestion tapped: sent as if typed, and the line under the box is let go. */
+  function suggest(idea: string): void {
+    if (at.current !== 'ask' || !on()) return
+    latest.current.stopAsking()
+    void put(idea)
+  }
+
+  /** The reader backs out of what was put to him, and the line under the box is let go. */
+  function backOut(): void {
+    if (at.current !== 'answer' || !on()) return
+    latest.current.stopAsking()
+    void answer(null)
   }
 
   /** The reader's answer, or what he does; null where he backs out. She reacts and judges. */
@@ -307,8 +328,6 @@ export function TruthOrDare({ play }: { play: GamePlay }): JSX.Element {
     stand('wait')
     const done = played.current
     const asker = askerAt(terms, done.length)
-    setTyped('')
-    show({ ...turnNow.current, reply: reply ?? '' })
     if (reply === null) {
       // Not waited on: her line queues behind it on the box.
       void latest.current
@@ -327,9 +346,16 @@ export function TruthOrDare({ play }: { play: GamePlay }): JSX.Element {
     )
     if (!on()) return
     const judged = judgedOf(got, kind, reply)
-    show({ ...turnNow.current, verdict: judged.verdict })
     await speak(asker, judged.line)
-    await close({ player: READER, asker, kind, prompt, reply: reply ?? '', deed: '', verdict: judged.verdict })
+    await close({
+      player: READER,
+      asker,
+      kind,
+      prompt,
+      reply: reply ?? '',
+      deed: '',
+      verdict: judged.verdict
+    })
   }
 
   /** The reader's question or dare for the girl whose turn it is. */
@@ -338,7 +364,6 @@ export function TruthOrDare({ play }: { play: GamePlay }): JSX.Element {
     const { kind } = turnNow.current
     if (at.current !== 'ask' || !on() || !kind || !prompt) return
     stand('wait')
-    setTyped('')
     show({ ...turnNow.current, prompt })
     latest.current.readerSays(prompt)
     await herAnswer(kind, prompt)
@@ -358,6 +383,8 @@ export function TruthOrDare({ play }: { play: GamePlay }): JSX.Element {
     const running = pauses.current
     return () => {
       live.current = false
+      // A question still open is taken back: nobody is left to hear the answer.
+      if (at.current === 'ask' || at.current === 'answer') latest.current.stopAsking()
       // Every pause is ended: whatever waited on one finds the table gone and stops.
       for (const [timer, end] of running) {
         clearTimeout(timer)
@@ -374,20 +401,28 @@ export function TruthOrDare({ play }: { play: GamePlay }): JSX.Element {
   const asker = over ? -1 : askerAt(terms, turn)
   const score = tally(terms, log)
   const kind = now.kind
-  const field = phase === 'ask' || phase === 'answer'
   const ideas = phase === 'ask' && kind ? stock(kind, terms.heat, askedSoFar(log), 3, turn) : []
-  const send = (): void => {
-    if (phase === 'ask') void put(typed)
-    else if (phase === 'answer' && typed.trim()) void answer(typed.trim())
-  }
-  const whose = (seat: number): string => (seat === READER ? 'Your' : `${seatName(terms, seat)}'s`)
-  const asks = (seat: number): string => (seat === READER ? 'you ask' : `${seatName(terms, seat)} asks`)
-  /** Who said the answer on show. */
-  const replier = player >= 0 ? seatName(terms, player) : ''
+  /** What is happening and what is wanted now, in one line. */
+  const state = over
+    ? 'That is the game.'
+    : phase === 'pick'
+      ? 'Your turn: truth or dare?'
+      : phase === 'ask'
+        ? `Your turn to ${kind === 'dare' ? 'dare' : 'ask'} ${seatName(terms, player)}: type it below, or pick one`
+        : phase === 'answer'
+          ? kind === 'dare'
+            ? `${seatName(terms, asker)} dared you: say what you do below`
+            : `${seatName(terms, asker)} asked you a truth: answer below`
+          : waiting || '…'
+  // What was put to the reader stays in sight until his turn is over: the box moves on.
+  const kept = !over && player === READER ? now.prompt : ''
 
   return (
     <div className="vu-tod">
-      <ul className="vu-tod-tally" aria-label="Tally">
+      <ul
+        className="vu-tod-tally"
+        aria-label={`Tally, turn ${Math.min(turn + 1, turnsIn(terms))} of ${turnsIn(terms)}`}
+      >
         {score.map((points, seat) => (
           <li key={seat} className="vu-tod-seat" data-turn={seat === player || undefined}>
             <span className="vu-tod-seatname">{seatName(terms, seat)}</span>
@@ -396,153 +431,71 @@ export function TruthOrDare({ play }: { play: GamePlay }): JSX.Element {
         ))}
       </ul>
 
-      <p className="vu-tod-turn" aria-live="polite">
-        {over ? (
-          'game over'
-        ) : (
-          <>
-            {whose(player)} turn
-            <span className="vu-tod-turnmeta">
-              {asks(asker)} · turn {turn + 1} of {turnsIn(terms)} · {HEAT_WORD[terms.heat]}
-            </span>
-          </>
-        )}
+      <p
+        className="vu-tod-state"
+        role="status"
+        data-out={phase !== 'wait' || waiting !== '' || undefined}
+      >
+        {state}
       </p>
 
-      {/* The turn so far: what was put and what came of it, so the box need not be relied on. */}
-      <div className="vu-tod-log">
-        <p className="vu-tod-kind">{kind ?? (over ? 'that is the game' : 'truth or dare?')}</p>
-        {now.prompt && (
-          <p className="vu-tod-line">
-            <span className="vu-tod-who">{asker >= 0 ? seatName(terms, asker) : ''}</span>
-            {now.prompt}
-          </p>
-        )}
-        {(now.reply || now.deed) && (
-          <p className="vu-tod-line">
-            <span className="vu-tod-who">{replier}</span>
-            {now.reply}
-            {now.deed && <span className="vu-tod-deed">{now.deed}</span>}
-          </p>
-        )}
-        {now.verdict && (
-          <p className="vu-tod-verdict" data-scored={scored(now.verdict) || undefined}>
-            {VERDICT_MARK[now.verdict]}
-          </p>
-        )}
-      </div>
+      {kept && (
+        <p className="vu-tod-kept" title={kept}>
+          <span className="vu-tod-kind">{kind}</span>
+          {kept}
+        </p>
+      )}
 
-      {/* One of three things stands here, in the same room: the pick, the field, or the wait. */}
-      <div className="vu-tod-act">
-        {phase === 'pick' && (
-          <div className="vu-tod-picks">
-            <motion.button
-              type="button"
-              className="vu-btn vu-btn--outline vu-paper vu-btn--panel"
-              {...gestures(false, lift, press)}
-              onClick={() => void pick('truth')}
-            >
-              Truth
-            </motion.button>
-            <motion.button
-              type="button"
-              className="vu-btn vu-btn--outline vu-paper vu-btn--panel"
-              {...gestures(false, lift, press)}
-              onClick={() => void pick('dare')}
-            >
-              Dare
-            </motion.button>
-          </div>
-        )}
-
-        {field && kind && (
-          <form
-            className="vu-tod-form"
-            onSubmit={(event) => {
-              event.preventDefault()
-              send()
-            }}
-            // Enter sends from the game's own field, and nothing behind the table answers it too.
-            onKeyDown={(event) => {
-              if (event.key !== 'Enter') return
-              event.stopPropagation()
-              // A held key sends nothing more.
-              if (event.repeat) return event.preventDefault()
-              if ((event.target as HTMLElement).tagName !== 'INPUT') return
-              event.preventDefault()
-              send()
-            }}
+      {phase === 'pick' && (
+        <div className="vu-tod-picks">
+          <motion.button
+            type="button"
+            className="vu-btn vu-btn--outline vu-paper vu-btn--panel"
+            {...gestures(false, lift, press)}
+            onClick={() => void pick('truth')}
           >
-            <TextField
-              // A new field each time one is called for, so it takes the focus as it arrives.
-              key={`${turn}:${phase}`}
-              id="truth-or-dare-text"
-              label={
-                phase === 'ask'
-                  ? `Your ${kind === 'truth' ? 'question' : 'dare'} for ${seatName(terms, player)}`
-                  : kind === 'truth'
-                    ? 'Your answer'
-                    : 'What you do'
-              }
-              value={typed}
-              onChange={setTyped}
-              maxLength={TYPED_MAX}
-              placeholder={
-                phase === 'ask'
-                  ? kind === 'truth'
-                    ? 'Ask her anything…'
-                    : 'Dare her to…'
-                  : kind === 'truth'
-                    ? 'Answer in your own words…'
-                    : 'Say what you do…'
-              }
-              autoFocus
-            />
-            {ideas.length > 0 && (
-              <ul className="vu-tod-ideas" aria-label="Suggestions">
-                {ideas.map((idea) => (
-                  <li key={idea}>
-                    <motion.button
-                      type="button"
-                      className="vu-tod-idea"
-                      {...gestures(false, quietLift, quietPress)}
-                      onClick={() => void put(idea)}
-                    >
-                      {idea}
-                    </motion.button>
-                  </li>
-                ))}
-              </ul>
-            )}
-            <div className="vu-tod-send">
-              {phase === 'answer' && (
-                <motion.button
-                  type="button"
-                  className="vu-btn vu-btn--quiet"
-                  {...gestures(false, quietLift, quietPress)}
-                  onClick={() => void answer(null)}
-                >
-                  Back out
-                </motion.button>
-              )}
-              <motion.button
-                type="submit"
-                className="vu-btn vu-btn--outline vu-paper vu-btn--panel"
-                disabled={!typed.trim()}
-                {...gestures(!typed.trim(), lift, press)}
-              >
-                {phase === 'ask' ? (kind === 'truth' ? 'Ask' : 'Dare') : kind === 'truth' ? 'Answer' : 'Do it'}
-              </motion.button>
-            </div>
-          </form>
-        )}
+            Truth
+          </motion.button>
+          <motion.button
+            type="button"
+            className="vu-btn vu-btn--outline vu-paper vu-btn--panel"
+            {...gestures(false, lift, press)}
+            onClick={() => void pick('dare')}
+          >
+            Dare
+          </motion.button>
+        </div>
+      )}
 
-        {(phase === 'wait' || over) && (
-          <p className="vu-tod-wait" role="status" data-out={waiting !== '' || undefined}>
-            {over ? 'The last turn is played.' : waiting || '…'}
-          </p>
-        )}
-      </div>
+      {ideas.length > 0 && (
+        <ul className="vu-tod-ideas" aria-label="Suggestions">
+          {ideas.map((idea) => (
+            <li key={idea}>
+              <motion.button
+                type="button"
+                className="vu-tod-idea"
+                {...gestures(false, quietLift, quietPress)}
+                onClick={() => suggest(idea)}
+              >
+                {idea}
+              </motion.button>
+            </li>
+          ))}
+        </ul>
+      )}
+
+      {phase === 'answer' && (
+        <div className="vu-tod-picks">
+          <motion.button
+            type="button"
+            className="vu-btn vu-btn--quiet"
+            {...gestures(false, quietLift, quietPress)}
+            onClick={backOut}
+          >
+            Back out
+          </motion.button>
+        </div>
+      )}
     </div>
   )
 }

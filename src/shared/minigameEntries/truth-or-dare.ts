@@ -45,10 +45,10 @@ const TRUTH_OR_DARE: MiniGameDef = {
   suggestAt: { room: 'sometimes', lowrise_dorms: 'sometimes', stalestein_bar: 'sometimes' },
   players: { min: 1, max: 3 },
   surface: 'table',
-  // The game has a field of its own, which takes the keyboard whenever the reader is to type.
-  keys: true,
+  // Played in words: the line under the dialogue box is the game's, live when it asks for typing.
+  typed: true,
   controls:
-    'Click Truth or Dare on your turn. Type your answer, or your question or dare for her, in the game\'s own field and press Enter; a suggestion can be clicked instead, and Back out passes on your turn.',
+    'Pick Truth or Dare on your turn, and type in the line under the dialogue box when the game asks: your answer, what you do for a dare, or your question or dare for her. A suggestion can be tapped instead of typing one, and Back out passes on your turn.',
   skillBrief:
     'A good player answers straight, goes through with dares and asks questions that land; a poor one dodges, backs out and asks safe ones.'
 }
