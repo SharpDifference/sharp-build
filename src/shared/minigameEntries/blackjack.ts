@@ -25,6 +25,7 @@ const BLACKJACK: MiniGameDef = {
   players: { min: 1, max: 3 },
   surface: 'table',
   controls: 'Click Hit or Stand.',
+  stepped: false,
   skillBrief:
     'A good player knows the total she has to beat and when another card is worth the risk of going over; a poor one stands out of nerves or draws out of greed.'
 }

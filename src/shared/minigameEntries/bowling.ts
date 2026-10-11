@@ -27,6 +27,7 @@ const BOWLING: MiniGameDef = {
   keys: true,
   players: { min: 0, max: 3 },
   controls: 'Space or a click, three times: your spot, your power, your hook.',
+  stepped: false,
   skillBrief:
     'A good bowler has the coordination and the practice to put the ball in the pocket time after time, the strength to carry the pins and the focus to pick up her spares; a poor one sprays it about and finds the gutter.'
 }

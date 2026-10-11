@@ -25,6 +25,7 @@ const SKEE_BALL: MiniGameDef = {
   keys: true,
   players: { min: 0, max: 3 },
   controls: 'Space or a click, twice: your line across the lane, then your power.',
+  stepped: false,
   skillBrief:
     'A good player has a smooth, repeatable roll and a feel for the weight, lands the 40s and 50s ball after ball and knows when a corner pocket is worth the gamble; a poor one sprays balls into the gutter and cannot resist the 100s.'
 }

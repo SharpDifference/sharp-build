@@ -42,6 +42,12 @@ export interface GamePlay {
   opponents: readonly Opponent[]
   /** The id of the place the scene is at, or null where it has none: a pool, or the sea. */
   location: string | null
+  /**
+   * The game's text is being read at the reader's own pace: {@link GamePlay.narrate} resolves
+   * only once he has moved past the line before it. A game played in turns then waits on each
+   * line it narrates before its next move, and drops its own pauses for reading.
+   */
+  stepped: boolean
   /** What is riding on the game, as the scene settled it; empty where nothing is. */
   stake: string
   /** How much she is to say for herself, as the player has it set; what that comes to is the game's. */

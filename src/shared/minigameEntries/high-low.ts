@@ -34,6 +34,7 @@ const HIGH_LOW: MiniGameDef = {
   suggestAt: { cutetea: 'sometimes', lowrise_dorms: 'sometimes', room: 'sometimes' },
   players: { min: 0, max: 1 },
   controls: 'Click Higher or Lower.',
+  stepped: false,
   skillBrief:
     'A good player keeps track of the cards already turned and calls with the odds; a poor one goes on hunches.'
 }

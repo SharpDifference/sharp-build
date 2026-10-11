@@ -29,7 +29,10 @@ export const usePrefsStore = create<PrefsState>((set) => ({
   set: (gameId, prefs) =>
     set((state) => {
       const byGame = { ...state.byGame }
-      const empty = !prefs.suggest && Object.keys(prefs.options ?? {}).length === 0
+      const empty =
+        !prefs.suggest &&
+        prefs.stepped === undefined &&
+        Object.keys(prefs.options ?? {}).length === 0
       if (empty) delete byGame[gameId]
       else byGame[gameId] = prefs
       try {

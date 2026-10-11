@@ -140,6 +140,28 @@ function GamePage({ game, onBack }: { game: MiniGameDef; onBack: () => void }): 
           ]}
         />
       ))}
+      {game.stepped !== undefined && (
+        <SelectField
+          id={`minigame-pref-${game.id}-stepped`}
+          label="The game's text"
+          hint="Whether each line waits for you to move on, or the game keeps its own pace."
+          value={prefs?.stepped === undefined ? '' : prefs.stepped ? 'yes' : 'no'}
+          onChange={(value) =>
+            setPrefs(game.id, {
+              ...prefs,
+              stepped: value === '' ? undefined : value === 'yes'
+            })
+          }
+          options={[
+            {
+              value: '',
+              label: `As the game has it (${game.stepped ? 'waits for you' : 'moves on by itself'})`
+            },
+            { value: 'yes', label: 'Waits for you' },
+            { value: 'no', label: 'Moves on by itself' }
+          ]}
+        />
+      )}
       {game.players.max > 0 && (
         <SelectField
           id={`minigame-pref-${game.id}-suggest`}

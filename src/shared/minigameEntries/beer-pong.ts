@@ -27,6 +27,7 @@ const BEER_PONG: MiniGameDef = {
   keys: true,
   players: { min: 1, max: 3 },
   controls: 'Space or a click, twice: your aim, then your arc. A button calls your one re-rack.',
+  stepped: false,
   skillBrief:
     'A good player has a soft, repeatable lob and a steady hand that holds up after a few drinks, and picks her cup; a poor one flings it at the rack and hopes, and gets wilder with every cup.'
 }

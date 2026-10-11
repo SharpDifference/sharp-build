@@ -113,9 +113,12 @@ export interface MiniGameDef {
    */
   typed?: boolean
   /**
-   * Read at the reader's own pace: a line the game puts in the dialogue box stays until he moves
-   * on, by a click, a key, or playing his move, and only then does the next one arrive. For a
-   * game of words; one played against a clock leaves it unset, and its lines keep their own time.
+   * Whether the game's text is read at the reader's own pace: a line it puts in the dialogue box
+   * stays until he moves on, by a click, a key, or playing his move, and only then does the next
+   * arrive. A game played in turns says how it usually goes, `true` or `false`, and the player
+   * may have it the other way on the game's page; such a game waits on each line it narrates
+   * before its next move while {@link GamePlay.stepped} is set. A game played against a clock
+   * leaves this unset: its lines keep their own time and the player is given no choice.
    */
   stepped?: boolean
   /** How it is played, for the player: the keys or the pointer, in a sentence. Shown on its page. */
@@ -230,6 +233,8 @@ export interface GamePrefs {
   options?: Readonly<Record<string, number>>
   /** How readily a girl suggests it, everywhere it is played, in place of what the game says. */
   suggest?: SuggestRate
+  /** Whether its text waits for him, for a game that gives the choice, in place of its usual way. */
+  stepped?: boolean
 }
 
 /**
@@ -247,7 +252,10 @@ export function tuned(game: MiniGameDef, prefs: GamePrefs | undefined): MiniGame
   return {
     ...game,
     ...(options ? { options } : {}),
-    ...(prefs.suggest ? { suggest: prefs.suggest, suggestAt: undefined } : {})
+    ...(prefs.suggest ? { suggest: prefs.suggest, suggestAt: undefined } : {}),
+    ...(prefs.stepped !== undefined && game.stepped !== undefined
+      ? { stepped: prefs.stepped }
+      : {})
   }
 }
 

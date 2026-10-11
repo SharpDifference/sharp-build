@@ -302,6 +302,7 @@ export function MiniGamePanel({ theme, onClose }: ScenePanelProps): JSX.Element 
     () => ({
       opponents: seated?.opponents ?? [],
       location,
+      stepped: Boolean(seated?.game.stepped),
       stake: seated?.stake ?? '',
       chattiness,
       options: seated?.options ?? {},
@@ -353,7 +354,7 @@ export function MiniGamePanel({ theme, onClose }: ScenePanelProps): JSX.Element 
       },
       finish: (ended) => setResult(ended)
     }),
-    [seated?.game.name, seated?.opponents, seated?.stake, seated?.options, chattiness, location]
+    [seated?.game.name, seated?.game.stepped, seated?.opponents, seated?.stake, seated?.options, chattiness, location]
   )
 
   function leave(ended: PlayResult): void {
