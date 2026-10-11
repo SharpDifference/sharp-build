@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type JSX } from 'react'
+import { useEffect, useMemo, useRef, useState, type JSX } from 'react'
 import { createPortal } from 'react-dom'
 import { motion } from 'motion/react'
 import { MINI_GAMES_LIST, type MiniGameDef } from '@shared/minigames'
@@ -24,6 +24,7 @@ import { skillOf } from './skill'
 import {
   fileResult,
   nameOf,
+  narrateAtTable,
   proposeGame,
   takeTurnForGame,
   useGamesOffered,
@@ -46,6 +47,9 @@ interface Sitting {
   stake: string
 }
 
+/** How long a finished game stands on the table before it is cleared. */
+const RESULT_BEAT_MS = 1800
+
 /** Nobody at the table but the reader. */
 const NO_ONE: Opponent[] = []
 
@@ -56,13 +60,17 @@ function sittingOf(agreed: Agreed | null): Sitting | null {
 }
 
 /**
- * The table a game is played at, over the scene. Opened from the rail it lists what can be
- * played: a game alone starts at once, and a game with a girl is asked for in the reader's own
- * words, as his turn in the scene. Opened on a game she agreed to, it is that game.
+ * The framework's place over a scene, in two shapes.
  *
- * The framework owns the way out. Before the first move it is free, and the reply being read is
- * left as it was; once a game is under way, leaving is walking away from it and is said in the
- * scene; once it is over, the one answer takes the result back to the scene.
+ * Choosing is a panel: opened from the rail it lists what can be played, and a game with a girl
+ * is asked for in the reader's own words, as his turn in the scene.
+ *
+ * Playing is not: the scene stays lit and the game is drawn on its surface in the middle of it,
+ * the girls still standing either side and the dialogue box still the scene's, saying what the
+ * game narrates. The framework owns the way out. Before the first move it is free, and the reply
+ * being read is left as it was; once a game is under way, leaving is walking away from it and is
+ * said in the scene; once it is over, the table clears itself after a beat and the result goes
+ * into the scene.
  */
 export function MiniGamePanel({ theme, onClose }: ScenePanelProps): JSX.Element | null {
   const offered = useGamesOffered()
@@ -128,14 +136,23 @@ export function MiniGamePanel({ theme, onClose }: ScenePanelProps): JSX.Element 
   }
   const { host, overlayProps } = useModalShell(dismiss)
 
+  // The first move is the reader's turn taken, once: what the reply had left to say is dropped.
+  const begun = useRef(false)
+  function begin(): void {
+    if (begun.current) return
+    begun.current = true
+    takeTurnForGame()
+    setUnderWay(true)
+  }
+
   const play = useMemo<GamePlay>(
     () => ({
       opponents: seated?.opponents ?? [],
       stake: seated?.stake ?? '',
-      // The first move is the reader's turn taken: what the reply had left to say is dropped.
-      started: () => {
-        takeTurnForGame()
-        setUnderWay(true)
+      started: () => begin(),
+      narrate: (text) => {
+        begin()
+        narrateAtTable(text)
       },
       finish: (ended) => setResult(ended)
     }),
@@ -149,6 +166,14 @@ export function MiniGamePanel({ theme, onClose }: ScenePanelProps): JSX.Element 
     fileResult(ended, { game: seated.game, names, stake: seated.stake })
     onClose()
   }
+
+  // A finished game stands for a beat, then clears itself: there is nothing to answer.
+  useEffect(() => {
+    if (!result) return
+    const timer = setTimeout(() => leave(result), RESULT_BEAT_MS)
+    return () => clearTimeout(timer)
+    // The result is set once, and what `leave` reads has settled by then.
+  }, [result])
 
   function pick(offer: Offer): void {
     if (offer.charId === null) {
@@ -168,8 +193,61 @@ export function MiniGamePanel({ theme, onClose }: ScenePanelProps): JSX.Element 
 
   if (!host || nothing) return null
 
-  const title = seated ? seated.game.name : asking ? `Ask ${nameOf(asking.charId)}` : 'Play a game'
+  const title = asking ? `Ask ${nameOf(asking.charId)}` : 'Play a game'
   const against = seated?.opponents?.[0]
+
+  if (seated && Game) {
+    return createPortal(
+      <motion.div
+        className="vu-veil vu-minigame-veil"
+        data-theme={theme}
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        transition={{ duration: 0.2 }}
+        {...overlayProps}
+      >
+        <motion.div
+          id="minigame-table"
+          className={`vu-minigame-surface vu-minigame-surface--${seated.game.surface ?? 'table'} vu-paper`}
+          role="dialog"
+          aria-modal="true"
+          aria-label={seated.game.name}
+          initial={{ y: -18, scale: 0.96 }}
+          animate={{ y: 0, scale: 1 }}
+          transition={{ duration: 0.24, ease: 'easeOut' }}
+        >
+          <p className="vu-minigame-name">{seated.game.name}</p>
+          {seated.opponents ? (
+            <Game play={play} />
+          ) : (
+            <p className="vu-empty">She is getting settled…</p>
+          )}
+          {/* Standing through the result's beat, dead, so the table does not jump as it ends. */}
+          <motion.button
+            id="minigame-walk"
+            className="vu-pill vu-minigame-leave"
+            type="button"
+            disabled={result !== null}
+            {...gestures(result !== null, quietLift, quietPress)}
+            onClick={() =>
+              underWay
+                ? leave({
+                    outcome: 'abandoned',
+                    summary: `You walk away from the game of ${seated.game.name}${
+                      against ? ` with ${against.name}` : agreed ? ` with ${nameOf(agreed.charId)}` : ''
+                    } before it is over.`
+                  })
+                : onClose()
+            }
+          >
+            {underWay ? 'Walk away' : 'Not now'}
+          </motion.button>
+        </motion.div>
+      </motion.div>,
+      host
+    )
+  }
 
   return createPortal(
     <motion.div
@@ -192,20 +270,7 @@ export function MiniGamePanel({ theme, onClose }: ScenePanelProps): JSX.Element 
         <TitleTab>{title}</TitleTab>
 
         <div className="vu-minigame-body">
-          {seated && Game ? (
-            seated.opponents ? (
-              <>
-                {seated.stake && (
-                  <p className="vu-minigame-stake">
-                    <span className="vu-minigame-stakeword">riding on it</span> {seated.stake}
-                  </p>
-                )}
-                <Game play={play} />
-              </>
-            ) : (
-              <p className="vu-empty">She is getting settled at the table…</p>
-            )
-          ) : asking ? (
+          {asking ? (
             <form
               className="vu-minigame-ask"
               onSubmit={(event) => {
@@ -250,34 +315,7 @@ export function MiniGamePanel({ theme, onClose }: ScenePanelProps): JSX.Element 
         </div>
 
         <div className="vu-foot">
-          {result ? (
-            <motion.button
-              id="minigame-done"
-              className="vu-btn vu-btn--primary vu-paper vu-btn--panel"
-              type="button"
-              {...gestures(false, lift, press)}
-              onClick={() => leave(result)}
-            >
-              Back to the scene
-            </motion.button>
-          ) : underWay && seated ? (
-            <motion.button
-              id="minigame-walk"
-              className="vu-btn vu-btn--quiet"
-              type="button"
-              {...gestures(false, quietLift, quietPress)}
-              onClick={() =>
-                leave({
-                  outcome: 'abandoned',
-                  summary: `You walk away from the game of ${seated.game.name}${
-                    against ? ` with ${against.name}` : agreed ? ` with ${nameOf(agreed.charId)}` : ''
-                  } before it is over.`
-                })
-              }
-            >
-              Walk away
-            </motion.button>
-          ) : asking ? (
+          {asking ? (
             <>
               <motion.button
                 id="minigame-back"

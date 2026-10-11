@@ -1,5 +1,4 @@
 import { gamesOffered, type MiniGameDef } from '@shared/minigames'
-import type { SceneLine } from '@shared/types'
 import { useGameStore } from '../stores/gameStore'
 import { submitAction, takeTurnFromReply } from '../stores/gameLoop'
 import { advance } from '../stores/loop/hooks'
@@ -74,6 +73,36 @@ export function takeTurnForGame(): boolean {
   return takeTurnFromReply()
 }
 
+/**
+ * Brings the scene to the reader's turn for something the table is about to send. At his turn
+ * already, nothing to do; over a reply, the interjection's own steps. A table that has been
+ * narrating stands on its own last line with nothing behind it, and where the scene will not
+ * count that as a turn to take (a class scene's opening), the turn is simply opened.
+ */
+function reachTurn(): boolean {
+  const game = useGameStore.getState()
+  if (game.awaitingInput && !game.busy && game.pendingLines.length === 0) return true
+  if (takeTurnFromReply()) return true
+  if (game.busy || game.streaming || game.pendingLines.length > 0) return false
+  game.setAwaitingInput(true)
+  return true
+}
+
+/** Puts lines on the transcript and on the box at once, the box turning to the first of them. */
+function playLines(text: string): void {
+  const lines = splitOverflow({ speaker: '', text }, boxFits)
+  const game = useGameStore.getState()
+  game.appendSceneLines(lines)
+  game.appendPendingLines(lines)
+  game.setAwaitingInput(false)
+  advance()
+}
+
+/** A line from the table in the scene's dialogue box, once the turn is the table's. */
+export function narrateAtTable(text: string): void {
+  playLines(text)
+}
+
 /** Who a game was played with and for what, as far as filing its result goes. */
 export interface PlayedWith {
   game: MiniGameDef
@@ -94,8 +123,8 @@ export interface PlayedWith {
  * with that one request.
  */
 export function fileResult(result: PlayResult, played: PlayedWith): void {
-  // The game's first move took the turn; a result filed without one takes it here.
-  if (!takeTurnForGame()) return
+  // The game's first move took the turn, and its narration has stood on the box since.
+  if (!reachTurn()) return
 
   if (played.names.length > 0) {
     const who = played.names.join(' and ')
@@ -115,11 +144,5 @@ export function fileResult(result: PlayResult, played: PlayedWith): void {
     return
   }
 
-  const line: SceneLine = { speaker: '', text: result.summary }
-  const lines = splitOverflow(line, boxFits)
-  const game = useGameStore.getState()
-  game.appendSceneLines(lines)
-  game.appendPendingLines(lines)
-  game.setAwaitingInput(false)
-  advance()
+  playLines(result.summary)
 }

@@ -41,8 +41,14 @@ export interface GamePlay {
   /** The first move is made: from here, leaving the table is walking away from a game. */
   started: () => void
   /**
-   * The game is over. The component keeps showing how it ended; the framework offers the way
-   * back to the scene, and files the result as the reader takes it.
+   * Says something in the scene's own dialogue box, in the game's words and at once: a move
+   * made, a card turned. It goes onto the scene's transcript like any narration. The first one
+   * is a first move: whatever of a reply was still unread is dropped.
+   */
+  narrate: (text: string) => void
+  /**
+   * The game is over. The component keeps showing how it ended for a beat; then the framework
+   * clears the table and takes the result into the scene.
    */
   finish: (result: PlayResult) => void
 }

@@ -37,6 +37,37 @@ export function rankMark(rank: number): string {
   return FACES[rank] ?? String(rank)
 }
 
+const WORDS: Record<number, string> = {
+  2: 'a two',
+  3: 'a three',
+  4: 'a four',
+  5: 'a five',
+  6: 'a six',
+  7: 'a seven',
+  8: 'an eight',
+  9: 'a nine',
+  10: 'a ten',
+  11: 'a jack',
+  12: 'a queen',
+  13: 'a king',
+  14: 'an ace'
+}
+
+/** A rank as it is said aloud, with its article. */
+export function rankWord(rank: number): string {
+  return WORDS[rank] ?? String(rank)
+}
+
+/** A call and what it turned, as the scene's narration says it. `who` is "You" or her name. */
+export function callLine(who: string, call: Call, shown: Card, next: Card): string {
+  const verb = who === 'You' ? 'call' : 'calls'
+  const came =
+    next.rank === shown.rank
+      ? `${rankWord(next.rank)} again: a miss`
+      : `${rankWord(next.rank)}: ${callWins(shown, next, call) ? 'right' : 'a miss'}`
+  return `${who} ${verb} ${call}. ${came.charAt(0).toUpperCase()}${came.slice(1)}.`
+}
+
 /** How a girl plays, from 1 (on hunches) to 5 (counts every card). */
 export type Skill = 1 | 2 | 3 | 4 | 5
 

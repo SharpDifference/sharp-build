@@ -10,6 +10,15 @@
 /** The framework's mod id. A pack names it in its `requires`. */
 export const MINI_GAMES = 'mini-games'
 
+/**
+ * How much of the stage a game is drawn on. The scene stays lit behind every one of them.
+ *
+ * - `table`: a compact board in the upper middle, the girls either side of it.
+ * - `board`: most of the stage above the dialogue box.
+ * - `screen`: the whole stage, for a game that is all action.
+ */
+export type PlaySurface = 'table' | 'board' | 'screen'
+
 export interface MiniGameDef {
   /** Stable, lower case with dashes: memories and saves may name it. */
   id: string
@@ -27,6 +36,8 @@ export interface MiniGameDef {
    * one nobody joins.
    */
   players: { min: number; max: number }
+  /** The surface it is played on; a `table` where it does not say. */
+  surface?: PlaySurface
   /** What makes someone good at it, in a sentence, for judging how well a girl plays. */
   skillBrief: string
 }

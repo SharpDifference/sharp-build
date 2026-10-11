@@ -39,16 +39,52 @@
   gap: 12px;
 }
 
-/* What is riding on the game, said once over the table in the bookkeeping voice. */
-.vu-minigame-stake {
-  margin: 0 0 14px;
-  color: var(--vu-text-body);
-  font: 500 15px var(--font-body);
-  text-align: center;
+/* Playing: the scene stays lit. The veil keeps its job of taking every click and key off the
+   scene, and gives up its dimming and its centring: the surface hangs from the top of the stage. */
+.vu-minigame-veil {
+  place-items: start center;
+  padding-top: 64px;
+  background: none;
 }
 
-.vu-minigame-stakeword {
-  margin-right: 8px;
-  color: var(--vu-text-muted);
-  font: 700 12px var(--font-mono);
+/* The surface a game is drawn on: a container, on paper, between the girls. */
+.vu-minigame-surface {
+  --paper-face: var(--vu-surface);
+  --paper-shadow: var(--vu-panel-shadow);
+  --paper-offset: 9px 8px;
+  --paper-tilt: -0.8deg;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  padding: 22px 34px 20px;
+  border-radius: 34px;
+  color: var(--vu-text);
+  font-family: var(--font-body);
+}
+
+.vu-minigame-surface--table {
+  min-width: 380px;
+}
+
+.vu-minigame-surface--board {
+  width: min(1100px, 100% - 240px);
+  min-height: 560px;
+}
+
+.vu-minigame-surface--screen {
+  width: calc(100% - 60px);
+  min-height: calc(100% - 60px);
+}
+
+/* What is being played, said once over the surface in the display face. */
+.vu-minigame-name {
+  margin: 0;
+  color: var(--vu-text);
+  font: 400 26px var(--font-display);
+}
+
+/* The way out, a quiet utility under the game. */
+.vu-minigame-leave {
+  margin-top: 2px;
 }
