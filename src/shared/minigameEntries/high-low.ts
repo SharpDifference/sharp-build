@@ -19,6 +19,9 @@ const HIGH_LOW: MiniGameDef = {
       default: 5
     }
   ],
+  // A deck in a pocket: it comes up where people sit around with time to spare, and seldom elsewhere.
+  suggest: 'rarely',
+  suggestAt: { cutetea: 'sometimes', lowrise_dorms: 'sometimes', room: 'sometimes' },
   players: { min: 0, max: 1 },
   skillBrief:
     'A good player keeps track of the cards already turned and calls with the odds; a poor one goes on hunches.'

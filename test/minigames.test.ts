@@ -3,6 +3,7 @@ import {
   gamesOffered,
   seatsFor,
   settledOptions,
+  suggestRate,
   MINI_GAMES,
   type MiniGameDef
 } from '../src/shared/minigames'
@@ -69,5 +70,13 @@ describe('gamesOffered', () => {
     expect(settledOptions(rounds, { calls: '2.5' })).toEqual({ calls: 5 })
     expect(settledOptions(rounds, undefined)).toEqual({ calls: 5 })
     expect(settledOptions(cards, { calls: 3 })).toEqual({})
+  })
+
+  it('has a girl suggest a game as the place says, the game otherwise, and never in a busy scene', () => {
+    const cabinetGame = game('cab', { suggest: 'rarely', suggestAt: { arcade: 'often' } })
+    expect(suggestRate(cabinetGame, 'arcade', false)).toBe('often')
+    expect(suggestRate(cabinetGame, 'pub', false)).toBe('rarely')
+    expect(suggestRate(cards, null, false)).toBe('sometimes')
+    expect(suggestRate(cabinetGame, 'arcade', true)).toBe('never')
   })
 })

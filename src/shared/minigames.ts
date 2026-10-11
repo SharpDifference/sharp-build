@@ -35,6 +35,17 @@ export interface GameOption {
   default: number
 }
 
+/**
+ * How readily a girl brings a game up herself. It never limits the reader, who may ask for any
+ * game on offer at any time.
+ *
+ * - `often`: it is what people come to this place for.
+ * - `sometimes`: when the moment is slow or playful.
+ * - `rarely`: only when the moment really calls for it.
+ * - `never`: she does not bring it up herself.
+ */
+export type SuggestRate = 'often' | 'sometimes' | 'rarely' | 'never'
+
 export interface MiniGameDef {
   /** Stable, lower case with dashes: memories and saves may name it. */
   id: string
@@ -59,6 +70,10 @@ export interface MiniGameDef {
   format: string
   /** What may be varied by agreement; absent, the game is always played the one way. */
   options?: readonly GameOption[]
+  /** How readily a girl suggests it herself; `sometimes` where it does not say. */
+  suggest?: SuggestRate
+  /** The same, at particular places, by location id: an arcade game at the arcade is `often`. */
+  suggestAt?: Readonly<Record<string, SuggestRate>>
   /** The surface it is played on; a `table` where it does not say. */
   surface?: PlaySurface
   /** What makes someone good at it, in a sentence, for judging how well a girl plays. */
@@ -102,6 +117,16 @@ export function gamesOffered(
       (!game.locations || (spot.location !== null && game.locations.includes(spot.location))) &&
       spot.girls >= game.players.min
   )
+}
+
+/**
+ * How readily a girl suggests a game in the scene at hand: the place's own rate where the game
+ * names one, the game's otherwise. `busy` is a scene with something else going on, a class or a
+ * shift, where nobody suggests a game whatever it is.
+ */
+export function suggestRate(game: MiniGameDef, location: string | null, busy: boolean): SuggestRate {
+  if (busy) return 'never'
+  return (location && game.suggestAt?.[location]) || game.suggest || 'sometimes'
 }
 
 /** A game's options at their defaults. */
