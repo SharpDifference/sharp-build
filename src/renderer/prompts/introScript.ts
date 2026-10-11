@@ -43,7 +43,7 @@ export function introScrollLines(stats: PlayerStats, date: number): SceneLine[] 
     },
     {
       bg: 'downtown_street',
-      text: `You pass a sign that says "Welcome to Downtown Veridan." You make your way through the narrow, weathered streets, eye on the statue of Zeus in the distance that marks the VU campus gate.`
+      text: `You pass a sign that says "Welcome to Downtown Veridan." You make your way through the narrow, weathered streets, eye on the statue of Jupiter in the distance that marks the VU campus gate.`
     },
     {
       bg: 'stanchion_street',

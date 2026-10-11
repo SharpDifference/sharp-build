@@ -38,7 +38,7 @@ export const GAME_OVER_SCENES: Record<GameOverReason, GameOverScene> = {
       'He gets to the point: you\'re expelled. He explains that your recent behavior violated the university\'s code of conduct.',
       'He lets you argue for a bit before shooing you out.',
       'Campus security hovers over you as you pack your stuff, then drags you on a walk of shame to the campus gates.',
-      'In less than an hour, you\'re waving farewell to Hades as the stone statue near the gates shrinks in the distance.',
+      'In less than an hour, you\'re waving farewell to Pluto as the stone statue near the gates shrinks in the distance.',
       'Somewhere back on campus, the semester goes on without you.'
     ],
     title: 'Game over',
@@ -48,7 +48,7 @@ export const GAME_OVER_SCENES: Record<GameOverReason, GameOverScene> = {
   gameComplete: {
     lines: [
       'You finally finish stuffing everything into your backpack and suitcase and head for the Loop.',
-      'From the tram window, you take one last look back down the road at the gates, where the stone statue of Zeus is waving your farewell.',
+      'From the tram window, you take one last look back down the road at the gates, where the stone statue of Jupiter is waving your farewell.',
       'As your flight takes off, you pick out the familiar buildings of Downtown, Stanchion, and the Promenade, thinking about all the memories you made this semester.',
       'You smile as you realize how when you first arrived, you were a stranger to all the friends you made. Now, you\'ll never forget them.',
       'You can\'t wait until next semester.'

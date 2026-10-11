@@ -1,12 +1,12 @@
 # Mods in this build
 
-This branch is a proposal for how the community mods share one build: every mod's code is
-always in the game, and a switch decides whether it acts. Players turn mods on and off from
-**Mods** on the main menu; nothing is chosen at install time.
+This is how the community mods share one build: every mod's code is always in the game, and a
+switch decides whether it acts. Players turn mods on and off from **Mods** on the main menu;
+nothing is chosen at install time.
 
-It carries no mods yet. This is the frame alone, on the game as Venus Dev released it (0.3.1),
-so any mod can start from it. The `extracurriculars-base` branch adds Continuing Semesters on
-top as a worked example.
+`core` is the frame alone, on the game from Venus Dev's public repository, so any mod can
+start from it.
+`main` is `core` with every mod, and each mod's own guide is in `docs/mods/`.
 
 ## The three things a mod does
 
@@ -215,11 +215,13 @@ Where a branch goes:
 
 - `core`: the mod system on the current game version, with no mods.
 - `mod/<name>`: one mod, built on `core`, looked after by its author.
+- `integrate/<name>`: the mod merged with `main`, where conflicts with other mods are settled;
+  its pull request goes into `main`.
 - `main`: what players get, assembled from `core` and every mod branch.
 
 ## Not decided yet
 
-- The build's name and version (`BUILD` in `mods.ts`).
+- The build's version numbering (`BUILD.version` in `mods.ts`).
 - Whether `data/mods.json` goes into the game's own backup; it does not today.
 - How a mod that patches the built code, rather than the source, reads its switch.
 

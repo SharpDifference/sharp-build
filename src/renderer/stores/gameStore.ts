@@ -1260,11 +1260,7 @@ function nextLineFields(
   let sceneLog = state.sceneLog
   let absences = { offStage: state.offStage, departed: state.departed }
   const reader = (line: SceneLine | undefined): boolean => line?.speaker === READER_SPEAKER
-  if (state.replaying && reader(queue[0])) {
-    const charged = chargeAbsences(absences.offStage, absences.departed)
-    absences = { offStage: charged.offStage, departed: charged.departed }
-  }
-  while (!state.replaying && reader(queue[0])) {
+  while (reader(queue[0])) {
     const charged = chargeAbsences(absences.offStage, absences.departed)
     absences = { offStage: charged.offStage, departed: charged.departed }
     sceneLog = [...sceneLog, queue[0]]
@@ -1811,8 +1807,7 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
   rewindLine: () => {
     const state = get()
     const log = state.sceneLog
-    const replaying = state.replaying !== null
-    const target = rewindTargetOf(log, replaying)
+    const target = rewindTargetOf(log, state.replaying !== null)
     if (target === -1) return false
     const sceneLog = log.slice(0, target + 1)
     const stepped = log.slice(target + 1)
@@ -1822,12 +1817,9 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
       currentLine: log[target],
       ...foldedStageOf(state, sceneLog),
       lineRewound: state.lineRewound + 1,
-      // The lines stepped back over were read, all but the reader's own counting outside a
-      // replay, where his are shown too, and so was the decision point if it was open.
-      reread:
-        state.reread +
-        (replaying ? stepped.length : nonReaderCount(stepped)) +
-        (state.awaitingInput ? 1 : 0)
+      // The lines stepped back over were read, all but the reader's own, and so was the decision
+      // point if it was open.
+      reread: state.reread + nonReaderCount(stepped) + (state.awaitingInput ? 1 : 0)
     })
     return true
   },

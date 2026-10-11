@@ -123,14 +123,16 @@ export function slotReplayOf(date: number, time: TimeSlot): SlotReplay | null {
 }
 
 /**
- * A replay's lines to queue, copied, the first of them given the first background any of them
- * names, so the stage is set from the first line whichever line named it.
+ * A replay's lines to queue, copied, the first of them shown — the reader's own are passed over —
+ * given the first background any of them names, so the stage is set from the first line read
+ * whichever line named it.
  */
 export function replayLinesOf(transcript: readonly SceneLine[]): SceneLine[] {
   const lines = transcript.map((line) => ({ ...line }))
   const bg = lines.find((line) => line.bg !== undefined)?.bg
-  if (lines.length > 0 && bg !== undefined && lines[0].bg === undefined) {
-    lines[0] = { ...lines[0], bg }
+  const first = lines.findIndex((line) => line.speaker !== READER_SPEAKER)
+  if (first !== -1 && bg !== undefined && lines[first].bg === undefined) {
+    lines[first] = { ...lines[first], bg }
   }
   return lines
 }

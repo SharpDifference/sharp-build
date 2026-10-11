@@ -10,7 +10,8 @@
     "sav",
     "0hrichi",
     "NihilBaxter",
-    "SenpaiDaddy890"
+    "SenpaiDaddy890",
+    "cilantro"
   ],
   "playtesters": [
     "Maboy",
@@ -22,6 +23,10 @@
     {
       "name": "0hrichi",
       "marbles": 4
+    },
+    {
+      "name": "cilantro",
+      "marbles": 3
     },
     {
       "name": "Elitetaco",
