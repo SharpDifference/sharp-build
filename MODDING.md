@@ -335,6 +335,12 @@ theme-role variables (`--vu-accent`, `--vu-text`, `--vu-text-muted`, `--vu-text-
 | `surface` | `table` (the default), `board` or `screen`. |
 | `keys` | `true` for a game played on the keyboard. |
 | `skillBrief` | What makes someone good at it, in a sentence. |
+| `controls` | How it is played, for the player: the keys or the pointer, in a sentence. Shown on the game's page. |
+
+The framework draws a pack's page on the Mods screen from these: the pack's games, each with its
+switch, and a page for each game saying what it is, with whom and where it is played and its
+`controls`, where the player sets the value each option starts from and how readily a girl
+suggests it. A pack writes no screen of its own for any of that.
 
 **What the model is told, and why the wording matters.** On every turn the reader takes with a
 girl where the game can be played, the model is given `name`, `blurb`, `format`, each option and
