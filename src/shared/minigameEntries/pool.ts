@@ -30,6 +30,7 @@ const POOL: MiniGameDef = {
   },
   players: { min: 0, max: 1 },
   surface: 'board',
+  controls: 'Aim with the pointer, hold to set the power, let go to shoot.',
   skillBrief:
     'A good player picks the shot that is on, cues straight with the right weight and strings several pots together; a poor one takes on hard cuts, misses by a ball\'s width and sometimes sends the cue ball into a pocket.'
 }

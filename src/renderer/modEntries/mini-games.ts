@@ -1,3 +1,4 @@
+import { gameById, tunedGame } from '../minigames/prefs'
 import {
   gamesOffered,
   MINI_GAMES,
@@ -8,6 +9,7 @@ import {
 import { optionOn } from '@shared/mods'
 import { charKeyOf, type Character } from '@shared/types'
 import { MiniGamePanel } from '../minigames/MiniGamePanel'
+import { PackPage } from '../minigames/PackPage'
 import { MiniGameSeat } from '../minigames/MiniGameSeat'
 import { agreedOf, withOffer } from '../minigames/offer'
 import { gameComponent } from '../minigames/play'
@@ -22,9 +24,9 @@ import { useModsStore } from '../stores/modsStore'
 /** The games a girl in this scene could be played at, each with a component to play it with. */
 function gamesWith(cast: readonly Character[], location: string | null): MiniGameDef[] {
   if (cast.length === 0) return []
-  return gamesOffered({ location, girls: cast.length }, gameIsOn).filter(
-    (game) => game.players.max >= 1 && Boolean(gameComponent(game.id))
-  )
+  return gamesOffered({ location, girls: cast.length }, gameIsOn)
+    .filter((game) => game.players.max >= 1 && Boolean(gameComponent(game.id)))
+    .map(tunedGame)
 }
 
 /** The girls he asked who are still in the scene, as the proposal's turn names them. */
@@ -54,6 +56,8 @@ function agree(
 
 registerHooks(MINI_GAMES, {
   scenePlay: { Seat: MiniGameSeat, Panel: MiniGamePanel },
+  // A pack's page on the Mods screen: its games, and each one's own page.
+  modDetail: (mod) => (MINI_GAMES_LIST.some((game) => game.modId === mod.id) ? PackPage : undefined),
 
   prompts: {
     // What a game just played has to say, on the one turn that reports it.
@@ -74,7 +78,7 @@ registerHooks(MINI_GAMES, {
       // never picks up a stale one.
       const { proposal } = useTableStore.getState()
       if (proposal && ctx.query.includes(proposal.text)) {
-        const game = MINI_GAMES_LIST.find((entry) => entry.id === proposal.gameId)
+        const game = gameById(proposal.gameId)
         const asked = askedOf(proposal.charIds, ctx.cast)
         return game && asked.length > 0 ? withProposal(request, game, asked) : request
       }
@@ -98,7 +102,7 @@ registerHooks(MINI_GAMES, {
     table.setProposal(null)
 
     if (proposal) {
-      const game = MINI_GAMES_LIST.find((entry) => entry.id === proposal.gameId)
+      const game = gameById(proposal.gameId)
       if (!game) return
       // A girl who has left since is not asked; a yes from a scene that then ended is no game.
       const { accepted, charIds, stake, options } = answerOf(

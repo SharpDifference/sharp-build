@@ -24,6 +24,7 @@ const AIR_HOCKEY: MiniGameDef = {
   suggestAt: { btb_arcade: 'often', bowling_alley: 'sometimes' },
   players: { min: 1, max: 1 },
   surface: 'board',
+  controls: 'Your mallet follows the pointer.',
   skillBrief:
     'A good player has quick hands and reads the angles, getting the mallet behind the puck before it arrives and hitting bank shots off the walls; a poor one chases the puck and leaves the goal open.'
 }

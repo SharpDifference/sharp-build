@@ -25,6 +25,7 @@ const FOOT_RACE: MiniGameDef = {
   surface: 'board',
   keys: true,
   players: { min: 0, max: 3 },
+  controls: 'Alternate Left and Right (arrows or A and D) to stride. Wait for GO.',
   skillBrief:
     'A good runner is fit and fast, trains or plays a sport, is quick off the mark and knows how to pace a lap; a poor one is unfit or never runs, is slow away, goes out too fast and fades, or trips over her own feet.'
 }

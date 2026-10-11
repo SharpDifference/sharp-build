@@ -42,6 +42,7 @@ const TRUTH_OR_DARE: MiniGameDef = {
   suggestAt: { room: 'sometimes', lowrise_dorms: 'sometimes', stalestein_bar: 'sometimes' },
   players: { min: 1, max: 3 },
   surface: 'table',
+  controls: 'Pick Truth or Dare, and type your questions, dares and answers.',
   skillBrief:
     'A good player answers straight, goes through with dares and asks questions that land; a poor one dodges, backs out and asks safe ones.'
 }

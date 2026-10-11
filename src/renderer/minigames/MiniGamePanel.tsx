@@ -1,3 +1,4 @@
+import { gameById } from './prefs'
 import { useEffect, useMemo, useRef, useState, type JSX } from 'react'
 import { createPortal } from 'react-dom'
 import { motion } from 'motion/react'
@@ -7,7 +8,6 @@ import {
   groupsFor,
   listed,
   MINI_GAMES,
-  MINI_GAMES_LIST,
   type Chattiness,
   type MiniGameDef
 } from '@shared/minigames'
@@ -81,7 +81,7 @@ const NO_ONE: Opponent[] = []
 
 /** The sitting a game she agreed to opens on, her skill still to come. */
 function sittingOf(agreed: Agreed | null): Sitting | null {
-  const game = agreed && MINI_GAMES_LIST.find((entry) => entry.id === agreed.gameId)
+  const game = agreed && gameById(agreed.gameId)
   return game ? { game, opponents: null, stake: agreed.stake, options: agreed.options } : null
 }
 
@@ -146,7 +146,7 @@ export function MiniGamePanel({ theme, onClose }: ScenePanelProps): JSX.Element 
   // Her skill, judged when she agreed and ready by now more often than not.
   useEffect(() => {
     if (!agreed) return
-    const game = MINI_GAMES_LIST.find((entry) => entry.id === agreed.gameId)
+    const game = gameById(agreed.gameId)
     const characters = agreed.charIds
       .map((charId) => useGameStore.getState().characters[charId])
       .filter((character) => character !== undefined)

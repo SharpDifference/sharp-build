@@ -100,6 +100,8 @@ export interface MiniGameDef {
   surface?: PlaySurface
   /** Played on the keyboard, so the line to her does not take the focus when the game opens. */
   keys?: boolean
+  /** How it is played, for the player: the keys or the pointer, in a sentence. Shown on its page. */
+  controls?: string
   /** What makes someone good at it, in a sentence, for judging how well a girl plays. */
   skillBrief: string
 }
@@ -202,6 +204,41 @@ export function suggestRate(
   if (busy) return 'never'
   if (keen) return 'often'
   return (location && game.suggestAt?.[location]) || game.suggest || 'sometimes'
+}
+
+/** What a player has set for one game on its page: his own usual options, and how often it comes up. */
+export interface GamePrefs {
+  /** The value he would rather an option started at, by option id. */
+  options?: Readonly<Record<string, number>>
+  /** How readily a girl suggests it, everywhere it is played, in place of what the game says. */
+  suggest?: SuggestRate
+}
+
+/**
+ * A game as a player has tuned it: each option starting where he set it, where that is a value
+ * the game allows, and suggested as often as he chose. The game itself where he has set nothing.
+ */
+export function tuned(game: MiniGameDef, prefs: GamePrefs | undefined): MiniGameDef {
+  if (!prefs) return game
+  const options = game.options?.map((option) => {
+    const value = prefs.options?.[option.id]
+    const fits =
+      value !== undefined && Number.isInteger(value) && value >= option.min && value <= option.max
+    return fits ? { ...option, default: value } : option
+  })
+  return {
+    ...game,
+    ...(options ? { options } : {}),
+    ...(prefs.suggest ? { suggest: prefs.suggest, suggestAt: undefined } : {})
+  }
+}
+
+/** Who a game is played with, as a page says it. */
+export function playersWords(game: MiniGameDef): string {
+  const { min, max } = game.players
+  if (max <= 0) return 'alone'
+  const girls = max === 1 ? 'one girl' : min >= max ? `${max} girls` : `up to ${max} girls`
+  return min === 0 ? `alone, or with ${girls}` : `with ${girls}`
 }
 
 /** A game's options at their defaults. */

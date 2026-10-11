@@ -107,3 +107,65 @@ body:has(.vu-minigame-veil) .vu-scene-divider {
   visibility: hidden;
   pointer-events: none;
 }
+
+/* A pack's page on the Mods screen. A game's row is the screen's own option row whose words are
+   a button: it opens the game's page, and the switch beside it stays the switch. */
+.vu-minigame-entry-pick {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+  padding: 4px 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.vu-minigame-entry-icon {
+  flex: none;
+  width: 28px;
+  font-size: 22px;
+  text-align: center;
+}
+
+/* One game's own page, in the same pane. */
+.vu-minigame-page {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.vu-minigame-page-back {
+  align-self: flex-start;
+}
+
+.vu-minigame-page-name {
+  margin: 0;
+  color: var(--vu-text);
+  font: 400 22px var(--font-display);
+}
+
+/* What a game says of itself: a mono word, and the sentence it heads. */
+.vu-minigame-facts {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 8px 14px;
+  margin: 0;
+}
+
+.vu-minigame-facts dt {
+  padding-top: 3px;
+  color: var(--vu-text-muted);
+  font: 700 11px var(--font-mono);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.vu-minigame-facts dd {
+  margin: 0;
+  color: var(--vu-text-body);
+  font: 400 14px/1.45 var(--font-body);
+}

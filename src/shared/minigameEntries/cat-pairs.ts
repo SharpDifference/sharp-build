@@ -32,6 +32,7 @@ const CAT_PAIRS: MiniGameDef = {
   suggestAt: { cat_cafe: 'often', cutetea: 'sometimes' },
   players: { min: 0, max: 3 },
   surface: 'table',
+  controls: 'Click two cards to turn them.',
   skillBrief:
     'A good player remembers where every card that has been turned lies, follows the cards a cat moves, and never turns a card blind when a pair is known; a poor one forgets what was shown a turn ago and mostly guesses.'
 }

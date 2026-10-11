@@ -36,6 +36,7 @@ const POKER: MiniGameDef = {
   },
   players: { min: 1, max: 3 },
   surface: 'board',
+  controls: 'Click Fold, Call, or one of the bet sizes.',
   skillBrief:
     'A good player weighs how strong her hand is against the price of a call, bets her good hands, folds her bad ones and bluffs rarely and well; a poor one calls too much, bluffs at the wrong moments or is frightened off the best hand.'
 }

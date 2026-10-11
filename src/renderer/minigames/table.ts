@@ -9,6 +9,7 @@ import { useModsStore, modIsOn } from '../stores/modsStore'
 import { splitOverflow } from '../stores/sceneSanitizer'
 import { boxFits } from '../views/boxRows'
 import { gameComponent, type PlayResult } from './play'
+import { tunedGame, usePrefsStore } from './prefs'
 import { useTableStore } from './session'
 import { tableLine } from './talk'
 
@@ -27,9 +28,11 @@ export function useGamesOffered(): MiniGameDef[] {
   const girls = useGameStore((s) => s.cast.filter((id) => !s.departed.includes(id)).length)
   // Read so a switch moved mid-scene is answered at once.
   useModsStore((s) => s.switches)
-  return gamesOffered({ location, girls }, gameIsOn).filter((game) =>
-    Boolean(gameComponent(game.id))
-  )
+  // Read so a game retuned on its page is offered as retuned.
+  usePrefsStore((s) => s.byGame)
+  return gamesOffered({ location, girls }, gameIsOn)
+    .filter((game) => Boolean(gameComponent(game.id)))
+    .map(tunedGame)
 }
 
 /** The girls in the scene, by id: the cast, less whoever has left it. */

@@ -1,6 +1,7 @@
+import { gameById } from './prefs'
 import { useEffect, useRef, type JSX } from 'react'
 import type { SceneSeatProps } from '../mods/hooks'
-import { fewestWith, MINI_GAMES_LIST } from '@shared/minigames'
+import { fewestWith } from '@shared/minigames'
 import { useGameStore } from '../stores/gameStore'
 import { DiceIcon } from '../views/screenIcons'
 import { keptAgreed, useTableStore } from './session'
@@ -31,7 +32,7 @@ export function MiniGameSeat({ Seat, visible, open }: SceneSeatProps): JSX.Eleme
     const here = due.charIds.filter(
       (charId) => scene.cast.includes(charId) && !scene.departed.includes(charId)
     )
-    const game = MINI_GAMES_LIST.find((entry) => entry.id === due.gameId)
+    const game = gameById(due.gameId)
     if (!game || here.length < fewestWith(game)) {
       useTableStore.getState().setAgreed(null)
       return

@@ -26,6 +26,7 @@ const SWIM_RACE: MiniGameDef = {
   surface: 'board',
   keys: true,
   players: { min: 0, max: 3 },
+  controls: 'Hold Space to pull and let go to glide. W breathes, S turns at the wall.',
   skillBrief:
     'A good swimmer has a long, even stroke learned in lessons or on a team, breathes without breaking her rhythm, turns cleanly and has the fitness to hold her pace to the end; a poor one thrashes, comes up gasping, fumbles her turns and fades after the first length.'
 }

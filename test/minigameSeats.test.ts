@@ -141,3 +141,22 @@ describe('a pack of games', () => {
     }
   })
 })
+
+describe('a game as the player has it set', () => {
+  it('starts an option where he set it, within what the game allows, and is suggested as he chose', async () => {
+    const { tuned, suggestRate, defaultOptions, playersWords } = await import('../src/shared/minigames')
+    const base = {
+      ...game(0, 3),
+      options: [{ id: 'hands', describe: 'hands', min: 1, max: 5, default: 3 }],
+      suggest: 'rarely' as const,
+      suggestAt: { bar: 'often' as const }
+    }
+    expect(tuned(base, undefined)).toBe(base)
+    expect(defaultOptions(tuned(base, { options: { hands: 5 } }))).toEqual({ hands: 5 })
+    expect(defaultOptions(tuned(base, { options: { hands: 9 } }))).toEqual({ hands: 3 })
+    expect(suggestRate(tuned(base, { suggest: 'never' }), 'bar', false)).toBe('never')
+    expect(suggestRate(tuned(base, {}), 'bar', false)).toBe('often')
+    expect(playersWords(base)).toBe('alone, or with up to 3 girls')
+    expect(playersWords(game(1, 1))).toBe('with one girl')
+  })
+})

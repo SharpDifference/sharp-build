@@ -25,6 +25,7 @@ const PARADISO: MiniGameDef = {
   surface: 'screen',
   keys: true,
   players: { min: 0, max: 1 },
+  controls: 'Arrow keys, or D F J K, as each arrow reaches the top. The targets can be clicked too.',
   skillBrief:
     'A good dancer has rhythm, some dance or music behind her, the fitness to keep it up for a whole song and hours already spent on arcade machines; a poor one is stiff, off the beat, quickly winded or has never stood on a dance pad.'
 }

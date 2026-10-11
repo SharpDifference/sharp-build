@@ -24,6 +24,7 @@ const ROLLER_DERBY: MiniGameDef = {
   surface: 'board',
   keys: true,
   players: { min: 0, max: 3 },
+  controls: 'Alternate Left and Right in time with the pulse. Hold Down or S through the bends.',
   skillBrief:
     'A good skater has balance, rhythm and strong legs, has skated or danced or played a sport before, and leans into a bend without thinking; a poor one is stiff, unfit or new to skates, loses her stride, takes the bends wide and ends up on the floor.'
 }
