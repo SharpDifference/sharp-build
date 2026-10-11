@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { callWins, freshDeck, herCall, type Card } from '../src/shared/highLow'
+import { callWins, freshDeck, herCall, versusOver, type Card } from '../src/shared/highLow'
 
 /** High-Low's rules: what a call wins on, and the deck it is played from. */
 
@@ -33,5 +33,18 @@ describe('High-Low', () => {
     expect(herCall(eight, seen, 5, never)).toBe('higher')
     expect(herCall(eight, seen, 1, () => 0)).toBe('higher')
     expect(herCall(eight, seen, 1, () => 0.9)).toBe('lower')
+  })
+
+  it('ends sudden death only when one is ahead after equal turns', () => {
+    const call = (hers: boolean, right: boolean) => ({ hers, call: 'higher' as const, right })
+    // He is ahead, but she has not had her call.
+    expect(versusOver([call(false, true)], 5, true)).toBe(false)
+    // Level after a call each: on they go.
+    expect(versusOver([call(false, true), call(true, true)], 5, true)).toBe(false)
+    expect(versusOver([call(false, false), call(true, false)], 5, true)).toBe(false)
+    // Ahead after equal turns: over, however few calls it took.
+    expect(versusOver([call(false, false), call(true, true)], 5, true)).toBe(true)
+    // A normal game runs its length whatever the count.
+    expect(versusOver([call(false, false), call(true, true)], 5, false)).toBe(false)
   })
 })

@@ -8,15 +8,22 @@ const HIGH_LOW: MiniGameDef = {
   blurb:
     'a quick card game: a card is turned face up and the player calls whether the next is higher or lower',
   format:
-    'One deck. A card is face up; the player whose turn it is calls whether the next card will be higher or lower, the card is turned, and a right call scores. The two take turns, the reader first, each making the same number of calls, and the better count wins; level counts are a draw. Twos are low, aces high, and the same rank again is a miss.',
+    'One deck. A card is face up; the player whose turn it is calls whether the next card will be higher or lower, the card is turned, and a right call scores. The two take turns, the reader first, each making the same number of calls, and the better count wins; level counts are a draw. In sudden death they keep going a call each at a time until one is ahead after equal turns, so there is always a winner. Twos are low, aces high, and the same rank again is a miss.',
   options: [
     {
       id: 'calls',
-      describe:
-        'how many calls each player makes; a single call each is how a tiebreak is played',
+      describe: 'how many calls each player makes in a normal game',
       min: 1,
       max: 5,
       default: 5
+    },
+    {
+      id: 'sudden',
+      describe:
+        'sudden death, which is how a tiebreak or a death match is played: 1 to play it, 0 for a normal game. In sudden death the two make one call each, again and again, until one of them is ahead after both have had the same number of calls; "calls" is then ignored',
+      min: 0,
+      max: 1,
+      default: 0
     }
   ],
   // A deck in a pocket: it comes up where people sit around with time to spare, and seldom elsewhere.

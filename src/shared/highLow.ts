@@ -139,7 +139,8 @@ export interface CallMade {
 export function versusAccount(
   name: string,
   deck: readonly Card[],
-  calls: readonly CallMade[]
+  calls: readonly CallMade[],
+  sudden = false
 ): string[] {
   const each = calls.filter((made) => !made.hers).length
   /** How many times each side called against cards that clearly favoured the other call. */
@@ -173,10 +174,34 @@ export function versusAccount(
   const count = (side: boolean): number =>
     calls.filter((made) => made.hers === side && made.right).length
   return [
+    ...(sudden
+      ? [
+          'It was sudden death: a call each at a time until one of them was ahead after equal turns.'
+        ]
+      : []),
     `Each called ${each === 1 ? 'once' : `${each} times`}, in turn, on whether the next card would be higher or lower. Twos are low and aces high; the same rank again is a miss.`,
     ...lines,
     played('The reader', against.reader),
     played(name, against.her),
     `Final count: the reader ${count(false)}, ${name} ${count(true)}.`
   ]
+}
+
+/**
+ * Whether a game against her is over after `made` calls. A normal game ends when both have made
+ * `each` calls. Sudden death ends the first time the counts differ with both having called the
+ * same number of times, or when the deck has no card left for another pair of calls.
+ */
+export function versusOver(
+  made: readonly CallMade[],
+  each: number,
+  sudden: boolean,
+  deckSize = 52
+): boolean {
+  if (!sudden) return made.length >= each * 2
+  if (made.length === 0 || made.length % 2 === 1) return false
+  const count = (side: boolean): number =>
+    made.filter((call) => call.hers === side && call.right).length
+  // Every call turns one card, and the first card is already up.
+  return count(false) !== count(true) || made.length + 2 > deckSize - 1
 }

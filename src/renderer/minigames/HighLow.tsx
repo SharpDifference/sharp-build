@@ -10,6 +10,7 @@ import {
   rankWord,
   soloSummary,
   versusAccount,
+  versusOver,
   versusSummary,
   type Call,
   type Card,
@@ -58,16 +59,19 @@ export function HighLow({ play }: { play: GamePlay }): JSX.Element {
 
   // Five calls each unless the two of them settled on fewer.
   const each = play.options.calls ?? CALLS_EACH
-  const total = her ? each * 2 : each
+  // Sudden death is a game against someone: a call each until one of them is ahead.
+  const sudden = Boolean(her) && play.options.sudden === 1
+  const isOver = (calls: readonly Made[]): boolean =>
+    her ? versusOver(calls, each, sudden) : calls.length >= each
   const shown = deck[made.length]
   const mine = made.filter((turn) => !turn.hers && turn.right).length
   const hers = made.filter((turn) => turn.hers && turn.right).length
-  const over = made.length >= total
+  const over = isOver(made)
   const herTurn = Boolean(her) && !over && made.length % 2 === 1
 
   // Against her the game is on from the moment she sits down, and the deal is said.
   useEffect(() => {
-    if (her) play.narrate(`${her.name} cuts the deck and turns the top card: ${rankWord(deck[0].rank)}. ${each === 1 ? 'One call each' : `${each} calls each`}, yours first.`)
+    if (her) play.narrate(`${her.name} cuts the deck and turns the top card: ${rankWord(deck[0].rank)}. ${sudden ? 'Sudden death: a call each until one of you is ahead' : each === 1 ? 'One call each' : `${each} calls each`}, yours first.`)
     // Once, as the table opens.
   }, [])
 
@@ -77,7 +81,7 @@ export function HighLow({ play }: { play: GamePlay }): JSX.Element {
     const all = [...made, { hers: byHer, call: called, right: callWins(shown, next, called) }]
     play.narrate(callLine(byHer && her ? her.name : 'You', called, shown, next))
     setMade(all)
-    if (all.length < total) return
+    if (!isOver(all)) return
 
     const right = (side: boolean): number =>
       all.filter((turn) => turn.hers === side && turn.right).length
@@ -89,7 +93,7 @@ export function HighLow({ play }: { play: GamePlay }): JSX.Element {
     play.finish({
       outcome: a > b ? 'won' : a < b ? 'lost' : 'draw',
       summary: versusSummary(her.name, a, b),
-      account: versusAccount(her.name, deck, all)
+      account: versusAccount(her.name, deck, all, sudden)
     })
   }
 
@@ -103,7 +107,8 @@ export function HighLow({ play }: { play: GamePlay }): JSX.Element {
     // Her turn comes round once per card turned, which the count alone says.
   }, [herTurn, made.length])
 
-  const round = Math.min(Math.floor(made.length / (her ? 2 : 1)) + 1, each)
+  const played = Math.floor(made.length / (her ? 2 : 1))
+  const round = sudden ? played + (over ? 0 : 1) : Math.min(played + 1, each)
 
   return (
     <div className="vu-highlow">
@@ -124,7 +129,7 @@ export function HighLow({ play }: { play: GamePlay }): JSX.Element {
       <p className="vu-highlow-count">
         {her ? `you ${mine} · ${her.name} ${hers}` : `${mine} right`}
         <span className="vu-highlow-round">
-          {over ? 'game over' : `call ${round} of ${each}`}
+          {over ? 'game over' : sudden ? `sudden death · call ${round}` : `call ${round} of ${each}`}
         </span>
       </p>
 
