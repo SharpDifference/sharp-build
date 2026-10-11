@@ -94,6 +94,22 @@
   visibility: hidden;
 }
 
+/* Her turn: the calls stand back while she makes hers. */
+.vu-highlow-calls[data-waiting] {
+  opacity: 0.35;
+}
+
+/* How she plays, a note under the count. */
+.vu-highlow-style {
+  margin: -10px 0 0;
+  color: var(--vu-text-muted);
+  font: italic 500 14px var(--font-body);
+}
+
+.vu-highlow-turnwho {
+  color: var(--vu-text-body);
+}
+
 /* A call swells about its own centre, as an answer in a foot does. */
 .vu-highlow-calls > button {
   transform-origin: center;
@@ -103,7 +119,7 @@
 .vu-highlow-trail {
   display: flex;
   gap: 14px;
-  min-height: 100px;
+  min-height: 118px;
   margin: 0;
   padding: 0;
   list-style: none;

@@ -31,3 +31,24 @@
   font: 500 15px var(--font-body);
   line-height: 1.5;
 }
+
+/* The proposal: one field, the reader's own words. */
+.vu-minigame-ask {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+/* What is riding on the game, said once over the table in the bookkeeping voice. */
+.vu-minigame-stake {
+  margin: 0 0 14px;
+  color: var(--vu-text-body);
+  font: 500 15px var(--font-body);
+  text-align: center;
+}
+
+.vu-minigame-stakeword {
+  margin-right: 8px;
+  color: var(--vu-text-muted);
+  font: 700 12px var(--font-mono);
+}

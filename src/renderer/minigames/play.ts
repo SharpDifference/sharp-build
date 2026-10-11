@@ -15,7 +15,22 @@ export interface PlayResult {
   summary: string
 }
 
+/** A girl at the table. */
+export interface Opponent {
+  charId: string
+  /** What the reader calls her. */
+  name: string
+  /** How well she plays, from 1 to 5. */
+  skill: 1 | 2 | 3 | 4 | 5
+  /** How she plays, in a few words; empty where nothing was judged. */
+  style: string
+}
+
 export interface GamePlay {
+  /** The girls playing against the reader; none for a game played alone. */
+  opponents: readonly Opponent[]
+  /** What is riding on the game, as the scene settled it; empty where nothing is. */
+  stake: string
   /** The first move is made: from here, leaving the table is walking away from a game. */
   started: () => void
   /**

@@ -37,10 +37,57 @@ export function rankMark(rank: number): string {
   return FACES[rank] ?? String(rank)
 }
 
+/** How a girl plays, from 1 (on hunches) to 5 (counts every card). */
+export type Skill = 1 | 2 | 3 | 4 | 5
+
+/**
+ * The call the cards favour on `shown`, given every card turned so far (`shown` among them), and
+ * by how much: the share of the cards still in the deck that separates the two calls.
+ */
+export function oddsCall(shown: Card, seen: readonly Card[]): { call: Call; edge: number } {
+  let higher = 0
+  let lower = 0
+  for (let rank = 2; rank <= 14; rank++) {
+    const left = 4 - seen.filter((card) => card.rank === rank).length
+    if (rank > shown.rank) higher += left
+    else if (rank < shown.rank) lower += left
+  }
+  const left = 52 - seen.length
+  return {
+    call: higher >= lower ? 'higher' : 'lower',
+    edge: left > 0 ? Math.abs(higher - lower) / left : 0
+  }
+}
+
+/** The edge under which she stops reading the cards and goes on a hunch, by skill. */
+const HUNCH_UNDER: Record<Skill, number> = { 1: 0.5, 2: 0.35, 3: 0.2, 4: 0.1, 5: 0 }
+
+/**
+ * Her call. Everyone calls lower on a king; what skill buys is the close ones: the better she
+ * is, the finer an edge she still reads, and under that she is guessing.
+ */
+export function herCall(
+  shown: Card,
+  seen: readonly Card[],
+  skill: Skill,
+  rand: () => number = Math.random
+): Call {
+  const { call, edge } = oddsCall(shown, seen)
+  if (edge > HUNCH_UNDER[skill]) return call
+  return rand() < 0.5 ? 'higher' : 'lower'
+}
+
 /** What a game played alone comes to, as the scene's narration says it. */
 export function soloSummary(right: number): string {
   const calls = `${right} of ${CALLS_EACH} calls right`
   if (right === CALLS_EACH) return `You deal yourself a game of High-Low and get all ${calls}. A perfect run.`
   if (right === 0) return `You deal yourself a game of High-Low and get ${calls}. The deck had it in for you.`
   return `You deal yourself a game of High-Low and get ${calls}.`
+}
+
+/** What a game against her comes to, as the scene's narration says it. */
+export function versusSummary(name: string, mine: number, hers: number): string {
+  if (mine > hers) return `You play High-Low with ${name} and win, ${mine} calls to ${hers}.`
+  if (mine < hers) return `You play High-Low with ${name} and lose, ${mine} calls to ${hers}.`
+  return `You play High-Low with ${name} and it ends level, ${mine} calls each.`
 }
