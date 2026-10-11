@@ -61,8 +61,9 @@ export function withProposal(
             'What the two of them may settle about it, in the "options" of the field:',
             ...options.map(
               (option) =>
-                `- "${option.id}": ${option.describe}. From ${option.min} to ${option.max}; ${option.default} unless something else was said.`
-            )
+                `- "${option.id}": ${option.describe}. From ${option.min} to ${option.max}. Use ${option.default} unless one of them names something else out loud in this exchange.`
+            ),
+            'Never change an option on your own. A value other than the usual one must have been asked for by the reader in his words, or be said by her in your lines, so that both of them know what they are sitting down to.'
           ]
         : []),
       `That is the whole of what the table can do. The game is run for real, by its rules as written here, and nothing either of them says can change them. If the reader asks for a way of playing this does not cover, ${name} cannot agree to that version: she steers it back to what the game does, in character, or says no.`,
