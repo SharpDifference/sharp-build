@@ -3,6 +3,7 @@ import type { Card, SkillLevel as Skill, Suit } from '../src/shared/minigameKit'
 import { MINI_GAMES_LIST, settledOptions } from '../src/shared/minigames'
 import {
   act,
+  actionsLine,
   awardPots,
   dealHand,
   evaluate,
@@ -13,6 +14,7 @@ import {
   girlChoice,
   handStrength,
   handTold,
+  judged,
   knownEquity,
   legal,
   nextButton,
@@ -109,6 +111,21 @@ describe('Poker hands', () => {
     expect(score('2d 3s 4c 5h 6d')).toBeGreaterThan(score('Ah 2d 3s 4c 5h'))
     expect(score('Th Jd Qs Kc Ah')).toBeGreaterThan(score('9h Td Js Qc Kh'))
     expect(category('Qh Kd As 2c 3h 8d 9c')).toBe(0)
+  })
+
+  it('is not fooled by seven cards: two sets, three pairs, a flush beside a straight', () => {
+    // Two sets of three make a full house, the higher set on top.
+    expect(evaluate(cards('Ah Ad As Kh Kd Ks Qc'))).toMatchObject({ category: 6, ranks: [14, 13] })
+    // Three pairs are the best two, and the third pair's rank is the kicker if nothing beats it.
+    expect(evaluate(cards('Ah Ad Kh Kd Qs Qc Jc'))).toMatchObject({ category: 2, ranks: [14, 13, 12] })
+    // A flush and a straight in different cards are a flush, not a straight flush.
+    expect(evaluate(cards('Ah Kh Qh Jh 9h Ts 2c'))).toMatchObject({ category: 5, ranks: [14, 13, 12, 11, 9] })
+    // A wheel in one suit is a straight flush to the five, under one to the six.
+    expect(evaluate(cards('Ah 2h 3h 4h 5h Kd Kc'))).toMatchObject({ category: 8, ranks: [5] })
+    expect(score('2h 3h 4h 5h 6h Ah Kc')).toBeGreaterThan(score('Ah 2h 3h 4h 5h Kd Kc'))
+    // Four of a kind on the board: only the kicker counts, and a pocket pair is no help.
+    expect(score('9h 9d 9s 9c 4h Ad 2c')).toBeGreaterThan(score('9h 9d 9s 9c 4h Kd Kc'))
+    expect(score('9h 9d 9s 9c Ah Kd Kc')).toBe(score('9h 9d 9s 9c Ah 3d 2c'))
   })
 
   it('breaks ties on kickers, down to the fifth card', () => {
@@ -320,6 +337,70 @@ describe('Poker betting', () => {
     expect(stacks(done)).toEqual([196, 8])
   })
 
+  it('keeps the big blind the bet to match when the seat posting it is short', () => {
+    const deck = stacked(['7c 2s', 'Kh Qd', 'Ah Ad'], 'As 8d Jc 4s 9h')
+    const hand = dealHand([200, 200, 4], 0, 1, deck)
+    expect([hand.smallBlind, hand.bigBlind, hand.toAct]).toEqual([1, 2, 0])
+    expect(hand.seats[2]).toMatchObject({ bet: 4, allIn: true })
+    expect(legal(hand, 0)).toMatchObject({ owed: 10, minTo: 20 })
+    // Both call the full blind: the short stack can win 4 from each, the rest is between the two.
+    const called = play(hand, call, call)
+    expect(called.toAct).toBeNull()
+    const flop = proceed(called)
+    expect(flop.toAct).toBe(1)
+    const done = play(flop, check, check, 'deal', check, check, 'deal', check, check, 'deal')
+    expect(done.pots).toEqual([
+      { amount: 12, eligible: [0, 1, 2], winners: [2] },
+      { amount: 12, eligible: [0, 1], winners: [1] }
+    ])
+    expect(stacks(done)).toEqual([190, 202, 12])
+    // Folded round to the small blind, whose 5 already covers her: nothing is asked of it, and its odd chip comes back.
+    const alone = act(hand, fold)
+    expect(alone.toAct).toBeNull()
+    expect(alone.runoutFrom).toBe(0)
+    expect(stacks(play(alone, 'deal', 'deal', 'deal', 'deal'))).toEqual([200, 196, 8])
+  })
+
+  it('shares three all-ins of different sizes into a main pot, a side pot and a refund', () => {
+    const deck = stacked(['Ah Ad', 'Kh Kd', '7c 2s'], '3h 8d Jc 4s 9h')
+    const hand = dealHand([50, 120, 300], 2, 1, deck)
+    expect(hand.toAct).toBe(2)
+    const in3 = play(hand, raise(300), call, call)
+    expect(in3.toAct).toBeNull()
+    expect(in3.runoutFrom).toBe(0)
+    // What nobody could match is back before a card is dealt.
+    expect(in3.seats[2]).toMatchObject({ stack: 180, allIn: false })
+    const done = play(in3, 'deal', 'deal', 'deal', 'deal')
+    expect(done.showdown).toBe(true)
+    expect(done.pots).toEqual([
+      { amount: 150, eligible: [0, 1, 2], winners: [0] },
+      { amount: 140, eligible: [1, 2], winners: [1] }
+    ])
+    expect(stacks(done)).toEqual([150, 140, 180])
+  })
+
+  it('does not close the betting on a call that was all-in for less while others are still to act', () => {
+    const hand = dealHand([200, 40, 200], 2, 1, freshDeck(seeded(8)))
+    const raised = act(hand, raise(100))
+    expect(raised.toAct).toBe(0)
+    const short = play(raised, fold, call)
+    // The big blind is in for her 40; the raiser's other 60 comes back and the board is dealt out.
+    expect(short.toAct).toBeNull()
+    expect(short.seats[1]).toMatchObject({ stack: 0, allIn: true, total: 40 })
+    expect(short.seats[2].stack).toBe(160)
+    expect(potOf(short)).toBe(85)
+  })
+
+  it('lets a player raise again after a full raise, at no less than the last raise', () => {
+    const hand = dealHand([400, 400, 400], 2, 1, freshDeck(seeded(9)))
+    // The button raises to 30, the small blind to 90: the button may raise again, by 60 at least.
+    const back = play(hand, raise(30), raise(90), fold)
+    expect(back.toAct).toBe(2)
+    expect(legal(back, 2)).toMatchObject({ owed: 60, canRaise: true, minTo: 150 })
+    // A raise asked for below that is brought up to it.
+    expect(act(back, raise(100)).seats[2].bet).toBe(150)
+  })
+
   it('never loses or makes a chip, whatever is played, and always ends', () => {
     const rand = seeded(11)
     for (let game = 0; game < 60; game++) {
@@ -429,12 +510,35 @@ describe('Poker, her play', () => {
   const facing = spot({ owed: 60, canCheck: false, pot: 120, minTo: 120, halfTo: 150, potTo: 240 })
   const skills: Skill[] = [1, 2, 3, 4, 5]
 
-  it('has everyone bet a strong hand and raise a very strong one, with no guess taken', () => {
+  it('has everyone bet a strong hand and raise a very strong one, unless she is too timid to', () => {
+    const sure = (): number => 0.99
     for (const skill of skills) {
-      expect(girlChoice(0.95, spot(), skill, '', never)).toEqual({ kind: 'raise', to: 60 })
-      expect(girlChoice(0.75, spot(), skill, '', never)).toEqual({ kind: 'raise', to: 30 })
-      expect(girlChoice(0.96, facing, skill, '', never)).toEqual({ kind: 'raise', to: 240 })
+      expect(girlChoice(0.95, spot(), skill, '', sure)).toEqual({ kind: 'raise', to: 60 })
+      expect(girlChoice(0.75, spot(), skill, '', sure).kind).toBe('raise')
+      expect(girlChoice(0.96, facing, skill, '', sure)).toEqual({ kind: 'raise', to: 240 })
     }
+    // A poor player sometimes only checks or calls it; a good one takes no guess about it.
+    expect(girlChoice(0.95, spot(), 1, '', () => 0)).toEqual({ kind: 'check' })
+    expect(girlChoice(0.96, facing, 1, '', () => 0)).toEqual({ kind: 'call' })
+    expect(girlChoice(0.95, spot(), 5, '', never)).toEqual({ kind: 'raise', to: 60 })
+    expect(girlChoice(0.96, facing, 5, '', never)).toEqual({ kind: 'raise', to: 240 })
+  })
+
+  it('has the best player bet a thinner hand than the others, and count the players still in', () => {
+    expect(girlChoice(0.63, spot(), 5, '', never)).toEqual({ kind: 'raise', to: 30 })
+    expect(girlChoice(0.63, spot(), 3, '', () => 0.99)).toEqual({ kind: 'check' })
+    expect(girlChoice(0.73, spot({ opponents: 3 }), 5, '', never)).toEqual({ kind: 'check' })
+    expect(girlChoice(0.73, spot({ opponents: 3 }), 1, '', () => 0.99).kind).toBe('raise')
+  })
+
+  it('has a poor player misjudge a middling hand, never a sure one, and the best judge every hand right', () => {
+    const rand = seeded(5)
+    let off = 0
+    for (let i = 0; i < 200; i++) off += Math.abs(judged(0.5, 1, rand) - 0.5)
+    expect(off / 200).toBeGreaterThan(0.12)
+    expect(judged(1, 1, rand)).toBe(1)
+    expect(judged(0, 1, rand)).toBe(0)
+    expect(judged(0.5, 5, never)).toBe(0.5)
   })
 
   it('never folds when checking is free', () => {
@@ -484,7 +588,7 @@ describe('Poker, her play', () => {
   it('opens a good hand before the flop, and commits rather than leave a crumb behind', () => {
     const open = spot({ street: 'preflop', owed: 5, canCheck: false, pot: 15, minTo: 20, halfTo: 20, potTo: 30 })
     expect(girlChoice(0.7, open, 5, '', never)).toEqual({ kind: 'raise', to: 30 })
-    expect(girlChoice(0.95, spot({ maxTo: 80, stack: 80 }), 3, '', never)).toEqual({ kind: 'raise', to: 80 })
+    expect(girlChoice(0.95, spot({ maxTo: 80, stack: 80 }), 3, '', () => 0.99)).toEqual({ kind: 'raise', to: 80 })
   })
 
   it('leans with the words of her style', () => {
@@ -524,12 +628,33 @@ describe('Poker, her play', () => {
       }
       ahead += hand.seats[0].stack - 300
     }
-    // Over this many hands the better player's edge is well clear of the luck of the cards.
-    expect(ahead).toBeGreaterThan(0)
+    // Over this many hands the better player's edge is well clear of the luck of the cards:
+    // more than half a big blind a hand.
+    expect(ahead).toBeGreaterThan(3000 * 5)
   })
 })
 
 describe('Poker, the telling', () => {
+  it('says a round of checks, calls and folds in one line, those who did the same together', () => {
+    const made = (seat: number, kind: 'fold' | 'check' | 'call', paid = 0, allIn = false) => ({
+      seat,
+      street: 'preflop' as const,
+      kind,
+      to: paid,
+      paid,
+      allIn,
+      pot: 15,
+      toCall: paid
+    })
+    const names = ['Ana', 'Bea', 'Cy']
+    expect(actionsLine(names, [made(1, 'fold'), made(2, 'call', 10), made(3, 'call', 10), made(0, 'check')])).toBe(
+      'Ana folds; Bea and Cy call 10; you check.'
+    )
+    expect(actionsLine(names, [made(0, 'check'), made(1, 'check')])).toBe('You and Ana check.')
+    expect(actionsLine(names, [made(1, 'call', 10), made(2, 'call', 5)])).toBe('Ana calls 10; Bea calls 5.')
+    expect(actionsLine(names, [made(2, 'call', 40, true)])).toBe('Bea calls 40, all-in.')
+  })
+
   it('tells a bluff that worked, and who folded the better hand, without showing it to the table', () => {
     // The reader holds nothing and bets the river; Ana folds a pair of kings.
     const deck = stacked(['7c 2s', 'Kh Qd'], 'Ks 9d 4c 3h Jh')

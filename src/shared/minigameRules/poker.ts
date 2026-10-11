@@ -279,8 +279,12 @@ function nextToAct(hand: HandState, from: number): number | null {
   const count = hand.seats.length
   const ables = hand.seats.flatMap((seat, i) => (able(seat) ? [i] : []))
   if (ables.length === 0) return null
-  // One player left with chips and nothing to match: nobody is there to bet against.
-  if (ables.length === 1 && owedBy(hand, ables[0]) === 0) return null
+  // One player left with chips who has matched everyone still in: nobody is there to bet against.
+  // A big blind posted short leaves a bet to match that nobody made, which is not owed to anyone.
+  if (ables.length === 1) {
+    const rest = hand.seats.filter((seat, i) => i !== ables[0] && live(seat)).map((seat) => seat.bet)
+    if (hand.seats[ables[0]].bet >= Math.max(0, ...rest)) return null
+  }
   for (let k = 1; k <= count; k++) {
     const i = (from + k) % count
     if (able(hand.seats[i]) && (owedBy(hand, i) > 0 || !hand.seats[i].acted)) return i
@@ -406,7 +410,8 @@ function nextIn(seats: readonly PokerSeat[], from: number): number {
 /**
  * A new hand: two cards each off `deck` in seat order, the blinds posted. Heads-up the button
  * posts the small blind and acts first before the flop; otherwise the blinds are the two seats
- * to its left. A seat with no chips is not dealt in. `button` must be a seat with chips.
+ * to its left. A blind short of chips is all-in for what it has, and the big blind is still the
+ * bet to match. A seat with no chips is not dealt in. `button` must be a seat with chips.
  */
 export function dealHand(stacks: readonly number[], button: number, no: number, deck: readonly Card[]): HandState {
   let dealt = 0
@@ -439,7 +444,8 @@ export function dealHand(stacks: readonly number[], button: number, no: number, 
     board: [],
     street: 'preflop',
     toAct: null,
-    currentBet: Math.max(...seats.map((seat) => seat.bet)),
+    // The big blind is the bet to match even where the seat posting it was short of it.
+    currentBet: BIG_BLIND,
     lastRaise: BIG_BLIND,
     log: [],
     start: stacks.map((stack) => Math.max(0, stack)),
@@ -621,13 +627,34 @@ export function styleTraits(style: string): Traits {
 /** How much of a bet's meaning she takes in: a bet says its maker likely holds something. */
 const READ: Record<Skill, number> = { 1: 0, 2: 0.3, 3: 0.6, 4: 0.85, 5: 1 }
 /** How far short of the price she will still call, out of hope. */
-const LOOSE: Record<Skill, number> = { 1: 0.22, 2: 0.13, 3: 0.05, 4: 0, 5: 0 }
+const LOOSE: Record<Skill, number> = { 1: 0.25, 2: 0.13, 3: 0.05, 4: 0, 5: 0 }
 /** How often a big bet frightens her off a hand that was good enough to call with. */
 const SCARE: Record<Skill, number> = { 1: 0.3, 2: 0.2, 3: 0.1, 4: 0.04, 5: 0 }
 /** How often she bets with nothing where she sees a chance to. */
 const BLUFF: Record<Skill, number> = { 1: 0.2, 2: 0.16, 3: 0.12, 4: 0.1, 5: 0.1 }
 /** How often she raises a bet with nothing: a bluff into strength, which a good player does not make. */
-const WILD: Record<Skill, number> = { 1: 0.12, 2: 0.08, 3: 0.03, 4: 0, 5: 0 }
+const WILD: Record<Skill, number> = { 1: 0.15, 2: 0.09, 3: 0.03, 4: 0, 5: 0 }
+/** How good a hand she bets for what it is worth: a good player bets a thinner one. */
+const VALUE: Record<Skill, number> = { 1: 0.72, 2: 0.7, 3: 0.68, 4: 0.64, 5: 0.6 }
+/** How good a hand she raises a bet with. */
+const RERAISE: Record<Skill, number> = { 1: 0.93, 2: 0.93, 3: 0.92, 4: 0.89, 5: 0.86 }
+/** How good a hand she opens with before the flop. */
+const OPEN: Record<Skill, number> = { 1: 0.66, 2: 0.65, 3: 0.64, 4: 0.6, 5: 0.57 }
+/** How often she only checks or calls a hand that was worth a bet or a raise. */
+const MEEK: Record<Skill, number> = { 1: 0.4, 2: 0.25, 3: 0.1, 4: 0, 5: 0 }
+/** How far out she can be in judging a hand that could go either way. */
+const MISREAD: Record<Skill, number> = { 1: 0.6, 2: 0.38, 3: 0.18, 4: 0.07, 5: 0 }
+
+/**
+ * Her hand's strength as she judges it. A poor player misjudges a hand that could go either
+ * way, thinking a middling one good or bad; nobody mistakes a sure thing or a hopeless one.
+ */
+export function judged(strength: number, skill: Skill, rand: () => number = Math.random): number {
+  const off = MISREAD[skill]
+  if (off === 0) return strength
+  const doubt = 4 * strength * (1 - strength)
+  return Math.min(1, Math.max(0, strength + (rand() + rand() - 1) * off * doubt))
+}
 
 /** Where she stands when it is her move. */
 export interface Spot extends Legal {
@@ -645,15 +672,18 @@ export interface Choice extends Move {
 }
 
 /**
- * A girl's move from `strength`, her hand's chance against one random hand, and the spot.
+ * A girl's move from `strength`, her hand's chance against one random hand as she judges it,
+ * and the spot.
  *
- * Everyone bets a strong hand, raises a very strong one and never folds for free. The best
- * player calls when her chance beats the price of the call with room for what a bet says about
- * the bettor, and bluffs now and then only where it can work: after the flop, against one
- * player, with a hand that cannot win by checking. Weaker players make a person's mistakes:
- * they take a bet at face value and call on hope, are sometimes frightened off a good hand by a
- * big bet, and bluff into several players, before the flop or straight into a bet. Her style
- * shifts the same lines a little.
+ * Nobody folds for free, and a hand that is nearly sure is never folded. The best player bets
+ * a good hand for what it is worth, a thinner one than the others would and bigger the better
+ * it is, counts the players still in, raises a very strong one, calls when her chance beats the
+ * price of the call with room for what a bet says about the bettor, and bluffs now and then
+ * only where it can work: after the flop, against one player, with a hand that cannot win by
+ * checking. Weaker players make a person's mistakes: they only check or call a hand that was
+ * worth a bet, take a bet at face value and call on hope, are sometimes frightened off a good
+ * hand by a big bet, and bluff into several players, before the flop or straight into a bet.
+ * Her style shifts the same lines a little.
  */
 export function girlChoice(
   strength: number,
@@ -667,11 +697,15 @@ export function girlChoice(
   // Leaving a crumb behind is never worth it: a raise of most of her chips is all of them.
   const raise = (to: number): Choice => ({ kind: 'raise', to: to >= spot.maxTo * 0.7 ? spot.maxTo : to })
   const preflop = spot.street === 'preflop'
+  // A hand good against one player is less so against several, which a poor player does not count.
+  const worth = skill >= 3 ? strength ** Math.sqrt(rivals) : strength
+  const meekly = MEEK[skill] * (1 - 0.5 * lean.bold)
+  const meek = (): boolean => meekly > 0 && rand() < meekly
 
   if (spot.owed === 0) {
     if (!spot.canRaise) return { kind: 'check' }
-    if (strength >= 0.86 - 0.04 * lean.bold) return raise(spot.potTo)
-    if (strength >= 0.68 - 0.06 * lean.bold) return raise(spot.halfTo)
+    const value = VALUE[skill] - 0.06 * lean.bold
+    if (worth >= value) return meek() ? { kind: 'check' } : raise(worth >= value + (skill >= 4 ? 0.14 : 0.18) ? spot.potTo : spot.halfTo)
     const where =
       skill >= 4
         ? rivals === 1 && !preflop && strength < 0.45
@@ -686,12 +720,19 @@ export function girlChoice(
   }
 
   if (spot.canRaise) {
-    if (strength >= 0.92) return raise(spot.potTo)
-    if (strength >= 0.84 - 0.04 * lean.bold && spot.owed * 4 <= spot.stack) return raise(spot.halfTo)
+    const top = RERAISE[skill] - 0.04 * lean.bold
+    const open = preflop && spot.owed <= BIG_BLIND && strength >= OPEN[skill] - 0.05 * lean.bold
     // Nobody has raised yet before the flop: a good hand opens.
-    if (preflop && spot.owed <= BIG_BLIND && strength >= 0.64 - 0.05 * lean.bold) return raise(spot.potTo)
+    if ((worth >= top - 0.05 || open) && !meek()) {
+      if (worth >= top || open) return raise(spot.potTo)
+      if (spot.owed * 4 <= spot.stack) return raise(spot.halfTo)
+    }
   }
   if (strength >= 0.92) return { kind: 'call' }
+  const wild = WILD[skill] * (1 + 0.6 * lean.sly) * (1 + 0.4 * lean.bold)
+  if (wild > 0 && spot.canRaise && !preflop && strength < 0.6 && rand() < wild) {
+    return { ...raise(spot.potTo), bluff: true }
+  }
   const price = spot.owed / (spot.pot + spot.owed)
   // How big the bet is: against twenty big blinds before the flop, against the pot after it.
   const size = Math.min(1, preflop ? spot.owed / (20 * BIG_BLIND) : spot.owed / Math.max(1, spot.pot - spot.owed))
@@ -702,8 +743,6 @@ export function girlChoice(
     if (scare > 0 && size >= 0.5 && strength < 0.88 && rand() < scare) return { kind: 'fold' }
     return { kind: 'call' }
   }
-  const wild = WILD[skill] * (1 + 0.6 * lean.sly) * (1 + 0.4 * lean.bold)
-  if (wild > 0 && spot.canRaise && !preflop && rand() < wild) return { ...raise(spot.potTo), bluff: true }
   return { kind: 'fold' }
 }
 
@@ -717,7 +756,7 @@ export function girlAction(
   trials = 120
 ): Choice {
   const opponents = hand.seats.filter((seat, i) => i !== at && live(seat)).length
-  const strength = handStrength(hand.seats[at].hole, hand.board, opponents, rand, trials)
+  const strength = judged(handStrength(hand.seats[at].hole, hand.board, opponents, rand, trials), skill, rand)
   const spot: Spot = {
     ...legal(hand, at),
     pot: potOf(hand),
@@ -796,24 +835,46 @@ export function dealLine(names: readonly string[], hand: HandState): string {
   return `Hand ${hand.no}. ${blinds} You are dealt ${cardWord(seats[0].hole[0])} and ${cardWord(seats[0].hole[1])}.`
 }
 
+/**
+ * Moves made one after another, as the scene's narration says them in one line: those in a row
+ * who did the same are named together. "Ana folds; you and Bea call 10."
+ */
+export function actionsLine(names: readonly string[], made: readonly ActionMade[]): string {
+  const who = namer(names, 'you')
+  const runs: { first: ActionMade; seats: number[] }[] = []
+  for (const each of made) {
+    const last = runs[runs.length - 1]
+    const plain = each.kind === 'fold' || each.kind === 'check' || each.kind === 'call'
+    const same =
+      last !== undefined &&
+      plain &&
+      last.first.kind === each.kind &&
+      !each.allIn &&
+      !last.first.allIn &&
+      (each.kind !== 'call' || last.first.paid === each.paid)
+    if (same) last.seats.push(each.seat)
+    else runs.push({ first: each, seats: [each.seat] })
+  }
+  const said = runs.map(({ first, seats }) => {
+    const many = seats.length > 1 || seats[0] === 0
+    const verb = (word: string): string => (many ? word : word === 'check' ? 'checks' : `${word}s`)
+    const allIn = first.allIn ? ', all-in' : ''
+    const does =
+      first.kind === 'fold' || first.kind === 'check'
+        ? verb(first.kind)
+        : first.kind === 'call'
+          ? `${verb('call')} ${first.paid}${allIn}`
+          : first.kind === 'bet'
+            ? `${verb('bet')} ${first.to}${allIn}`
+            : `${verb('raise')} to ${first.to}${allIn}`
+    return `${listed(seats.map(who))} ${does}`
+  })
+  return `${cap(said.join('; '))}.`
+}
+
 /** A move, as the scene's narration says it. */
 export function actionLine(names: readonly string[], made: ActionMade): string {
-  const me = made.seat === 0
-  const who = me ? 'You' : names[made.seat - 1]
-  const verb = (word: string): string => (me ? word : word === 'check' ? 'checks' : `${word}s`)
-  const allIn = made.allIn ? ', all-in' : ''
-  switch (made.kind) {
-    case 'fold':
-      return `${who} ${verb('fold')}.`
-    case 'check':
-      return `${who} ${verb('check')}.`
-    case 'call':
-      return `${who} ${verb('call')} ${made.paid}${allIn}.`
-    case 'bet':
-      return `${who} ${verb('bet')} ${made.to}${allIn}.`
-    default:
-      return `${who} ${verb('raise')} to ${made.to}${allIn}.`
-  }
+  return actionsLine(names, [made])
 }
 
 /** The street just dealt, as the scene's narration says it. */
@@ -828,8 +889,15 @@ export function streetLine(hand: HandState): string {
 
 /** Who took which pot, in a sentence. */
 function potsWord(hand: HandState, who: (seat: number) => string, past: boolean): string {
-  const said = hand.pots
-    .filter((pot) => pot.amount > 0)
+  // Pots that went to the same players are said as one.
+  const taken: Pot[] = []
+  for (const pot of hand.pots) {
+    if (pot.amount <= 0) continue
+    const last = taken[taken.length - 1]
+    if (last && last.winners.join() === pot.winners.join()) last.amount += pot.amount
+    else taken.push({ ...pot })
+  }
+  const said = taken
     .map((pot, i, all) => {
       const verb = pot.winners.length > 1 ? 'split' : past ? 'took' : pot.winners[0] === 0 && who(0) === 'you' ? 'take' : 'takes'
       const which = all.length === 1 ? 'the pot' : i === 0 ? 'the main pot' : all.length === 2 ? 'the side pot' : 'a side pot'
@@ -856,7 +924,7 @@ export function resultLines(names: readonly string[], hand: HandState): string[]
     lines.push(`Showdown: ${shown.join('; ')}.`)
     lines.push(`${cap(potsWord(hand, who, false))}.`)
   } else {
-    lines.push(`Everyone else has folded: ${potsWord(hand, who, false)}.`)
+    lines.push(`${cap(potsWord(hand, who, false))} without a showdown.`)
   }
   const gone = bustedIn(hand)
   if (gone.length) lines.push(`${cap(listed(gone.map(who)))} ${gone.length > 1 || gone[0] === 0 ? 'are' : 'is'} out of chips.`)

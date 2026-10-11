@@ -218,8 +218,10 @@
 /* The reader's moves in a row: fold, check or call, and the three sizes of bet. */
 .vu-poker-moves {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: 20px;
+  justify-content: center;
+  gap: 12px 20px;
   padding: 0 12px 8px 0;
 }
 

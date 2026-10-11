@@ -7,6 +7,7 @@ import {
   SMALL_BLIND,
   act,
   actionLine,
+  actionsLine,
   chipsLine,
   cardWord,
   dealHand,
@@ -29,10 +30,11 @@ import {
   resultLines,
   startingStack,
   streetLine,
+  type ActionMade,
   type HandState,
   type Move
 } from '@shared/minigameRules/poker'
-import { gestures, lift, press } from '../kit'
+import { gestures, lift, press, useReducedMotion } from '../kit'
 import { BunnyMark } from '../kit'
 import type { GamePlay } from '../kit'
 import '../../vu_styles/Poker.css'
@@ -89,10 +91,11 @@ function CardBack(): JSX.Element {
 
 /** A card landing where it is dealt. */
 function Dealt({ children }: { children: JSX.Element }): JSX.Element {
+  const still = useReducedMotion()
   return (
     <motion.span
       className="vu-poker-slot"
-      initial={{ opacity: 0, y: -14, rotate: -5 }}
+      initial={still ? false : { opacity: 0, y: -14, rotate: -5 }}
       animate={{ opacity: 1, y: 0, rotate: 0 }}
       transition={{ duration: 0.26, ease: 'easeOut' }}
     >
@@ -163,6 +166,12 @@ export function Poker({ play }: { play: GamePlay }): JSX.Element | null {
   const sayCap = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
   // When the hand on the table was settled.
   const settledAt = useRef(0)
+  // Her line is still being written: nobody else is asked for one until it is in.
+  const saying = useRef(false)
+  // The hand as it stood when the last move was made from it: one move a position, however fast the clicks.
+  const movedFrom = useRef<HandState | null>(null)
+  // The checks, calls and folds made since the last line: they are said together, in one.
+  const unsaid = useRef<ActionMade[]>([])
   useEffect(() => {
     live.current = true
     return () => {
@@ -193,15 +202,32 @@ export function Poker({ play }: { play: GamePlay }): JSX.Element | null {
     // Once, as the table opens.
   }, [])
 
-  /** The hand has moved on: what happened is said, and where it ended the hand is closed. */
+  /** The routine moves not yet said, as one line, or nothing where there are none. */
+  function routine(): string {
+    const made = unsaid.current
+    unsaid.current = []
+    return made.length ? actionsLine(names, made) : ''
+  }
+
+  /**
+   * The hand has moved on: what happened is said, and where it ended the hand is closed. A
+   * check, a call or a fold waits to be said with the others of its round, in one line: when the
+   * reader is to move, before a bet or a raise, with the next card, or with how the hand ended.
+   */
   function carry(next: HandState, line?: string): void {
-    if (line) play.narrate(line)
+    const said = (text: string): void => {
+      const all = [routine(), text].filter(Boolean).join(' ')
+      if (all) play.narrate(all)
+    }
     if (!next.over) {
+      if (line || next.toAct === 0) said(line ?? '')
       setTable({ hand: next, done })
       return
     }
     settledAt.current = performance.now()
-    for (const said of resultLines(names, next)) play.narrate(said)
+    const [first, ...rest] = resultLines(names, next)
+    said([line, first].filter(Boolean).join(' '))
+    if (rest.length) play.narrate(rest.join(' '))
     const all = [...done, next]
     setTable({ hand: next, done: all })
     const stacks = next.seats.map((seat) => seat.stack)
@@ -221,11 +247,12 @@ export function Poker({ play }: { play: GamePlay }): JSX.Element | null {
    * Has one of the girls say something about the hand just finished, where it is worth it: a
    * bluff that worked or was caught, a bad beat or a bad call, an all-in, a big pot, somebody
    * losing her last chip. A few times a game at most between them all, one voice a hand, and
-   * never on the last hand, which the scene's own reply answers. She is told what the table
-   * saw, and of what stayed hidden only her own cards.
+   * never on the last hand, which the scene's own reply answers, nor while an earlier line is
+   * still being written. She is told what the table saw and nothing else: no hand that was
+   * folded or never turned over, her own included, so nothing she says can give one away.
    */
   function remark(all: readonly HandState[]): void {
-    if (remarks.current >= REMARKS[play.chattiness]) return
+    if (saying.current || remarks.current >= REMARKS[play.chattiness]) return
     const last = all[all.length - 1]
     const told = handTold(names, last, stack)
     // Talkative, they have a word for an ordinary hand too.
@@ -233,14 +260,7 @@ export function Poker({ play }: { play: GamePlay }): JSX.Element | null {
     remarks.current++
     const by = remarkBy(last, spoken.current)
     spoken.current[by] = (spoken.current[by] ?? 0) + 1
-    const hers = last.seats[by + 1]
-    const own = hers.out
-      ? ` ${names[by]} was already out of chips and only watched.`
-      : last.showdown && !hers.folded
-        ? ''
-        : told.bluffer === by + 1
-          ? ` ${names[by]} herself held ${holeWord(hers.hole)}: she was bluffing, which nobody else at the table knows.`
-          : ` ${names[by]} herself held ${holeWord(hers.hole)}, which nobody else saw.`
+    const own = last.seats[by + 1].out ? ` ${names[by]} was already out of chips and only watched.` : ''
     const stacks = last.seats.map((seat) => seat.stack)
     const cue = `${told.seen}${own} The chips now: ${chipsLine(names, stacks, 'the reader')}.${all.length + 1 === hands ? ' The next hand is the last.' : ''}`
     // The next hand waits for her line, but not for long: a slow one lands over the deal.
@@ -254,16 +274,32 @@ export function Poker({ play }: { play: GamePlay }): JSX.Element | null {
     setSpeaking(true)
     clearTimeout(sayCap.current)
     sayCap.current = setTimeout(release, SAY_WAIT_MS)
+    const landed = (): void => {
+      saying.current = false
+      release()
+    }
+    saying.current = true
     void Promise.resolve()
       .then(() => play.say(girls[by].charId, cue))
-      .then(release, release)
+      .then(landed, landed)
   }
 
   /** The seat to act makes a move, and it is said. */
   function move(made: Move): void {
     if (finished.current || !live.current || hand.over || hand.toAct === null) return
+    if (movedFrom.current === hand) return
+    movedFrom.current = hand
     const next = act(hand, made)
-    carry(next, actionLine(names, next.log[next.log.length - 1]))
+    const did = next.log[next.log.length - 1]
+    // A bet, a raise and anything all-in has a line to itself, after what led to it.
+    if (did.kind === 'bet' || did.kind === 'raise' || did.allIn) {
+      const before = routine()
+      if (before) play.narrate(before)
+      carry(next, actionLine(names, did))
+      return
+    }
+    unsaid.current.push(did)
+    carry(next)
   }
 
   /** The reader's move, from one of his buttons. */
@@ -275,6 +311,8 @@ export function Poker({ play }: { play: GamePlay }): JSX.Element | null {
   function step(): void {
     if (finished.current || !live.current || hand.over) return
     if (hand.toAct === null) {
+      if (movedFrom.current === hand) return
+      movedFrom.current = hand
       const next = proceed(hand)
       carry(next, next.board.length > hand.board.length ? streetLine(next) : undefined)
       return
@@ -441,7 +479,7 @@ export function Poker({ play }: { play: GamePlay }): JSX.Element | null {
             {me.stack}
             <span className="vu-poker-bet">{me.bet > 0 ? `in ${me.bet}` : ''}</span>
           </p>
-          <p className="vu-poker-state">{me.folded ? 'folded' : held}</p>
+          <p className="vu-poker-state">{me.folded ? 'folded' : winners.has(0) ? `${held} · wins` : held}</p>
         </div>
       </div>
 
