@@ -178,3 +178,22 @@ describe('a mod that throws reading a scene reply', () => {
     expect(seen).toEqual(['read'])
   })
 })
+
+describe("a mod's own page on the Mods screen", () => {
+  it('comes from the first mod that is on and has one for the mod picked', async () => {
+    const hooks = await fresh({ off: false }, ['off', 'frame', 'other'])
+    const Page = (): null => null
+    const Unseen = (): null => null
+    const mod = (id: string) => ({ id }) as import('../src/shared/mods').ModDef
+    hooks.registerHooks('off', { modDetail: () => Unseen })
+    hooks.registerHooks('frame', { modDetail: (picked) => (picked.id === 'pack' ? Page : undefined) })
+    hooks.registerHooks('other', { modDetail: () => Unseen })
+    expect(hooks.modDetail(mod('pack'))).toBe(Page)
+    expect(hooks.modDetail(mod('else'))).toBe(Unseen)
+  })
+
+  it('is none where no mod has one', async () => {
+    const hooks = await fresh({}, [])
+    expect(hooks.modDetail({ id: 'pack' } as import('../src/shared/mods').ModDef)).toBeUndefined()
+  })
+})

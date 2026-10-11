@@ -167,6 +167,7 @@ else names it.
 | `postVisible` | `feedView.ts`, `loop/feed.ts`, `ContactPage.tsx` | Keep a post off the feed for now |
 | `endingChoice` | `GameView.tsx` | Offer a way on from the ending, beside "Return to the main menu" |
 | `saveChoice` | `LoadGameModal.tsx` | Offer something for a picked save, beside "Load" |
+| `modDetail` | `ModsModal.tsx` | Draw a page of its own for the mod picked on the Mods screen, its own or one built on it, in place of the list of that mod's options |
 
 The two ways on (`endingChoice`, `saveChoice`) share one shape, `WayOn`. Its `prepare` runs
 while nothing has been torn down, does whatever may fail and reports it, and returns `enter`,

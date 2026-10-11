@@ -16,6 +16,7 @@ import type { TextingPromptState } from '../prompts/textingPrompt'
 import type { ResolvedSave } from '../stores/saveStore'
 import type { ViewName } from '../stores/uiStore'
 import type { ScreenTheme } from '../views/clockTheme'
+import type { ModDef } from '@shared/mods'
 
 /**
  * The places in the game a mod adds to, without editing the game's code there.
@@ -91,6 +92,24 @@ export interface WayOn {
 export interface EndingChoice extends WayOn {
   /** The button's words. */
   label: string
+}
+
+/** What the Mods screen hands a mod's own page ({@link ModHooks.modDetail}). */
+export interface ModDetailProps {
+  /** The mod picked in the list. */
+  mod: ModDef
+  /** The screen's own switch, so a page's switches are the screen's. */
+  Switch: ComponentType<{
+    id: string
+    label: string
+    on: boolean
+    disabled?: boolean
+    onChange: (on: boolean) => void
+  }>
+  /** Whether one of the picked mod's options is on. */
+  optionOn: (optionId: string) => boolean
+  /** Moves one, by the screen's own way of making a change: asked first where it costs something. */
+  setOption: (optionId: string, on: boolean) => void
 }
 
 /** What a mod offers for a save picked in Load Game, beside loading it. */
@@ -211,6 +230,12 @@ export interface ModHooks {
     reason: GameOverReason
     playthroughId: string | null
   }) => EndingChoice | undefined
+  /**
+   * A page of its own on the Mods screen for the mod picked there, its own or one that builds on
+   * it, drawn where that mod's options would be listed. The same component every time it is
+   * asked for the same mod; undefined for a mod it has nothing to say about.
+   */
+  modDetail?: (mod: ModDef) => ComponentType<ModDetailProps> | undefined
   /** An offer for a save picked in Load Game, beside loading it; the first mod that answers. */
   saveChoice?: (ctx: {
     playthroughId: string
@@ -362,6 +387,15 @@ export function endingChoice(ctx: Parameters<NonNullable<ModHooks['endingChoice'
   for (const hooks of active()) {
     const choice = hooks.endingChoice?.(ctx)
     if (choice) return choice
+  }
+  return undefined
+}
+
+/** A mod's own page on the Mods screen, in place of the list of its options, from the first mod that has one. */
+export function modDetail(mod: ModDef): ComponentType<ModDetailProps> | undefined {
+  for (const hooks of active()) {
+    const Detail = hooks.modDetail?.(mod)
+    if (Detail) return Detail
   }
   return undefined
 }
