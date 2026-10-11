@@ -1,4 +1,5 @@
 import { gamesOffered, type MiniGameDef } from '@shared/minigames'
+import { charKeyOf } from '@shared/types'
 import { useGameStore } from '../stores/gameStore'
 import { submitAction, takeTurnFromReply } from '../stores/gameLoop'
 import { advance } from '../stores/loop/hooks'
@@ -8,6 +9,7 @@ import { splitOverflow } from '../stores/sceneSanitizer'
 import { boxFits } from '../views/boxRows'
 import { gameComponent, type PlayResult } from './play'
 import { useTableStore } from './session'
+import { tableLine } from './talk'
 
 /** Where the framework meets the scene: what is on offer in it, and how a result goes into it. */
 
@@ -97,8 +99,8 @@ function reachTurn(): boolean {
 }
 
 /** Puts lines on the transcript and on the box at once, the box turning to the first of them. */
-function playLines(text: string): void {
-  const lines = splitOverflow({ speaker: '', text }, boxFits)
+function playLines(text: string, speaker = ''): void {
+  const lines = splitOverflow({ speaker, text }, boxFits)
   const game = useGameStore.getState()
   game.appendSceneLines(lines)
   game.appendPendingLines(lines)
@@ -106,9 +108,72 @@ function playLines(text: string): void {
   advance()
 }
 
+/**
+ * The table's turn at the dialogue box. A line someone speaks is given a moment on the box
+ * before anything replaces it, so what follows waits behind it, in order. A table that has
+ * closed says nothing more: whatever was still waiting is dropped with it.
+ */
+const SPOKEN_HOLD_MS = 1900
+let sitting = 0
+let heldUntil = 0
+
+/** A new table: nothing is waiting, and nothing from the last one may speak. */
+export function openTable(): void {
+  sitting++
+  heldUntil = 0
+}
+
+/** The table is cleared; lines still waiting on the box are dropped. */
+export function closeTable(): void {
+  sitting++
+}
+
+function show(text: string, speaker: string, hold: number): Promise<void> {
+  const at = sitting
+  const now = performance.now()
+  const wait = Math.max(0, heldUntil - now)
+  heldUntil = Math.max(now, heldUntil) + hold
+  return new Promise((resolve) => {
+    const put = (): void => {
+      if (at === sitting) playLines(text, speaker)
+      resolve()
+    }
+    if (wait === 0) put()
+    else setTimeout(put, wait)
+  })
+}
+
 /** A line from the table in the scene's dialogue box, once the turn is the table's. */
 export function narrateAtTable(text: string): void {
-  playLines(text)
+  void show(text, '', 0)
+}
+
+/**
+ * A girl's line at the table, written by the model from the game's cue and shown in the scene's
+ * dialogue box as hers. Resolves once it is on the box, or once it is clear there will be none.
+ */
+export async function sayAtTable(charId: string, situation: string, cue: string): Promise<void> {
+  const at = sitting
+  const character = useGameStore.getState().characters[charId]
+  if (!character) return
+  const line = await tableLine(character, situation, cue)
+  if (!line || at !== sitting) return
+  await show(line, charKeyOf(character.firstName, character.lastName), SPOKEN_HOLD_MS)
+}
+
+/**
+ * Something the reader says at the table, whenever he likes: his words go onto the scene as his
+ * own, the game goes on, and she answers in a line when it comes.
+ */
+export async function readerSaysAtTable(
+  charId: string,
+  situation: string,
+  words: string
+): Promise<void> {
+  const text = words.trim()
+  if (!text) return
+  useGameStore.getState().logPlayerAction(text, true)
+  await sayAtTable(charId, situation, `The reader says to her: "${text}"`)
 }
 
 /** Who a game was played with and for what, as far as filing its result goes. */

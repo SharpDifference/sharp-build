@@ -49,6 +49,18 @@ export interface GamePlay {
    */
   narrate: (text: string) => void
   /**
+   * Has a girl at the table say something: the model writes her one short line from `cue`, the
+   * game's plain account of what just happened ("she called lower on a queen and an ace came").
+   * Each is a call to the model and takes a moment, so a game keeps them for the moments worth
+   * one. Resolves when her line is on the box, or when there will be none.
+   */
+  say: (charId: string, cue: string) => Promise<void>
+  /**
+   * Tells the framework how the game stands, in a sentence or two, whenever that changes. It is
+   * what she is reminded of when she speaks, the reader's own remarks at the table included.
+   */
+  situation: (text: string) => void
+  /**
    * The game is over. The component keeps showing how it ended for a beat; then the framework
    * clears the table and takes the result into the scene.
    */

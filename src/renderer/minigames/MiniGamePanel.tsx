@@ -22,9 +22,13 @@ import { gameComponent, type GamePlay, type Opponent, type PlayResult } from './
 import { useTableStore, type Agreed } from './session'
 import { skillOf } from './skill'
 import {
+  closeTable,
   fileResult,
   nameOf,
   narrateAtTable,
+  openTable,
+  readerSaysAtTable,
+  sayAtTable,
   proposeGame,
   takeTurnForGame,
   useGamesOffered,
@@ -151,7 +155,27 @@ export function MiniGamePanel({ theme, onClose }: ScenePanelProps): JSX.Element 
     if (begun.current) return
     begun.current = true
     takeTurnForGame()
+    openTable()
     setUnderWay(true)
+  }
+
+  // How the game stands, as the game last said it: what she is reminded of when she speaks.
+  const situation = useRef('')
+  // A table taken down mid-game, by anything, says nothing more.
+  useEffect(() => closeTable, [])
+
+  // What the reader says at the table, whenever he likes. The game is not held for it; one
+  // remark is out at a time, so her answers come back in the order he spoke.
+  const [remark, setRemark] = useState('')
+  const [answering, setAnswering] = useState(false)
+  function speak(): void {
+    const her = seated?.opponents?.[0]
+    if (!her || answering || !remark.trim() || result) return
+    begin()
+    const words = remark
+    setRemark('')
+    setAnswering(true)
+    void readerSaysAtTable(her.charId, situation.current, words).finally(() => setAnswering(false))
   }
 
   const play = useMemo<GamePlay>(
@@ -164,12 +188,20 @@ export function MiniGamePanel({ theme, onClose }: ScenePanelProps): JSX.Element 
         begin()
         narrateAtTable(text)
       },
+      say: (charId, cue) => {
+        begin()
+        return sayAtTable(charId, situation.current, cue)
+      },
+      situation: (text) => {
+        situation.current = text
+      },
       finish: (ended) => setResult(ended)
     }),
     [seated?.opponents, seated?.stake, seated?.options]
   )
 
   function leave(ended: PlayResult): void {
+    closeTable()
     if (!seated) return
     // Whoever sat down, judged yet or not: she was at the table either way.
     const names = seated.opponents?.map((opponent) => opponent.name) ?? (agreed ? [nameOf(agreed.charId)] : [])
@@ -232,6 +264,28 @@ export function MiniGamePanel({ theme, onClose }: ScenePanelProps): JSX.Element 
             <Game play={play} />
           ) : (
             <p className="vu-empty">She is getting settled…</p>
+          )}
+          {/* A word across the table, for a game with someone to say it to. */}
+          {seated.opponents && seated.opponents.length > 0 && (
+            <form
+              className="vu-minigame-say"
+              onSubmit={(event) => {
+                event.preventDefault()
+                speak()
+              }}
+            >
+              <input
+                id="minigame-say"
+                className="vu-minigame-sayfield"
+                type="text"
+                value={remark}
+                maxLength={200}
+                placeholder={answering ? `${seated.opponents[0].name} is answering…` : 'Say something…'}
+                disabled={result !== null}
+                autoComplete="off"
+                onChange={(event) => setRemark(event.target.value)}
+              />
+            </form>
           )}
           {/* Standing through the result's beat, dead, so the table does not jump as it ends. */}
           <motion.button

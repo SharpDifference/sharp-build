@@ -130,6 +130,53 @@ export interface CallMade {
   right: boolean
 }
 
+/** One call as the account tells it, and what kind of call it was. */
+export interface CallTold {
+  /** The call in a sentence, with its judgment. */
+  line: string
+  /** Worth a remark at the table: anything but an ordinary call. */
+  notable: boolean
+  /** Made against cards that clearly favoured the other call. */
+  poor: boolean
+}
+
+/**
+ * Call `i` of a game, judged: who called what on which card and what came, and whether it was a
+ * call that could not win, a bad one, a long shot that came in, a safe one that failed, or the
+ * same card turning up twice. `deck` is the deck as it was dealt.
+ */
+export function callTold(
+  name: string,
+  deck: readonly Card[],
+  calls: readonly CallMade[],
+  i: number
+): CallTold {
+  const made = calls[i]
+  const shown = deck[i]
+  const next = deck[i + 1]
+  const { call: favoured, edge } = oddsCall(shown, deck.slice(0, i + 1))
+  const hopeless =
+    (made.call === 'lower' && shown.rank === 2) || (made.call === 'higher' && shown.rank === 14)
+  const poor = made.call !== favoured && edge >= 0.3
+  const note = hopeless
+    ? `, a call that could not win: nothing is ${made.call} than ${rankWord(shown.rank)}`
+    : next.rank === shown.rank
+      ? ', the same card again'
+      : poor && made.right
+        ? ', a long shot that came in'
+        : poor
+          ? `, a bad call: the cards clearly favoured ${favoured}`
+          : !made.right && edge >= 0.5
+            ? ', a safe call that failed: plain bad luck'
+            : ''
+  const who = made.hers ? name : 'The reader'
+  return {
+    line: `${who} called ${made.call} on ${rankWord(shown.rank)} and ${rankWord(next.rank)} came: ${made.right ? 'right' : 'a miss'}${note}.`,
+    notable: note !== '',
+    poor
+  }
+}
+
 /**
  * How a game against her went, call by call, for the scene's writer: who called what on which
  * card and what came, with the calls worth a remark marked and bad play told apart from bad
@@ -143,30 +190,12 @@ export function versusAccount(
   sudden = false
 ): string[] {
   const each = calls.filter((made) => !made.hers).length
-  /** How many times each side called against cards that clearly favoured the other call. */
-  const against = { reader: 0, her: 0 }
-  const lines = calls.map((made, i) => {
-    const shown = deck[i]
-    const next = deck[i + 1]
-    const { call: favoured, edge } = oddsCall(shown, deck.slice(0, i + 1))
-    const hopeless =
-      (made.call === 'lower' && shown.rank === 2) || (made.call === 'higher' && shown.rank === 14)
-    const poor = made.call !== favoured && edge >= 0.3
-    if (poor) against[made.hers ? 'her' : 'reader']++
-    const note = hopeless
-      ? `, a call that could not win: nothing is ${made.call} than ${rankWord(shown.rank)}`
-      : next.rank === shown.rank
-        ? ', the same card again'
-        : poor && made.right
-          ? ', a long shot that came in'
-          : poor
-            ? `, a bad call: the cards clearly favoured ${favoured}`
-            : !made.right && edge >= 0.5
-              ? ', a safe call that failed: plain bad luck'
-              : ''
-    const who = made.hers ? name : 'The reader'
-    return `${who} called ${made.call} on ${rankWord(shown.rank)} and ${rankWord(next.rank)} came: ${made.right ? 'right' : 'a miss'}${note}.`
-  })
+  const told = calls.map((_, i) => callTold(name, deck, calls, i))
+  const against = {
+    reader: told.filter((call, i) => call.poor && !calls[i].hers).length,
+    her: told.filter((call, i) => call.poor && calls[i].hers).length
+  }
+  const lines = told.map((call) => call.line)
   const played = (who: string, times: number): string =>
     times === 0
       ? `${who} played the odds every time.`
