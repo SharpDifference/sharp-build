@@ -55,3 +55,8 @@ registerHooks(MINI_GAMES, {
     useTableStore.getState().setPlayed(null)
   }
 })
+
+// In development a change to this file, or to anything it imports that is not a component, runs
+// it again, and registering again stacks a second seat and a second set of hooks on the first.
+// The page is reloaded instead, so there is only ever the one registration.
+if (import.meta.hot) import.meta.hot.accept(() => window.location.reload())
