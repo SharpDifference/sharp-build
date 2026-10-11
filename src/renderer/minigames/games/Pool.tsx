@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type JSX } from 'react'
 import {
   BALL_R,
+  MAX_STEPS,
   POCKETS,
   STEP,
   TABLE_H,
@@ -194,6 +195,10 @@ export function Pool({ play }: { play: GamePlay }): JSX.Element {
     let remarks = 0
     let sinceRemark = 0
     let speaking = false
+    // A line of hers asked for and not yet come back, however long ago the table stopped waiting on it.
+    let saying = false
+    // How many steps the shot on the table has been run for.
+    let rolled = 0
     let remarked = 0
     let hold: ReturnType<typeof setTimeout> | undefined
     let frame = 0
@@ -289,6 +294,8 @@ export function Pool({ play }: { play: GamePlay }): JSX.Element {
       if (!her) return
       const now = latest.current
       sinceRemark++
+      // One line of hers at a time: a shot that comes while one is still being written goes unremarked.
+      if (saying) return
       if (remarks >= REMARKS[now.chattiness]) return
       const about = shotCue(her.name, shot)
       if (!about) return
@@ -305,7 +312,12 @@ export function Pool({ play }: { play: GamePlay }): JSX.Element {
       }
       clearTimeout(hold)
       hold = setTimeout(done, REMARK_WAIT_MS)
-      void now.say(her.charId, about.cue).then(done, done)
+      saying = true
+      const back = (): void => {
+        saying = false
+        done()
+      }
+      void now.say(her.charId, about.cue).then(back, back)
     }
 
     const shoot = (angle: number, weight: number): void => {
@@ -318,6 +330,7 @@ export function Pool({ play }: { play: GamePlay }): JSX.Element {
       log = freshLog()
       strike(rack.balls, angle, weight)
       owed = 0
+      rolled = 0
       phase = 'rolling'
       sync()
     }
@@ -448,7 +461,12 @@ export function Pool({ play }: { play: GamePlay }): JSX.Element {
         owed += passed
         while (owed >= STEP) {
           owed -= STEP
-          if (!stepBalls(rack.balls, log)) {
+          // A shot that has run its longest is stopped where it is, as the rules' own is.
+          if (!stepBalls(rack.balls, log) || ++rolled >= MAX_STEPS) {
+            for (const ball of rack.balls) {
+              ball.vx = 0
+              ball.vy = 0
+            }
             settle(at)
             break
           }
@@ -511,7 +529,7 @@ export function Pool({ play }: { play: GamePlay }): JSX.Element {
               ? `${name} is at the table`
               : hud.phase === 'charging'
                 ? 'let go to play'
-                : 'aim with the pointer, hold to set the power, let go to play'
+                : 'aim with the pointer, hold for power, let go to play'
   const groupWord = (side: Side): string =>
     hud.groups[side] ? (hud.left[side].length === 0 ? `${hud.groups[side]}: on the eight` : `${hud.groups[side]}`) : 'open table'
 
@@ -519,17 +537,15 @@ export function Pool({ play }: { play: GamePlay }): JSX.Element {
     <div className="vu-pool">
       <div className="vu-pool-head">
         <div className="vu-pool-side" data-turn={mine && hud.phase !== 'over' ? '' : undefined}>
-          <p className="vu-pool-who">you</p>
-          {her ? (
-            <>
-              <p className="vu-pool-group">{groupWord('reader')}</p>
-              <Tray ids={hud.left.reader} />
-            </>
-          ) : (
+          <div className="vu-pool-name">
+            <p className="vu-pool-who">you</p>
             <p className="vu-pool-group">
-              {hud.shots} {hud.shots === 1 ? 'shot' : 'shots'} · {hud.fouls} {hud.fouls === 1 ? 'foul' : 'fouls'}
+              {her
+                ? groupWord('reader')
+                : `${hud.shots} ${hud.shots === 1 ? 'shot' : 'shots'} · ${hud.fouls} ${hud.fouls === 1 ? 'foul' : 'fouls'}`}
             </p>
-          )}
+          </div>
+          {her && <Tray ids={hud.left.reader} />}
         </div>
         <div className="vu-pool-match">
           {her ? (
@@ -552,8 +568,10 @@ export function Pool({ play }: { play: GamePlay }): JSX.Element {
         >
           {her && (
             <>
-              <p className="vu-pool-who">{name}</p>
-              <p className="vu-pool-group">{groupWord('her')}</p>
+              <div className="vu-pool-name">
+                <p className="vu-pool-who">{name}</p>
+                <p className="vu-pool-group">{groupWord('her')}</p>
+              </div>
               <Tray ids={hud.left.her} />
             </>
           )}

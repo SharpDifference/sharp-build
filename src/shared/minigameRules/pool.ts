@@ -24,12 +24,14 @@ const FRICTION = 450
 const CUSHION_BOUNCE = 0.74
 const BALL_BOUNCE = 0.95
 /** The longest a shot is run for: nothing struck at full power rolls longer. */
-const MAX_STEPS = 2400
+export const MAX_STEPS = 2400
 /** Where the cue ball is broken from, and where the head of the rack stands. */
 export const HEAD_SPOT: Point = { x: TABLE_W / 4, y: TABLE_H / 2 }
 export const FOOT_SPOT: Point = { x: (TABLE_W * 3) / 4, y: TABLE_H / 2 }
 /** How far the cue ball and then the object ball travel in a pot worth calling long. */
 const LONG_POT = 520
+/** A pot off the cue ball's collision of this number or later, balls and cushions both, was nobody's plan. */
+const FLUKE_FROM = 3
 /** A run of this many pots in one visit is worth a word. */
 export const RUN_WORTH = 3
 
@@ -87,10 +89,21 @@ export interface ShotLog {
   pockets: number[]
   /** How many cushions each ball has come off, by ball id. */
   cushions: number[]
+  /** How many times the cue ball has met a ball or come off a cushion. */
+  cueHits: number
+  /** That count as each ball was first set moving, by ball id; 0 for a ball nothing has touched. */
+  moved: number[]
 }
 
 export function freshLog(): ShotLog {
-  return { firstHit: null, potted: [], pockets: [], cushions: new Array<number>(16).fill(0) }
+  return {
+    firstHit: null,
+    potted: [],
+    pockets: [],
+    cushions: new Array<number>(16).fill(0),
+    cueHits: 0,
+    moved: new Array<number>(16).fill(0)
+  }
 }
 
 export function cloneBalls(balls: readonly Ball[]): Ball[] {
@@ -198,7 +211,12 @@ export function stepBalls(balls: Ball[], log: ShotLog): boolean {
       a.vy -= push * ny
       b.vx += push * nx
       b.vy += push * ny
-      if (log.firstHit === null && a.id === 0) log.firstHit = b.id
+      if (a.id === 0) {
+        log.cueHits++
+        if (log.firstHit === null) log.firstHit = b.id
+      }
+      if (a.id !== 0 && log.moved[a.id] === 0) log.moved[a.id] = Math.max(1, log.cueHits)
+      if (log.moved[b.id] === 0) log.moved[b.id] = Math.max(1, log.cueHits)
     }
   }
 
@@ -254,7 +272,10 @@ export function stepBalls(balls: Ball[], log: ShotLog): boolean {
           off = true
         }
       }
-      if (off) log.cushions[ball.id]++
+      if (off) {
+        log.cushions[ball.id]++
+        if (ball.id === 0) log.cueHits++
+      }
     }
     if (ball.vx !== 0 || ball.vy !== 0) moving = true
   }
@@ -333,9 +354,13 @@ export function canPlace(balls: readonly Ball[], at: Point): boolean {
   return true
 }
 
-/** The free spot nearest a point, looking outward from it in rings. */
-function freeSpotNear(balls: readonly Ball[], want: Point): Point {
-  if (canPlace(balls, want)) return { ...want }
+/** The free spot nearest a point, looking outward from it in rings; `clearOfCue` for a ball that is not the cue ball. */
+function freeSpotNear(balls: readonly Ball[], want: Point, clearOfCue = false): Point {
+  const cue = balls[0]
+  const free = (at: Point): boolean =>
+    canPlace(balls, at) &&
+    !(clearOfCue && cue && !cue.potted && Math.hypot(at.x - cue.x, at.y - cue.y) < BALL_R * 2 + 1)
+  if (free(want)) return { ...want }
   for (let ring = 1; ring < 40; ring++) {
     for (let k = 0; k < 12; k++) {
       const turn = (k / 12) * Math.PI * 2
@@ -343,7 +368,7 @@ function freeSpotNear(balls: readonly Ball[], want: Point): Point {
         x: want.x + Math.cos(turn) * ring * BALL_R,
         y: want.y + Math.sin(turn) * ring * BALL_R
       }
-      if (canPlace(balls, at)) return at
+      if (free(at)) return at
     }
   }
   return { ...want }
@@ -436,9 +461,13 @@ export interface ShotRecord {
   assigned: Group | null
   /** A pot from a long way off, struck straight at it. */
   long: boolean
-  /** A pot that was not the shot played: off another ball or a cushion, or not what she aimed for. */
+  /**
+   * A pot that was plainly luck. Hers is one she did not mean, her plan being known. The reader's
+   * intent is not, so his is only a ball first set moving at the cue ball's third collision or
+   * later: a bank or a combination may well have been meant, and nothing is said of it.
+   */
   fluke: boolean
-  /** A pot that was the shot played. */
+  /** A pot that was the shot played: hers as she meant it, his struck first and straight in. */
   clean: boolean
   /** Pots in this visit, this shot's included. */
   run: number
@@ -497,7 +526,7 @@ export function resolveShot(
         potted = potted.filter((id) => id !== 8)
         const black = balls[8]
         black.potted = false
-        const at = freeSpotNear(balls, FOOT_SPOT)
+        const at = freeSpotNear(balls, FOOT_SPOT, true)
         black.x = at.x
         black.y = at.y
       } else if (atEight && !foul) {
@@ -542,8 +571,11 @@ export function resolveShot(
   const direct = (id: number): boolean => id === first && log.cushions[id] === 0
   const scored = !rack.breaking && !foul && own.length > 0
   const fluke =
-    scored && (expected ? own.some((id) => !expected.includes(id)) : !own.some(direct))
-  const clean = scored && !fluke
+    scored &&
+    (expected
+      ? own.some((id) => !expected.includes(id))
+      : own.every((id) => log.moved[id] >= FLUKE_FROM))
+  const clean = scored && (expected ? !fluke : own.some(direct))
   const cueBefore = pre[0]
   const long =
     clean &&
@@ -911,7 +943,10 @@ export function shotCue(name: string, shot: ShotRecord): { cue: string; notable:
   }
   if (shot.fluke) {
     return {
-      cue: `${who} potted ${ballsWord(shot.own)} by a fluke: it was not the shot played, the ball went in off something else.`,
+      cue:
+        shot.by === 'reader'
+          ? `${who} potted ${ballsWord(shot.own)} by a plain fluke: the cue ball had bounced around the table before anything sent it in.`
+          : `${who} potted ${ballsWord(shot.own)} by a fluke: it was not the ball she was playing for.`,
       notable: true
     }
   }
@@ -931,6 +966,12 @@ export function shotCue(name: string, shot: ShotRecord): { cue: string; notable:
     return { cue: `${who} potted ${ballsWord(shot.potted)} and so plays ${shot.assigned} for this rack.`, notable: false }
   }
   if (shot.own.length > 0) return { cue: `${who} potted ${ballsWord(shot.own)} and shoots again.`, notable: false }
+  if (shot.other.length > 0 && !shot.breakShot) {
+    return {
+      cue: `${who} potted ${ballsWord(shot.other)}, which ${shot.other.length > 1 ? 'are' : 'is'} ${them}'s, not ${shot.by === 'reader' ? 'his' : 'her'} own: a mistake that helps ${them}, and the turn passes.`,
+      notable: false
+    }
+  }
   if (!shot.breakShot) return { cue: `${who} missed and the turn passes to ${them}.`, notable: false }
   return null
 }

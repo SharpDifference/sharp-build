@@ -271,8 +271,18 @@ describe('eight-ball', () => {
     const straight = judge(rackWith(spread, { groups }), log(1, [1]))
     expect(straight.record.clean).toBe(true)
     expect(straight.record.fluke).toBe(false)
+    // His bank or combination may have been meant: nothing is said of luck.
     const off = judge(rackWith(spread, { groups }), log(1, [2]))
-    expect(off.record.fluke).toBe(true)
+    expect(off.record.fluke).toBe(false)
+    expect(off.record.clean).toBe(false)
+    // A ball first moved at the cue ball's third collision or later was nobody's plan.
+    const moved = freshLog().moved
+    moved[2] = 3
+    const lucky = judge(rackWith(spread, { groups }), { ...log(1, [2]), cueHits: 3, moved })
+    expect(lucky.record.fluke).toBe(true)
+    // With a pot that may have been meant beside it, nothing is said.
+    const both = judge(rackWith(spread, { groups }), { ...log(1, [1, 2]), cueHits: 3, moved })
+    expect(both.record.fluke).toBe(false)
     // Hers is judged against what she meant to pot.
     const rack = rackWith(spread, { groups, turn: 'her' })
     const pre = cloneBalls(rack.balls)
@@ -292,6 +302,72 @@ describe('eight-ball', () => {
     expect(scratch.rack.turn).toBe('reader')
     const done = judge(eight.rack, log(9, [9]))
     expect(done.rack.winner).toBe('reader')
+  })
+})
+
+describe('the table, played', () => {
+  it('counts the cue ball\'s collisions and when each ball was first moved', () => {
+    // Off the top cushion and back down onto the 1: its second collision.
+    const rack = rackWith({ 0: [200, 200], 1: [200, 320] })
+    const played = simulate(rack.balls, -Math.PI / 2, 0.5)
+    expect(played.cushions[0]).toBeGreaterThanOrEqual(1)
+    expect(played.firstHit).toBe(1)
+    expect(played.moved[1]).toBe(2)
+    expect(played.cueHits).toBeGreaterThanOrEqual(2)
+    // A combination: the 2 is moved off the cue ball's first collision.
+    const combo = rackWith({ 0: [100, 200], 1: [200, 200], 2: [260, 200] })
+    const got = simulate(combo.balls, 0, 0.4)
+    expect(got.firstHit).toBe(1)
+    expect(got.moved[1]).toBe(1)
+    expect(got.moved[2]).toBe(1)
+  })
+
+  it('comes to rest within the cap at full power, with nothing overlapping or through a cushion', () => {
+    for (let n = 0; n < 12; n++) {
+      const balls = rackedBalls()
+      simulate(balls, (n - 6) * 0.01, 1)
+      const up = balls.filter((ball) => !ball.potted)
+      for (const ball of up) expect(onTable(ball)).toBe(true)
+      for (const a of up)
+        for (const b of up)
+          if (a.id < b.id) expect(Math.hypot(a.x - b.x, a.y - b.y)).toBeGreaterThan(BALL_R * 2 - 0.5)
+      expect(stepBalls(balls, freshLog())).toBe(false)
+    }
+  })
+
+  it('puts an eight potted on the break back clear of the cue ball', () => {
+    const rack = freshRack('reader')
+    const pre = cloneBalls(rack.balls)
+    rack.balls[8].potted = true
+    rack.balls[0].x = FOOT_SPOT.x
+    rack.balls[0].y = FOOT_SPOT.y
+    for (const ball of rack.balls) if (ball.id !== 0 && ball.id !== 8) ball.potted = ball.id > 3
+    const got = resolveShot(rack, pre, log(1, [8]))
+    const black = got.rack.balls[8]
+    expect(black.potted).toBe(false)
+    expect(Math.hypot(black.x - FOOT_SPOT.x, black.y - FOOT_SPOT.y)).toBeGreaterThanOrEqual(BALL_R * 2)
+  })
+
+  it('chooses her shot quickly on a full table at her best', () => {
+    const rack = freshRack('reader')
+    simulate(rack.balls, 0.004, 1)
+    for (const ball of rack.balls) ball.potted = false
+    const rand = seeded(7)
+    for (const ball of rack.balls) {
+      // Spread wide, so every ball is a shot to weigh.
+      ball.x = 40 + rand() * (TABLE_W - 80)
+      ball.y = 40 + rand() * (TABLE_H - 80)
+    }
+    for (let i = 0; i < 400; i++) stepBalls(rack.balls, freshLog())
+    const table: Rack = { ...rack, breaking: false, turn: 'her', groups: { reader: null, her: null } }
+    herShot(table, 5, rand)
+    let worst = 0
+    for (let n = 0; n < 5; n++) {
+      const before = performance.now()
+      herShot(table, 5, rand)
+      worst = Math.max(worst, performance.now() - before)
+    }
+    expect(worst).toBeLessThan(50)
   })
 })
 

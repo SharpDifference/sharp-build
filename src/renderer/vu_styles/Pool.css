@@ -5,7 +5,7 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 10px;
+  gap: 6px;
 }
 
 /* Over the table: the reader's side, the rack score, her side. */
@@ -13,14 +13,14 @@
   display: flex;
   align-items: flex-end;
   justify-content: space-between;
-  width: 780px;
+  width: 680px;
 }
 
 .vu-pool-side {
   display: flex;
   flex-direction: column;
   gap: 3px;
-  width: 300px;
+  width: 270px;
   padding-left: 10px;
   border-left: 4px solid transparent;
 }
@@ -36,6 +36,18 @@
 /* Whose shot it is: the accent down that side's edge. */
 .vu-pool-side[data-turn] {
   border-color: var(--vu-accent);
+}
+
+/* Who it is and what they are on, on one line. */
+.vu-pool-name {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0 10px;
+}
+
+.vu-pool-side--hers .vu-pool-name {
+  justify-content: flex-end;
 }
 
 .vu-pool-who {
@@ -68,7 +80,7 @@
 .vu-pool-racks {
   margin: 0;
   color: var(--vu-text);
-  font: 400 40px var(--font-display);
+  font: 400 34px var(--font-display);
   font-variant-numeric: tabular-nums;
   line-height: 1;
 }
@@ -84,8 +96,8 @@
 /* Sized to the table's own shape: a pointer is read through the drawing, whatever the stage's scale. */
 .vu-pool-field {
   display: block;
-  width: 780px;
-  height: 414px;
+  width: 680px;
+  height: 361px;
   cursor: crosshair;
   touch-action: none;
   user-select: none;
@@ -177,22 +189,22 @@
 
 .vu-pool-aimline {
   stroke: var(--vu-text);
-  stroke-width: 1.5;
-  stroke-dasharray: 7 6;
-  opacity: 0.7;
+  stroke-width: 2.5;
+  stroke-dasharray: 8 6;
+  stroke-linecap: round;
 }
 
 .vu-pool-sendline {
-  stroke: var(--vu-accent);
-  stroke-width: 2.5;
+  stroke: var(--vu-text);
+  stroke-width: 3;
   stroke-linecap: round;
 }
 
 .vu-pool-ghost {
-  fill: none;
+  fill: var(--vu-surface);
+  fill-opacity: 0.55;
   stroke: var(--vu-text);
-  stroke-width: 1.5;
-  opacity: 0.8;
+  stroke-width: 2.5;
 }
 
 /* The cue ball in the reader's hand. */
@@ -210,7 +222,7 @@
   align-items: center;
   justify-content: space-between;
   gap: 20px;
-  width: 780px;
+  width: 680px;
 }
 
 .vu-pool-status {
