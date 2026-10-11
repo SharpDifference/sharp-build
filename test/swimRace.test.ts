@@ -15,11 +15,13 @@ import {
   breathe,
   callTurn,
   clockOf,
+  courseWords,
   herMind,
   herMove,
   herRace,
   herReaction,
   herTurn,
+  legLabel,
   lengthsOf,
   onBlocks,
   orderNow,
@@ -32,6 +34,8 @@ import {
   strokeWorth,
   swimming,
   toWall,
+  turnPlace,
+  waterAt,
   type Skill,
   type Swimmer,
   type TurnGrade
@@ -401,5 +405,128 @@ describe('Swim Race on paper', () => {
     expect(at(null)).toBe(false)
     expect(suggestRate(swim, 'palaestra_stadium', false)).toBe('often')
     expect(suggestRate(swim, 'selkie_beach', false)).toBe('sometimes')
+  })
+})
+
+/**
+ * The reader as an ordinary player: every pull and every cycle up to 120 ms out either way, a
+ * breath every third or fourth stroke, and turns that are good rather than perfect.
+ */
+function ordinary(lengths: number, rand: () => number): Swimmer {
+  const swimmer = onBlocks(Math.round(300 + rand() * 150))
+  const off = (): number => (rand() - 0.5) * 240
+  let next = 0
+  let cycle: number | null = null
+  let sinceBreath = 0
+  let breatheEvery = 3 + Math.floor(rand() * 2)
+  let turnAt = 1 + rand() * 1.2
+  for (let clock = STEP; swimmer.finishMs === null && clock < 900_000; clock += STEP) {
+    advance(swimmer, STEP, clock, lengths)
+    if (!swimming(swimmer)) {
+      next = 0
+      cycle = null
+      continue
+    }
+    if (toWall(swimmer) <= turnAt && callTurn(swimmer, lengths)) turnAt = 1 + rand() * 1.2
+    next -= STEP
+    if (next > 0) continue
+    const wait = CYCLE_MS + off()
+    next += wait
+    if (sinceBreath >= breatheEvery && breathe(swimmer)) {
+      sinceBreath = 0
+      breatheEvery = 3 + Math.floor(rand() * 2)
+    }
+    stroke(swimmer, PULL_MS + off(), cycle)
+    sinceBreath++
+    cycle = wait
+  }
+  return swimmer
+}
+
+describe('Swim Race balance', () => {
+  it('lets an ordinary player beat a poor swimmer and lose to a fine one, without running out of air', () => {
+    for (const lengths of [2, 4, 6]) {
+      const rand = seededRand(`ordinary ${lengths}`)
+      const mine = Array.from({ length: 200 }, () => ordinary(lengths, rand))
+      const beaten = (skill: Skill): number =>
+        mine.filter((me) => (me.finishMs ?? 0) < (herRace(skill, lengths, rand).finishMs ?? 0)).length / mine.length
+      expect(beaten(2)).toBeGreaterThan(0.9)
+      expect(beaten(5)).toBeLessThan(0.35)
+      expect(mean(mine.map((me) => me.gasps))).toBeLessThan(0.1)
+      expect(mine.every((me) => me.turns.every((turn) => turn === 'good'))).toBe(true)
+    }
+  })
+
+  it('lets a swimmer out of air recover: the gasping ends, with air to swim on', () => {
+    const swimmer = inWater(1)
+    swimmer.air = 0.01
+    expect(stroke(swimmer, PULL_MS, null).emptied).toBe(true)
+    expect(breathe(swimmer)).toBe(false)
+    for (let clock = STEP; clock <= GASP_MS + STEP; clock += STEP) advance(swimmer, STEP, clock, 6)
+    expect(swimmer.gaspMs).toBe(0)
+    expect(swimmer.air).toBeGreaterThanOrEqual(0.5)
+    expect(stroke(swimmer, PULL_MS, null).emptied).toBe(false)
+  })
+})
+
+describe('Swim Race wording by the water', () => {
+  const home = (ms: number, turns: TurnGrade[]): Swimmer => ({
+    ...onBlocks(250),
+    dist: 50,
+    blockMs: 0,
+    finishMs: ms,
+    strokes: 20,
+    worth: 17,
+    breaths: 3,
+    turns
+  })
+  const all = [
+    { name: 'You', swimmer: home(24_500, ['late']) },
+    { name: 'Ana', swimmer: home(23_900, ['good']) }
+  ]
+
+  it('knows the pool and the sea by the location, and anywhere else is just water', () => {
+    expect(waterAt('palaestra_stadium')).toBe('pool')
+    expect(waterAt('selkie_beach')).toBe('sea')
+    expect(waterAt(null)).toBe('water')
+    expect(waterAt('lowrise_dorms')).toBe('water')
+  })
+
+  it('says lengths and the pool at the stadium, and the buoy and the sea at the beach', () => {
+    const pool = [raceSummary(all, 2, 'pool'), ...raceAccount(all, 2, ['Ana'], 'pool')].join('\n')
+    expect(pool).toContain('2 lengths of the pool')
+    expect(pool).toContain('the stadium pool')
+    expect(pool).toContain('into the wall')
+    expect(pool).not.toMatch(/buoy|sea/)
+    const sea = [raceSummary(all, 2, 'sea'), ...raceAccount(all, 2, ['Ana'], 'sea')].join('\n')
+    expect(sea).toContain('out to the buoy and back')
+    expect(sea).toContain('in the sea')
+    expect(sea).toContain('Ana led at the buoy')
+    expect(sea).not.toMatch(/length|pool|wall|touch|blocks/)
+    expect(raceSummary(all, 4, 'sea')).toContain('twice out to the buoy and back')
+    expect(raceSummary(all.slice(0, 1), 6, 'sea')).toContain('three times out to the buoy and back in the sea, 150 metres')
+    expect(raceAccount(all.slice(0, 1), 2, [], 'sea').join('\n')).not.toMatch(/length|pool|wall|touch|blocks/)
+  })
+
+  it('keeps to neutral words where it is told nothing', () => {
+    const plain = [raceSummary(all, 2), ...raceAccount(all, 2, ['Ana'])].join('\n')
+    expect(plain).toContain('over 2 lengths')
+    expect(plain).not.toMatch(/buoy|sea|pool/)
+  })
+
+  it('labels a leg by the water, and names where each turn is made', () => {
+    expect(legLabel(3, 4)).toBe('3/4')
+    expect([1, 2].map((length) => legLabel(length, 2, 'sea'))).toEqual(['Out', 'Back'])
+    expect([1, 2, 3, 4].map((length) => legLabel(length, 4, 'sea'))).toEqual(['Out 1/2', 'Back 1/2', 'Out 2/2', 'Back 2/2'])
+    expect([1, 2, 3].map((length) => turnPlace(length, 'sea'))).toEqual(['the buoy', 'the shore', 'the buoy'])
+    expect(turnPlace(1, 'pool')).toBe('the wall')
+    expect(courseWords(6, 'pool')).toBe('over 6 lengths of the pool')
+  })
+
+  it('gives a swim alone an account of its time, its turns and its air', () => {
+    const account = raceAccount(all.slice(0, 1), 2, [], 'pool').join('\n')
+    expect(account).toContain('24.50')
+    expect(account).toContain('one turn')
+    expect(account).toContain('3 breaths')
   })
 })

@@ -275,6 +275,23 @@
   background: repeating-linear-gradient(135deg, var(--vu-text-muted) 0 6px, transparent 6px 12px);
 }
 
+/* Said as well as shown. */
+.vu-swimrace[data-low] .vu-swimrace-label--air::after {
+  content: ' · low';
+  color: var(--vu-text);
+}
+
+.vu-swimrace[data-gasping] .vu-swimrace-label--air::after {
+  content: ' · gasping';
+  color: var(--vu-text);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .vu-swimrace[data-low] .vu-swimrace-airfill {
+    animation: none;
+  }
+}
+
 @keyframes vu-swimrace-short {
   from {
     opacity: 1;
@@ -347,6 +364,7 @@
 .vu-swimrace[data-turn] .vu-swimrace-key--turn {
   color: var(--vu-accent);
   border-color: var(--vu-accent);
+  border-style: dashed;
 }
 
 .vu-swimrace[data-low] .vu-swimrace-key--breath,

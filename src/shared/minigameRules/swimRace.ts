@@ -430,10 +430,52 @@ export function orderNow(swimmers: readonly Swimmer[]): number[] {
 
 const ORDINALS = ['first', 'second', 'third', 'fourth']
 
-/** How far a race is, in words. */
-export function distanceWords(lengths: number): string {
-  return `${lengths} lengths, ${lengths * LENGTH_M} metres`
+/**
+ * Where a race is swum, for its wording alone: lengths of a pool, or out to a buoy in the sea
+ * and back. `water` is anywhere, in words that suit both. The rules are the same in each.
+ */
+export type Water = 'pool' | 'sea' | 'water'
+
+/** The water at a scene's location: the stadium's pool, the sea off the beach, or just water. */
+export function waterAt(location: string | null | undefined): Water {
+  return location === 'selkie_beach' ? 'sea' : location === 'palaestra_stadium' ? 'pool' : 'water'
 }
+
+/** How many times a race at sea goes out to the buoy and back. */
+const tripsOf = (lengths: number): number => Math.max(1, Math.round(lengths / 2))
+
+/** The course as a race is swum over it: "over 4 lengths of the pool", "twice out to the buoy and back". */
+export function courseWords(lengths: number, water: Water = 'water'): string {
+  if (water !== 'sea') return `over ${lengths} lengths${water === 'pool' ? ' of the pool' : ''}`
+  const trips = tripsOf(lengths)
+  const times = trips === 1 ? '' : trips === 2 ? 'twice ' : trips === 3 ? 'three times ' : `${trips} times `
+  return `${times}out to the buoy and back`
+}
+
+/** How far a race is, in words. */
+export function distanceWords(lengths: number, water: Water = 'water'): string {
+  const metres = `${lengths * LENGTH_M} metres`
+  if (water === 'sea') return `${courseWords(lengths, water)} in the sea, ${metres}`
+  return `${lengths} lengths${water === 'pool' ? ' of the pool' : ''}, ${metres}`
+}
+
+/** Where the turn at the end of a length is made, as a place: a wall, or at sea the buoy and then the shore. */
+export function turnPlace(length: number, water: Water = 'water'): string {
+  if (water !== 'sea') return 'the wall'
+  return length % 2 === 1 ? 'the buoy' : 'the shore'
+}
+
+/** The leg a swimmer is on, as a lane's board has it: "2/4", and at sea "Out", "Back 2/3". */
+export function legLabel(length: number, lengths: number, water: Water = 'water'): string {
+  if (water !== 'sea') return `${length}/${lengths}`
+  const trips = tripsOf(lengths)
+  const leg = length % 2 === 1 ? 'Out' : 'Back'
+  return trips === 1 ? leg : `${leg} ${Math.ceil(length / 2)}/${trips}`
+}
+
+/** A race's finish as a verb, in the past and the present: a wall is touched, a shore is not. */
+const touched = (water: Water): string => (water === 'sea' ? 'finished' : 'touched')
+const touch = (water: Water): string => (water === 'sea' ? 'finish' : 'touch')
 
 /** One swimmer in a finished race: the reader is the first handed in, under the name "You". */
 export interface Finisher {
@@ -450,30 +492,31 @@ function finishOrder(all: readonly Finisher[]): { who: Finisher; place: number; 
 }
 
 /** The result as the scene narrates it, to "you". The first finisher is the reader. */
-export function raceSummary(all: readonly Finisher[], lengths: number): string {
+export function raceSummary(all: readonly Finisher[], lengths: number, water: Water = 'water'): string {
   const [me, ...girls] = all
   const mine = clockOf(me.swimmer.finishMs ?? 0)
   if (girls.length === 0) {
-    return `You swim ${distanceWords(lengths)}, alone against the clock, and touch in ${mine}.`
+    return `You swim ${distanceWords(lengths, water)}, alone against the clock, and ${touch(water)} in ${mine}.`
   }
   const names = listed(girls.map((girl) => girl.name))
+  const course = courseWords(lengths, water)
   const outcome = outcomeOf(all.map((entry) => entry.swimmer.finishMs ?? Infinity))
   const order = finishOrder(all)
   if (girls.length === 1) {
     const hers = clockOf(girls[0].swimmer.finishMs ?? 0)
-    if (outcome === 'draw') return `You race ${names} over ${lengths} lengths and touch together, ${mine} each: a dead heat.`
+    if (outcome === 'draw') return `You race ${names} ${course} and ${touch(water)} together, ${mine} each: a dead heat.`
     return outcome === 'won'
-      ? `You race ${names} over ${lengths} lengths and win, ${mine} to her ${hers}.`
-      : `You race ${names} over ${lengths} lengths and lose, ${mine} to her ${hers}.`
+      ? `You race ${names} ${course} and win, ${mine} to her ${hers}.`
+      : `You race ${names} ${course} and lose, ${mine} to her ${hers}.`
   }
   const told = order
     .map(({ who, index }) => `${index === 0 ? 'you' : who.name} ${clockOf(who.swimmer.finishMs ?? 0)}`)
     .join(', ')
-  const said = `You race ${names} over ${lengths} lengths`
+  const said = `You race ${names} ${course}`
   if (outcome === 'won') return `${said} and win: ${told}.`
   if (outcome === 'draw') {
     const level = order.filter((entry) => entry.place === 1 && entry.index !== 0).map((entry) => entry.who.name)
-    return `${said} and touch first together with ${listed(level)}: ${told}.`
+    return `${said} and ${touch(water)} first together with ${listed(level)}: ${told}.`
   }
   const winners = order.filter((entry) => entry.place === 1).map((entry) => entry.who.name)
   const place = order.find((entry) => entry.index === 0)?.place ?? all.length
@@ -481,14 +524,14 @@ export function raceSummary(all: readonly Finisher[], lengths: number): string {
 }
 
 /** A swimmer's turns in a clause, or nothing where she made none. */
-function turnsTold(turns: readonly TurnGrade[]): string {
+function turnsTold(turns: readonly TurnGrade[], water: Water): string {
   if (turns.length === 0) return ''
   const count = (grade: TurnGrade): number => turns.filter((turn) => turn === grade).length
   const parts = [
     ...(count('perfect') ? [`${count('perfect')} perfectly timed`] : []),
     ...(count('good') ? [`${count('good')} decent`] : []),
     ...(count('early') ? [`${count('early')} begun too early and glided in`] : []),
-    ...(count('late') ? [`${count('late')} botched, swimming straight into the wall`] : [])
+    ...(count('late') ? [`${count('late')} botched, ${water === 'sea' ? 'swinging wide of the mark' : 'swimming straight into the wall'}`] : [])
   ]
   return `${turns.length === 1 ? 'one turn' : `${turns.length} turns`}: ${parts.join(', ')}`
 }
@@ -512,8 +555,8 @@ function airTold(swimmer: Swimmer): string {
 }
 
 /** How a swimmer left the blocks, in a phrase. */
-function startTold(swimmer: Swimmer): string {
-  if (swimmer.falseStart) return 'went before the whistle and was held back on the blocks'
+function startTold(swimmer: Swimmer, water: Water): string {
+  if (swimmer.falseStart) return `went before the whistle and was held back ${water === 'sea' ? 'at the water\'s edge' : 'on the blocks'}`
   if (swimmer.reactionMs <= SHARP_START_MS) return `a sharp start, ${clockOf(swimmer.reactionMs)} s off the whistle`
   return swimmer.reactionMs >= 600
     ? `a slow start, ${clockOf(swimmer.reactionMs)} s off the whistle`
@@ -525,18 +568,24 @@ function startTold(swimmer: Swimmer): string {
  * at each turn, and how each of them swam it. `leaders` is who turned first at each wall, as
  * the names in `all` have them with the reader as "the reader".
  */
-export function raceAccount(all: readonly Finisher[], lengths: number, leaders: readonly string[]): string[] {
+export function raceAccount(
+  all: readonly Finisher[],
+  lengths: number,
+  leaders: readonly string[],
+  water: Water = 'water'
+): string[] {
+  const where = water === 'sea' ? 'in the sea off the beach' : water === 'pool' ? 'in the stadium pool' : 'in the water'
   const [me, ...girls] = all
   const named = (index: number, who: Finisher): string => (index === 0 ? 'the reader' : who.name)
   const lines: string[] = []
   lines.push(
     girls.length === 0
-      ? `The reader swam a freestyle time trial alone in the water: ${distanceWords(lengths)}.`
-      : `A freestyle race in the water between the reader and ${listed(girls.map((girl) => girl.name))}: ${distanceWords(lengths)}, first to touch wins.`
+      ? `The reader swam a freestyle time trial alone ${where}: ${distanceWords(lengths, water)}.`
+      : `A freestyle race ${where} between the reader and ${listed(girls.map((girl) => girl.name))}: ${distanceWords(lengths, water)}, ${water === 'sea' ? 'first back to the shore' : 'first to touch'} wins.`
   )
   const order = finishOrder(all)
   if (girls.length === 0) {
-    lines.push(`The reader touched in ${clockOf(me.swimmer.finishMs ?? 0)}.`)
+    lines.push(`The reader ${touched(water)} in ${clockOf(me.swimmer.finishMs ?? 0)}.`)
   } else {
     lines.push(
       `Finish: ${order
@@ -545,13 +594,13 @@ export function raceAccount(all: readonly Finisher[], lengths: number, leaders: 
     )
     const firsts = order.filter((entry) => entry.place === 1)
     if (firsts.length > 1) {
-      lines.push(`${listed(firsts.map((entry) => named(entry.index, entry.who)))} touched in the same hundredth: a dead heat for first.`)
+      lines.push(`${listed(firsts.map((entry) => named(entry.index, entry.who)))} ${touched(water)} in the same hundredth: a dead heat for first.`)
     } else if (order.length > 1) {
       const gap = (order[1].who.swimmer.finishMs ?? 0) - (order[0].who.swimmer.finishMs ?? 0)
       const [first, second] = [named(order[0].index, order[0].who), named(order[1].index, order[1].who)]
       lines.push(
         gap < TOUCH_OUT_MS
-          ? `${first} touched ${second} out by ${clockOf(gap)} s: it was decided on the last stroke.`
+          ? `${first} ${water === 'sea' ? 'beat' : 'touched'} ${second} ${water === 'sea' ? 'home' : 'out'} by ${clockOf(gap)} s: it was decided on the last stroke.`
           : gap > 4000
             ? `${first} won by a long way, ${clockOf(gap)} s clear of ${second}.`
             : `${first} won by ${clockOf(gap)} s from ${second}.`
@@ -561,7 +610,7 @@ export function raceAccount(all: readonly Finisher[], lengths: number, leaders: 
       const same = leaders.every((leader) => leader === leaders[0])
       lines.push(
         leaders.length === 1
-          ? `${leaders[0]} led at the turn.`
+          ? `${leaders[0]} led at ${water === 'sea' ? 'the buoy' : 'the turn'}.`
           : same
             ? `${leaders[0]} led at every turn.`
             : `Leading at each turn in order: ${leaders.join(', ')}.`
@@ -570,20 +619,21 @@ export function raceAccount(all: readonly Finisher[], lengths: number, leaders: 
   }
   all.forEach((who, index) => {
     const swimmer = who.swimmer
-    const turns = turnsTold(swimmer.turns)
+    const turns = turnsTold(swimmer.turns, water)
     const name = named(index, who)
     lines.push(
-      `${name[0].toUpperCase()}${name.slice(1)}: ${startTold(swimmer)}; ${strokeTold(swimmer)}; ${airTold(swimmer)}${turns ? `; ${turns}` : ''}.`
+      `${name[0].toUpperCase()}${name.slice(1)}: ${startTold(swimmer, water)}; ${strokeTold(swimmer)}; ${airTold(swimmer)}${turns ? `; ${turns}` : ''}.`
     )
   })
   if (girls.length > 0) {
     const faded = girls.filter((girl) => girl.swimmer.gasps > 0 || smoothness(girl.swimmer) < 0.5)
     if (faded.length > 0) lines.push(`${listed(faded.map((girl) => girl.name))} visibly tired and struggled toward the end.`)
   }
+  const after = water === 'sea' ? 'in the shallows' : water === 'pool' ? 'in the pool at the wall' : 'in the water'
   lines.push(
     girls.length === 0
-      ? 'The reader is in the water at the finish, soaked and out of breath.'
-      : 'Everyone is still in the water at the finish, soaked, hair dripping and out of breath.'
+      ? `The reader is ${after} at the finish, soaked and out of breath.`
+      : `Everyone is still ${after} at the finish, soaked, hair dripping and out of breath.`
   )
   return lines
 }

@@ -15,9 +15,11 @@ import {
   breathe,
   callTurn,
   clockOf,
+  courseWords,
   herMind,
   herMove,
   herReaction,
+  legLabel,
   lengthOn,
   lengthsOf,
   onBlocks,
@@ -29,12 +31,14 @@ import {
   stroke,
   swimming,
   toWall,
+  turnPlace,
+  waterAt,
   type HerMind,
   type Swimmer,
   type TurnGrade
 } from '@shared/minigameRules/swimRace'
 import { typingIn, useWindowKeydown } from '../kit'
-import { gestures, lift, press } from '../kit'
+import { gestures, lift, press, useReducedMotion } from '../kit'
 import type { GamePlay } from '../kit'
 import '../../vu_styles/SwimRace.css'
 
@@ -122,6 +126,11 @@ function Body(): JSX.Element {
 export function SwimRace({ play }: { play: GamePlay }): JSX.Element {
   const girls = play.opponents
   const lengths = lengthsOf(play.options.lengths)
+  /** The pool or the sea: the same race, told in the words of where it is swum. */
+  const water = waterAt(play.location)
+  const sea = water === 'sea'
+  const reduced = useReducedMotion()
+  const turnWord = (grade: TurnGrade): string => (sea && grade === 'late' ? 'Wide of the mark' : TURN_WORD[grade])
   const names = ['You', ...girls.map((girl) => girl.name)]
   /** Each swimmer as the scene's writer is told of her. */
   const told = (index: number): string => (index === 0 ? 'the reader' : names[index])
@@ -173,7 +182,7 @@ export function SwimRace({ play }: { play: GamePlay }): JSX.Element {
     const game = live.current
     const who = listed(girls.map((girl) => girl.name))
     const stake = held.current.stake ? ` Riding on it: ${held.current.stake}` : ''
-    const terms = `The game is a freestyle swimming race over ${lengths} lengths between the reader and ${who}, each in a lane of their own.`
+    const terms = `The game is a freestyle swimming race ${courseWords(lengths, water)} between the reader and ${who}, ${sea ? 'side by side in the sea' : 'each in a lane of their own'}.`
     if (game.phase === 'ready' || game.phase === 'marks') {
       return `${terms} They are at the edge of the water, about to dive in.${stake}`
     }
@@ -182,7 +191,7 @@ export function SwimRace({ play }: { play: GamePlay }): JSX.Element {
         const swimmer = game.swimmers[index]
         return swimmer.finishMs !== null
           ? `${told(index)} (finished in ${clockOf(swimmer.finishMs)})`
-          : `${told(index)} (on length ${lengthOn(swimmer, lengths)})`
+          : `${told(index)} (${sea ? `on leg ${legLabel(lengthOn(swimmer, lengths), lengths, water).toLowerCase()}` : `on length ${lengthOn(swimmer, lengths)}`})`
       })
       .join(', then ')
     return `${terms} They are mid-race, heads down in the water, with breath for a gasped word at most. In order: ${order}.${stake}`
@@ -325,7 +334,7 @@ export function SwimRace({ play }: { play: GamePlay }): JSX.Element {
     if (opened.current || girls.length === 0) return
     opened.current = true
     play.narrate(
-      `You and ${listed(girls.map((girl) => girl.name))} line up at the edge of the water: ${lengths} lengths, first to touch.`
+      `You and ${listed(girls.map((girl) => girl.name))} line up at the edge of the water: ${sea ? `${courseWords(lengths, water)}, first home` : `${lengths} lengths, first to touch`}.`
     )
     play.situation(standing())
     // Once, as the table opens.
@@ -359,8 +368,8 @@ export function SwimRace({ play }: { play: GamePlay }): JSX.Element {
       setPhase('over')
       held.current.finish({
         outcome: girls.length === 0 ? 'played' : outcomeOf(times),
-        summary: raceSummary(all, lengths),
-        account: raceAccount(all, lengths, game.leaders)
+        summary: raceSummary(all, lengths, water),
+        account: raceAccount(all, lengths, game.leaders, water)
       })
     }
 
@@ -375,17 +384,17 @@ export function SwimRace({ play }: { play: GamePlay }): JSX.Element {
             swimmer.falseStart
               ? 'You go before the whistle and are called back; by the time you dive the water ahead is already churning.'
               : swimmer.reactionMs <= SHARP_START_MS
-                ? `The whistle, and you are off the blocks at once: ${clockOf(swimmer.reactionMs)}.`
+                ? `The whistle, and you are ${sea ? 'in and away' : 'off the blocks'} at once: ${clockOf(swimmer.reactionMs)}.`
                 : `The whistle. You dive ${clockOf(swimmer.reactionMs)} after it.`
           )
           if (girls.length > 0) held.current.situation(standing())
         } else if (event.kind === 'turn') {
           if (game.leaders[event.length - 1] === undefined) game.leaders[event.length - 1] = told(index)
-          board(index, { length: event.length + 1, word: TURN_WORD[event.grade] })
+          board(index, { length: event.length + 1, word: turnWord(event.grade) })
           if (index === 0) {
             game.pullFrom = null
             game.lastPull = null
-            felt(TURN_WORD[event.grade])
+            felt(turnWord(event.grade))
             // The order at the turn, on a race long enough to have a middle.
             if (lengths >= 4) {
               if (girls.length === 0) {
@@ -393,7 +402,7 @@ export function SwimRace({ play }: { play: GamePlay }): JSX.Element {
               } else {
                 const order = orderNow(game.swimmers).map((at) => (at === 0 ? 'you' : names[at]))
                 held.current.narrate(
-                  `Turn ${event.length} of ${lengths - 1}: ${order[0]} in front, then ${listed(order.slice(1))}.`
+                  `${sea ? (event.length % 2 ? 'Round the buoy' : 'Off the shore again') : `Turn ${event.length} of ${lengths - 1}`}: ${order[0]} in front, then ${listed(order.slice(1))}.`
                 )
               }
             }
@@ -401,10 +410,13 @@ export function SwimRace({ play }: { play: GamePlay }): JSX.Element {
           if (girls.length > 0) {
             held.current.situation(standing())
             const whose = index === 0 ? "The reader's" : `${names[index]}'s`
+            const at = sea ? `at ${turnPlace(event.length, water)}` : `at the end of length ${event.length}`
+            // Once he has touched the rest come home at speed: nothing said then would be in step.
+            if (game.swimmers[0].finishMs !== null) continue
             if (event.grade === 'perfect') {
-              remark(voiceFor(index), `${whose} turn at the end of length ${event.length} was perfectly timed: a tumble and a hard push off the wall.`)
+              remark(voiceFor(index), `${whose} turn ${at} was perfectly timed: ${sea ? 'tight round and away at full stretch' : 'a tumble and a hard push off the wall'}.`)
             } else if (event.grade === 'late') {
-              remark(voiceFor(index), `${whose} turn at the end of length ${event.length} was botched: straight into the wall and a scramble to get going again.`)
+              remark(voiceFor(index), `${whose} turn ${at} was botched: ${sea ? 'swung wide and almost stopped' : 'straight into the wall'}, and a scramble to get going again.`)
             }
           }
         } else {
@@ -419,14 +431,14 @@ export function SwimRace({ play }: { play: GamePlay }): JSX.Element {
           if (stillOut && before && ms - before.ms < TOUCH_OUT_MS && girls.length > 0) {
             remark(
               voiceFor(index),
-              `${index === 0 ? 'The reader' : names[index]} has just finished ${clockOf(ms - before.ms)} of a second behind ${told(before.who)}: touched out at the wall.`
+              `${index === 0 ? 'The reader' : names[index]} has just finished ${clockOf(ms - before.ms)} of a second behind ${told(before.who)}: ${sea ? 'beaten home by a stroke' : 'touched out at the wall'}.`
             )
           }
         }
       }
       if (index > 0 && herMove(swimmer, game.minds[index - 1], girls[index - 1].skill, dt, lengths)) {
         board(index, { word: 'Gasping' })
-        remark(girls[index - 1].charId, `${names[index]} has just run out of air mid-length and come up gasping, losing speed.`)
+        if (game.swimmers[0].finishMs === null) remark(girls[index - 1].charId, `${names[index]} has just run out of air mid-length and come up gasping, losing speed.`)
       }
     }
 
@@ -548,7 +560,8 @@ export function SwimRace({ play }: { play: GamePlay }): JSX.Element {
     >
       <div className="vu-swimrace-head">
         <span className="vu-swimrace-distance">
-          {lengths} lengths · {lengths * LENGTH_M} m
+          {sea ? `${lengths > 2 ? `${lengths / 2}× ` : ''}to the buoy and back` : `${lengths} lengths`} ·{' '}
+          {lengths * LENGTH_M} m
         </span>
         <span ref={clockText} className="vu-swimrace-clock">
           0.00
@@ -579,7 +592,7 @@ export function SwimRace({ play }: { play: GamePlay }): JSX.Element {
               </div>
               <span className="vu-swimrace-tally">
                 <span className="vu-swimrace-place">{names.length > 1 && whistled ? ORDINAL[place - 1] : ' '}</span>
-                <span className="vu-swimrace-length">{lane.time ?? `${lane.length}/${lengths}`}</span>
+                <span className="vu-swimrace-length">{lane.time ?? legLabel(lane.length, lengths, water)}</span>
                 <span className="vu-swimrace-word">{lane.time ? ' ' : lane.word || ' '}</span>
               </span>
             </div>
@@ -589,10 +602,10 @@ export function SwimRace({ play }: { play: GamePlay }): JSX.Element {
         {phase === 'ready' && (
           <div className="vu-swimrace-over">
             <p className="vu-swimrace-how">
-              Hold <kbd>Space</kbd> to pull and let go to glide: long, even strokes in time with
-              the guide. <kbd>W</kbd> or <kbd>↑</kbd> takes a breath before your air runs out.{' '}
-              <kbd>S</kbd> or <kbd>↓</kbd> turns, pressed just as you reach the wall. Dive on the
-              whistle with <kbd>Space</kbd>, not before.
+              Hold <kbd>Space</kbd> for each stroke: let go as the marker crosses from pull to
+              glide, press again as it reaches the end. <kbd>W</kbd> breathes before your air runs
+              out. <kbd>S</kbd> turns, just as you reach {sea ? 'the buoy or the shore' : 'the wall'}.
+              Dive on the whistle with <kbd>Space</kbd>, not before.
             </p>
             <motion.button
               type="button"
@@ -614,7 +627,7 @@ export function SwimRace({ play }: { play: GamePlay }): JSX.Element {
 
       <div className="vu-swimrace-deck" inert={!racing || undefined} data-waiting={!racing || undefined}>
         <div className="vu-swimrace-gauge">
-          <span className="vu-swimrace-label">Air</span>
+          <span className="vu-swimrace-label vu-swimrace-label--air">Air</span>
           <div className="vu-swimrace-air" role="meter" aria-label="Air" aria-valuemin={0} aria-valuemax={100}>
             <span className="vu-swimrace-airfill" />
           </div>
@@ -632,7 +645,7 @@ export function SwimRace({ play }: { play: GamePlay }): JSX.Element {
           key={feel.count}
           className="vu-swimrace-feel"
           role="status"
-          initial={{ scale: 1.3 }}
+          initial={reduced ? false : { scale: 1.3 }}
           animate={{ scale: 1 }}
           transition={{ duration: 0.14, ease: 'easeOut' }}
         >
@@ -650,6 +663,7 @@ export function SwimRace({ play }: { play: GamePlay }): JSX.Element {
             onPointerUp={pullUp}
             onPointerLeave={pullUp}
             onPointerCancel={pullUp}
+            onContextMenu={(event) => event.preventDefault()}
           >
             Stroke
           </button>
