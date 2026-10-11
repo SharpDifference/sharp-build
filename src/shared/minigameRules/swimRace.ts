@@ -1,4 +1,4 @@
-import { listed } from './minigames'
+import { listed } from '../minigameKit'
 
 /**
  * Swim Race's rules: the water, what a stroke, a breath and a turn do to a swimmer, how a girl

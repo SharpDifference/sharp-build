@@ -1,4 +1,4 @@
-import type { MiniGameDef } from '../minigames'
+import type { MiniGameDef } from '../minigameKit'
 
 const PARADISO: MiniGameDef = {
   id: 'paradiso',

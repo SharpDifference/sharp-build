@@ -1,5 +1,5 @@
-import { freshDeck, rankWord, type Card, type Skill } from './highLow'
-import { listed } from './minigames'
+import { freshDeck, rankWord, type Card, type SkillLevel as Skill } from '../minigameKit'
+import { listed } from '../minigameKit'
 
 /**
  * Blackjack's rules, with no dealer: what a hand is worth, which hand wins among everyone at

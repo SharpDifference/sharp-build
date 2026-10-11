@@ -1,4 +1,4 @@
-import type { MiniGameDef } from '../minigames'
+import type { MiniGameDef } from '../minigameKit'
 
 const TRUTH_OR_DARE: MiniGameDef = {
   id: 'truth-or-dare',

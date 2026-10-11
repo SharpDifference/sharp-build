@@ -1,4 +1,4 @@
-import { seededRand } from './hash'
+import { seededRand } from '../minigameKit'
 
 /** PARADISO's rules: the chart of a song, how a step is judged, the score, and how she dances. */
 

@@ -20,7 +20,7 @@ import {
   type Ball,
   type Skill,
   type Throw
-} from '../src/shared/bowling'
+} from '../src/shared/minigameRules/bowling'
 import { gamesOffered, MINI_GAMES_LIST, suggestRate } from '../src/shared/minigames'
 
 /** Bowling's rules: the scoring, what a ball takes, how she throws and how a game is told. */

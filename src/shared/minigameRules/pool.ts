@@ -5,7 +5,7 @@
  * surface running from (0, 0) to (TABLE_W, TABLE_H); times are in seconds, angles in radians.
  */
 
-import { listed } from './minigames'
+import { listed } from '../minigameKit'
 
 export const TABLE_W = 800
 export const TABLE_H = 400

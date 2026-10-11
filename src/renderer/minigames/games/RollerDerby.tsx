@@ -27,11 +27,11 @@ import {
   type Race,
   type RaceEvent,
   type Stride
-} from '@shared/rollerDerby'
-import { typingIn, useWindowKeydown } from '../components/useWindowKeydown'
-import { gestures, lift, press } from '../views/motion'
-import type { GamePlay } from './play'
-import '../vu_styles/RollerDerby.css'
+} from '@shared/minigameRules/rollerDerby'
+import { typingIn, useWindowKeydown } from '../kit'
+import { gestures, lift, press } from '../kit'
+import type { GamePlay } from '../kit'
+import '../../vu_styles/RollerDerby.css'
 
 /** How many times in a race anyone says something, the whole rink together, by how talkative they are to be. */
 const REMARKS = { quiet: 0, some: 3, lots: 6 } as const

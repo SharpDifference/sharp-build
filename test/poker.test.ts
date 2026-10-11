@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import type { Card, Skill, Suit } from '../src/shared/highLow'
+import type { Card, SkillLevel as Skill, Suit } from '../src/shared/minigameKit'
 import { MINI_GAMES_LIST, settledOptions } from '../src/shared/minigames'
 import {
   act,
@@ -25,7 +25,7 @@ import {
   type HandState,
   type Move,
   type Spot
-} from '../src/shared/poker'
+} from '../src/shared/minigameRules/poker'
 
 /** Poker's rules: what a hand is worth, how the pots are shared, and how she plays hers. */
 

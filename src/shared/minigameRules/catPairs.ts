@@ -1,4 +1,4 @@
-import { listed } from './minigames'
+import { listed } from '../minigameKit'
 
 /**
  * Cat Pairs' rules: the cards and who has taken which, what a turn comes to, the café cat's

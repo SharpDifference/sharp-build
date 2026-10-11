@@ -1,12 +1,12 @@
 import AIR_HOCKEY from '@shared/minigameEntries/air-hockey'
-import { AirHockey } from '../minigames/AirHockey'
+import { AirHockey } from '../minigames/games/AirHockey'
 import PARADISO from '@shared/minigameEntries/paradiso'
-import { Paradiso } from '../minigames/Paradiso'
+import { Paradiso } from '../minigames/games/Paradiso'
 import POOL from '@shared/minigameEntries/pool'
-import { Pool } from '../minigames/Pool'
+import { Pool } from '../minigames/games/Pool'
 import BOWLING from '@shared/minigameEntries/bowling'
-import { Bowling } from '../minigames/Bowling'
-import { registerGame } from '../minigames/play'
+import { Bowling } from '../minigames/games/Bowling'
+import { registerGame } from '../minigames/kit'
 
 registerGame(AIR_HOCKEY.id, AirHockey)
 registerGame(PARADISO.id, Paradiso)

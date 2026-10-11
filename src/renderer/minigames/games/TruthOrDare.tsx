@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type JSX } from 'react'
 import { motion } from 'motion/react'
-import { listed } from '@shared/minigames'
+import { listed } from '@shared/minigameKit'
 import {
   HEAT_WORD,
   READER,
@@ -31,11 +31,11 @@ import {
   type Terms,
   type Turn,
   type Verdict
-} from '@shared/truthOrDare'
-import { TextField } from '../components/TextField'
-import { gestures, lift, press, quietLift, quietPress } from '../views/motion'
-import type { GamePlay, RoundAsk } from './play'
-import '../vu_styles/TruthOrDare.css'
+} from '@shared/minigameRules/truthOrDare'
+import { TextField } from '../kit'
+import { gestures, lift, press, quietLift, quietPress } from '../kit'
+import type { GamePlay, RoundAsk } from '../kit'
+import '../../vu_styles/TruthOrDare.css'
 
 /** The most the reader may type for a question, a dare or an answer. */
 const TYPED_MAX = 240

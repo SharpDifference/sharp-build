@@ -1,6 +1,6 @@
 /** Bowling's rules: the lane, a throw, which pins it takes, the scoring and how she throws. */
 
-import { listed } from './minigames'
+import { listed } from '../minigameKit'
 
 /** Half the lane's width, in inches: everything across the lane is measured from its middle. */
 export const LANE_HALF = 20.75

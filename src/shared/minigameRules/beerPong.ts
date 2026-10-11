@@ -1,6 +1,6 @@
 /** Beer Pong's rules: the racks, a throw and where it lands, the turns, how she throws and how a game is told. */
 
-import { listed } from './minigames'
+import { listed } from '../minigameKit'
 
 /** Everything is measured in cup widths: a cup is 1 across, and neighbours in a rack touch. */
 /** How near a cup's middle a ball must land to drop straight in. */

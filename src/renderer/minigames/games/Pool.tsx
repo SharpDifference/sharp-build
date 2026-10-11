@@ -33,9 +33,9 @@ import {
   type RackRecord,
   type ShotRecord,
   type Side
-} from '@shared/pool'
-import type { GamePlay } from './play'
-import '../vu_styles/Pool.css'
+} from '@shared/minigameRules/pool'
+import type { GamePlay } from '../kit'
+import '../../vu_styles/Pool.css'
 
 /** How many times in a match she says something about a shot, by how talkative she is to be. */
 const REMARKS = { quiet: 0, some: 3, lots: 8 } as const

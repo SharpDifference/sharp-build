@@ -29,11 +29,11 @@ import {
   type Game,
   type Shot,
   type Throw
-} from '@shared/beerPong'
-import { listed } from '@shared/minigames'
-import { gestures, lift, press } from '../views/motion'
-import type { GamePlay } from './play'
-import '../vu_styles/BeerPong.css'
+} from '@shared/minigameRules/beerPong'
+import { listed } from '@shared/minigameKit'
+import { gestures, lift, press } from '../kit'
+import type { GamePlay } from '../kit'
+import '../../vu_styles/BeerPong.css'
 
 /** How many times in a game any of them says something for herself: the whole table's. */
 const REMARKS = { quiet: 0, some: 4, lots: 9 } as const

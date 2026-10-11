@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type JSX } from 'react'
 import { motion } from 'motion/react'
-import { freshDeck, rankMark, type Card, type Suit } from '@shared/highLow'
-import { listed } from '@shared/minigames'
+import { freshDeck, rankMark, type Card, type Suit } from '@shared/minigameKit'
+import { listed } from '@shared/minigameKit'
 import {
   BIG_BLIND,
   SMALL_BLIND,
@@ -31,11 +31,11 @@ import {
   streetLine,
   type HandState,
   type Move
-} from '@shared/poker'
-import { gestures, lift, press } from '../views/motion'
-import { BunnyMark } from '../views/screenIcons'
-import type { GamePlay } from './play'
-import '../vu_styles/Poker.css'
+} from '@shared/minigameRules/poker'
+import { gestures, lift, press } from '../kit'
+import { BunnyMark } from '../kit'
+import type { GamePlay } from '../kit'
+import '../../vu_styles/Poker.css'
 
 const SUIT_MARK: Record<Suit, string> = { spades: '♠', hearts: '♥', diamonds: '♦', clubs: '♣' }
 

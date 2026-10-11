@@ -32,7 +32,7 @@ import {
   type ShotRecord,
   type Side,
   type Skill
-} from '../src/shared/pool'
+} from '../src/shared/minigameRules/pool'
 import { MINI_GAMES, MINI_GAMES_LIST } from '../src/shared/minigames'
 import { MODS } from '../src/shared/mods'
 

@@ -32,12 +32,12 @@ import {
   type Side,
   type Strides,
   type Told
-} from '@shared/footRace'
-import { listed } from '@shared/minigames'
-import { typingIn, useWindowKeydown } from '../components/useWindowKeydown'
-import { gestures, lift, press } from '../views/motion'
-import type { GamePlay } from './play'
-import '../vu_styles/FootRace.css'
+} from '@shared/minigameRules/footRace'
+import { listed } from '@shared/minigameKit'
+import { typingIn, useWindowKeydown } from '../kit'
+import { gestures, lift, press } from '../kit'
+import type { GamePlay } from '../kit'
+import '../../vu_styles/FootRace.css'
 
 /** The keys that stride: the arrows, and A and D. */
 const KEYS: Readonly<Record<string, Side>> = {

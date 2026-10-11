@@ -29,7 +29,7 @@ import {
   type Race,
   type RaceEvent,
   type Skill
-} from '../src/shared/rollerDerby'
+} from '../src/shared/minigameRules/rollerDerby'
 
 /** Rink Race's rules: the stride, the bends, how the girls skate, the order and the account. */
 

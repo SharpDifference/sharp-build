@@ -1,5 +1,5 @@
-import { freshDeck, type Card, type Skill, type Suit } from './highLow'
-import { listed } from './minigames'
+import { freshDeck, type Card, type SkillLevel as Skill, type Suit } from '../minigameKit'
+import { listed } from '../minigameKit'
 
 /**
  * Texas hold'em with play chips, for the reader and one to three girls: what a hand is worth,

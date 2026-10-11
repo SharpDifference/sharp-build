@@ -5,22 +5,16 @@ import {
   callLine,
   callTold,
   callWins,
-  freshDeck,
   herCall,
-  rankMark,
-  rankWord,
   soloSummary,
   versusAccount,
   versusOver,
   versusSummary,
-  type Call,
-  type Card,
-  type Suit
-} from '@shared/highLow'
-import { gestures, lift, press } from '../views/motion'
-import { BunnyMark } from '../views/screenIcons'
-import type { GamePlay } from './play'
-import '../vu_styles/HighLow.css'
+  type Call
+} from '@shared/minigameRules/highLow'
+import { freshDeck, rankMark, rankWord, type Card, type Suit } from '@shared/minigameKit'
+import { BunnyMark, gestures, lift, press, type GamePlay } from '../kit'
+import '../../vu_styles/HighLow.css'
 
 const SUIT_MARK: Record<Suit, string> = { spades: '♠', hearts: '♥', diamonds: '♦', clubs: '♣' }
 

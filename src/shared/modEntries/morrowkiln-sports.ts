@@ -1,4 +1,4 @@
-import { packMod } from '../minigames'
+import { packMod } from '../minigameKit'
 import FOOT_RACE from '../minigameEntries/foot-race'
 import SWIM_RACE from '../minigameEntries/swim-race'
 import ROLLER_DERBY from '../minigameEntries/roller-derby'

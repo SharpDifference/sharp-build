@@ -1,4 +1,4 @@
-import { listed } from './minigames'
+import { listed } from '../minigameKit'
 
 /**
  * Rink Race's rules: the oval, what a stride is worth by its timing, what a bend does to a

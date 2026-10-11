@@ -34,7 +34,7 @@ import {
   type Skill,
   type Strides,
   type Told
-} from '../src/shared/footRace'
+} from '../src/shared/minigameRules/footRace'
 
 /** Foot Race's rules: strides into effort, effort into speed and stamina, her race by her skill, the start and the finish. */
 

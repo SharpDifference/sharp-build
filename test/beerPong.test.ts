@@ -29,7 +29,7 @@ import {
   type Game,
   type Skill,
   type Throw
-} from '../src/shared/beerPong'
+} from '../src/shared/minigameRules/beerPong'
 import BEER_PONG from '../src/shared/minigameEntries/beer-pong'
 import { gamesOffered, groupsFor, suggestRate } from '../src/shared/minigames'
 

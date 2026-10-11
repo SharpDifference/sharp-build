@@ -1,4 +1,4 @@
-import { packMod } from '../minigames'
+import { packMod } from '../minigameKit'
 import HIGH_LOW from '../minigameEntries/high-low'
 import BLACKJACK from '../minigameEntries/blackjack'
 import POKER from '../minigameEntries/poker'

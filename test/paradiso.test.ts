@@ -25,7 +25,7 @@ import {
   type Judgement,
   type Note,
   type Skill
-} from '../src/shared/paradiso'
+} from '../src/shared/minigameRules/paradiso'
 
 /** PARADISO's rules: the chart, the judging of a step, the score, and how she dances. */
 

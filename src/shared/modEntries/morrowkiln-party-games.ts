@@ -1,4 +1,4 @@
-import { packMod } from '../minigames'
+import { packMod } from '../minigameKit'
 import BEER_PONG from '../minigameEntries/beer-pong'
 import TRUTH_OR_DARE from '../minigameEntries/truth-or-dare'
 

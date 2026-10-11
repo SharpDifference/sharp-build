@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type JSX } from 'react'
 import { motion } from 'motion/react'
-import { listed } from '@shared/minigames'
+import { listed } from '@shared/minigameKit'
 import {
   CLEAN_STROKE,
   CYCLE_MS,
@@ -32,11 +32,11 @@ import {
   type HerMind,
   type Swimmer,
   type TurnGrade
-} from '@shared/swimRace'
-import { typingIn, useWindowKeydown } from '../components/useWindowKeydown'
-import { gestures, lift, press } from '../views/motion'
-import type { GamePlay } from './play'
-import '../vu_styles/SwimRace.css'
+} from '@shared/minigameRules/swimRace'
+import { typingIn, useWindowKeydown } from '../kit'
+import { gestures, lift, press } from '../kit'
+import type { GamePlay } from '../kit'
+import '../../vu_styles/SwimRace.css'
 
 /** How many times in a race anyone says something, by how talkative the table is to be. */
 const REMARKS = { quiet: 0, some: 2, lots: 5 } as const

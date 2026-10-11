@@ -27,11 +27,11 @@ import {
   type CafeCat,
   type Game,
   type Memory
-} from '@shared/catPairs'
-import { listed } from '@shared/minigames'
-import { gestures, quietPress, toggleLift } from '../views/motion'
-import type { GamePlay } from './play'
-import '../vu_styles/CatPairs.css'
+} from '@shared/minigameRules/catPairs'
+import { listed } from '@shared/minigameKit'
+import { gestures, quietPress, toggleLift } from '../kit'
+import type { GamePlay } from '../kit'
+import '../../vu_styles/CatPairs.css'
 
 /** How many times in a game the girls say something about a turn, between them, by how talkative they are to be. */
 const REMARKS = { quiet: 0, some: 3, lots: 7 } as const

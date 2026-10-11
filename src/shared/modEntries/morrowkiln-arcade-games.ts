@@ -1,4 +1,4 @@
-import { packMod } from '../minigames'
+import { packMod } from '../minigameKit'
 import AIR_HOCKEY from '../minigameEntries/air-hockey'
 import PARADISO from '../minigameEntries/paradiso'
 import POOL from '../minigameEntries/pool'

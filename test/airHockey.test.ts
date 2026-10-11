@@ -28,7 +28,7 @@ import {
   type Point,
   type Side,
   type Table
-} from '../src/shared/airHockey'
+} from '../src/shared/minigameRules/airHockey'
 import { MINI_GAMES, MINI_GAMES_LIST, gamesOffered, suggestRate } from '../src/shared/minigames'
 import { MODS } from '../src/shared/mods'
 

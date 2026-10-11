@@ -1,4 +1,4 @@
-import type { MiniGameDef } from '../minigames'
+import type { MiniGameDef } from '../minigameKit'
 
 const CAT_PAIRS: MiniGameDef = {
   id: 'cat-pairs',

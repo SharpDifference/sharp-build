@@ -1,4 +1,4 @@
-import { listed } from './minigames'
+import { listed } from '../minigameKit'
 
 /**
  * Foot Race's rules, pure: the course at each distance, how a runner's effort becomes speed and

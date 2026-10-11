@@ -19,7 +19,7 @@ import {
   turnsIn,
   type Terms,
   type Turn
-} from '../src/shared/truthOrDare'
+} from '../src/shared/minigameRules/truthOrDare'
 
 /** Truth or Dare's bookkeeping: who goes and who asks, what a round is told, and what is kept. */
 

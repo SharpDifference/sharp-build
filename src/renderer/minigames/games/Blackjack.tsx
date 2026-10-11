@@ -21,13 +21,13 @@ import {
   type HerMoveMade,
   type HitMade,
   type TableHand
-} from '@shared/blackjack'
-import { freshDeck, rankMark, rankWord, type Card, type Suit } from '@shared/highLow'
-import { listed } from '@shared/minigames'
-import { gestures, lift, press } from '../views/motion'
-import { BunnyMark } from '../views/screenIcons'
-import type { GamePlay } from './play'
-import '../vu_styles/Blackjack.css'
+} from '@shared/minigameRules/blackjack'
+import { freshDeck, rankMark, rankWord, type Card, type Suit } from '@shared/minigameKit'
+import { listed } from '@shared/minigameKit'
+import { gestures, lift, press } from '../kit'
+import { BunnyMark } from '../kit'
+import type { GamePlay } from '../kit'
+import '../../vu_styles/Blackjack.css'
 
 const SUIT_MARK: Record<Suit, string> = { spades: '♠', hearts: '♥', diamonds: '♦', clubs: '♣' }
 

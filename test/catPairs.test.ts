@@ -24,7 +24,7 @@ import {
   type Game,
   type Memory,
   type Skill
-} from '../src/shared/catPairs'
+} from '../src/shared/minigameRules/catPairs'
 import { MINI_GAMES, MINI_GAMES_LIST, gamesOffered, settledOptions } from '../src/shared/minigames'
 
 /** Cat Pairs' rules: the deal, turns and scoring, the cat's swaps, and how she plays from memory. */

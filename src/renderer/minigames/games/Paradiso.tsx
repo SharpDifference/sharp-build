@@ -22,11 +22,11 @@ import {
   type Judgement,
   type Lane,
   type Tally
-} from '@shared/paradiso'
-import { typingIn, useWindowKeydown } from '../components/useWindowKeydown'
-import { gestures, lift, press } from '../views/motion'
-import type { GamePlay } from './play'
-import '../vu_styles/Paradiso.css'
+} from '@shared/minigameRules/paradiso'
+import { typingIn, useWindowKeydown } from '../kit'
+import { gestures, lift, press } from '../kit'
+import type { GamePlay } from '../kit'
+import '../../vu_styles/Paradiso.css'
 
 /** The keys that step on each pad: the arrows, and a row for two hands. */
 const KEYS: Readonly<Record<string, Lane>> = {

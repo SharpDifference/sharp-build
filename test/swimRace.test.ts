@@ -35,7 +35,7 @@ import {
   type Skill,
   type Swimmer,
   type TurnGrade
-} from '../src/shared/swimRace'
+} from '../src/shared/minigameRules/swimRace'
 
 /** Swim Race's rules: the stroke, the air, the turn, how she swims, and how a race is placed. */
 

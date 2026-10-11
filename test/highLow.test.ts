@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { callWins, freshDeck, herCall, versusOver, type Card } from '../src/shared/highLow'
+import { callWins, herCall, versusOver } from '../src/shared/minigameRules/highLow'
+import { freshDeck, type Card } from '../src/shared/minigameKit'
 
 /** High-Low's rules: what a call wins on, and the deck it is played from. */
 

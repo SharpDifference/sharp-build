@@ -23,11 +23,11 @@ import {
   type Ball,
   type BallTold,
   type Throw
-} from '@shared/bowling'
-import { listed } from '@shared/minigames'
-import { gestures, lift, press } from '../views/motion'
-import type { GamePlay } from './play'
-import '../vu_styles/Bowling.css'
+} from '@shared/minigameRules/bowling'
+import { listed } from '@shared/minigameKit'
+import { gestures, lift, press } from '../kit'
+import type { GamePlay } from '../kit'
+import '../../vu_styles/Bowling.css'
 
 /** How many times in a game anything is said about a ball, by how talkative the girls are to be: the whole table's, however many of them are bowling. */
 const REMARKS = { quiet: 0, some: 3, lots: 8 } as const

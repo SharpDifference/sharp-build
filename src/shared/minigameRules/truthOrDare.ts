@@ -1,4 +1,4 @@
-import { listed } from './minigames'
+import { listed } from '../minigameKit'
 
 /**
  * Truth or Dare, as far as code can run it: whose turn it is and who asks, what each round asks

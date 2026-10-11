@@ -22,9 +22,9 @@ import {
   swingAt,
   type Point,
   type Side
-} from '@shared/airHockey'
-import type { GamePlay } from './play'
-import '../vu_styles/AirHockey.css'
+} from '@shared/minigameRules/airHockey'
+import type { GamePlay } from '../kit'
+import '../../vu_styles/AirHockey.css'
 
 /** A count of goals as the narration says it. */
 const NUMBER: Record<number, string> = {

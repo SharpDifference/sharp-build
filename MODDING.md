@@ -243,8 +243,8 @@ A pack is one mod and any number of games. For the game `high-low`, in the pack
 | `src/shared/modEntries/morrowkiln-card-games.ts` | The pack's entry on the Mods screen, named for the mod's id, as any mod's. One per pack. |
 | `src/renderer/modEntries/morrowkiln-card-games.ts` | Named for the mod's id: hands the framework each game's component. One per pack. |
 | `src/shared/minigameEntries/high-low.ts` | The game on paper, named for the game's id: its `MiniGameDef`, default export. Its `modId` is the pack's id. |
-| `src/shared/highLow.ts` | The rules, pure: no React, no stores, nothing from the renderer. |
-| `src/renderer/minigames/HighLow.tsx` | The component the game is played with. |
+| `src/shared/minigameRules/highLow.ts` | The rules, pure: no React, no stores, nothing from the renderer. |
+| `src/renderer/minigames/games/HighLow.tsx` | The component the game is played with. |
 | `src/renderer/vu_styles/HighLow.css` | What it looks like, imported by the component. |
 | `test/highLow.test.ts` | Tests of the rules file. |
 
@@ -257,7 +257,7 @@ The pack's entry is made by `packMod`, which requires the framework and gives ev
 switch of its own among the mod's options, on until the player turns it off:
 
 ```ts
-import { packMod } from '../minigames'
+import { packMod } from '../minigameKit'
 import HIGH_LOW from '../minigameEntries/high-low'
 import BLACKJACK from '../minigameEntries/blackjack'
 
@@ -278,14 +278,43 @@ The renderer's entry is the whole of the registration, a line per game:
 
 ```ts
 import HIGH_LOW from '@shared/minigameEntries/high-low'
-import { HighLow } from '../minigames/HighLow'
-import { registerGame } from '../minigames/play'
+import { HighLow } from '../minigames/games/HighLow'
+import { registerGame } from '../minigames/kit'
 
 registerGame(HIGH_LOW.id, HighLow)
 ```
 
 A game with no registered component is never offered. A pack of several games has one file in
 `minigameEntries/` per game, all with the pack's `modId`, and one `registerGame` each.
+
+### The kit: the only things a pack imports
+
+A pack is self-contained. Beyond its own files it imports React, `motion/react`, and the two kits
+the framework offers, and nothing else of the game: no store, no view, no other pack. The game can
+then change underneath without a pack noticing, and anyone's pack sits beside anyone else's.
+`test/minigamePacks.test.ts` fails a pack that reaches past them. If a game needs something the
+kits do not have, the thing to do is add it to the kit, for every pack.
+
+| Kit | For | What is in it |
+| --- | --- | --- |
+| `@shared/minigameKit` | Games on paper, the pack's entry, the rules | `MiniGameDef` and its types, `packMod`, `listed`, `fewestWith`, `SkillLevel`; playing cards (`Card`, `Suit`, `freshDeck`, `rankMark`, `rankWord`); `seededRand`, `shuffle`, `pick` |
+| `src/renderer/minigames/kit` | The component and the entry that registers it | `GamePlay` and its types, `registerGame`; the game's own controls (`gestures`, `lift`, `press`, `quietLift`, `quietPress`, `toggleLift`, `TextField`, `BunnyMark`); `useWindowKeydown` and `typingIn`; and the helpers below |
+
+| Helper | What it saves writing |
+| --- | --- |
+| `useOnTable()` | Asks whether the table is still up, for a timer or a promise that comes back late. |
+| `useAway()` | True while the window has lost focus or the page is hidden: a game on a clock stops it. |
+| `sayCapped(play, charId, cue, capMs)` | Her line, waited on no longer than the cap, never rejecting. |
+| `remarkBudget(chattiness, caps)` | The table's remarks for the game, counted down. |
+| `pointIn(svg, event)` | A pointer in an SVG's own units, read through the surface's tilt. |
+| `useReducedMotion()` | True where the player has asked for less motion. |
+
+A pack's styles use the game's design system directly, as `UI_STYLE_GUIDE.md` gives it: the
+theme-role variables (`--vu-accent`, `--vu-text`, `--vu-text-muted`, `--vu-text-body`,
+`--vu-border`, `--vu-surface`, `--vu-recessed`, `--vu-tint`, `--vu-accent-ink`,
+`--vu-accent-shadow`, `--vu-good`, `--vu-warn`, `--vu-danger`, and the fonts `--font-display`,
+`--font-body`, `--font-mono`) and the shared classes (`vu-btn`, `vu-pill`, `vu-paper`,
+`vu-empty`). A pack's own classes and variables carry its own prefix (`vu-highlow-…`).
 
 ### The game on paper
 
@@ -371,7 +400,7 @@ focus when the table opens. `keys: true` leaves the focus alone, so the first ke
 
 ### The component
 
-The component is `({ play }: { play: GamePlay })`, from `src/renderer/minigames/play.ts`. The
+The component is `({ play }: { play: GamePlay })`, from the kit (`src/renderer/minigames/kit`). The
 framework draws the surface, the game's name over it and the way out under it; the component
 draws what is between.
 
@@ -549,7 +578,7 @@ for the stake to the two of them. The component is simply unmounted.
   colour is written out, so the game is right by day and by night. Faces are `--font-display`,
   `--font-body` and `--font-mono`.
 - Every class is the game's own: `vu-highlow`, `vu-highlow-card`. Buttons are `base.css`'s
-  (`vu-btn vu-btn--outline vu-paper vu-btn--panel`), with the gestures from `views/motion`.
+  (`vu-btn vu-btn--outline vu-paper vu-btn--panel`), with the gestures from the kit.
 - Size it for its surface on a stage laid out 1080px high. The surface hangs 150px from the top
   and the dialogue box is below it. High-Low's whole table is two 124 by 172 cards, a line of
   count and two buttons.

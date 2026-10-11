@@ -19,8 +19,8 @@ import {
   tableWon,
   type Move,
   type TableHand
-} from '../src/shared/blackjack'
-import type { Card } from '../src/shared/highLow'
+} from '../src/shared/minigameRules/blackjack'
+import type { Card } from '../src/shared/minigameKit'
 import { MINI_GAMES, MINI_GAMES_LIST, settledOptions } from '../src/shared/minigames'
 
 /** Blackjack's rules: what a hand is worth, which hand wins, and how she plays hers. */
