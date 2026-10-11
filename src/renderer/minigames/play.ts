@@ -86,6 +86,12 @@ export interface GamePlay {
    */
   situation: (text: string) => void
   /**
+   * What the scene should know of the game so far, should the reader walk away from it now: the
+   * same lines an account is made of, said again whenever there is more to say. A game that never
+   * says leaves a game walked away from as only that.
+   */
+  progress: (account: readonly string[]) => void
+  /**
    * The game is over. The component keeps showing how it ended for a beat; then the framework
    * clears the table and takes the result into the scene.
    */

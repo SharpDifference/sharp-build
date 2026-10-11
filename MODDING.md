@@ -423,6 +423,7 @@ draws what is between.
 | `readerSays(text)` | Puts words on the scene as the reader's own, as part of the game. Nobody answers. |
 | `round(ask)` | A model call. One round no code can play; see below. |
 | `situation(text)` | How the game stands now. Free; call it whenever it changes. |
+| `progress(account)` | What the scene should know of the game so far, were the reader to walk away now: account lines, said again whenever there is more. Free. A game whose point is what was said in it (Truth or Dare) calls it each turn. |
 | `finish(result)` | The game is over. |
 
 The rules that matter:

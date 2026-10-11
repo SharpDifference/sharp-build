@@ -194,6 +194,8 @@ export function MiniGamePanel({ theme, onClose }: ScenePanelProps): JSX.Element 
 
   // How the game stands, as the game last said it: what she is reminded of when she speaks.
   const situation = useRef('')
+  // What the game has said the scene should know of it so far, for a game walked away from.
+  const soFar = useRef<readonly string[]>([])
   // A table taken down mid-game, by anything, says nothing more.
   useEffect(() => closeTable, [])
 
@@ -268,6 +270,9 @@ export function MiniGamePanel({ theme, onClose }: ScenePanelProps): JSX.Element 
       },
       situation: (text) => {
         situation.current = text
+      },
+      progress: (account) => {
+        soFar.current = account
       },
       finish: (ended) => setResult(ended)
     }),
@@ -374,7 +379,8 @@ export function MiniGamePanel({ theme, onClose }: ScenePanelProps): JSX.Element 
                     outcome: 'abandoned',
                     summary: `You walk away from the game of ${seated.game.name}${
                       tableNames.length > 0 ? ` with ${listed(tableNames)}` : ''
-                    } before it is over.`
+                    } before it is over.`,
+                    ...(soFar.current.length > 0 ? { account: soFar.current } : {})
                   })
                 : onClose()
             }
