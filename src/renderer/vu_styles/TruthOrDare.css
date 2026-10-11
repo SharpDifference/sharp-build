@@ -67,6 +67,9 @@
   flex-direction: column;
   gap: 8px;
   min-height: 156px;
+  /* A long question and a long answer scroll inside it rather than push the table off the stage. */
+  max-height: 240px;
+  overflow-y: auto;
   padding: 14px 18px;
   border: 2.5px solid var(--vu-border);
   border-radius: 20px;

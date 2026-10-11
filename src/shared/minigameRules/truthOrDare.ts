@@ -8,8 +8,11 @@ import { listed } from '../minigameKit'
 
 export type Kind = 'truth' | 'dare'
 
-/** How a turn came out: a truth answered straight or dodged, a dare done or backed out of. */
-export type Verdict = 'honest' | 'dodged' | 'done' | 'chickened'
+/**
+ * How a turn came out: a truth answered straight or dodged, a dare done or backed out of.
+ * `skipped` is a girl's turn the model never played: nobody's doing, and no point either way.
+ */
+export type Verdict = 'honest' | 'dodged' | 'done' | 'chickened' | 'skipped'
 
 /** How far the questions and dares may go. */
 export type Heat = 1 | 2 | 3
@@ -48,6 +51,10 @@ const HEAT_MEANS: Record<Heat, string> = {
   3: 'bold: frank about attraction, romance and each other; dares may be daring and close, a kiss at most. Nothing explicit.'
 }
 
+/** What holds at every heat, said in every brief. */
+const LIMIT =
+  'Whatever the heat, everything asked, dared, said and done stays within what adults playing this at a party, in company, would really say and do: never sexually explicit in word or deed, no undressing, and nothing physical beyond a kiss.'
+
 export function heatOf(value: number | undefined): Heat {
   return value === 1 || value === 3 ? value : 2
 }
@@ -85,6 +92,11 @@ function told(terms: Terms, seat: number): string {
 
 export function scored(verdict: Verdict): boolean {
   return verdict === 'honest' || verdict === 'done'
+}
+
+/** The turn was ducked by whoever's it was: a dodge or a backing out, not a turn that was skipped. */
+export function ducked(verdict: Verdict): boolean {
+  return verdict === 'dodged' || verdict === 'chickened'
 }
 
 /** The verdicts a turn of this kind can end on: the one that scores, then the one that does not. */
@@ -208,7 +220,8 @@ function frame(terms: Terms, log: readonly Turn[]): string[] {
   const used = askedSoFar(log)
   return [
     `Truth or Dare, turn ${turn + 1} of ${turnsIn(terms)}. It is ${told(terms, player)}'s turn to take a truth or a dare; ${told(terms, asker)} is the one who asks the question or sets the dare.`,
-    `Heat is ${terms.heat} of 3, ${HEAT_MEANS[terms.heat]} That is the ceiling, not a target: stay within what the girl speaking would really say or do, and within what her relationship with the reader in this scene supports.`,
+    `Heat is ${terms.heat} of 3, ${HEAT_MEANS[terms.heat]} That is the ceiling, not a target. ${LIMIT}`,
+    'Write every girl in her own character and voice, as her sheet and the scene so far show her, and within what her relationship with the reader in this scene supports: she says and does only what she really would with him, here, now.',
     used.length > 0
       ? `Already asked or dared this game, none of which may be repeated or reworded: ${used.map((p) => `"${p}"`).join(' ')}`
       : 'Nothing has been asked or dared yet this game.'
@@ -312,7 +325,7 @@ export function judgeRound(
       kind === 'truth'
         ? `The reader answered, word for word: "${reply}"`
         : `The reader says what he does, word for word: "${reply}"`,
-      `${her} reacts and judges it, in character and fairly: she takes him at his word unless what he typed plainly ducks it.`,
+      `${her} reacts and judges it, in character and fairly: she takes him at his word unless what he typed plainly ducks it. Where what he typed goes further than the heat allows, she does not go along with it or repeat it: she laughs it off or calls him on it, and her own line stays within the heat.`,
       `"line" is what ${her} says in reaction, ${HER_WORDS}. She reacts to what he actually ${kind === 'truth' ? 'said' : 'did'}.`,
       kind === 'truth'
         ? `"verdict" is "${yes}" where he gave a real answer to the question asked, and "${no}" where he deflected, joked past it or answered something else.`
@@ -324,27 +337,40 @@ export function judgeRound(
 
 /* What the game does where a round comes back empty. */
 
+/** A text field of a round, or empty: a blank one is as good as none. */
+function text(got: Record<string, string> | null, field: string): string {
+  const value = got?.[field]
+  return typeof value === 'string' ? value.trim() : ''
+}
+
 export interface Chosen {
   kind: Kind
   line: string
 }
 
-/** Her pick: the model's, or a coin and a plain word. */
+/** Her pick: the model's, or a coin and a plain word. A pick with no line to it is no round. */
 export function chosenOf(got: Record<string, string> | null, rand: () => number = Math.random): Chosen {
-  if (got && (got.choice === 'truth' || got.choice === 'dare')) {
-    return { kind: got.choice, line: got.line || (got.choice === 'truth' ? 'Truth.' : 'Dare.') }
+  const line = text(got, 'line')
+  if (got && line && (got.choice === 'truth' || got.choice === 'dare')) {
+    return { kind: got.choice, line }
   }
   return rand() < 0.6 ? { kind: 'truth', line: 'Truth.' } : { kind: 'dare', line: 'Dare.' }
 }
 
-/** What she puts to the reader: the model's, or the first stock one not yet used. */
+/**
+ * What she puts to the reader: the model's, or the first stock one not yet used. A blank one, or
+ * one already put this game, is no round.
+ */
 export function posedOf(
   got: Record<string, string> | null,
   kind: Kind,
   heat: Heat,
   log: readonly Turn[]
 ): string {
-  return got?.prompt || stock(kind, heat, askedSoFar(log), 1, log.length)[0]
+  const used = askedSoFar(log)
+  const prompt = text(got, 'prompt')
+  if (prompt && !used.some((u) => same(u, prompt))) return prompt
+  return stock(kind, heat, used, 1, log.length)[0]
 }
 
 export interface Answered {
@@ -353,18 +379,33 @@ export interface Answered {
   verdict: Verdict
 }
 
+/** Her answer or her dare as the model played it, or null where the round is no use. */
+export function answerHeard(got: Record<string, string> | null, kind: Kind): Answered | null {
+  const [yes, no] = verdictsFor(kind)
+  const line = text(got, 'line')
+  const deed = kind === 'dare' ? text(got, 'action') : ''
+  if (!got || !line || (kind === 'dare' && !deed)) return null
+  if (got.outcome !== yes && got.outcome !== no) return null
+  return { line, deed, verdict: got.outcome }
+}
+
 /**
- * Her answer or her dare: the model's, or a stock one. No code can answer a question for her,
- * so without the model she ducks a truth; a dare she is taken to have done.
+ * Her answer or her dare: the model's, or what stands in. No code can answer a question for
+ * her, and a failed call is not her dodging it: her truth is skipped, with no point either way
+ * and nothing put in her mouth. A dare she is taken to have done.
  */
 export function answeredOf(got: Record<string, string> | null, kind: Kind, name: string): Answered {
-  const [yes, no] = verdictsFor(kind)
-  if (got && got.line && (got.outcome === yes || got.outcome === no)) {
-    return { line: got.line, deed: kind === 'dare' ? (got.action ?? '') : '', verdict: got.outcome }
-  }
-  return kind === 'truth'
-    ? { line: 'Mm… no. I am keeping that one to myself.', deed: '', verdict: 'dodged' }
-    : { line: 'Fine. There. Happy now?', deed: `${name} goes through with it.`, verdict: 'done' }
+  return (
+    answerHeard(got, kind) ??
+    (kind === 'truth'
+      ? { line: '', deed: '', verdict: 'skipped' }
+      : { line: 'Fine. There. Happy now?', deed: `${name} goes through with it.`, verdict: 'done' })
+  )
+}
+
+/** What the table is told where a girl's turn is skipped. */
+export function skippedLine(name: string): string {
+  return `${name}'s answer never comes, and her turn is skipped: no point either way.`
 }
 
 export interface Judged {
@@ -378,9 +419,10 @@ export interface Judged {
  */
 export function judgedOf(got: Record<string, string> | null, kind: Kind, reply: string | null): Judged {
   const [yes, no] = verdictsFor(kind)
-  if (reply === null) return { line: got?.line || 'Backing out? Noted.', verdict: no }
-  if (got && got.line && (got.verdict === yes || got.verdict === no)) {
-    return { line: got.line, verdict: got.verdict }
+  const line = text(got, 'line')
+  if (reply === null) return { line: line || 'Backing out? Noted.', verdict: no }
+  if (got && line && (got.verdict === yes || got.verdict === no)) {
+    return { line, verdict: got.verdict }
   }
   return { line: kind === 'truth' ? 'Okay. I will take that.' : 'All right, that counts.', verdict: yes }
 }
@@ -403,6 +445,8 @@ export function onlooker(
 ): number | null {
   const last = log[log.length - 1]
   if (!last || log.length >= turnsIn(terms) || made >= REMARKS[chattiness]) return null
+  // A skipped turn is nobody's doing: there is nothing in it to remark on.
+  if (last.verdict === 'skipped') return null
   if (chattiness !== 'lots' && scored(last.verdict)) return null
   const spare = terms.names
     .map((_, i) => i + 1)
@@ -414,7 +458,8 @@ const VERDICT_TOLD: Record<Verdict, string> = {
   honest: 'answered straight',
   dodged: 'dodged it',
   done: 'did it',
-  chickened: 'backed out'
+  chickened: 'backed out',
+  skipped: 'turn skipped'
 }
 
 /** The turn just played, for whoever remarks on it. */
@@ -477,8 +522,12 @@ function turnTold(terms: Terms, turn: Turn, at: number): string {
     turn.kind === 'truth'
       ? `${at + 1}. Truth. ${asker} asked ${player}: "${turn.prompt}"`
       : `${at + 1}. Dare. ${asker} dared ${player}: "${turn.prompt}"`
+  if (turn.verdict === 'skipped') {
+    return `${head} No answer came and the turn was skipped: ${player} was not heard to answer or to refuse. (turn skipped, no point either way)`
+  }
   const backed = turn.player === READER && turn.reply === ''
-  const verb = turn.kind === 'truth' ? 'answered' : 'said'
+  // His dare is his own account of what he did; hers is her line, and then what she was seen to do.
+  const verb = turn.kind === 'truth' ? 'answered' : turn.player === READER ? 'said what he did' : 'said'
   const body = backed
     ? ` ${player} backed out without ${turn.kind === 'truth' ? 'answering' : 'doing it'}.`
     : `${turn.reply ? ` ${player} ${verb}: "${turn.reply}"` : ''}${turn.deed ? ` ${turn.deed}` : ''}`
@@ -487,22 +536,33 @@ function turnTold(terms: Terms, turn: Turn, at: number): string {
 
 /**
  * The game for the scene's writer: the terms, every turn with what was asked and what was said
- * in answer, who ducked, and the tally.
+ * in answer, who ducked, and the tally. A game left before its last turn is told as far as it
+ * got, with nobody the winner.
  */
 export function accountOf(terms: Terms, log: readonly Turn[]): string[] {
   const score = tally(terms, log)
   const best = Math.max(...score)
   const top = score.map((p, seat) => (p === best ? told(terms, seat) : '')).filter(Boolean)
-  const ducked = Array.from({ length: seats(terms) }, (_, seat) => ({
-    name: told(terms, seat),
-    times: log.filter((turn) => turn.player === seat && !scored(turn.verdict)).length
-  })).filter((entry) => entry.times > 0)
+  const count = (seat: number, is: (verdict: Verdict) => boolean): number =>
+    log.filter((turn) => turn.player === seat && is(turn.verdict)).length
+  const times = (n: number): string => (n === 1 ? 'once' : `${n} times`)
+  const all = Array.from({ length: seats(terms) }, (_, seat) => seat)
+  const backed = all.filter((seat) => count(seat, ducked) > 0)
+  const lost = all.filter((seat) => count(seat, (v) => v === 'skipped') > 0)
+  const whole = log.length >= turnsIn(terms)
   return [
     `Truth or Dare, ${terms.rounds} turn${terms.rounds === 1 ? '' : 's'} each, played ${HEAT_WORD[terms.heat]}. What was said below was really said at the table and everyone there heard it: it may be remembered, teased about or brought up again.`,
     ...log.map((turn, at) => turnTold(terms, turn, at)),
-    ducked.length > 0
-      ? `Dodged or backed out: ${ducked.map((d) => `${d.name} ${d.times === 1 ? 'once' : `${d.times} times`}`).join(', ')}.`
+    backed.length > 0
+      ? `Dodged or backed out: ${backed.map((seat) => `${told(terms, seat)} ${times(count(seat, ducked))}`).join(', ')}.`
       : 'Nobody dodged or backed out.',
-    `Final tally: ${tallyTold(terms, log)}. ${top.length > 1 ? `${listed(top).replace(/^t/, 'T')} share the top: a draw between them.` : `${top[0].replace(/^t/, 'T')} won.`}`
+    ...(lost.length > 0
+      ? [
+          `Turns skipped through nobody's fault, not held against her: ${lost.map((seat) => `${told(terms, seat)} ${times(count(seat, (v) => v === 'skipped'))}`).join(', ')}.`
+        ]
+      : []),
+    whole
+      ? `Final tally: ${tallyTold(terms, log)}. ${top.length > 1 ? `${listed(top).replace(/^t/, 'T')} share the top: a draw between them.` : `${top[0].replace(/^t/, 'T')} won.`}`
+      : `The game stopped after ${log.length} of ${turnsIn(terms)} turns, unfinished. The tally as it stood: ${tallyTold(terms, log)}. Nobody won.`
   ]
 }

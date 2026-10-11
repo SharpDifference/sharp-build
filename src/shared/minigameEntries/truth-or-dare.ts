@@ -12,6 +12,7 @@ const TRUTH_OR_DARE: MiniGameDef = {
   options: [
     {
       id: 'rounds',
+      label: 'Turns each',
       describe:
         'how many turns each player gets, which is how many times round the table the game goes ("a quick one" is 1, "a few rounds" is 3)',
       min: 1,
@@ -20,8 +21,9 @@ const TRUTH_OR_DARE: MiniGameDef = {
     },
     {
       id: 'heat',
+      label: 'How far it goes',
       describe:
-        'how far the questions and dares may go: 1 is mild, harmless fun between friends ("keep it clean", "nothing weird"); 2 is flirty, with teasing, crushes and a little closeness; 3 is bold, frank about attraction and daring ("no holding back", "make it spicy"). Pick what was said out loud, and no higher than she would be comfortable with given how close she and the reader are',
+        'how far the questions and dares may go: 1 is mild, harmless fun between friends ("keep it clean", "nothing weird"); 2 is flirty, with teasing, crushes and a little closeness; 3 is bold, frank about attraction and daring, a kiss at most and never explicit ("no holding back", "make it spicy"). Pick what was said out loud, and no higher than she would be comfortable with given how close she and the reader are',
       min: 1,
       max: 3,
       default: 2
@@ -42,7 +44,10 @@ const TRUTH_OR_DARE: MiniGameDef = {
   suggestAt: { room: 'sometimes', lowrise_dorms: 'sometimes', stalestein_bar: 'sometimes' },
   players: { min: 1, max: 3 },
   surface: 'table',
-  controls: 'Pick Truth or Dare, and type your questions, dares and answers.',
+  // The game has a field of its own, which takes the keyboard whenever the reader is to type.
+  keys: true,
+  controls:
+    'Click Truth or Dare on your turn. Type your answer, or your question or dare for her, in the game\'s own field and press Enter; a suggestion can be clicked instead, and Back out passes on your turn.',
   skillBrief:
     'A good player answers straight, goes through with dares and asks questions that land; a poor one dodges, backs out and asks safe ones.'
 }

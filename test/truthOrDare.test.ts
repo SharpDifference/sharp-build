@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   READER,
   accountOf,
+  answerHeard,
   answerRound,
   answeredOf,
   askerAt,
@@ -111,8 +112,8 @@ describe('Truth or Dare', () => {
     expect(stock('truth', 3, [], 50).length).toBeGreaterThan(mild.length)
     expect(stock('truth', 2, [], 50).filter((q) => !mild.includes(q)).every((q) => !mild.includes(q))).toBe(true)
 
-    // She cannot be answered for: a truth is ducked, a dare taken as done.
-    expect(answeredOf(null, 'truth', 'Ana').verdict).toBe('dodged')
+    // She cannot be answered for: a truth is skipped with nothing said, a dare taken as done.
+    expect(answeredOf(null, 'truth', 'Ana')).toEqual({ line: '', deed: '', verdict: 'skipped' })
     expect(answeredOf(null, 'dare', 'Ana')).toMatchObject({ verdict: 'done', deed: 'Ana goes through with it.' })
     expect(answeredOf({ line: 'No way.', action: 'Ana shakes her head.', outcome: 'chickened' }, 'dare', 'Ana')).toEqual({
       line: 'No way.',
@@ -182,5 +183,67 @@ describe('Truth or Dare', () => {
     const backed = accountOf(terms, [turn({ kind: 'dare', reply: '', verdict: 'chickened' })])
     expect(backed[1]).toContain('the reader backed out')
     expect(backed[1]).not.toContain('said:')
+  })
+
+  it('treats a blank or repeated field as a failed round', () => {
+    expect(chosenOf({ choice: 'dare', line: '   ' }, () => 0)).toEqual({ kind: 'truth', line: 'Truth.' })
+    const stockOne = posedOf(null, 'truth', 2, [])
+    expect(posedOf({ prompt: '  ' }, 'truth', 2, [])).toBe(stockOne)
+    // What was already put this game is not put again, however it is cased.
+    const log = [turn({ prompt: 'Who do you like?' })]
+    expect(posedOf({ prompt: 'who do you like? ' }, 'truth', 2, log)).not.toMatch(/who do you like/i)
+    expect(posedOf({ prompt: ' Why? ' }, 'truth', 2, log)).toBe('Why?')
+    expect(answerHeard({ line: ' ', outcome: 'honest' }, 'truth')).toBeNull()
+    expect(answerHeard({ line: 'Yes.', outcome: 'done' }, 'truth')).toBeNull()
+    expect(answerHeard({ line: 'Fine.', action: '', outcome: 'done' }, 'dare')).toBeNull()
+    expect(answerHeard({ line: 'Fine.', outcome: 'done' }, 'dare')).toBeNull()
+    expect(answerHeard({ line: 'Heights.', outcome: 'honest' }, 'truth')).toEqual({
+      line: 'Heights.',
+      deed: '',
+      verdict: 'honest'
+    })
+    expect(judgedOf({ line: ' ', verdict: 'dodged' }, 'truth', 'Heights.').verdict).toBe('honest')
+    expect(judgedOf({ line: ' ' }, 'dare', null)).toEqual({ line: 'Backing out? Noted.', verdict: 'chickened' })
+  })
+
+  it('holds a skipped turn against nobody', () => {
+    const terms = table(['Ana', 'Bea'], 1)
+    const skipped = turn({ player: 1, asker: 0, reply: '', verdict: 'skipped' })
+    expect(tally(terms, [skipped])).toEqual([0, 0, 0])
+    expect(onlooker(terms, [skipped], 'lots', 0)).toBeNull()
+    const account = accountOf(terms, [turn({ asker: 2 }), skipped, turn({ player: 2, asker: 1 })])
+    expect(account[2]).toContain('the reader asked Ana: "What scares you?"')
+    expect(account[2]).toContain('skipped')
+    expect(account[2]).not.toContain('dodged')
+    expect(account).toContain('Nobody dodged or backed out.')
+    expect(account.some((line) => line.includes('Turns skipped') && line.includes('Ana once'))).toBe(true)
+  })
+
+  it('says every round what no heat permits and to keep each girl in character', () => {
+    for (const heat of [1, 2, 3] as const) {
+      const terms = table(['Ana'], 1, heat)
+      const plans = [
+        poseRound(terms, [], 'dare'),
+        judgeRound(terms, [], 'dare', 'Sing.', 'I sing'),
+        chooseRound(terms, [turn({})]),
+        answerRound(terms, [turn({})], 'dare', 'Sing.')
+      ]
+      for (const plan of plans) {
+        expect(plan.brief).toContain('never sexually explicit')
+        expect(plan.brief).toContain('nothing physical beyond a kiss')
+        expect(plan.brief).toContain('in her own character and voice')
+      }
+    }
+  })
+
+  it('accounts for a game left part-way without naming a winner', () => {
+    const terms = table(['Ana'], 2)
+    const account = accountOf(terms, [turn({ prompt: 'Who do you like?', reply: 'you' })])
+    expect(account[1]).toContain('"Who do you like?"')
+    const last = account[account.length - 1]
+    expect(last).toContain('stopped after 1 of 4 turns')
+    expect(last).toContain('the reader 1, Ana 0')
+    expect(last).toContain('Nobody won')
+    expect(last).not.toContain('Final tally')
   })
 })
