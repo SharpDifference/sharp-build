@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type JSX } from 'react'
 import { createPortal } from 'react-dom'
 import { motion } from 'motion/react'
-import { MINI_GAMES_LIST, type MiniGameDef } from '@shared/minigames'
+import { defaultOptions, MINI_GAMES_LIST, type MiniGameDef } from '@shared/minigames'
 import { TextField } from '../components/TextField'
 import { TitleTab } from '../components/TitleTab'
 import { useModalShell } from '../components/useModalShell'
@@ -45,6 +45,7 @@ interface Sitting {
   /** Null while a girl's skill is still being judged. */
   opponents: Opponent[] | null
   stake: string
+  options: Record<string, number>
 }
 
 /** How long a finished game stands on the table before it is cleared. */
@@ -56,7 +57,7 @@ const NO_ONE: Opponent[] = []
 /** The sitting a game she agreed to opens on, her skill still to come. */
 function sittingOf(agreed: Agreed | null): Sitting | null {
   const game = agreed && MINI_GAMES_LIST.find((entry) => entry.id === agreed.gameId)
-  return game ? { game, opponents: null, stake: agreed.stake } : null
+  return game ? { game, opponents: null, stake: agreed.stake, options: agreed.options } : null
 }
 
 /**
@@ -99,7 +100,12 @@ export function MiniGamePanel({ theme, onClose }: ScenePanelProps): JSX.Element 
 
   // The one thing on offer, alone, is the game: nothing to pick.
   const only = offers.length === 1 && offers[0].charId === null ? offers[0].game : null
-  const seated = sitting ?? (only ? { game: only, opponents: NO_ONE, stake: '' } : null)
+  const seated = useMemo<Sitting | null>(
+    () =>
+      sitting ??
+      (only ? { game: only, opponents: NO_ONE, stake: '', options: defaultOptions(only) } : null),
+    [sitting, only]
+  )
   const Game = seated ? gameComponent(seated.game.id) : undefined
 
   // Her skill, judged when she agreed and ready by now more often than not.
@@ -149,6 +155,7 @@ export function MiniGamePanel({ theme, onClose }: ScenePanelProps): JSX.Element 
     () => ({
       opponents: seated?.opponents ?? [],
       stake: seated?.stake ?? '',
+      options: seated?.options ?? {},
       started: () => begin(),
       narrate: (text) => {
         begin()
@@ -156,7 +163,7 @@ export function MiniGamePanel({ theme, onClose }: ScenePanelProps): JSX.Element 
       },
       finish: (ended) => setResult(ended)
     }),
-    [seated?.opponents, seated?.stake]
+    [seated?.opponents, seated?.stake, seated?.options]
   )
 
   function leave(ended: PlayResult): void {
@@ -177,7 +184,7 @@ export function MiniGamePanel({ theme, onClose }: ScenePanelProps): JSX.Element 
 
   function pick(offer: Offer): void {
     if (offer.charId === null) {
-      setSitting({ game: offer.game, opponents: NO_ONE, stake: '' })
+      setSitting({ game: offer.game, opponents: NO_ONE, stake: '', options: defaultOptions(offer.game) })
       return
     }
     setWords(`I ask ${nameOf(offer.charId)} if she wants to play a game of ${offer.game.name}.`)

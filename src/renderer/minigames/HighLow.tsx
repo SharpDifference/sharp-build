@@ -56,7 +56,9 @@ export function HighLow({ play }: { play: GamePlay }): JSX.Element {
   const [made, setMade] = useState<Made[]>([])
   const her = play.opponents[0]
 
-  const total = her ? CALLS_EACH * 2 : CALLS_EACH
+  // Five calls each unless the two of them settled on fewer.
+  const each = play.options.calls ?? CALLS_EACH
+  const total = her ? each * 2 : each
   const shown = deck[made.length]
   const mine = made.filter((turn) => !turn.hers && turn.right).length
   const hers = made.filter((turn) => turn.hers && turn.right).length
@@ -65,7 +67,7 @@ export function HighLow({ play }: { play: GamePlay }): JSX.Element {
 
   // Against her the game is on from the moment she sits down, and the deal is said.
   useEffect(() => {
-    if (her) play.narrate(`${her.name} cuts the deck and turns the top card: ${rankWord(deck[0].rank)}. Your call first.`)
+    if (her) play.narrate(`${her.name} cuts the deck and turns the top card: ${rankWord(deck[0].rank)}. ${each === 1 ? 'One call each' : `${each} calls each`}, yours first.`)
     // Once, as the table opens.
   }, [])
 
@@ -80,7 +82,7 @@ export function HighLow({ play }: { play: GamePlay }): JSX.Element {
     const right = (side: boolean): number =>
       all.filter((turn) => turn.hers === side && turn.right).length
     if (!her) {
-      play.finish({ outcome: 'played', summary: soloSummary(right(false)) })
+      play.finish({ outcome: 'played', summary: soloSummary(right(false), each) })
       return
     }
     const [a, b] = [right(false), right(true)]
@@ -101,7 +103,7 @@ export function HighLow({ play }: { play: GamePlay }): JSX.Element {
     // Her turn comes round once per card turned, which the count alone says.
   }, [herTurn, made.length])
 
-  const round = Math.min(Math.floor(made.length / (her ? 2 : 1)) + 1, CALLS_EACH)
+  const round = Math.min(Math.floor(made.length / (her ? 2 : 1)) + 1, each)
 
   return (
     <div className="vu-highlow">
@@ -122,7 +124,7 @@ export function HighLow({ play }: { play: GamePlay }): JSX.Element {
       <p className="vu-highlow-count">
         {her ? `you ${mine} · ${her.name} ${hers}` : `${mine} right`}
         <span className="vu-highlow-round">
-          {over ? 'game over' : `call ${round} of ${CALLS_EACH}`}
+          {over ? 'game over' : `call ${round} of ${each}`}
         </span>
       </p>
 

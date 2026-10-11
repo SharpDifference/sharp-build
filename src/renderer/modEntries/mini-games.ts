@@ -37,12 +37,13 @@ registerHooks(MINI_GAMES, {
     const { proposal } = table
     if (!proposal) return
     table.setProposal(null)
-    const { accepted, stake } = answerOf(reply)
     const game = MINI_GAMES_LIST.find((entry) => entry.id === proposal.gameId)
+    if (!game) return
+    const { accepted, stake, options } = answerOf(reply, game)
     const character = cast.find((member) => member.charId === proposal.charId)
     // A yes from a scene that then ended, or from a girl who has left, is no game.
-    if (!accepted || ending || !game || !character) return
-    table.setAgreed({ gameId: game.id, charId: character.charId, stake })
+    if (!accepted || ending || !character) return
+    table.setAgreed({ gameId: game.id, charId: character.charId, stake, options })
     // Judged while the reader reads her answer, so the table opens with her ready.
     void skillOf(character, game)
   },

@@ -19,6 +19,8 @@ export interface Agreed {
   charId: string
   /** What is riding on the game, as the scene settled it; empty where nothing is. */
   stake: string
+  /** How the game is to be played, by the options it declares. */
+  options: Record<string, number>
 }
 
 /** A game just played with a girl, while the turn that tells the scene about it is out. */

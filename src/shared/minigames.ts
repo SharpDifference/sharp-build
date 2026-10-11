@@ -19,6 +19,22 @@ export const MINI_GAMES = 'mini-games'
  */
 export type PlaySurface = 'table' | 'board' | 'screen'
 
+/**
+ * One thing about how a game is played that the two of them may settle between them before it
+ * starts: a whole number in a range. The model sets it from what was said when she agrees; the
+ * game is handed the value and is the one that knows what it means.
+ */
+export interface GameOption {
+  /** Stable, lower case: the key the game reads its value by. */
+  id: string
+  /** What it sets, for the model, in a clause ("how many calls each player makes"). */
+  describe: string
+  min: number
+  max: number
+  /** What it is where nothing was said, and for a game played alone. */
+  default: number
+}
+
 export interface MiniGameDef {
   /** Stable, lower case with dashes: memories and saves may name it. */
   id: string
@@ -36,6 +52,13 @@ export interface MiniGameDef {
    * one nobody joins.
    */
   players: { min: number; max: number }
+  /**
+   * How a game of it goes, in a sentence, as the table actually runs it: what the model is told
+   * she can agree to, and nothing else.
+   */
+  format: string
+  /** What may be varied by agreement; absent, the game is always played the one way. */
+  options?: readonly GameOption[]
   /** The surface it is played on; a `table` where it does not say. */
   surface?: PlaySurface
   /** What makes someone good at it, in a sentence, for judging how well a girl plays. */
@@ -78,6 +101,26 @@ export function gamesOffered(
       isOn(game.modId) &&
       (!game.locations || (spot.location !== null && game.locations.includes(spot.location))) &&
       spot.girls >= game.players.min
+  )
+}
+
+/** A game's options at their defaults. */
+export function defaultOptions(game: MiniGameDef): Record<string, number> {
+  return Object.fromEntries((game.options ?? []).map((option) => [option.id, option.default]))
+}
+
+/**
+ * What was settled for a game, made safe to play: every option the game declares, each a whole
+ * number inside its range, the default wherever what came back is missing or is not one.
+ */
+export function settledOptions(game: MiniGameDef, given: unknown): Record<string, number> {
+  const source = given && typeof given === 'object' ? (given as Record<string, unknown>) : {}
+  return Object.fromEntries(
+    (game.options ?? []).map((option) => {
+      const value = Number(source[option.id])
+      const whole = Number.isInteger(value) && value >= option.min && value <= option.max
+      return [option.id, whole ? value : option.default]
+    })
   )
 }
 

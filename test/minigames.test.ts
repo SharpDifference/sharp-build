@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest'
-import { gamesOffered, seatsFor, MINI_GAMES, type MiniGameDef } from '../src/shared/minigames'
+import {
+  gamesOffered,
+  seatsFor,
+  settledOptions,
+  MINI_GAMES,
+  type MiniGameDef
+} from '../src/shared/minigames'
 import { modOn, NO_SWITCHES, withMod, type ModDef } from '../src/shared/mods'
 
 /** Which games a scene offers: the mod's switch, the place, and who is there to play. */
@@ -11,6 +17,7 @@ function game(id: string, over: Partial<MiniGameDef> = {}): MiniGameDef {
     name: id,
     icon: '',
     blurb: '',
+    format: '',
     players: { min: 0, max: 1 },
     skillBrief: '',
     ...over
@@ -51,5 +58,16 @@ describe('gamesOffered', () => {
     expect(gamesOffered(spot, (id) => modOn(off, id, undefined, mods), all)).toEqual([])
     const back = withMod(off, MINI_GAMES, true)
     expect(ids(gamesOffered(spot, (id) => modOn(back, id, undefined, mods), all))).toEqual(['cards', 'darts'])
+  })
+
+  it('plays only what a game declares, inside its range, whatever came back', () => {
+    const rounds = game('rounds', {
+      options: [{ id: 'calls', describe: '', min: 1, max: 5, default: 5 }]
+    })
+    expect(settledOptions(rounds, { calls: '1' })).toEqual({ calls: 1 })
+    expect(settledOptions(rounds, { calls: 9, cheat: 1 })).toEqual({ calls: 5 })
+    expect(settledOptions(rounds, { calls: '2.5' })).toEqual({ calls: 5 })
+    expect(settledOptions(rounds, undefined)).toEqual({ calls: 5 })
+    expect(settledOptions(cards, { calls: 3 })).toEqual({})
   })
 })

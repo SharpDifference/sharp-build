@@ -7,6 +7,18 @@ const HIGH_LOW: MiniGameDef = {
   icon: '🃏',
   blurb:
     'a quick card game: a card is turned face up and the player calls whether the next is higher or lower',
+  format:
+    'One deck. A card is face up; the player whose turn it is calls whether the next card will be higher or lower, the card is turned, and a right call scores. The two take turns, the reader first, each making the same number of calls, and the better count wins; level counts are a draw. Twos are low, aces high, and the same rank again is a miss.',
+  options: [
+    {
+      id: 'calls',
+      describe:
+        'how many calls each player makes: 5 for a full game, fewer for a quick one, 1 for a single call each as a tiebreak',
+      min: 1,
+      max: 5,
+      default: 5
+    }
+  ],
   players: { min: 0, max: 1 },
   skillBrief:
     'A good player keeps track of the cards already turned and calls with the odds; a poor one goes on hunches.'

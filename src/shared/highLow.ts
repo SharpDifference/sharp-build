@@ -12,7 +12,7 @@ export interface Card {
 
 export type Call = 'higher' | 'lower'
 
-/** How many calls one player makes in a game. */
+/** How many calls one player makes in a full game. */
 export const CALLS_EACH = 5
 
 const SUITS: readonly Suit[] = ['spades', 'hearts', 'diamonds', 'clubs']
@@ -109,11 +109,11 @@ export function herCall(
 }
 
 /** What a game played alone comes to, as the scene's narration says it. */
-export function soloSummary(right: number): string {
-  const calls = `${right} of ${CALLS_EACH} calls right`
-  if (right === CALLS_EACH) return `You deal yourself a game of High-Low and get all ${calls}. A perfect run.`
-  if (right === 0) return `You deal yourself a game of High-Low and get ${calls}. The deck had it in for you.`
-  return `You deal yourself a game of High-Low and get ${calls}.`
+export function soloSummary(right: number, calls = CALLS_EACH): string {
+  const said = `${right} of ${calls} calls right`
+  if (right === calls) return `You deal yourself a game of High-Low and get all ${said}. A perfect run.`
+  if (right === 0) return `You deal yourself a game of High-Low and get ${said}. The deck had it in for you.`
+  return `You deal yourself a game of High-Low and get ${said}.`
 }
 
 /** What a game against her comes to, as the scene's narration says it. */
@@ -141,6 +141,7 @@ export function versusAccount(
   deck: readonly Card[],
   calls: readonly CallMade[]
 ): string[] {
+  const each = calls.filter((made) => !made.hers).length
   /** How many times each side called against cards that clearly favoured the other call. */
   const against = { reader: 0, her: 0 }
   const lines = calls.map((made, i) => {
@@ -172,7 +173,7 @@ export function versusAccount(
   const count = (side: boolean): number =>
     calls.filter((made) => made.hers === side && made.right).length
   return [
-    `Each called ${CALLS_EACH} times, in turn, on whether the next card would be higher or lower. Twos are low and aces high; the same rank again is a miss.`,
+    `Each called ${each === 1 ? 'once' : `${each} times`}, in turn, on whether the next card would be higher or lower. Twos are low and aces high; the same rank again is a miss.`,
     ...lines,
     played('The reader', against.reader),
     played(name, against.her),
