@@ -343,6 +343,25 @@ function dancedLine(who: string, notes: number, tally: Tally): string {
 }
 
 /**
+ * A song danced alone as the scene's writer is told it: the song, the score, grade, longest
+ * combo and judgements, whether a step was missed at all, and what it took out of him.
+ */
+export function soloAccount(chart: Chart, mine: Tally): string[] {
+  const notes = chart.notes.length
+  const landed = notes - mine.counts.miss
+  return [
+    `The reader danced one song alone on the PARADISO machine, ${notes} steps at difficulty ${chart.difficulty} of ${MAX_DIFFICULTY} (${chart.bpm} beats a minute).`,
+    dancedLine('The reader', notes, mine),
+    ...(notes > 0 && mine.counts.miss === 0
+      ? ['It was a full combo: not one step missed from the first to the last.']
+      : landed === 0
+        ? ['The reader did not land a single step.']
+        : []),
+    'It was a physical minute, stamping on the pad at speed: the reader comes off the machine flushed and out of breath.'
+  ]
+}
+
+/**
  * The game against her as the scene's writer is told it: the song, each dancer's score, grade,
  * longest combo and judgements, who was ahead halfway, how near it was, and what it took out of
  * them. `halfway` is the reader's score less hers at the halfway mark.

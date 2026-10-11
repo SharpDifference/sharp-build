@@ -16,6 +16,7 @@ import {
   points,
   resultLine,
   scoreShare,
+  soloAccount,
   soloSummary,
   tallied,
   tallyOf,
@@ -279,6 +280,33 @@ describe('PARADISO, told', () => {
     expect(text).toContain('At the halfway mark Mika was ahead, and the reader came back')
     expect(text).toContain('out of breath')
     expect(account.every((line) => !line.includes('\n'))).toBe(true)
+  })
+
+  it('gives the writer a song danced alone: difficulty, score, grade, combo and judgements', () => {
+    const chart = makeChart('solo', 4)
+    const notes = chart.notes.length
+    const mixed = tallyOf(chart.notes.map((_, i) => (i === 3 ? 'miss' : i % 2 ? 'great' : 'perfect')))
+    const account = soloAccount(chart, mixed)
+    expect(account[0]).toContain(`${notes} steps at difficulty 4 of 5`)
+    expect(account[1]).toContain(`scored ${points(mixed.score)}, grade ${gradeOf(scoreShare(mixed.score, notes))}`)
+    expect(account[1]).toContain(`${mixed.counts.perfect} Perfect, ${mixed.counts.great} Great, 0 Good and 1 missed`)
+    expect(account[1]).toContain(`longest combo of ${mixed.maxCombo} steps`)
+    expect(account).toHaveLength(3)
+  })
+
+  it('tells a full combo and a song with nothing landed apart from the rest', () => {
+    const chart = makeChart('solo', 1)
+    const full = soloAccount(chart, tallyOf(chart.notes.map(() => 'perfect')))
+    expect(full[1]).toContain('grade AAA')
+    expect(full[1]).toContain(`longest combo of ${chart.notes.length} steps`)
+    expect(full[2]).toContain('full combo')
+    const none = tallyOf(chart.notes.map(() => 'miss'))
+    const nothing = soloAccount(chart, none)
+    expect(nothing[1]).toContain('scored 0, grade D')
+    expect(nothing[1]).toContain('longest combo of 0 steps')
+    expect(nothing[2]).toContain('did not land a single step')
+    expect(soloSummary(1, chart.notes.length, none)).toContain('The arrows got away from you.')
+    expect(soloSummary(1, chart.notes.length, tallyOf(chart.notes.map(() => 'good')))).toContain('without missing a step')
   })
 
   it('says when it was close, when it was not, and when it was level', () => {

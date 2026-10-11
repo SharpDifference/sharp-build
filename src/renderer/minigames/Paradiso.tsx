@@ -12,8 +12,8 @@ import {
   missed,
   noteToHit,
   points,
-  resultLine,
   scoreShare,
+  soloAccount,
   soloSummary,
   startLine,
   tallied,
@@ -59,6 +59,8 @@ const PAST_MS = 260
 const LIT_MS = 110
 /** How far ahead of the song the beat's ticks are handed to the audio clock, in ms. */
 const TICK_AHEAD_MS = 160
+/** The most of the sound card's own delay a tick is sent early by, in ms. */
+const LATENCY_CAP_MS = 80
 
 const WORD: Readonly<Record<Judgement, string>> = {
   perfect: 'Perfect',
@@ -79,8 +81,13 @@ const freshSide = (): Side => ({ tally: emptyTally(), last: null, steps: 0 })
 
 /** The song as it is being danced: read and written by the frame loop, never rendered from. */
 interface Live {
-  /** `performance.now()` at the song's first moment, or -1 before it. */
+  /**
+   * `performance.now()` at the song's first moment, or -1 before it. Moved on by every pause,
+   * so the clock less this is always how far into the song it is.
+   */
   startedAt: number
+  /** `performance.now()` when the song was stopped for a window that went away, or -1 while it runs. */
+  pausedAt: number
   over: boolean
   /** The reader's judgement of each note, by its place in the chart. */
   judged: (Judgement | undefined)[]
@@ -199,9 +206,11 @@ export function Paradiso({ play }: { play: GamePlay }): JSX.Element {
   const [phase, setPhase] = useState<'ready' | 'dancing' | 'over'>('ready')
   const [mine, setMine] = useState<Side>(freshSide)
   const [hers, setHers] = useState<Side>(freshSide)
+  const [paused, setPaused] = useState(false)
 
   const live = useRef<Live>({
     startedAt: -1,
+    pausedAt: -1,
     over: false,
     judged: [],
     mine: freshSide(),
@@ -263,7 +272,7 @@ export function Paradiso({ play }: { play: GamePlay }): JSX.Element {
    */
   function remark(at: number, cue: string, kept = false): void {
     const game = live.current
-    if (!her || game.over || game.speaking) return
+    if (!her || game.over || game.speaking || !mounted.current) return
     const budget = REMARKS[held.current.chattiness]
     const owed = kept ? 0 : (game.halfway ? 0 : 1) + (game.finalStretch ? 0 : 1)
     if (game.remarks >= budget - owed) return
@@ -299,7 +308,7 @@ export function Paradiso({ play }: { play: GamePlay }): JSX.Element {
 
   function begin(): void {
     const game = live.current
-    if (game.startedAt >= 0) return
+    if (game.startedAt >= 0 || game.over || !mounted.current) return
     game.startedAt = performance.now()
     held.current.started()
     held.current.narrate(startLine(chart, her?.name))
@@ -312,15 +321,22 @@ export function Paradiso({ play }: { play: GamePlay }): JSX.Element {
     setPhase('dancing')
   }
 
-  /** A foot down on a pad: the song's start while it waits, a step at a note once it runs. */
-  function step(lane: Lane): void {
+  /**
+   * A foot down on a pad: the song's start while it waits, a step at a note once it runs.
+   * `stamp` is when the key or the tap happened, where the event knows it better than now.
+   */
+  function step(lane: Lane, stamp?: number): void {
     const game = live.current
-    if (game.over) return
+    if (game.over || !mounted.current) return
     if (game.startedAt < 0) {
       begin()
       return
     }
-    const at = performance.now() - game.startedAt
+    // A stopped song takes no steps.
+    if (game.pausedAt >= 0) return
+    const now = performance.now()
+    const when = stamp !== undefined && stamp > game.startedAt && stamp <= now ? stamp : now
+    const at = when - game.startedAt
     game.pressed[lane] = at
     const index = noteToHit(steps, game.judged, lane, at)
     if (index < 0) return
@@ -338,7 +354,7 @@ export function Paradiso({ play }: { play: GamePlay }): JSX.Element {
     const lane = KEYS[event.key.length === 1 ? event.key.toLowerCase() : event.key]
     if (lane === undefined) return
     event.preventDefault()
-    if (!event.repeat) step(lane)
+    if (!event.repeat) step(lane, event.timeStamp)
   })
 
   // The song itself: every frame reads the clock and brings the screen up to it.
@@ -363,11 +379,15 @@ export function Paradiso({ play }: { play: GamePlay }): JSX.Element {
       game.over = true
       const [a, b] = [game.mine.tally, game.hers.tally]
       const notes = steps.length
-      held.current.narrate(resultLine(notes, a, her ? { name: her.name, tally: b } : undefined))
+      // The scores are the result's to say: the framework shows its summary, once.
       if (her) held.current.situation(standing(chart.lengthMs))
       setPhase('over')
       if (!her) {
-        held.current.finish({ outcome: 'played', summary: soloSummary(difficulty, notes, a) })
+        held.current.finish({
+          outcome: 'played',
+          summary: soloSummary(difficulty, notes, a),
+          account: soloAccount(chart, a)
+        })
         return
       }
       held.current.finish({
@@ -379,6 +399,11 @@ export function Paradiso({ play }: { play: GamePlay }): JSX.Element {
 
     const loop = (): void => {
       if (!mounted.current || game.over) return
+      // Stopped: the clock stands, and so does everything read off it.
+      if (game.pausedAt >= 0) {
+        frame = requestAnimationFrame(loop)
+        return
+      }
       const at = performance.now() - game.startedAt
       let mineMoved = false
       let hersMoved = false
@@ -435,10 +460,14 @@ export function Paradiso({ play }: { play: GamePlay }): JSX.Element {
         }
       }
       const sound = audio.current
+      // Sent early by what the sound card takes to be heard, so the tick lands with the target.
+      const delay = sound
+        ? Math.min(LATENCY_CAP_MS, ((sound.baseLatency || 0) + (sound.outputLatency || 0)) * 1000)
+        : 0
       while (sound && game.nextBeat * chart.beatMs < Math.min(at + TICK_AHEAD_MS, chart.lengthMs)) {
         const due = game.nextBeat * chart.beatMs
         if (due >= at - 30) {
-          tick(sound, sound.currentTime + Math.max(0, due - at) / 1000, game.nextBeat % 4 === 0)
+          tick(sound, sound.currentTime + Math.max(0, due - at - delay) / 1000, game.nextBeat % 4 === 0)
         }
         game.nextBeat++
       }
@@ -481,8 +510,35 @@ export function Paradiso({ play }: { play: GamePlay }): JSX.Element {
       frame = requestAnimationFrame(loop)
     }
 
+    // A window hidden or out of focus draws no frames and hears no keys: the song stops for
+    // it, sound and all, and picks up where it stood. Her steps are read off the same clock.
+    const stop = (): void => {
+      if (game.over || game.pausedAt >= 0) return
+      game.pausedAt = performance.now()
+      void audio.current?.suspend().catch(() => undefined)
+      setPaused(true)
+    }
+    const resume = (): void => {
+      if (game.over || game.pausedAt < 0) return
+      if (document.hidden || !document.hasFocus()) return
+      game.startedAt += performance.now() - game.pausedAt
+      game.pausedAt = -1
+      void audio.current?.resume().catch(() => undefined)
+      setPaused(false)
+    }
+    const seen = (): void => (document.hidden ? stop() : resume())
+    document.addEventListener('visibilitychange', seen)
+    window.addEventListener('blur', stop)
+    window.addEventListener('focus', resume)
+    if (document.hidden || !document.hasFocus()) stop()
+
     frame = requestAnimationFrame(loop)
-    return () => cancelAnimationFrame(frame)
+    return () => {
+      cancelAnimationFrame(frame)
+      document.removeEventListener('visibilitychange', seen)
+      window.removeEventListener('blur', stop)
+      window.removeEventListener('focus', resume)
+    }
     // The song starts once and runs to its end off the clock.
   }, [phase])
 
@@ -491,7 +547,6 @@ export function Paradiso({ play }: { play: GamePlay }): JSX.Element {
     mounted.current = true
     return () => {
       mounted.current = false
-      live.current.over = true
       const sound = audio.current
       audio.current = null
       if (sound) void sound.close().catch(() => undefined)
@@ -517,7 +572,7 @@ export function Paradiso({ play }: { play: GamePlay }): JSX.Element {
               pad === 'mine'
                 ? (event) => {
                     event.preventDefault()
-                    step(lane as Lane)
+                    step(lane as Lane, event.timeStamp)
                   }
                 : undefined
             }
@@ -542,7 +597,7 @@ export function Paradiso({ play }: { play: GamePlay }): JSX.Element {
   )
 
   return (
-    <div ref={root} className="vu-paradiso" data-phase={phase}>
+    <div ref={root} className="vu-paradiso" data-phase={phase} data-paused={paused || undefined}>
       <div
         className="vu-paradiso-song"
         role="progressbar"
@@ -575,6 +630,12 @@ export function Paradiso({ play }: { play: GamePlay }): JSX.Element {
               >
                 Start the song
               </motion.button>
+            </div>
+          )}
+          {paused && !over && (
+            <div className="vu-paradiso-ready" role="status">
+              <p className="vu-paradiso-paused">Paused</p>
+              <p className="vu-paradiso-how">The song waits while the window is away.</p>
             </div>
           )}
         </div>

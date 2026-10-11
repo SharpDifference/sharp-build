@@ -37,6 +37,7 @@
   align-items: stretch;
   justify-content: center;
   gap: 36px;
+  max-width: 100%;
 }
 
 /* One dancer's board: who, the score, the last judgement, the combo, the four counts. */
@@ -46,7 +47,9 @@
   align-items: center;
   justify-content: center;
   gap: 10px;
-  width: 230px;
+  /* The boards give way before the lanes do, on a surface too narrow for all of it. */
+  flex: 0 1 230px;
+  min-width: 0;
   color: var(--vu-text);
 }
 
@@ -103,6 +106,7 @@
 .vu-paradiso-pads {
   position: relative;
   display: flex;
+  flex: none;
   gap: 22px;
 }
 
@@ -243,6 +247,17 @@
   color: var(--vu-text-body);
   font: 500 15px var(--font-body);
   line-height: 1.5;
+}
+
+/* The song stopped for a window that went away: said on the same card. */
+.vu-paradiso-paused {
+  margin: 0;
+  color: var(--vu-text);
+  font: 400 34px var(--font-display);
+}
+
+.vu-paradiso[data-paused] .vu-paradiso-pad {
+  opacity: 0.45;
 }
 
 .vu-paradiso-level {
