@@ -18,11 +18,10 @@ const BOWLING: MiniGameDef = {
       default: 5
     }
   ],
-  // Lanes are where the lanes are: City Life's bowling alley where that mod is on, and the
-  // arcade's own short lanes either way. A place no playthrough has is simply never stood in.
-  locations: ['bowling_alley', 'btb_arcade'],
-  suggest: 'sometimes',
-  suggestAt: { bowling_alley: 'often', btb_arcade: 'sometimes' },
+  // Lanes are where the lanes are: City Life's bowling alley. Without that mod nobody is ever
+  // stood in one, and the game is simply not on offer.
+  locations: ['bowling_alley'],
+  suggest: 'often',
   surface: 'board',
   keys: true,
   players: { min: 0, max: 3 },
