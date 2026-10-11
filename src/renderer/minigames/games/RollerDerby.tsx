@@ -47,6 +47,11 @@ const QUIET_M = 20
 /** The lead changing in the first scramble off the line is not worth a word, in ms. */
 const SCRAMBLE_MS = 4000
 
+/** How far ahead a bend is called, in seconds at the reader's speed: time to get into the crouch. */
+const BEND_AHEAD_S = 0.3
+/** Where each skater's name sits against her disc, by seat: above and below in turn, so names on one spot do not cover each other. */
+const TAG_Y = [-15, 23, -28, 36] as const
+
 /** The oval as it is drawn: the racing line's bend radius, and straights as long as a bend. */
 const R = 100
 const STRAIGHT = Math.PI * R
@@ -223,7 +228,7 @@ export function RollerDerby({ play }: { play: GamePlay }): JSX.Element {
       rows,
       speed: me.speed,
       clock: Math.max(0, race.t),
-      bend: game.phase === 'racing' && inBend(me.dist),
+      bend: game.phase === 'racing' && (inBend(me.dist) || inBend(me.dist + me.speed * BEND_AHEAD_S)),
       lean: me.lean,
       last: game.last,
       strides: game.strides,
@@ -540,7 +545,7 @@ export function RollerDerby({ play }: { play: GamePlay }): JSX.Element {
               data-seat={index}
             >
               <circle r={index === 0 ? 10 : 9} />
-              <text y={-15} textAnchor="middle">
+              <text y={TAG_Y[index] ?? -15} textAnchor="middle">
                 {index === 0 ? 'You' : names[index - 1]}
               </text>
             </g>
@@ -629,6 +634,7 @@ export function RollerDerby({ play }: { play: GamePlay }): JSX.Element {
             aria-label="Lean"
             onPointerDown={(event) => {
               event.preventDefault()
+              if (live.current.paused) return
               live.current.leanTap = !live.current.leanTap
               lean()
               setView(board())

@@ -24,6 +24,8 @@
 
 .vu-rink-track {
   display: block;
+  /* A name under a skater on the boards may hang past the drawing's edge. */
+  overflow: visible;
   width: 100%;
   height: auto;
 }

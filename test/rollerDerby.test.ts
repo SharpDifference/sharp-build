@@ -359,3 +359,93 @@ describe('Rink Race on paper', () => {
     expect(lapsOf(40)).toBe(6)
   })
 })
+
+describe('Rink Race review', () => {
+  it('orders skaters still out at the call by how far round they were, behind everyone home', () => {
+    const race = finished([null, 36000, null, null])
+    race.skaters[0].dist = 120
+    race.skaters[2].dist = 250
+    race.skaters[3].dist = 120
+    race.called = true
+    expect(placings(race).map((placing) => [placing.who, placing.place])).toEqual([
+      [1, 1],
+      [2, 2],
+      [0, 3],
+      [3, 3]
+    ])
+    expect(outcomeOf(race)).toBe('lost')
+    // Furthest round with nobody home is still not a win.
+    const nobody = finished([null, null])
+    nobody.skaters[0].dist = 200
+    expect(placings(nobody)[0]).toEqual({ who: 0, place: 1, time: null })
+    expect(outcomeOf(nobody)).toBe('lost')
+  })
+
+  it('never records a girl who was behind the reader at the line as home before him', () => {
+    for (let i = 0; i < 40; i++) {
+      const rand = seededRand(`home:${i}`)
+      const race = newRace(2, [1, 3, 5])
+      let next = 0
+      let foot: Foot = 'left'
+      while (race.skaters[0].finishedAt === null && !race.called) {
+        if (race.t >= next) {
+          readerStride(race, foot, next)
+          foot = foot === 'left' ? 'right' : 'left'
+          next += BEAT_MS + (rand() * 2 - 1) * 60
+        }
+        readerLean(race, inBend(race.skaters[0].dist))
+        advance(race, 16, rand)
+      }
+      const mine = race.skaters[0].finishedAt as number
+      const out = [1, 2, 3].filter((who) => race.skaters[who].finishedAt === null)
+      const clockAtLine = race.t
+      finishOut(race, rand)
+      for (const who of out) {
+        const hers = race.skaters[who].finishedAt
+        if (hers !== null) expect(hers).toBeGreaterThan(mine)
+      }
+      // The clock only went on if someone was still out.
+      if (out.length === 0) expect(race.t).toBe(clockAtLine)
+      const order = placings(race).map((placing) => placing.who)
+      for (const who of out) expect(order.indexOf(who)).toBeGreaterThan(order.indexOf(0))
+    }
+  })
+
+  it('lets a slightly sloppy reader beat a poor skater and lose to a fine one, without falls in a chain', () => {
+    const sloppy = (seed: string): number => {
+      const rand = seededRand(seed)
+      const race = newRace(3, [])
+      const me = race.skaters[0]
+      let next = 0
+      let foot: Foot = 'left'
+      let bend = -1
+      let leanFrom = 0
+      while (me.finishedAt === null && !race.called) {
+        if (me.downMs > 0) next = race.t + 300
+        else if (race.t >= next) {
+          readerStride(race, foot, next)
+          foot = foot === 'left' ? 'right' : 'left'
+          next += BEAT_MS + (rand() * 2 - 1) * 80
+        }
+        const now = Math.floor((me.dist + 12.5) / 50)
+        if (now !== bend) {
+          bend = now
+          // Now and then the lean comes late enough to cost him.
+          leanFrom = 12.5 + 50 * now + (rand() < 0.15 ? 6 + 6 * rand() : 3 * rand())
+        }
+        readerLean(race, inBend(me.dist) && me.dist >= leanFrom)
+        advance(race, 16, never)
+      }
+      for (let f = 1; f < me.falls.length; f++) expect(me.falls[f].at - me.falls[f - 1].at).toBeGreaterThan(4000)
+      return me.finishedAt ?? 3 * LIMIT_MS_PER_LAP
+    }
+    const mean = (time: (i: number) => number): number => {
+      let sum = 0
+      for (let i = 0; i < 80; i++) sum += time(i)
+      return sum / 80
+    }
+    const his = mean((i) => sloppy(`sloppy:${i}`))
+    expect(his).toBeLessThan(mean((i) => herTime(2, `two:${i}`)))
+    expect(his).toBeGreaterThan(mean((i) => herTime(5, `five:${i}`)))
+  })
+})

@@ -421,7 +421,10 @@ export function clock(ms: number): string {
 
 export interface Placing {
   who: number
-  /** From 1; skaters with the same time to the hundredth share a place, and those not home share the last. */
+  /**
+   * From 1; skaters with the same time to the hundredth share a place. Those not home when time
+   * was called come after everyone who is, the further round the better.
+   */
   place: number
   /** In ms, or null where the rink called time first. */
   time: number | null
@@ -433,10 +436,14 @@ export function placings(race: Race): Placing[] {
     const at = race.skaters[who].finishedAt
     return at === null ? Infinity : Math.round(at / 10)
   }
-  const order = race.skaters.map((_, who) => who).sort((a, b) => hundredths(a) - hundredths(b) || a - b)
+  // Two skaters still out have no times to tell them apart, so the floor does it.
+  const round = (who: number): number => (race.skaters[who].finishedAt === null ? race.skaters[who].dist : 0)
+  const order = race.skaters
+    .map((_, who) => who)
+    .sort((a, b) => (hundredths(a) === hundredths(b) ? round(b) - round(a) || a - b : hundredths(a) - hundredths(b)))
   const out: Placing[] = []
   order.forEach((who, i) => {
-    const same = i > 0 && hundredths(order[i - 1]) === hundredths(who)
+    const same = i > 0 && hundredths(order[i - 1]) === hundredths(who) && round(order[i - 1]) === round(who)
     out.push({ who, place: same ? out[i - 1].place : i + 1, time: race.skaters[who].finishedAt })
   })
   return out
