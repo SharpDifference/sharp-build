@@ -109,9 +109,42 @@ function reachTurn(): boolean {
   return true
 }
 
-/** Puts lines on the transcript and on the box at once, the box turning to the first of them. */
-function playLines(text: string, speaker = ''): void {
+/**
+ * Every line of move-by-move narration the tables of this scene have said, as it stands in the
+ * log. The scene's closing bookkeeping reads the log, not the transcript a finished game is taken
+ * back off, and a game's worth of card turns there is a lot for it to think through for nothing:
+ * {@link withoutTableNarration} takes them out of what it is sent.
+ */
+const narrated = new Set<string>()
+
+/** A new game entered: nothing said at any earlier table is this one's. */
+export function forgetTableNarration(): void {
+  narrated.clear()
+}
+
+/**
+ * A request's prompt without the move-by-move narration of the games played in the scene: the
+ * lines exactly as the tables said them, whoever the prompt names as their speaker. What a game
+ * came to is still there, in the result that went into the scene.
+ */
+export function withoutTableNarration(prompt: string): string {
+  if (narrated.size === 0) return prompt
+  return prompt
+    .split('\n')
+    .filter((line) => {
+      const said = line.replace(/^\s*[A-Z][A-Z ]*:\s*/, '').trim()
+      return !narrated.has(said)
+    })
+    .join('\n')
+}
+
+/**
+ * Puts lines on the transcript and on the box at once, the box turning to the first of them.
+ * `moves` marks a game's own narration of its moves, as against a result that stays in the scene.
+ */
+function playLines(text: string, speaker = '', moves = false): void {
   const lines = splitOverflow({ speaker, text }, boxFits)
+  if (moves) for (const line of lines) narrated.add(line.text.trim())
   const game = useGameStore.getState()
   game.appendSceneLines(lines)
   game.appendPendingLines(lines)
@@ -188,7 +221,7 @@ function show(text: string, speaker: string): Promise<void> {
   heldUntil = Math.max(now, heldUntil) + holdFor(text, speaker !== '')
   return new Promise((resolve) => {
     const put = (): void => {
-      if (at === sitting) playLines(text, speaker)
+      if (at === sitting) playLines(text, speaker, speaker === '')
       resolve()
     }
     if (wait === 0) put()
