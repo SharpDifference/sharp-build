@@ -60,7 +60,9 @@ registerHooks(MINI_GAMES, {
     scene: {
       lines: (ctx) => {
         const { played } = useTableStore.getState()
-        return played && ctx.query.includes(played.text) ? ['', ...played.brief, ''] : []
+        return played && (played.next || ctx.query.includes(played.text))
+          ? ['', ...played.brief, '']
+          : []
       }
     }
   },

@@ -33,6 +33,8 @@ export interface Played {
   text: string
   /** What rides with that turn's prompt and is never shown: the account, and the stake. */
   brief: readonly string[]
+  /** A game played alone: the brief rides with the next turn, whatever its words. */
+  next?: boolean
 }
 
 interface TableState {

@@ -31,6 +31,7 @@ import {
 } from '../views/motion'
 import { gameComponent, type GamePlay, type Opponent, type PlayResult } from './play'
 import { useTableStore, type Agreed } from './session'
+import { tableRound } from './round'
 import { skillOf } from './skill'
 import {
   closeTable,
@@ -39,8 +40,10 @@ import {
   nameOf,
   narrateAtTable,
   openTable,
+  readerPlaysAtTable,
   readerSaysAtTable,
   sayAtTable,
+  speakAtTable,
   tableQuietIn,
   proposeGame,
   takeTurnForGame,
@@ -239,12 +242,34 @@ export function MiniGamePanel({ theme, onClose }: ScenePanelProps): JSX.Element 
         begin()
         return sayAtTable(charId, situationFor(charId), cue)
       },
+      speak: (charId, text) => {
+        begin()
+        return speakAtTable(charId, text)
+      },
+      readerSays: (text) => {
+        begin()
+        readerPlaysAtTable(text)
+      },
+      round: (ask) => {
+        begin()
+        const characters = useGameStore.getState().characters
+        const players = (seated?.opponents ?? [])
+          .map((girl) => characters[girl.charId])
+          .filter((character) => character !== undefined)
+        return tableRound(
+          seated?.game.name ?? '',
+          players,
+          situation.current,
+          seated?.stake ?? '',
+          ask
+        )
+      },
       situation: (text) => {
         situation.current = text
       },
       finish: (ended) => setResult(ended)
     }),
-    [seated?.opponents, seated?.stake, seated?.options, chattiness]
+    [seated?.game.name, seated?.opponents, seated?.stake, seated?.options, chattiness]
   )
 
   function leave(ended: PlayResult): void {

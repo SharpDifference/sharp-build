@@ -205,6 +205,21 @@ export async function sayAtTable(charId: string, situation: string, cue: string)
   await new Promise((resolve) => setTimeout(resolve, holdFor(line, true)))
 }
 
+/** A girl's line at the table in words already written, shown as hers and given its time. */
+export async function speakAtTable(charId: string, text: string): Promise<void> {
+  const character = useGameStore.getState().characters[charId]
+  const line = text.trim()
+  if (!character || !line) return
+  await show(line, charKeyOf(character.firstName, character.lastName))
+  await new Promise((resolve) => setTimeout(resolve, holdFor(line, true)))
+}
+
+/** The reader's own words as part of a game: onto the scene as his, with nobody asked to answer. */
+export function readerPlaysAtTable(words: string): void {
+  const text = words.trim()
+  if (text) useGameStore.getState().logPlayerAction(text, true)
+}
+
 /**
  * Something the reader says at the table, whenever he likes: his words go onto the scene as his
  * own, the game goes on, and she answers in a line when it comes.
@@ -245,21 +260,44 @@ export function fileResult(result: PlayResult, played: PlayedWith): void {
 
   if (played.names.length > 0) {
     const who = listed(played.names)
+    // Walked away from: that he did is all the scene is told. What it means is theirs to settle.
+    const left = result.outcome === 'abandoned'
     useTableStore.getState().setPlayed({
       text: result.summary,
-      brief: [
-        'MINI-GAME RESULT',
-        `The reader and ${who} have just played ${played.game.name} for real, at the table, between your last lines and now. It is over and settled: do not replay it or change how it came out.`,
-        ...(result.account ?? []),
-        ...(played.stake
-          ? [`Riding on it, as they agreed: ${played.stake} It is owed now.`]
-          : []),
-        `Open on the result, then let ${who} react to it in character: how the game went, anything in it worth a remark, and the stake if there was one.`
-      ]
+      brief: left
+        ? [
+            'MINI-GAME',
+            `The reader and ${who} were playing ${played.game.name} for real, at the table, between your last lines and now. The reader walked away from it before it was over. Nobody won it.`,
+            ...(result.account ?? []),
+            ...(played.stake ? [`Riding on it, as they agreed: ${played.stake}`] : []),
+            `Let ${who} react in character to him walking away. What it means, for the game and for anything riding on it, is for them to settle in the scene.`
+          ]
+        : [
+            'MINI-GAME RESULT',
+            `The reader and ${who} have just played ${played.game.name} for real, at the table, between your last lines and now. It is over and settled: do not replay it or change how it came out.`,
+            ...(result.account ?? []),
+            ...(played.stake
+              ? [`Riding on it, as they agreed: ${played.stake} It is owed now.`]
+              : []),
+            `Open on the result, then let ${who} react to it in character: how the game went, anything in it worth a remark, and the stake if there was one.`
+          ]
     })
     void submitAction(result.summary)
     return
   }
 
+  // Played alone, what the game has to say about how it went rides with the next turn's prompt,
+  // whoever is there to have watched.
+  if (result.account && result.account.length > 0) {
+    useTableStore.getState().setPlayed({
+      text: result.summary,
+      next: true,
+      brief: [
+        'MINI-GAME',
+        `The reader has just played ${played.game.name} on his own, for real, in this scene. It is over: do not replay it or change how it came out. Anyone here saw it and may bring it up.`,
+        ...result.account
+      ]
+    })
+  }
   playLines(result.summary)
 }

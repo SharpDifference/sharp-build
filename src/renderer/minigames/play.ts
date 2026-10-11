@@ -1,5 +1,8 @@
 import type { ComponentType } from 'react'
 import type { Chattiness } from '@shared/minigames'
+import type { RoundAsk } from './round'
+
+export type { RoundAsk } from './round'
 
 /**
  * What a mini-game is to the framework while it is being played: a component handed a
@@ -58,6 +61,22 @@ export interface GamePlay {
    * one. Resolves when her line is on the box, or when there will be none.
    */
   say: (charId: string, cue: string) => Promise<void>
+  /**
+   * Puts a girl's line on the dialogue box as hers, in words the game already has: what a
+   * {@link GamePlay.round} wrote for her. Resolves once it has had its time on the box.
+   */
+  speak: (charId: string, text: string) => Promise<void>
+  /**
+   * Something the reader says as part of the game, typed into the game's own field: an answer, a
+   * question, a pick. It goes onto the scene as his words; nobody answers it unless the game asks.
+   */
+  readerSays: (text: string) => void
+  /**
+   * Asks the model to run one round no code can play: what a girl asks or dares, what she makes
+   * of an answer, who she picks. Comes back as the fields the game named, or null where the model
+   * could not be had, which a game has to be able to carry on from. Takes a few seconds.
+   */
+  round: (ask: RoundAsk) => Promise<Record<string, string> | null>
   /**
    * Tells the framework how the game stands, in a sentence or two, whenever that changes. It is
    * what she is reminded of when she speaks, the reader's own remarks at the table included.
