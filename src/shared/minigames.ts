@@ -107,6 +107,11 @@ export interface MiniGameDef {
   surface?: PlaySurface
   /** Played on the keyboard, so the line to her does not take the focus when the game opens. */
   keys?: boolean
+  /**
+   * Played in words: the line under the dialogue box is the game's own, live only while the game
+   * asks for something to be typed ({@link GamePlay.ask}), and not a line to the table besides.
+   */
+  typed?: boolean
   /** How it is played, for the player: the keys or the pointer, in a sentence. Shown on its page. */
   controls?: string
   /** What makes someone good at it, in a sentence, for judging how well a girl plays. */

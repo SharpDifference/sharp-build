@@ -227,7 +227,38 @@ export function MiniGamePanel({ theme, onClose }: ScenePanelProps): JSX.Element 
       ? situation.current
       : `${situation.current} Also playing: ${listed(others.map((girl) => girl.name))}.`
   }
+  // What the game has asked the reader to type, while it waits for it.
+  const [asked, setAsked] = useState<{ placeholder: string } | null>(null)
+  const answerTo = useRef<((text: string | null) => void) | null>(null)
+  /** Ends whatever is being asked, unanswered. */
+  function endAsking(): void {
+    const resolve = answerTo.current
+    answerTo.current = null
+    setAsked(null)
+    resolve?.(null)
+  }
+  // A table taken down leaves no game waiting on an answer that cannot come.
+  useEffect(
+    () => () => {
+      answerTo.current?.(null)
+      answerTo.current = null
+    },
+    []
+  )
+
   function speak(): void {
+    // What the game asked for is the game's, not a word across the table.
+    if (answerTo.current) {
+      const text = remark.trim()
+      if (!text || result) return
+      const resolve = answerTo.current
+      answerTo.current = null
+      setAsked(null)
+      setRemark('')
+      resolve(text)
+      return
+    }
+    if (seated?.game.typed) return
     const table = seated?.opponents ?? []
     if (table.length === 0 || answering !== null || !remark.trim() || result) return
     // The girl he names answers; where he names nobody, they take it in turns.
@@ -285,6 +316,15 @@ export function MiniGamePanel({ theme, onClose }: ScenePanelProps): JSX.Element 
       situation: (text) => {
         situation.current = text
       },
+      ask: (placeholder) => {
+        begin()
+        answerTo.current?.(null)
+        return new Promise<string | null>((resolve) => {
+          answerTo.current = resolve
+          setAsked({ placeholder })
+        })
+      },
+      stopAsking: () => endAsking(),
       progress: (account) => {
         soFar.current = account
       },
@@ -406,7 +446,7 @@ export function MiniGamePanel({ theme, onClose }: ScenePanelProps): JSX.Element 
         {/* A word across the table, for a game with someone to say it to: the scene's own well,
             where the scene's own stands, and Go beside it. Enter sends from here, the scene's
             own listener being shut out while a table is up. */}
-        {against && (
+        {(against || asked) && (
           <div
             className="vu-turn vu-scene-row"
             data-well="out"
@@ -425,15 +465,23 @@ export function MiniGamePanel({ theme, onClose }: ScenePanelProps): JSX.Element 
               onAction={setRemark}
               onSubmit={speak}
               sending={false}
-              submitDead={answering !== null || !remark.trim() || result !== null}
-              inputDead={result !== null}
-              focus={!seated.game.keys}
+              submitDead={
+                asked
+                  ? !remark.trim() || result !== null
+                  : answering !== null || !remark.trim() || result !== null || Boolean(seated.game.typed)
+              }
+              inputDead={result !== null || (Boolean(seated.game.typed) && !asked)}
+              focus={asked ? true : !seated.game.keys && !seated.game.typed}
               placeholder={
-                answering !== null
-                  ? `${answering} is answering…`
-                  : tableNames.length > 1
-                    ? 'Say something to the table…'
-                    : `Say something to ${against.name}…`
+                asked
+                  ? asked.placeholder
+                  : seated.game.typed
+                    ? ''
+                    : answering !== null
+                      ? `${answering} is answering…`
+                      : tableNames.length > 1
+                        ? 'Say something to the table…'
+                        : `Say something to ${against?.name ?? 'her'}…`
               }
               multiline
             />

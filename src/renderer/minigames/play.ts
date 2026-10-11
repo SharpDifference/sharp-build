@@ -75,6 +75,16 @@ export interface GamePlay {
    */
   readerSays: (text: string) => void
   /**
+   * Asks the reader to type something, in the scene's own line under the dialogue box: the one
+   * place he types, whatever is asked of him. `placeholder` says what is wanted ("Your answer…").
+   * Resolves with what he sent, or null where the asking ended first: the table closed, the game
+   * asked for something else, or called {@link GamePlay.stopAsking}. Nothing goes on the scene
+   * by itself: a game puts his words there with {@link GamePlay.readerSays}.
+   */
+  ask: (placeholder: string) => Promise<string | null>
+  /** Takes back a question the reader has not answered: he chose another way, a button say. */
+  stopAsking: () => void
+  /**
    * Asks the model to run one round no code can play: what a girl asks or dares, what she makes
    * of an answer, who she picks. Comes back as the fields the game named, or null where the model
    * could not be had, which a game has to be able to carry on from. Takes a few seconds.

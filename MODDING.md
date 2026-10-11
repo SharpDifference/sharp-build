@@ -424,6 +424,7 @@ draws what is between.
 | `readerSays(text)` | Puts words on the scene as the reader's own, as part of the game. Nobody answers. |
 | `round(ask)` | A model call. One round no code can play; see below. |
 | `situation(text)` | How the game stands now. Free; call it whenever it changes. |
+| `ask(placeholder)` / `stopAsking()` | Has the reader type something in the scene's own line under the dialogue box, the one place he types; resolves with his words, or null if the asking ended first. A game played in words sets `typed: true` in its def, which makes that line the game's alone. Free. |
 | `progress(account)` | What the scene should know of the game so far, were the reader to walk away now: account lines, said again whenever there is more. Free. A game whose point is what was said in it (Truth or Dare) calls it each turn. |
 | `finish(result)` | The game is over. |
 
