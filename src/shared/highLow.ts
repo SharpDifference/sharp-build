@@ -132,34 +132,50 @@ export interface CallMade {
 
 /**
  * How a game against her went, call by call, for the scene's writer: who called what on which
- * card and what came, with the calls worth a remark marked: a long shot that landed, a safe one
- * that failed, the same card turning up twice. `deck` is the deck as it was dealt.
+ * card and what came, with the calls worth a remark marked and bad play told apart from bad
+ * luck: a long shot that landed, a safe call that failed, a call against the cards, one that
+ * could not win. `deck` is the deck as it was dealt.
  */
 export function versusAccount(
   name: string,
   deck: readonly Card[],
   calls: readonly CallMade[]
 ): string[] {
+  /** How many times each side called against cards that clearly favoured the other call. */
+  const against = { reader: 0, her: 0 }
   const lines = calls.map((made, i) => {
     const shown = deck[i]
     const next = deck[i + 1]
     const { call: favoured, edge } = oddsCall(shown, deck.slice(0, i + 1))
-    const note =
-      next.rank === shown.rank
+    const hopeless =
+      (made.call === 'lower' && shown.rank === 2) || (made.call === 'higher' && shown.rank === 14)
+    const poor = made.call !== favoured && edge >= 0.3
+    if (poor) against[made.hers ? 'her' : 'reader']++
+    const note = hopeless
+      ? `, a call that could not win: nothing is ${made.call} than ${rankWord(shown.rank)}`
+      : next.rank === shown.rank
         ? ', the same card again'
-        : made.right && made.call !== favoured && edge >= 0.3
+        : poor && made.right
           ? ', a long shot that came in'
-          : !made.right && made.call === favoured && edge >= 0.5
-            ? ', a safe call that failed'
-            : ''
+          : poor
+            ? `, a bad call: the cards clearly favoured ${favoured}`
+            : !made.right && edge >= 0.5
+              ? ', a safe call that failed: plain bad luck'
+              : ''
     const who = made.hers ? name : 'The reader'
-    return `${who} called ${made.call} on a ${rankMark(shown.rank)} and a ${rankMark(next.rank)} came: ${made.right ? 'right' : 'a miss'}${note}.`
+    return `${who} called ${made.call} on ${rankWord(shown.rank)} and ${rankWord(next.rank)} came: ${made.right ? 'right' : 'a miss'}${note}.`
   })
+  const played = (who: string, times: number): string =>
+    times === 0
+      ? `${who} played the odds every time.`
+      : `${who} called against the odds ${times} time${times === 1 ? '' : 's'}: poor play, not bad luck.`
   const count = (side: boolean): number =>
     calls.filter((made) => made.hers === side && made.right).length
   return [
-    `Each called ${CALLS_EACH} times, in turn, on whether the next card would be higher or lower.`,
+    `Each called ${CALLS_EACH} times, in turn, on whether the next card would be higher or lower. Twos are low and aces high; the same rank again is a miss.`,
     ...lines,
+    played('The reader', against.reader),
+    played(name, against.her),
     `Final count: the reader ${count(false)}, ${name} ${count(true)}.`
   ]
 }
