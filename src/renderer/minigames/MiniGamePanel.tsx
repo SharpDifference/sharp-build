@@ -105,6 +105,7 @@ export function MiniGamePanel({ theme, onClose }: ScenePanelProps): JSX.Element 
   const quiet = useModOption(MINI_GAMES, CHAT_OPTIONS.quiet)
   const lots = useModOption(MINI_GAMES, CHAT_OPTIONS.lots)
   const chattiness: Chattiness = quiet ? 'quiet' : lots ? 'lots' : 'some'
+  const location = useGameStore((s) => s.sceneLocation ?? null)
   // Who is standing where on the stage: left, middle, right.
   const slots = useGameStore((s) => s.slots)
   // The game she agreed to, taken off the table's own state as the panel opens on it.
@@ -230,13 +231,14 @@ export function MiniGamePanel({ theme, onClose }: ScenePanelProps): JSX.Element 
   const play = useMemo<GamePlay>(
     () => ({
       opponents: seated?.opponents ?? [],
+      location,
       stake: seated?.stake ?? '',
       chattiness,
       options: seated?.options ?? {},
       started: () => begin(),
       narrate: (text) => {
         begin()
-        narrateAtTable(text)
+        return narrateAtTable(text)
       },
       say: (charId, cue) => {
         begin()
@@ -269,7 +271,7 @@ export function MiniGamePanel({ theme, onClose }: ScenePanelProps): JSX.Element 
       },
       finish: (ended) => setResult(ended)
     }),
-    [seated?.game.name, seated?.opponents, seated?.stake, seated?.options, chattiness]
+    [seated?.game.name, seated?.opponents, seated?.stake, seated?.options, chattiness, location]
   )
 
   function leave(ended: PlayResult): void {

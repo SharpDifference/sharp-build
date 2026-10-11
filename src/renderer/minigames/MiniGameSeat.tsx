@@ -1,5 +1,7 @@
 import { useEffect, useRef, type JSX } from 'react'
 import type { SceneSeatProps } from '../mods/hooks'
+import { fewestWith, MINI_GAMES_LIST } from '@shared/minigames'
+import { useGameStore } from '../stores/gameStore'
 import { DiceIcon } from '../views/screenIcons'
 import { keptAgreed, useTableStore } from './session'
 import { useAtTurn, useGamesOffered, useSceneSpent, useTableOpen } from './table'
@@ -23,7 +25,20 @@ export function MiniGameSeat({ Seat, visible, open }: SceneSeatProps): JSX.Eleme
     // between her yes and the table.
     const due = agreed ?? keptAgreed()
     if (!due) return
-    if (!agreed) useTableStore.getState().setAgreed(due)
+    // A girl who has left the scene since she said yes is not sat down; with too few left for
+    // the game, there is no game.
+    const scene = useGameStore.getState()
+    const here = due.charIds.filter(
+      (charId) => scene.cast.includes(charId) && !scene.departed.includes(charId)
+    )
+    const game = MINI_GAMES_LIST.find((entry) => entry.id === due.gameId)
+    if (!game || here.length < fewestWith(game)) {
+      useTableStore.getState().setAgreed(null)
+      return
+    }
+    if (!agreed || here.length !== due.charIds.length) {
+      useTableStore.getState().setAgreed({ ...due, charIds: here })
+    }
     opener.current()
   }, [agreed, atTurn, visible])
 

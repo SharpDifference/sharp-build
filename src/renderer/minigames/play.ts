@@ -40,6 +40,8 @@ export interface Opponent {
 export interface GamePlay {
   /** The girls playing against the reader; none for a game played alone. */
   opponents: readonly Opponent[]
+  /** The id of the place the scene is at, or null where it has none: a pool, or the sea. */
+  location: string | null
   /** What is riding on the game, as the scene settled it; empty where nothing is. */
   stake: string
   /** How much she is to say for herself, as the player has it set; what that comes to is the game's. */
@@ -51,9 +53,10 @@ export interface GamePlay {
   /**
    * Says something in the scene's own dialogue box, in the game's words and at once: a move
    * made, a card turned. It goes onto the scene's transcript like any narration. The first one
-   * is a first move: whatever of a reply was still unread is dropped.
+   * is a first move: whatever of a reply was still unread is dropped. Resolves once the line is
+   * on the box, which is after everything said before it; most games need not wait.
    */
-  narrate: (text: string) => void
+  narrate: (text: string) => Promise<void>
   /**
    * Has a girl at the table say something: the model writes her one short line from `cue`, the
    * game's plain account of what just happened ("she called lower on a queen and an ace came").

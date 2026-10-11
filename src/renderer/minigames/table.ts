@@ -186,8 +186,8 @@ function show(text: string, speaker: string): Promise<void> {
 }
 
 /** A line from the table in the scene's dialogue box, once the turn is the table's. */
-export function narrateAtTable(text: string): void {
-  void show(text, '')
+export function narrateAtTable(text: string): Promise<void> {
+  return show(text, '')
 }
 
 /**
