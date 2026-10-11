@@ -65,6 +65,18 @@ const GAP = 10
  * tables, so that the longest game is no wider than a middling one. The grid is laid from these
  * and a swapped card travels by them, so the two cannot disagree.
  */
+/**
+ * How many columns the cards are laid in so the grid comes out full: three rows where they
+ * divide by three, else four rows, else two, and three rows with a short last one only where
+ * nothing fits the table (eleven pairs).
+ */
+function colsFor(cards: number): number {
+  for (const rows of [3, 4, 2]) {
+    if (cards % rows === 0 && cards / rows <= 8) return cards / rows
+  }
+  return Math.ceil(cards / 3)
+}
+
 function cardSize(cols: number): { w: number; h: number } {
   return cols >= 8 ? { w: 66, h: 88 } : cols === 7 ? { w: 74, h: 96 } : { w: 84, h: 106 }
 }
@@ -208,7 +220,7 @@ export function CatPairs({ play }: { play: GamePlay }): JSX.Element {
   const counts = pairCounts(game)
   const left = faceDown(game).length / 2
   const myTurn = phase === 'pick' && game.turn === 0
-  const cols = Math.ceil(game.cards.length / 3)
+  const cols = colsFor(game.cards.length)
   const card = cardSize(cols)
   // How far it is from one place to the next, along a row and down a column.
   const stepX = card.w + GAP

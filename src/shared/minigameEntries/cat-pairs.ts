@@ -16,7 +16,7 @@ const CAT_PAIRS: MiniGameDef = {
       describe: 'how many pairs of cats are laid out, which is how long the game is',
       min: 6,
       max: 12,
-      default: 8
+      default: 9
     },
     {
       id: 'cats',
