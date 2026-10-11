@@ -77,6 +77,12 @@ were one word in her sentence the model drew too literally, and each is a small 
 
 If a photo stays PNG while WebP is on, look for a `[photo] kept ... as PNG:` line.
 
+## 1.3.0
+
+- **Comments can be taken over**: another mod can write and draw the replies under posts in place
+  of Photo Feature's own stranger comments (Feed Comments does). With nothing taking them over,
+  comments work exactly as in 1.2.0.
+
 ## 1.2.0
 
 For Venus University 0.4.0, on the shared mod build, with a lot of photo tuning.
@@ -184,6 +190,14 @@ that sentence and adds tags read off it:
 Every tag these files can write has to be in the verified list in `test/photoTags.test.ts`,
 which fails on any other. A tag goes on that list once a same-seed ComfyUI check shows the
 checkpoint draws it.
+
+### Comment hand-off
+
+`src/renderer/stores/commentHandoff.ts` lets one other mod take over a post's replies while its
+own switch is on: the slot opening's lines about them, the schema of each post's `comments`
+field, how they are dressed when the post is filed (with the picture's tier already known), and
+the component that draws them. Photo Feature never names that mod; with nothing registered, or
+the mod off, its own plain comments are used.
 
 ### Hooks
 
