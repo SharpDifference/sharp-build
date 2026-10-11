@@ -82,7 +82,7 @@ function GamePage({ game, onBack }: { game: MiniGameDef; onBack: () => void }): 
         <SelectField
           key={option.id}
           id={`minigame-pref-${game.id}-${option.id}`}
-          label={sentence(option.describe)}
+          label={option.label ?? sentence(option.describe)}
           hint="What a game starts from. Either of you can still ask for something else."
           value={String(prefs?.options?.[option.id] ?? '')}
           onChange={(value) => {

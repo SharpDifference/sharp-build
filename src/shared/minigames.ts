@@ -51,6 +51,8 @@ export interface GameOption {
   id: string
   /** What it sets, for the model, in a clause ("how many calls each player makes"). */
   describe: string
+  /** What it is called on the game's page, in a few words for the player; `describe` where absent. */
+  label?: string
   min: number
   max: number
   /** What it is where nothing was said, and for a game played alone. */

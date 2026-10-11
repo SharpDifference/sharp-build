@@ -12,6 +12,7 @@ const AIR_HOCKEY: MiniGameDef = {
   options: [
     {
       id: 'goals',
+      label: 'Goals to win',
       describe: 'how many goals win the game: the first to reach it wins',
       min: 3,
       max: 9,

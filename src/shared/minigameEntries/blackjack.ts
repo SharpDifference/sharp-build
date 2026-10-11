@@ -12,6 +12,7 @@ const BLACKJACK: MiniGameDef = {
   options: [
     {
       id: 'hands',
+      label: 'Hands in a game',
       describe: 'how many hands the game is played over, whoever is playing',
       min: 1,
       max: 5,

@@ -12,6 +12,7 @@ const BOWLING: MiniGameDef = {
   options: [
     {
       id: 'frames',
+      label: 'Frames in a game',
       describe: 'how many frames each bowler plays: 10 is a full game, fewer is a quick one',
       min: 3,
       max: 10,

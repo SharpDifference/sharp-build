@@ -12,6 +12,7 @@ const HIGH_LOW: MiniGameDef = {
   options: [
     {
       id: 'calls',
+      label: 'Calls each',
       describe: 'how many calls each player makes in a normal game',
       min: 1,
       max: 5,
@@ -19,6 +20,7 @@ const HIGH_LOW: MiniGameDef = {
     },
     {
       id: 'sudden',
+      label: 'Sudden death (0 off, 1 on)',
       describe:
         'sudden death, which is how a tiebreak or a death match is played: 1 to play it, 0 for a normal game. In sudden death the two make one call each, again and again, until one of them is ahead after both have had the same number of calls; "calls" is then ignored',
       min: 0,
