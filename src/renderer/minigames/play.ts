@@ -48,6 +48,12 @@ export interface GamePlay {
    * line it narrates before its next move, and drops its own pauses for reading.
    */
   stepped: boolean
+  /**
+   * The reader has made a move by key: at his own pace, that is him moving on, and the line on
+   * the box counts as read. A press on the table's surface is taken so already; a game says it
+   * for a move made on the keyboard. Nothing where the text keeps its own time.
+   */
+  moved: () => void
   /** What is riding on the game, as the scene settled it; empty where nothing is. */
   stake: string
   /** How much she is to say for herself, as the player has it set; what that comes to is the game's. */
