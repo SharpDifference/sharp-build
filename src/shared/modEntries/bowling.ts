@@ -9,7 +9,7 @@ const def: ModDef = {
   version: '0.1.0',
   scope: 'anytime',
   defaultOn: true,
-  blurb: 'Ten pins, a lane and a steady hand: set your spot, your power and your hook. At the arcade, the mall and the stadium.',
+  blurb: 'Ten pins, a lane and a steady hand: set your spot, your power and your hook. At the bowling alley.',
   requires: [MINI_GAMES]
 }
 

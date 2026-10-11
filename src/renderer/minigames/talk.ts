@@ -47,7 +47,7 @@ function request(character: Character, situation: string, cue: string): Structur
       'RIGHT NOW',
       cue,
       '',
-      `Write the ONE thing ${name} says out loud at this moment, in her own voice and as she is with him in this scene. At most 20 words. Her spoken words only: no narration, no actions, no quotation marks, no name in front. She does not explain the rules, read out the score, or say what the next card will be.`
+      `Write the ONE thing ${name} says out loud at this moment, in her own voice and as she is with him in this scene. At most 20 words. Her spoken words only: no narration, no actions, no quotation marks, no name in front. She does not explain the rules, read out the score, or say what is going to happen next in the game.`
     ].join('\n'),
     schema: objectSchema('minigame_line', ['line'], { line: { type: 'string' } })
   }
