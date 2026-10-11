@@ -339,7 +339,7 @@ export function MiniGamePanel({ theme, onClose }: ScenePanelProps): JSX.Element 
               sending={false}
               submitDead={answering || !remark.trim() || result !== null}
               inputDead={result !== null}
-              focus
+              focus={!seated.game.keys}
               placeholder={
                 answering ? `${against.name} is answering…` : `Say something to ${against.name}…`
               }

@@ -96,6 +96,8 @@ export interface MiniGameDef {
   suggestAt?: Readonly<Record<string, SuggestRate>>
   /** The surface it is played on; a `table` where it does not say. */
   surface?: PlaySurface
+  /** Played on the keyboard, so the line to her does not take the focus when the game opens. */
+  keys?: boolean
   /** What makes someone good at it, in a sentence, for judging how well a girl plays. */
   skillBrief: string
 }
