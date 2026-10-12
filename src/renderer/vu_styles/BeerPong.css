@@ -254,6 +254,14 @@
   font: 500 12px var(--font-body);
 }
 
+/* The last throw or re-rack, in full ink: it stays until the next. */
+.vu-beerpong-hint[data-told] {
+  max-width: 100%;
+  color: var(--vu-text);
+  font-weight: 600;
+  text-align: center;
+}
+
 /* Her turn, a ball in the air, no re-rack to call, or the game over: it stands back. */
 .vu-beerpong-meter[data-waiting],
 .vu-beerpong-buttons > button[data-waiting] {

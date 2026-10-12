@@ -236,8 +236,17 @@
   font: 500 12px var(--font-body);
 }
 
-/* Her turn, a ball on its way, or the game over: the throw stands back. */
+/* The last ball, or the result, in full ink: it stays until the next. */
+.vu-bowling-hint[data-told] {
+  max-width: 100%;
+  color: var(--vu-text);
+  font-weight: 600;
+  text-align: center;
+}
+
+/* Her turn, a ball on its way, or the game over: the throw stands back, but not the line told under it. */
 .vu-bowling-meters[data-waiting],
-.vu-bowling-throw[data-waiting] {
+.vu-bowling-throw[data-waiting] > button,
+.vu-bowling-throw[data-waiting] > .vu-bowling-hint:not([data-told]) {
   opacity: 0.35;
 }

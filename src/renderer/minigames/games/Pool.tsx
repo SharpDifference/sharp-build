@@ -38,7 +38,7 @@ import {
   type ShotRecord,
   type Side
 } from '@shared/minigameRules/pool'
-import { useAway, type GamePlay } from '../kit'
+import { useAway, type GamePlay, type PlayResult } from '../kit'
 import '../../vu_styles/Pool.css'
 
 /** How many times in a match she says something about a shot, by how talkative she is to be. */
@@ -55,6 +55,12 @@ const HER_PAUSE_MS = 900
 const HER_AIM_MS = 750
 /** The beat between one rack and the next. */
 const RACK_PAUSE_MS = 1800
+/**
+ * How long the last shot stands told under the table before the result is handed over, read at
+ * the reader's own pace with the shots kept off the box: nothing there is left for him to step
+ * past, so the table would otherwise clear at once.
+ */
+const END_HOLD_MS = 2200
 /** The most time one frame may ask the table to make up, after a stall. */
 const MAX_FRAME_S = 0.1
 /** How long the power takes to climb from nothing to full; held longer, it comes back down. */
@@ -148,12 +154,15 @@ const hudOf = (rack: Rack, phase: Phase, racks: readonly RackRecord[], shots: re
  * power up and lets go to play; with the cue ball in hand a click puts it down, and before a break
  * a click behind the head string moves it there. Her shots are the
  * rules' own, at her skill, shown for a beat before they are played. The table runs a fixed step
- * at a time; every shot is said in the scene's dialogue box.
+ * at a time. Every shot is told in the line under the table, which stays until the next; the
+ * dialogue box tells it too only where play-by-play is on.
  */
 export function Pool({ play }: { play: GamePlay }): JSX.Element {
   const her = play.opponents[0]
   const race = play.options.race ?? 1
   const [hud, setHud] = useState<Hud>(() => hudOf(freshRack('reader', !her), 'aim', [], []))
+  // The last shot, or the next rack called, as it is told: the line under the table until the next.
+  const [lastTold, setLastTold] = useState<string | null>(null)
 
   // The framework's side of the game as it is now, for a loop that outlives any one render.
   const latest = useRef(play)
@@ -225,6 +234,24 @@ export function Pool({ play }: { play: GamePlay }): JSX.Element {
       if (gone) return
       setHud(hudOf(rack, phase, racks, shots))
       if (her) latest.current.situation(matchSituation(her.name, rack, racksWon(racks), race, latest.current.stake))
+    }
+
+    /** Tells a shot or a rack: under the table always, and in the dialogue box where play-by-play has it. */
+    const told = (line: string): Promise<void> => {
+      if (!gone) setLastTold(line)
+      return latest.current.narrate(line)
+    }
+
+    /** Hands over the result; read at his own pace with nothing on the box, after the last shot has stood a beat. */
+    const finish = (result: PlayResult): void => {
+      const now = latest.current
+      if (!now.stepped || now.playByPlay) {
+        now.finish(result)
+        return
+      }
+      setTimeout(() => {
+        if (!gone) latest.current.finish(result)
+      }, END_HOLD_MS)
     }
 
     const toTable = (event: PointerEvent): Point | null => {
@@ -376,10 +403,11 @@ export function Pool({ play }: { play: GamePlay }): JSX.Element {
           herPlay(at)
           return
         }
-        // Through the clock, so that it too waits while he looks elsewhere.
+        // Through the clock, so that it too waits while he looks elsewhere. With the shots kept
+        // off the box there may have been nothing to read, so she still looks the table over.
         const go = (): void => {
           if (gone || ended) return
-          due = { at: performance.now(), run: herPlay }
+          due = { at: performance.now() + (latest.current.playByPlay ? 0 : HER_PAUSE_MS), run: herPlay }
         }
         void latest.current.read().then(go, go)
         return
@@ -400,9 +428,7 @@ export function Pool({ play }: { play: GamePlay }): JSX.Element {
         set(at, false)
         return
       }
-      const called = latest.current.narrate(
-        `Rack ${racks.length + 1}. ${next === 'reader' ? 'You break' : `${her.name} breaks`}.`
-      )
+      const called = told(`Rack ${racks.length + 1}. ${next === 'reader' ? 'You break' : `${her.name} breaks`}.`)
       if (!latest.current.stepped) {
         set(at, false)
         return
@@ -422,7 +448,7 @@ export function Pool({ play }: { play: GamePlay }): JSX.Element {
       rack = got.rack
       shots.push(got.record)
       const now = latest.current
-      now.narrate(shotLine(her?.name ?? '', got.record, solo))
+      void told(shotLine(her?.name ?? '', got.record, solo))
       // What the scene is to know of it, should he walk away from here.
       const tell = (): void => {
         now.progress(her ? matchProgress(her.name, rack, racksWon(racks), race) : soloProgress(rack, shots))
@@ -432,7 +458,7 @@ export function Pool({ play }: { play: GamePlay }): JSX.Element {
         ended = true
         phase = 'over'
         sync()
-        now.finish({ outcome: 'played', summary: soloSummary(shots), account: soloAccount(shots) })
+        finish({ outcome: 'played', summary: soloSummary(shots), account: soloAccount(shots) })
         return
       }
       if (rack.winner && her) {
@@ -443,7 +469,7 @@ export function Pool({ play }: { play: GamePlay }): JSX.Element {
           ended = true
           phase = 'over'
           sync()
-          now.finish({
+          finish({
             outcome: won.reader > won.her ? 'won' : 'lost',
             summary: matchSummary(her.name, racks),
             account: matchAccount(her.name, racks, race)
@@ -454,8 +480,10 @@ export function Pool({ play }: { play: GamePlay }): JSX.Element {
         sync()
         tell()
         remark(got.record)
-        // At his own pace the next rack waits on him, not on the clock.
-        due = { at: now.stepped ? at : at + RACK_PAUSE_MS, run: nextRack }
+        // At his own pace the next rack waits on him, not on the clock; but with the shots kept
+        // off the box there is nothing of the rack's end for him to read there, so the rack just
+        // won stands its beat.
+        due = { at: now.stepped && now.playByPlay ? at : at + RACK_PAUSE_MS, run: nextRack }
         return
       }
       phase = 'settled'
@@ -607,6 +635,18 @@ export function Pool({ play }: { play: GamePlay }): JSX.Element {
                 : hud.breaking
                   ? 'your break: click behind the line to move the cue ball; aim, hold for power, let go to play'
                   : 'aim with the pointer, hold for power, let go to play'
+  // The last shot told stands in the line; what is for him to do joins it where it must be said.
+  const line = !lastTold
+    ? status
+    : hud.phase === 'over' || hud.phase === 'between'
+      ? `${lastTold} · ${status}`
+      : hud.phase === 'place'
+        ? `${lastTold} · click to put the cue ball down`
+        : hud.breaking && (hud.phase === 'aim' || hud.phase === 'charging')
+          ? `${lastTold} · click behind the line to move the cue ball`
+          : lastTold
+  // The power is wanted only while he lines up and plays; otherwise the line has the width.
+  const aiming = hud.phase === 'aim' || hud.phase === 'charging'
   const groupWord = (side: Side): string =>
     hud.groups[side] ? (hud.left[side].length === 0 ? `${hud.groups[side]}: on the eight` : `${hud.groups[side]}`) : 'open table'
 
@@ -700,8 +740,15 @@ export function Pool({ play }: { play: GamePlay }): JSX.Element {
       </div>
 
       <div className="vu-pool-foot">
-        <p className="vu-pool-status">{status}</p>
-        <span className="vu-pool-meter" data-live={hud.phase === 'charging' ? '' : undefined} aria-hidden="true">
+        <p className="vu-pool-status" data-told={lastTold ? '' : undefined} title={line} aria-live="polite">
+          {line}
+        </p>
+        <span
+          className="vu-pool-meter"
+          data-live={hud.phase === 'charging' ? '' : undefined}
+          data-idle={aiming ? undefined : ''}
+          aria-hidden="true"
+        >
           <span ref={meterFill} className="vu-pool-meterfill" />
         </span>
       </div>

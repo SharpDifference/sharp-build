@@ -46,6 +46,12 @@ const BRISK = { afterReaderMs: 1200, betweenMs: 700, run: 0.7, settleMs: 500 } a
 const SAY_CAP_MS = 2500
 /** Two stops closer together than this are one press, heard twice. */
 const PRESS_GAP_MS = 180
+/**
+ * How long the result stands told on the lane before it is handed over, read at the reader's own
+ * pace with the balls kept off the box: nothing there is left for him to step past, so the table
+ * would otherwise clear at once.
+ */
+const END_HOLD_MS = 2200
 
 /** The three things a throw is made of, in the order they are stopped, and each one's sweep. */
 const STAGES = [
@@ -77,8 +83,9 @@ interface Rolling extends Ball {
  * Bowling: a lane from above, the pins at the far end. A throw is three stops, each a click or
  * Space: where the ball is set down, how hard, and how much hook; then it rolls and the rules
  * say what falls. Alone the reader bowls every frame; with girls everyone bowls each frame in
- * turn, the reader first, and each girl's throws are the rules' own at her skill. What happens is
- * said in the scene's dialogue box; the surface shows the lane and the sheet.
+ * turn, the reader first, and each girl's throws are the rules' own at her skill. The surface
+ * shows the lane and the sheet, and under the button the last ball in a line, which stays until
+ * the next, and at the end the result; the dialogue box tells it too only where play-by-play is on.
  */
 export function Bowling({ play }: { play: GamePlay }): JSX.Element {
   const [balls, setBalls] = useState<Ball[]>([])
@@ -87,6 +94,8 @@ export function Bowling({ play }: { play: GamePlay }): JSX.Element {
   const [stage, setStage] = useState(0)
   // One of them is saying something about the last ball: the next girl's ball waits for it.
   const [speaking, setSpeaking] = useState(false)
+  // The last ball as it is told, or the result once the game is over, shown under the button.
+  const [lastTold, setLastTold] = useState<string | null>(null)
   const remarks = useRef(0)
   // Remarks asked for and not yet on the box, and the cap on the wait for the last of them.
   const saying = useRef(0)
@@ -171,6 +180,7 @@ export function Bowling({ play }: { play: GamePlay }): JSX.Element {
     setBalls(all)
     setRolling(null)
     setStage(0)
+    setLastTold(told.narration)
     play.narrate(told.narration)
     if (!tableOf(all, frames, girls.length).over) {
       remark(all, told)
@@ -178,20 +188,20 @@ export function Bowling({ play }: { play: GamePlay }): JSX.Element {
     }
 
     finished.current = true
-    if (girls.length === 0) {
-      play.finish({
-        outcome: 'played',
-        summary: soloSummary(all, frames),
-        account: soloAccount(all, frames)
-      })
+    const totals = totalsOf(all, frames, girls.length)
+    const result =
+      girls.length === 0
+        ? { outcome: 'played' as const, summary: soloSummary(all, frames), account: soloAccount(all, frames) }
+        : { outcome: outcomeOf(totals), summary: versusSummary(names, totals), account: versusAccount(names, all, frames) }
+    // The last ball is on the sheet; what the game came to is said under it.
+    setLastTold(result.summary)
+    if (!play.stepped || play.playByPlay) {
+      play.finish(result)
       return
     }
-    const totals = totalsOf(all, frames, girls.length)
-    play.finish({
-      outcome: outcomeOf(totals),
-      summary: versusSummary(names, totals),
-      account: versusAccount(names, all, frames)
-    })
+    setTimeout(() => {
+      if (live.current) play.finish(result)
+    }, END_HOLD_MS)
   }
 
   /**
@@ -259,15 +269,21 @@ export function Bowling({ play }: { play: GamePlay }): JSX.Element {
   }, [balls])
 
   // A girl's ball, after a beat: thrown at what is standing, at her own skill. Read at the
-  // reader's own pace there is no beat: she bowls once he has moved past everything said of the
-  // ball before.
+  // reader's own pace she bowls once he has moved past everything said of the ball before; with
+  // the balls kept off the box that may be at once, so the beat is still given, for the last
+  // ball to be seen on the lane and the sheet.
   useEffect(() => {
     if (!her || rolling || speaking) return
+    const afterReader = balls.length > 0 && balls[balls.length - 1].who === 0
+    const pause = !several ? HER_PAUSE_MS : afterReader ? BRISK.afterReaderMs : BRISK.betweenMs
+    // The beat runs from the ball before hers, so time spent on a remark is not waited out twice.
+    const beat = (): number => Math.max(300, pause - (performance.now() - landedAt.current))
     if (play.stepped) {
       let mine = true
       void play
         .read()
         .catch(() => undefined)
+        .then(() => (play.playByPlay ? undefined : new Promise((resolve) => setTimeout(resolve, beat()))))
         .then(() => {
           if (mine && live.current && !finished.current) bowl(herThrow(table.standing, her.skill), table.who)
         })
@@ -275,11 +291,7 @@ export function Bowling({ play }: { play: GamePlay }): JSX.Element {
         mine = false
       }
     }
-    const afterReader = balls.length > 0 && balls[balls.length - 1].who === 0
-    const pause = !several ? HER_PAUSE_MS : afterReader ? BRISK.afterReaderMs : BRISK.betweenMs
-    // The beat runs from the ball before hers, so time spent on a remark is not waited out twice.
-    const left = Math.max(300, pause - (performance.now() - landedAt.current))
-    const timer = setTimeout(() => bowl(herThrow(table.standing, her.skill), table.who), left)
+    const timer = setTimeout(() => bowl(herThrow(table.standing, her.skill), table.who), beat())
     return () => clearTimeout(timer)
     // A girl's turn comes round once per ball landed, which the count alone says.
   }, [herTurn, balls.length, rolling === null, speaking])
@@ -492,7 +504,10 @@ export function Bowling({ play }: { play: GamePlay }): JSX.Element {
           >
             {prompt}
           </motion.button>
-          <span className="vu-bowling-hint">click or Space, three times: spot, power, hook</span>
+          {/* The last ball told, in the hint's place, once there is one. */}
+          <span className="vu-bowling-hint" data-told={lastTold !== null || undefined} aria-live="polite">
+            {lastTold ?? 'click or Space, three times: spot, power, hook'}
+          </span>
         </div>
       </div>
     </div>

@@ -51,6 +51,12 @@ const SETTLE_MS = 380
 const SAY_CAP_MS = 2500
 /** Two stops closer together than this are one press, heard twice. */
 const PRESS_GAP_MS = 180
+/**
+ * How long the last throw stands told on the table before the result is handed over, read at
+ * the reader's own pace with the throws kept off the box: nothing there is left for him to step
+ * past, so the table would otherwise clear at once.
+ */
+const END_HOLD_MS = 2200
 
 /** The two things a throw is made of, in the order they are stopped, and each one's sweep. */
 const STAGES = [
@@ -90,8 +96,9 @@ interface Flight {
  * click or Space: a marker sweeping across the cups, then one sweeping up the table for the
  * arc; then the ball flies and the rules say where it ends. The girls' throws are the rules' own
  * at their skill. The reader's ball strays a little from his stops, as a hand does, and every cup
- * his side drinks makes his sweeps quicker and his hand less steady. What happens
- * is said in the scene's dialogue box; the surface shows the table, the sides and the drink.
+ * his side drinks makes his sweeps quicker and his hand less steady. The surface shows the
+ * table, the sides and the drink, and under the buttons the last throw or re-rack in a line,
+ * which stays until the next; the dialogue box tells it too only where play-by-play is on.
  */
 export function BeerPong({ play }: { play: GamePlay }): JSX.Element {
   const girls = play.opponents
@@ -103,6 +110,8 @@ export function BeerPong({ play }: { play: GamePlay }): JSX.Element {
   const [stage, setStage] = useState(0)
   // One of them is saying something: the next girl's throw waits for it.
   const [speaking, setSpeaking] = useState(false)
+  // The last throw or re-rack, as it is told, shown under the buttons until the next.
+  const [lastTold, setLastTold] = useState<string | null>(null)
   const remarks = useRef(0)
   const saying = useRef(0)
   const sayCap = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
@@ -179,7 +188,9 @@ export function BeerPong({ play }: { play: GamePlay }): JSX.Element {
     const left = game.sides[1].cups.length
     setGame(rerack(game, 0))
     setStage(0)
-    play.narrate(`You call your re-rack: the ${left} cups left are pulled in tight.`)
+    const line = `You call your re-rack: the ${left} cups left are pulled in tight.`
+    setLastTold(line)
+    play.narrate(line)
     remark(lastSaid(), `The reader used his side's one re-rack: the ${left} cups he is throwing at were pulled in tight.`)
   }
 
@@ -223,6 +234,7 @@ export function BeerPong({ play }: { play: GamePlay }): JSX.Element {
     setGame(next)
     setFlight(null)
     setStage(0)
+    setLastTold(told.narration)
     play.narrate(told.narration)
     if (next.winner === null) {
       // A moment worth a word; talkative, any cup that goes and any ball off the table too.
@@ -231,7 +243,14 @@ export function BeerPong({ play }: { play: GamePlay }): JSX.Element {
       return
     }
     finished.current = true
-    play.finish({ outcome: outcomeOf(next), summary: summaryOf(names, next), account: accountOf(names, next) })
+    const result = { outcome: outcomeOf(next), summary: summaryOf(names, next), account: accountOf(names, next) }
+    if (!play.stepped || play.playByPlay) {
+      play.finish(result)
+      return
+    }
+    setTimeout(() => {
+      if (live.current) play.finish(result)
+    }, END_HOLD_MS)
   }
 
   // How the game stands, for anything said at the table.
@@ -240,12 +259,16 @@ export function BeerPong({ play }: { play: GamePlay }): JSX.Element {
   }, [game])
 
   // A girl's throw, after a beat: her re-rack first where the cups are scattered, then the ball.
-  // Read at the reader's pace there is no beat: her move is made once he has moved past
-  // everything said so far, the throw before it included.
+  // Read at the reader's pace her move is made once he has moved past everything said so far,
+  // the throw before it included; with the throws kept off the box that may be at once, so the
+  // beat is still given, for the last throw to be seen on the table.
   useEffect(() => {
     if (!her || flight || speaking) return
     const side = game.turn
     const last = game.log[game.log.length - 1]
+    const pause = !several ? HER_PAUSE_MS : !last || last.who === 0 ? BRISK.afterReaderMs : BRISK.betweenMs
+    // The beat runs from the throw before hers, so time spent on a remark is not waited out twice.
+    const beat = (): number => Math.max(300, pause - (performance.now() - landedAt.current))
     if (play.stepped) {
       // The reader's own side's re-rack is his to call.
       const pulls = side === 1 && herRerack(game, side)
@@ -254,11 +277,15 @@ export function BeerPong({ play }: { play: GamePlay }): JSX.Element {
       void play
         .read()
         .catch(() => undefined)
+        .then(() => (play.playByPlay ? undefined : new Promise((resolve) => setTimeout(resolve, beat()))))
         .then(() => {
           if (!on || !live.current || finished.current) return
           if (pulls) {
+            landedAt.current = performance.now()
             setGame(rerack(game, side))
-            play.narrate(`${her.name} calls ${several ? 'their' : 'her'} re-rack: your ${cups} cups are pulled in tight.`)
+            const line = `${her.name} calls ${several ? 'their' : 'her'} re-rack: your ${cups} cups are pulled in tight.`
+            setLastTold(line)
+            play.narrate(line)
             remark(who - 1, `${her.name} used her side's one re-rack: the ${cups} cups she is throwing at were pulled in tight.`)
             return
           }
@@ -268,21 +295,20 @@ export function BeerPong({ play }: { play: GamePlay }): JSX.Element {
         on = false
       }
     }
-    const pause = !several ? HER_PAUSE_MS : !last || last.who === 0 ? BRISK.afterReaderMs : BRISK.betweenMs
-    // The beat runs from the throw before hers, so time spent on a remark is not waited out twice.
-    const left = Math.max(300, pause - (performance.now() - landedAt.current))
     const timer = setTimeout(() => {
       // The reader's own side's re-rack is his to call.
       if (side === 1 && herRerack(game, side)) {
         const cups = game.sides[0].cups.length
         landedAt.current = performance.now()
         setGame(rerack(game, side))
-        play.narrate(`${her.name} calls ${several ? 'their' : 'her'} re-rack: your ${cups} cups are pulled in tight.`)
+        const line = `${her.name} calls ${several ? 'their' : 'her'} re-rack: your ${cups} cups are pulled in tight.`
+        setLastTold(line)
+        play.narrate(line)
         remark(who - 1, `${her.name} used her side's one re-rack: the ${cups} cups she is throwing at were pulled in tight.`)
         return
       }
       launch(herThrow(game.sides[side === 0 ? 1 : 0].cups, her.skill, tipsyOf(game, side)))
-    }, left)
+    }, beat())
     return () => clearTimeout(timer)
   }, [game, flight === null, speaking])
 
@@ -520,7 +546,10 @@ export function BeerPong({ play }: { play: GamePlay }): JSX.Element {
               {game.sides[0].reracked ? 'Re-rack used' : 'Re-rack'}
             </motion.button>
           </div>
-          <span className="vu-beerpong-hint">click or Space, twice: aim, then arc</span>
+          {/* The last throw told, in the hint's place, once there is one. */}
+          <span className="vu-beerpong-hint" data-told={lastTold !== null || undefined} aria-live="polite">
+            {lastTold ?? 'click or Space, twice: aim, then arc'}
+          </span>
         </div>
       </div>
     </div>
