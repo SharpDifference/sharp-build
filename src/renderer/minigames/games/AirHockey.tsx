@@ -51,14 +51,20 @@ const MAX_FRAME_S = 0.1
 /** How long the table is held once he is back at it, counted down from this many. */
 const RESUME_MS = 2400
 const RESUME_COUNT = 3
+/**
+ * At the reader's own pace with the goals kept off the box, how long the last goal and the result
+ * stand before the match is handed over: there is no line for him to step past, so nothing else
+ * holds the table open.
+ */
+const STEPPED_END_MS = 1800
 
 /**
  * Air hockey: one table seen from above, the reader's end at the bottom and hers at the top. His
  * mallet follows the pointer inside his half; hers is the rules' own, at her skill. The table
  * runs in real time, a fixed step at a time, and stops for a beat at each goal, when the puck is
  * served to whoever let it in. It stops too for as long as he is looking elsewhere, and counts
- * him back in before the puck moves again. The goals are said in the scene's dialogue box; the
- * table shows the play and the score.
+ * him back in before the puck moves again. The table shows the play, the score, who scored the
+ * last goal and who took the match; the scene's dialogue box has them only with the play-by-play on.
  */
 export function AirHockey({ play }: { play: GamePlay }): JSX.Element {
   const her = play.opponents[0]
@@ -83,6 +89,11 @@ export function AirHockey({ play }: { play: GamePlay }): JSX.Element {
 
   const { mine, hers } = scoreOf(goals)
   const over = matchOver(goals, toWin)
+  // Who put the last one in, and who took the match: on the table, where the box no longer says it.
+  const herName = her?.name ?? 'she'
+  const lastBy = goals[goals.length - 1]
+  const scoredNote = lastBy === 'her' ? `${herName} scores` : 'you score'
+  const endNote = mine > hers ? 'you win' : `${herName} wins`
 
   // The match is on from the moment she takes her end, and the serve is said.
   const opened = useRef(false)
@@ -188,11 +199,18 @@ export function AirHockey({ play }: { play: GamePlay }): JSX.Element {
       if (matchOver(scored, toWin)) {
         ended = true
         const count = scoreOf(scored)
-        latest.current.finish({
-          outcome: count.mine > count.hers ? 'won' : 'lost',
-          summary: matchSummary(her.name, scored),
-          account: matchAccount(her.name, scored, toWin)
-        })
+        const result = (): void => {
+          if (gone) return
+          latest.current.finish({
+            outcome: count.mine > count.hers ? 'won' : 'lost',
+            summary: matchSummary(her.name, scored),
+            account: matchAccount(her.name, scored, toWin)
+          })
+        }
+        if (latest.current.stepped && !latest.current.playByPlay) {
+          latest.current.progress(matchAccountSoFar(her.name, scored, toWin))
+          hold = setTimeout(result, STEPPED_END_MS)
+        } else result()
         return
       }
       latest.current.progress(matchAccountSoFar(her.name, scored, toWin))
@@ -358,13 +376,13 @@ export function AirHockey({ play }: { play: GamePlay }): JSX.Element {
         <p className="vu-airhockey-note">first to {toWin}</p>
         <p className="vu-airhockey-note vu-airhockey-note--state">
           {over
-            ? 'game over'
+            ? endNote
             : away
               ? 'paused'
               : count
                 ? 'get ready'
                 : waiting
-                  ? 'goal'
+                  ? scoredNote
                   : 'in play'}
         </p>
         <p className="vu-airhockey-note">your mallet follows the pointer</p>

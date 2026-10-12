@@ -302,6 +302,20 @@
   opacity: 0.35;
 }
 
+/* The game over: the roll stands back, and the result under it is read in full. */
+.vu-skeeball-roll[data-over] {
+  opacity: 1;
+}
+
+.vu-skeeball-roll[data-over] > button {
+  opacity: 0.35;
+}
+
+.vu-skeeball-roll[data-over] .vu-skeeball-hint {
+  color: var(--vu-text);
+  font-weight: 700;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .vu-skeeball-pop {
     animation: none;

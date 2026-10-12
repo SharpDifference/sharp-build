@@ -68,6 +68,12 @@ const RESUME_BEAT_MS = 600
 const BACK_MS = 300
 /** How often the scene is told how the round stands, should he walk away from it. */
 const PROGRESS_MS = 10000
+/**
+ * At the reader's own pace with the round kept off the box, how long the buzzer and the result
+ * stand before the round is handed over: there is no line for him to step past, so nothing else
+ * holds the table open.
+ */
+const STEPPED_END_MS = 1800
 
 /** The reader's cabinet as it is drawn: HoopShot.css sizes the same box. */
 const VIEW = { width: 400, height: 250 }
@@ -162,7 +168,8 @@ function runWord(shooter: Shooter): string {
  * says how it comes out; the ball is back in his hand a moment later. Each girl shoots at her
  * own cabinet by her skill, stepped on the same clock, and is shown by her score, her last shot
  * and her run. For the last third the hoop slides and takes the band with it. Nothing waits on
- * anything said: the box hears the start, the hoop starting to move and the buzzer.
+ * anything said: the start, the hoop starting to move and the buzzer are on the court, and on the
+ * box too with the play-by-play on.
  */
 export function HoopShot({ play }: { play: GamePlay }): JSX.Element {
   const girls = play.opponents
@@ -396,19 +403,26 @@ export function HoopShot({ play }: { play: GamePlay }): JSX.Element {
       void held.current.narrate(buzzerLine(names, game.shooters))
       standing()
       setPhase('over')
-      held.current.finish(
-        girls.length
-          ? {
-              outcome: outcomeOf(scores),
-              summary: versusSummary(names, game.shooters),
-              account: versusAccount(names, game.shooters, game.mark, lengthMs)
-            }
-          : {
-              outcome: 'played',
-              summary: soloSummary(game.shooters[0], lengthMs),
-              account: soloAccount(game.shooters[0], lengthMs)
-            }
-      )
+      const result = (): void => {
+        if (!onTable()) return
+        held.current.finish(
+          girls.length
+            ? {
+                outcome: outcomeOf(scores),
+                summary: versusSummary(names, game.shooters),
+                account: versusAccount(names, game.shooters, game.mark, lengthMs)
+              }
+            : {
+                outcome: 'played',
+                summary: soloSummary(game.shooters[0], lengthMs),
+                account: soloAccount(game.shooters[0], lengthMs)
+              }
+        )
+      }
+      if (held.current.stepped && !held.current.playByPlay) {
+        tellProgress()
+        setTimeout(result, STEPPED_END_MS)
+      } else result()
     }
 
     const loop = (): void => {
@@ -543,6 +557,19 @@ export function HoopShot({ play }: { play: GamePlay }): JSX.Element {
   const dead = over || (playing && !canShoot)
   const label = !playing ? (over ? 'Buzzer' : 'Start') : count !== null || resuming !== null ? 'Get ready' : 'Shoot'
   const clock = `0:${String(left).padStart(2, '0')}`.replace('0:60', '1:00')
+  // How the round came out, on the court once the buzzer has gone: the box says it only with the
+  // play-by-play on.
+  const result = !over
+    ? ''
+    : !girls.length
+      ? `${mine.score} points`
+      : outcomeOf(scores) === 'won'
+        ? 'you win'
+        : outcomeOf(scores) === 'draw'
+          ? 'tied'
+          : ahead.length === 1
+            ? `${names[ahead[0] - 1]} wins`
+            : `${listed(ahead.map((seat) => names[seat - 1]))} tie`
 
   return (
     <div className="vu-hoopshot" data-phase={phase} data-paused={(playing && away) || undefined}>
@@ -597,6 +624,11 @@ export function HoopShot({ play }: { play: GamePlay }): JSX.Element {
             </motion.span>
           )}
           {sliding && !over && <span className="vu-hoopshot-three">3 points</span>}
+          {over && (
+            <span className="vu-hoopshot-three" role="status">
+              {result}
+            </span>
+          )}
 
           {phase === 'ready' && (
             <div className="vu-hoopshot-card">

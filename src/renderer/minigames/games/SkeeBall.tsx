@@ -49,6 +49,12 @@ const REMARKS = { quiet: 0, some: 3, lots: 7 } as const
 const HER_PAUSE_MS = 1200
 /** The beat before her ball where the text is read at the reader's own pace: no time for reading is kept. */
 const STEPPED_BEAT_MS = 300
+/**
+ * At the reader's own pace with the balls kept off the box, how long the last ball and the result
+ * stand before the game is handed over: there is no line for him to step past, so nothing else
+ * holds the table open.
+ */
+const STEPPED_END_MS = 1800
 /** The same with more than one girl rolling, and their balls shown at a brisker pace. */
 const BRISK = { afterReaderMs: 900, betweenMs: 550, run: 0.75 } as const
 /** A ball's trip: up the ramp, the hop onto the board, the drop into a ring or down to the gutter, and the score standing. */
@@ -112,7 +118,8 @@ interface Rolling {
  * or Space: the line across the lane, then the power on a meter; then the ball runs up the ramp,
  * hops and the rules say where it drops. Alone the reader rolls every ball; with girls everyone
  * rolls one ball in turn, the reader first, and each girl's rolls are the rules' own at her skill.
- * What happens is said in the scene's dialogue box; the surface shows the alley and the scores.
+ * The surface shows the alley, each ball's score, whose ball is next and how the game came out;
+ * the scene's dialogue box has the balls too only with the play-by-play on.
  */
 export function SkeeBall({ play }: { play: GamePlay }): JSX.Element {
   const girls = play.opponents
@@ -280,11 +287,16 @@ export function SkeeBall({ play }: { play: GamePlay }): JSX.Element {
 
     finished.current = true
     const totals = totalsOf(all, girls.length)
-    play.finish(
-      girls.length === 0
-        ? { outcome: 'played', summary: soloSummary(all), account: soloAccount(all) }
-        : { outcome: outcomeOf(totals), summary: versusSummary(names, totals), account: versusAccount(names, all, balls) }
-    )
+    const result = (): void => {
+      if (!onTable()) return
+      play.finish(
+        girls.length === 0
+          ? { outcome: 'played', summary: soloSummary(all), account: soloAccount(all) }
+          : { outcome: outcomeOf(totals), summary: versusSummary(names, totals), account: versusAccount(names, all, balls) }
+      )
+    }
+    if (play.stepped && !play.playByPlay) setTimeout(result, STEPPED_END_MS)
+    else result()
   }
   const landNow = useRef(land)
   landNow.current = land
@@ -313,7 +325,12 @@ export function SkeeBall({ play }: { play: GamePlay }): JSX.Element {
     const afterReader = rolls.length > 0 && rolls[rolls.length - 1].who === 0
     const pause = !several ? HER_PAUSE_MS : afterReader ? BRISK.afterReaderMs : BRISK.betweenMs
     // The beat runs from the ball before hers, so time spent on a remark is not waited out twice.
-    const left = play.stepped ? STEPPED_BEAT_MS : Math.max(300, pause - (performance.now() - landedAt.current))
+    // Stepping past the line for the ball before is the reader's time to take it in; with the balls
+    // kept off the box there is no such line, and the beat is the same as at the box's own pace.
+    const left =
+      play.stepped && play.playByPlay
+        ? STEPPED_BEAT_MS
+        : Math.max(300, pause - (performance.now() - landedAt.current))
     const who = table.who
     const timer = setTimeout(
       () => launch({ who, ...herRoll(her.skill, needOf(rolls, who, balls, girls.length)) }),
@@ -449,6 +466,20 @@ export function SkeeBall({ play }: { play: GamePlay }): JSX.Element {
   const hidden = away && !waiting
   // Her ball waits on a line the reader has yet to move past, where he steps through them himself.
   const held = her !== undefined && play.stepped && reached < rolls.length
+  // How it came out, where the box says it only with the play-by-play on.
+  const best = Math.max(...totals)
+  const top = players.filter((_, who) => totals[who] === best)
+  const ending = !table.over
+    ? ''
+    : girls.length === 0
+      ? `${totals[0]} points`
+      : outcomeOf(totals) === 'won'
+        ? `You win, with ${best}`
+        : top.length === 1
+          ? `${top[0]} wins, with ${best}`
+          : top.includes('You')
+            ? `A tie on ${best}`
+            : `${listed(top)} tie on ${best}`
   const prompt = table.over
     ? 'Game over'
     : rolling
@@ -589,7 +620,12 @@ export function SkeeBall({ play }: { play: GamePlay }): JSX.Element {
           </tbody>
         </table>
 
-        <div className="vu-skeeball-roll" inert={waiting || undefined} data-waiting={waiting || undefined}>
+        <div
+          className="vu-skeeball-roll"
+          inert={waiting || undefined}
+          data-waiting={waiting || undefined}
+          data-over={table.over || undefined}
+        >
           <motion.button
             type="button"
             className="vu-btn vu-btn--outline vu-paper vu-btn--panel"
@@ -606,7 +642,9 @@ export function SkeeBall({ play }: { play: GamePlay }): JSX.Element {
           >
             {prompt}
           </motion.button>
-          <span className="vu-skeeball-hint">click or Space, twice: your line, then your power</span>
+          <span className="vu-skeeball-hint" role={table.over ? 'status' : undefined}>
+            {table.over ? ending : 'click or Space, twice: your line, then your power'}
+          </span>
         </div>
       </div>
     </div>
