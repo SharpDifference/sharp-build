@@ -126,6 +126,14 @@ export interface MiniGameDef {
    * leaves this unset: its lines keep their own time and the player is given no choice.
    */
   stepped?: boolean
+  /**
+   * Whether the game's narration of its moves goes in the dialogue box: a throw landed, a card
+   * turned. Off where it does not say: the reader is at the table and sees every move on it, so
+   * the box keeps to what people say, and a line stays there while the game goes on. A game whose
+   * text is the play itself, or whose moves read better as lines, says `true`. The player may
+   * have it the other way on the game's page.
+   */
+  playByPlay?: boolean
   /** How it is played, for the player: the keys or the pointer, in a sentence. Shown on its page. */
   controls?: string
   /** What makes someone good at it, in a sentence, for judging how well a girl plays. */
@@ -276,6 +284,8 @@ export interface GamePrefs {
   suggest?: SuggestRate
   /** Whether its text waits for him, for a game that gives the choice, in place of its usual way. */
   stepped?: boolean
+  /** Whether its moves are narrated in the dialogue box, in place of its usual way. */
+  playByPlay?: boolean
 }
 
 /**
@@ -296,7 +306,8 @@ export function tuned(game: MiniGameDef, prefs: GamePrefs | undefined): MiniGame
     ...(prefs.suggest ? { suggest: prefs.suggest, suggestAt: undefined } : {}),
     ...(prefs.stepped !== undefined && game.stepped !== undefined
       ? { stepped: prefs.stepped }
-      : {})
+      : {}),
+    ...(prefs.playByPlay !== undefined ? { playByPlay: prefs.playByPlay } : {})
   }
 }
 

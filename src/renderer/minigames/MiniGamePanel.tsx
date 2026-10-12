@@ -39,6 +39,7 @@ import {
   compactTable,
   fileResult,
   nameOf,
+  moveAtTable,
   narrateAtTable,
   openTable,
   readerPlaysAtTable,
@@ -309,9 +310,10 @@ export function MiniGamePanel({ theme, onClose }: ScenePanelProps): JSX.Element 
       chattiness,
       options: seated?.options ?? {},
       started: () => begin(),
+      playByPlay: Boolean(seated?.game.playByPlay),
       narrate: (text) => {
         begin()
-        return narrateAtTable(text)
+        return seated?.game.playByPlay ? narrateAtTable(text) : moveAtTable()
       },
       say: (charId, cue) => {
         begin()
@@ -356,7 +358,7 @@ export function MiniGamePanel({ theme, onClose }: ScenePanelProps): JSX.Element 
       },
       finish: (ended) => setResult(ended)
     }),
-    [seated?.game.name, seated?.game.stepped, seated?.opponents, seated?.stake, seated?.options, chattiness, location]
+    [seated?.game.name, seated?.game.stepped, seated?.game.playByPlay, seated?.opponents, seated?.stake, seated?.options, chattiness, location]
   )
 
   function leave(ended: PlayResult): void {

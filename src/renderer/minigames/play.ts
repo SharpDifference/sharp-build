@@ -68,10 +68,17 @@ export interface GamePlay {
   /** The first move is made: from here, leaving the table is walking away from a game. */
   started: () => void
   /**
+   * Whether {@link GamePlay.narrate} puts the game's moves in the dialogue box, as the game and
+   * the player have it. Mostly it does not: the box keeps to what people say, and anything the
+   * reader needs to notice has to be on the game's own surface, not only in its narration.
+   */
+  playByPlay: boolean
+  /**
    * Says something in the scene's own dialogue box, in the game's words and at once: a move
    * made, a card turned. It goes onto the scene's transcript like any narration. The first one
    * is a first move: whatever of a reply was still unread is dropped. Resolves once the line is
-   * on the box, which is after everything said before it; most games need not wait.
+   * on the box, which is after everything said before it; most games need not wait. Where
+   * {@link GamePlay.playByPlay} is off, nothing is shown and it resolves after a short beat.
    */
   narrate: (text: string) => Promise<void>
   /**

@@ -162,6 +162,26 @@ function GamePage({ game, onBack }: { game: MiniGameDef; onBack: () => void }): 
           ]}
         />
       )}
+      <SelectField
+        id={`minigame-pref-${game.id}-playbyplay`}
+        label="Play-by-play in the text box"
+        hint="Whether each move is also told in the dialogue box, or the box keeps to what people say."
+        value={prefs?.playByPlay === undefined ? '' : prefs.playByPlay ? 'yes' : 'no'}
+        onChange={(value) =>
+          setPrefs(game.id, {
+            ...prefs,
+            playByPlay: value === '' ? undefined : value === 'yes'
+          })
+        }
+        options={[
+          {
+            value: '',
+            label: `As the game has it (${game.playByPlay ? 'every move told' : 'only what people say'})`
+          },
+          { value: 'yes', label: 'Every move told' },
+          { value: 'no', label: 'Only what people say' }
+        ]}
+      />
       {game.players.max > 0 && (
         <SelectField
           id={`minigame-pref-${game.id}-suggest`}

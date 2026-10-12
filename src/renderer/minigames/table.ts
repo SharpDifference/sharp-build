@@ -279,6 +279,18 @@ function showOne(text: string, speaker: string): Promise<void> {
   })
 }
 
+/** How long a move left out of the box is given before the game goes on: a beat to see it land. */
+const MOVE_BEAT_MS = 800
+
+/**
+ * A move the game would narrate, at a table whose box keeps to what people say: nothing goes on
+ * the box or the scene, and whatever is on the box stays. Resolves after a beat, so a game that
+ * waits on its narration between her moves still lets each be seen on the table.
+ */
+export function moveAtTable(): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, MOVE_BEAT_MS))
+}
+
 /** A line from the table in the scene's dialogue box, once the turn is the table's. */
 export function narrateAtTable(text: string): Promise<void> {
   return show(text, '')
