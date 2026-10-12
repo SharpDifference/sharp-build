@@ -1,5 +1,6 @@
 import { bunnyboardPages } from '../mods/hooks'
-import { useModsStore } from '../stores/modsStore'
+import { useModsStore, useModOn } from '../stores/modsStore'
+import { INCOMING_TEXTS } from '@shared/modEntries/incoming-texts'
 import {
   Fragment,
   memo,
@@ -31,6 +32,7 @@ import { PROFILE_PICTURE_TYPES } from '@shared/profilePicture'
 import { formatTokens } from '@shared/tallies'
 import { affectionFor, emptyFlags, relationshipTagOf } from '@shared/relationship'
 import { ConfirmModal } from '../components/ConfirmModal'
+import { CheckField } from '../components/CheckField'
 import { TextField } from '../components/TextField'
 import { useModalShell } from '../components/useModalShell'
 import { yearLabel } from '@shared/classes'
@@ -67,7 +69,8 @@ import {
   sceneActiveOf,
   sendBossMessage,
   sendFriendRequest,
-  sendMessage
+  sendMessage,
+  sendIncomingMessage
 } from '../stores/textingLoop'
 import {
   charBusyNow,
@@ -905,6 +908,15 @@ function ConversationView({
   const sceneActive = useGameStore(sceneActiveOf)
   const epilogue = useGameStore(epilogueOf)
   const [draft, setDraft] = useState('')
+  const incomingOn = useModOn(INCOMING_TEXTS)
+  const [incoming, setIncoming] = useState(false)
+  // A direction must never become an ordinary outgoing text when the mod is disabled.
+  useEffect(() => {
+    if (!incomingOn && incoming) {
+      setDraft('')
+      setIncoming(false)
+    }
+  }, [incomingOn, incoming])
   const [scrollBox, setScrollBox] = useState<HTMLDivElement | null>(null)
 
   const messages = conversation?.messages ?? []
@@ -963,8 +975,11 @@ function ConversationView({
   function onSend(): void {
     const value = draft.trim()
     if (!value || composerClosed) return
+    if (incoming && !incomingOn) return
     setDraft('')
-    void sendMessage(charId, value)
+    setIncoming(false)
+    if (incoming) void sendIncomingMessage(charId, value)
+    else void sendMessage(charId, value)
   }
 
   // Her handle sits beside her name, and under the pair a lamp and the one line the app is
@@ -1120,6 +1135,12 @@ function ConversationView({
           </div>
         ) : (
           <Composer
+            incomingAvailable={incomingOn}
+            incoming={incoming}
+            onIncoming={(value) => {
+              setDraft('')
+              setIncoming(value)
+            }}
             closed={composerClosed}
             draft={draft}
             placeholder={
@@ -1136,7 +1157,7 @@ function ConversationView({
                       ? `${name} is ${atWork ? 'at work' : 'in class'} right now.`
                       : busy
                         ? `Waiting for ${name}...`
-                        : 'Message'
+                        : incoming ? `Describe the text ${name} sends you` : 'Message'
             }
             onDraft={setDraft}
             onSend={onSend}
@@ -1166,12 +1187,18 @@ function ConversationView({
  * arrangement. Everything here is shut together, for the four reasons the thread decides.
  */
 function Composer({
+  incomingAvailable,
+  incoming,
+  onIncoming,
   closed,
   draft,
   placeholder,
   onDraft,
   onSend
 }: {
+  incomingAvailable: boolean
+  incoming: boolean
+  onIncoming: (value: boolean) => void
   closed: boolean
   draft: string
   placeholder: string
@@ -1192,6 +1219,18 @@ function Composer({
         onSend()
       }}
     >
+      {incomingAvailable && (
+        <div className="vu-bb-incoming">
+          <CheckField
+            id="bb-incoming"
+            label="Incoming text"
+            note="Your direction is not sent. Only her texts appear."
+            checked={incoming}
+            disabled={closed}
+            onChange={onIncoming}
+          />
+        </div>
+      )}
       <div className="vu-bb-compose">
         <textarea
           id="bb-compose"
@@ -1203,7 +1242,7 @@ function Composer({
           onChange={(e) => onDraft(e.target.value)}
         />
         <PrimaryButton id="bb-send" dead={closed || !draft.trim()} onClick={onSend}>
-          Send
+          {incoming ? 'Generate' : 'Send'}
         </PrimaryButton>
       </div>
 
