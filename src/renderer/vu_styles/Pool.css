@@ -1,7 +1,11 @@
 /* Pool: an eight-ball table from above, with each side's group and balls over it and the power
    meter under it. Drawn on the mini-game board. */
 
+/* The balls and pockets are things, not themed paper: an ivory ball reads as the cue ball and a
+   black one as the eight by day or by night, and a pocket is a hole. */
 .vu-pool {
+  --pool-ivory: #f7f0e6;
+  --pool-black: #1c171d;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -62,6 +66,14 @@
   margin: 0;
   color: var(--vu-text-muted);
   font: 700 12px var(--font-mono);
+}
+
+/* Once the table is no longer open, which balls are whose is said in the accent. */
+.vu-pool-group[data-set] {
+  color: var(--vu-accent);
+  font-size: 13px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
 }
 
 .vu-pool-tray {
@@ -137,20 +149,20 @@
 }
 
 .vu-pool-pocket {
-  fill: var(--vu-text);
+  fill: var(--pool-black);
   stroke: var(--vu-border);
   stroke-width: 2;
 }
 
-/* The balls: the cue ball plain, a solid filled in the accent, a stripe a band of it on the
-   surface, the eight in the ink. Every one carries its number. */
+/* The balls: the cue ball ivory, a solid filled in the accent, a stripe ivory with a band of
+   it, the eight black. On the table they carry no number; in the trays each does, on a disc. */
 .vu-pool-ball {
   stroke: var(--vu-border);
   stroke-width: 1.5;
 }
 
 .vu-pool-ball--cue {
-  fill: var(--vu-surface);
+  fill: var(--pool-ivory);
   stroke-width: 2;
 }
 
@@ -159,11 +171,11 @@
 }
 
 .vu-pool-ball--stripe {
-  fill: var(--vu-surface);
+  fill: var(--pool-ivory);
 }
 
 .vu-pool-ball--eight {
-  fill: var(--vu-text);
+  fill: var(--pool-black);
 }
 
 .vu-pool-band {
@@ -171,11 +183,11 @@
 }
 
 .vu-pool-disc {
-  fill: var(--vu-surface);
+  fill: var(--pool-ivory);
 }
 
 .vu-pool-number {
-  fill: var(--vu-text);
+  fill: var(--pool-black);
   font-family: var(--font-mono);
   font-weight: 700;
   text-anchor: middle;
@@ -201,7 +213,7 @@
 }
 
 .vu-pool-ghost {
-  fill: var(--vu-surface);
+  fill: var(--pool-ivory);
   fill-opacity: 0.55;
   stroke: var(--vu-text);
   stroke-width: 2.5;
@@ -209,7 +221,7 @@
 
 /* The cue ball in the reader's hand. */
 .vu-pool-hand {
-  fill: var(--vu-surface);
+  fill: var(--pool-ivory);
   stroke: var(--vu-accent);
   stroke-width: 2;
   stroke-dasharray: 4 3;

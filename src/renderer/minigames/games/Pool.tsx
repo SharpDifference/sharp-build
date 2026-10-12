@@ -86,10 +86,15 @@ interface Hud {
   breaking: boolean
 }
 
-/** A ball drawn about its own centre: the cue ball plain, a solid filled, a stripe banded, the eight dark. */
-function BallMark({ id, r }: { id: number; r: number }): JSX.Element {
+/**
+ * A ball drawn about its own centre: the cue ball plain, a solid filled, a stripe banded, the eight
+ * dark. On the table a ball carries no number, which nobody could read at its size and which only
+ * hid the colour: a solid is a disc of colour and a stripe an ivory ball with a band across its middle.
+ * In the trays over the table, where they are counted off, each keeps its number.
+ */
+function BallMark({ id, r, numbered = true }: { id: number; r: number; numbered?: boolean }): JSX.Element {
   const group = groupOf(id)
-  const half = r * 0.52
+  const half = r * 0.5
   const wide = Math.sqrt(r * r - half * half)
   return (
     <>
@@ -108,13 +113,13 @@ function BallMark({ id, r }: { id: number; r: number }): JSX.Element {
       {group === 'stripes' && (
         <path
           className="vu-pool-band"
-          d={`M ${-wide} ${-half} A ${r} ${r} 0 0 1 ${wide} ${-half} L ${wide} ${half} A ${r} ${r} 0 0 1 ${-wide} ${half} Z`}
+          d={`M ${-wide} ${-half} L ${wide} ${-half} A ${r} ${r} 0 0 1 ${wide} ${half} L ${-wide} ${half} A ${r} ${r} 0 0 1 ${-wide} ${-half} Z`}
         />
       )}
-      {id !== 0 && (
+      {id !== 0 && numbered && (
         <>
-          <circle className="vu-pool-disc" r={r * 0.56} />
-          <text className="vu-pool-number" fontSize={r * 0.82} dy="0.36em">
+          <circle className="vu-pool-disc" r={r * 0.42} />
+          <text className="vu-pool-number" fontSize={r * 0.66} dy="0.36em">
             {id}
           </text>
         </>
@@ -656,7 +661,7 @@ export function Pool({ play }: { play: GamePlay }): JSX.Element {
         <div className="vu-pool-side" data-turn={mine && hud.phase !== 'over' ? '' : undefined}>
           <div className="vu-pool-name">
             <p className="vu-pool-who">you</p>
-            <p className="vu-pool-group">
+            <p className="vu-pool-group" data-set={her && hud.groups.reader ? '' : undefined}>
               {her
                 ? groupWord('reader')
                 : `${hud.shots} ${hud.shots === 1 ? 'shot' : 'shots'} · ${hud.fouls} ${hud.fouls === 1 ? 'foul' : 'fouls'}`}
@@ -687,7 +692,9 @@ export function Pool({ play }: { play: GamePlay }): JSX.Element {
             <>
               <div className="vu-pool-name">
                 <p className="vu-pool-who">{name}</p>
-                <p className="vu-pool-group">{groupWord('her')}</p>
+                <p className="vu-pool-group" data-set={hud.groups.her ? '' : undefined}>
+                  {groupWord('her')}
+                </p>
               </div>
               <Tray ids={hud.left.her} />
             </>
@@ -732,7 +739,7 @@ export function Pool({ play }: { play: GamePlay }): JSX.Element {
                 ballMarks.current[id] = mark
               }}
             >
-              <BallMark id={id} r={BALL_R - 0.75} />
+              <BallMark id={id} r={BALL_R - 0.75} numbered={false} />
             </g>
           ))}
           <circle ref={handMark} className="vu-pool-hand" r={BALL_R - 0.75} visibility="hidden" />
