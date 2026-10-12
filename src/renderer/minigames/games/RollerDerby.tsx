@@ -20,6 +20,7 @@ import {
   placings,
   readerLean,
   readerStride,
+  soFar,
   standing,
   startLine,
   summary,
@@ -327,12 +328,16 @@ export function RollerDerby({ play }: { play: GamePlay }): JSX.Element {
         )
       } else if (event.kind === 'lap' && event.first) {
         held.current.narrate(lapLine(race, names, event.who, event.lap))
+        held.current.progress(soFar(race, names))
         if (girls.length > 0) held.current.situation(standing(race, names, held.current.stake))
         if (event.lap === race.laps - 1) {
           remark(`The last lap has just begun with ${who(event.who)} in front, everyone breathing hard.`)
         } else if (lots) {
           remark(`${who(event.who)} was first over the line at the end of lap ${event.lap}.`)
         }
+      } else if (event.kind === 'lap' && event.who === 0) {
+        // His own lap line, behind the leader: the race walked away from is known as it stood.
+        held.current.progress(soFar(race, names))
       } else if (event.kind === 'lead' && race.t > SCRAMBLE_MS) {
         remark(
           `${who(event.who)} has just skated past ${who(event.from)} to take the lead on lap ${lapOf(race, event.who)}.`,
@@ -407,11 +412,12 @@ export function RollerDerby({ play }: { play: GamePlay }): JSX.Element {
     const key = KEYS[event.key.length === 1 ? event.key.toLowerCase() : event.key]
     if (key === undefined) return
     event.preventDefault()
-    if (event.repeat) return
     if (key === 'lean') {
+      // A key held through a pause comes back as repeats: one of those takes the lean up again.
+      if (event.repeat && live.current.leanKey) return
       live.current.leanKey = true
       lean()
-    } else {
+    } else if (!event.repeat) {
       push(key, event.timeStamp)
     }
   })
@@ -484,6 +490,8 @@ export function RollerDerby({ play }: { play: GamePlay }): JSX.Element {
       if (!game.paused || document.hidden || !document.hasFocus()) return
       game.paused = false
       game.lastNow = performance.now()
+      // Nobody comes back to half a count-in: it is counted again from the top.
+      if (game.phase === 'count') game.count = COUNT_MS
       setPaused(false)
     }
     const seen = (): void => (document.hidden ? stop() : resume())
@@ -506,6 +514,7 @@ export function RollerDerby({ play }: { play: GamePlay }): JSX.Element {
 
   const over = phase === 'over'
   const racing = phase === 'racing'
+  const call = !racing ? null : view.bend ? (view.lean ? null : 'lean') : view.lean ? 'free' : null
 
   return (
     <div
@@ -556,7 +565,8 @@ export function RollerDerby({ play }: { play: GamePlay }): JSX.Element {
           <div className="vu-rink-over">
             <p className="vu-rink-how">
               Push off left and right in turn, in time with the pulse: ← → or A D. Hold ↓ or S to
-              lean through each bend, or you slide wide; hit the boards at speed and you fall.
+              lean through each bend, or you slide wide; hit the boards at speed and you fall. Let
+              go on the straights: leaning there is a crouch that slows you right down.
             </p>
             <motion.button
               type="button"
@@ -608,7 +618,11 @@ export function RollerDerby({ play }: { play: GamePlay }): JSX.Element {
         </div>
         {/* Keyed on the count, so each stride's judgement lands as a new one. */}
         <span key={view.strides} className="vu-rink-judged" data-stride={view.last ?? undefined}>
-          {view.bend && !view.lean ? 'Lean!' : view.last ? WORD[view.last] : ' '}
+          {view.last ? WORD[view.last] : ' '}
+        </span>
+        {/* The lean has its own line: wanted in a bend, to be let go of on a straight. */}
+        <span className="vu-rink-call" data-call={call || undefined} role="status">
+          {call === 'lean' ? 'Lean!' : call === 'free' ? 'Let go' : ' '}
         </span>
 
         <div className="vu-rink-pads" inert={!racing || undefined} data-waiting={!racing || undefined}>
@@ -640,7 +654,7 @@ export function RollerDerby({ play }: { play: GamePlay }): JSX.Element {
               setView(board())
             }}
           >
-            ↓ Lean
+            {call === 'free' ? '↓ Let go' : '↓ Lean'}
           </button>
           <button
             type="button"

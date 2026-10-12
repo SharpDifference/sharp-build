@@ -298,6 +298,19 @@
   color: var(--vu-text-muted);
 }
 
+/* The call for the lean, under the stride's judgement: into it in a bend, out of it on a straight. */
+.vu-rink-call {
+  min-height: 22px;
+  color: var(--vu-accent);
+  font: 400 17px var(--font-display);
+  line-height: 22px;
+  text-align: center;
+}
+
+.vu-rink-call[data-call='free'] {
+  color: var(--vu-text-muted);
+}
+
 /* The three pads: a foot each side, the lean between them. */
 .vu-rink-pads {
   display: grid;

@@ -21,6 +21,9 @@ import {
   readerLean,
   readerStride,
   rhythmShare,
+  soFar,
+  standing,
+  startLine,
   stride,
   strideReach,
   summary,
@@ -447,5 +450,119 @@ describe('Rink Race review', () => {
     const his = mean((i) => sloppy(`sloppy:${i}`))
     expect(his).toBeLessThan(mean((i) => herTime(2, `two:${i}`)))
     expect(his).toBeGreaterThan(mean((i) => herTime(5, `five:${i}`)))
+  })
+})
+
+describe('Rink Race fixes', () => {
+  it('names the racers as a list that reads, for none, one, two and three girls', () => {
+    const tables: string[][] = [[], ['Ana'], ['Ana', 'Bea'], ['Ana', 'Bea', 'Cy']]
+    const wanted = ['', 'and Ana', ', Ana and Bea', ', Ana, Bea and Cy']
+    tables.forEach((names, i) => {
+      const race = newRace(2, names.map(() => 3 as Skill))
+      const rand = seededRand(`names-${i}`)
+      expect(startLine(2, names).startsWith(i === 0 ? 'You roll up' : `You${i === 1 ? ' ' : ''}${wanted[i]} roll up`)).toBe(true)
+      expect(soFar(race, names)).toHaveLength(2)
+      let foot: Foot = 'left'
+      while (race.skaters[0].finishedAt === null && !race.called) {
+        if (race.t % BEAT_MS === 0) {
+          readerStride(race, foot)
+          foot = foot === 'left' ? 'right' : 'left'
+        }
+        readerLean(race, inBend(race.skaters[0].dist))
+        advance(race, 10, rand)
+      }
+      finishOut(race, rand)
+      const texts = [startLine(2, names), standing(race, names), summary(race, names), ...account(race, names), ...soFar(race, names)]
+      for (const text of texts) {
+        expect(text).not.toMatch(/(You|reader), \w+ (roll|are|raced|were)/)
+        expect(text).not.toMatch(/undefined|NaN/)
+      }
+      if (i === 0) {
+        expect(standing(race, names)).toBe('')
+        expect(account(race, names)[0]).toContain('The reader skated a timed run alone')
+        expect(soFar(race, names)[0]).toContain('The reader was skating')
+        return
+      }
+      const who = `The reader${i === 1 ? ' ' : ''}${wanted[i]}`
+      expect(standing(race, names)).toContain(`${who.replace('The', 'the')} are racing`)
+      expect(account(race, names)[0].startsWith(`${who} raced`)).toBe(true)
+      expect(soFar(race, names)[0].startsWith(`${who} were racing`)).toBe(true)
+      const few = i === 1 ? 'both of them' : 'all of them'
+      expect(standing(race, names)).toContain(few)
+      expect(account(race, names).at(-1)).toContain(few)
+    })
+  })
+
+  it('counts a slide that ends on the boards once, as the wobble or the fall', () => {
+    // Slow and upright: he is carried to the boards and wobbles off them.
+    const slow = newRace(3, [])
+    const events = skate(slow, 30000, 800, () => false)
+    const me = slow.skaters[0]
+    const wobbles = events.filter((event) => event.kind === 'wobble').length
+    expect(wobbles).toBeGreaterThan(0)
+    expect(me.wobbles).toBe(wobbles)
+    expect(me.wide).toBe(0)
+    const told = account(slow, []).join('\n')
+    expect(told).toContain('wobbled off the boards')
+    expect(told).not.toContain('ran wide')
+
+    // Fast and upright: the fall is the fall.
+    const fast = newRace(3, [])
+    skate(fast, 12000, BEAT_MS, () => false)
+    expect(fast.skaters[0].falls.length).toBeGreaterThan(0)
+    expect(fast.skaters[0].wide).toBe(0)
+
+    // A late lean that stops short of the boards is still a bend run wide.
+    const late = newRace(3, [])
+    skate(late, 90000, BEAT_MS, (dist) => inBend(dist - 4))
+    expect(late.skaters[0].falls.length + late.skaters[0].wobbles).toBe(0)
+    expect(late.skaters[0].wide).toBeGreaterThan(0)
+    expect(account(late, []).join('\n')).toContain('ran wide in a bend')
+
+    // A girl's one slide into the boards is one loss of the line.
+    for (let seed = 0; seed < 40; seed++) {
+      const race = newRace(3, [1])
+      const rand = seededRand(`slide-${seed}`)
+      let hits = 0
+      let crossed = 0
+      let was = 0
+      while (race.skaters[1].finishedAt === null && !race.called) {
+        hits += advance(race, 16, rand).filter((event) => (event.kind === 'wobble' || event.kind === 'fall') && event.who === 1).length
+        const now = race.skaters[1].drift
+        if (was < 0.5 && now >= 0.5) crossed++
+        was = now
+      }
+      const girl = race.skaters[1]
+      expect(girl.wobbles + girl.falls.length).toBe(hits)
+      expect(girl.wide).toBeGreaterThanOrEqual(0)
+      expect(girl.wide + hits).toBeLessThanOrEqual(crossed + hits)
+      expect(girl.wide).toBeLessThanOrEqual(crossed)
+    }
+  })
+
+  it('says how an unfinished race stands, for a reader who walks away', () => {
+    const race = newRace(3, [5, 1])
+    const rand = seededRand('away')
+    const names = ['Ana', 'Bea']
+    while (race.skaters[0].dist < LAP_M + 5) {
+      if (race.t % 420 === 0) readerStride(race, (race.t / 420) % 2 === 0 ? 'left' : 'right')
+      readerLean(race, inBend(race.skaters[0].dist))
+      advance(race, 10, rand)
+    }
+    const lines = soFar(race, names)
+    expect(lines[1]).toContain('not finished')
+    expect(lines[1]).toContain('lap 2 of 3')
+    expect(lines[1]).toMatch(/1st (Ana|the reader|Bea), 2nd /)
+    expect(lines.join(' ')).not.toContain('You')
+    const alone = newRace(2, [])
+    skate(alone, 5000, BEAT_MS, inBend)
+    expect(soFar(alone, [])[1]).toMatch(/the reader was on lap 1 of 2 with \d+\.\d\d s on the clock/)
+  })
+
+  it('tells the reader to let go of the lean on the straights', () => {
+    const def = MINI_GAMES_LIST.find((entry) => entry.id === 'roller-derby')
+    if (!def) throw new Error('no Rink Race')
+    expect(def.controls).toMatch(/let go on the straights/)
+    expect(def.format).toMatch(/straightens as each bend ends/)
   })
 })

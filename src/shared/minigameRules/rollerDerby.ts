@@ -142,6 +142,8 @@ export interface Skater {
   wobbles: number
   clips: number
   wide: number
+  /** The slide she is in has been counted as a bend run wide; taken back if it ends on the boards. */
+  wideNow: boolean
   strides: Record<Stride, number>
 }
 
@@ -195,6 +197,7 @@ function freshSkater(): Skater {
     wobbles: 0,
     clips: 0,
     wide: 0,
+    wideNow: false,
     strides: { perfect: 0, good: 0, rough: 0, off: 0, same: 0 }
   }
 }
@@ -303,12 +306,20 @@ function glide(race: Race, who: number, dt: number, events: RaceEvent[]): void {
   const before = skater.drift
   if (bend && !skater.lean) skater.drift += DRIFT_RATE * (skater.speed / 9) * dt
   else skater.drift = Math.max(0, skater.drift - (bend ? LEAN_RECOVER : STRAIGHT_RECOVER) * dt)
-  if (before < WIDE_AT && skater.drift >= WIDE_AT) skater.wide++
+  if (before < WIDE_AT && skater.drift >= WIDE_AT) {
+    skater.wide++
+    skater.wideNow = true
+  } else if (skater.drift < WIDE_AT) skater.wideNow = false
 
   // The boards are met once: a skater already on them scrapes along until she leans away.
   skater.drift = Math.min(1, skater.drift)
   if (before < 1 && skater.drift >= 1) {
     const brain = race.brains[who]
+    // One slide is one thing: a wide that ends on the boards is the wobble or the fall, not both.
+    if (skater.wideNow) {
+      skater.wide--
+      skater.wideNow = false
+    }
     if (skater.speed >= FALL_SPEED) {
       skater.falls.push({ at: race.t, lap: lapOf(race, who) })
       skater.downMs = DOWN_MS
@@ -484,10 +495,15 @@ const ORDINALS = ['1st', '2nd', '3rd', '4th']
 
 const times = (n: number): string => (n === 1 ? 'once' : n === 2 ? 'twice' : `${n} times`)
 
+/** Everyone in the race by name, the reader first as `me`: "You and Ana", "the reader, Ana and Bea". */
+export function racers(me: string, girls: readonly string[]): string {
+  return listed([me, ...girls])
+}
+
 /** Everyone rolling up to the line, as the scene's narration says it. */
 export function startLine(laps: number, girls: readonly string[]): string {
   return girls.length > 0
-    ? `You, ${listed(girls)} roll up to the line under the disco lights: ${laps} laps of the Starlight oval, first one home.`
+    ? `${racers('You', girls)} roll up to the line under the disco lights: ${laps} laps of the Starlight oval, first one home.`
     : `You roll up to the line under the disco lights: ${laps} laps of the Starlight oval against the clock.`
 }
 
@@ -537,10 +553,39 @@ export function standing(race: Race, girls: readonly string[], stake = ''): stri
     return `${ORDINALS[i]} ${name(who)} (${where}${fell})`
   })
   return [
-    `The game is Rink Race: the reader, ${listed(girls)} are racing ${race.laps} laps of the roller rink's oval on quad skates, all of them skating hard and short of breath.`,
+    `The game is Rink Race: ${racers('the reader', girls)} are racing ${race.laps} laps of the roller rink's oval on quad skates, ${girls.length === 1 ? 'both' : 'all'} of them skating hard and short of breath.`,
     race.t <= 0 ? 'They are on the line, about to start.' : `As it stands: ${rows.join('; ')}.`,
     ...(stake ? [`Riding on it: ${stake}`] : [])
   ].join(' ')
+}
+
+/**
+ * A race still being run, as the scene's writer is told it should the reader walk away now: who
+ * is racing, the lap, and the order with any falls.
+ */
+export function soFar(race: Race, girls: readonly string[]): string[] {
+  const name = (who: number): string => (who === 0 ? 'the reader' : girls[who - 1])
+  const fell = (who: number): string =>
+    race.skaters[who].falls.length > 0 ? ` (fell ${times(race.skaters[who].falls.length)})` : ''
+  const lap = `lap ${lapOf(race, 0)} of ${race.laps}`
+  if (girls.length === 0) {
+    return [
+      `The reader was skating a timed run alone at the Starlight Roller Rink: ${race.laps} laps of the oval on quad skates.`,
+      `The run was not finished: the reader${fell(0)} was on ${lap} with ${clock(race.t)} on the clock.`
+    ]
+  }
+  const order = race.skaters
+    .map((skater, who) => ({ who, skater }))
+    .sort(
+      (a, b) =>
+        (a.skater.finishedAt ?? Infinity) - (b.skater.finishedAt ?? Infinity) || b.skater.dist - a.skater.dist
+    )
+  return [
+    `${racers('The reader', girls)} were racing ${race.laps} laps of the oval at the Starlight Roller Rink on quad skates.`,
+    `The race was not finished: with the reader on ${lap} and ${clock(race.t)} on the clock, the order was ${order
+      .map(({ who }, i) => `${ORDINALS[i]} ${name(who)}${fell(who)}`)
+      .join(', ')}.`
+  ]
 }
 
 /** What the race comes to, as the scene's narration says it. */
@@ -584,7 +629,7 @@ export function account(race: Race, girls: readonly string[]): string[] {
   lines.push(
     solo
       ? `The reader skated a timed run alone at the Starlight Roller Rink: ${race.laps} laps of the oval on quad skates.`
-      : `The reader, ${listed(girls)} raced ${race.laps} laps of the oval at the Starlight Roller Rink on quad skates, all starting together.`
+      : `${racers('The reader', girls)} raced ${race.laps} laps of the oval at the Starlight Roller Rink on quad skates, all starting together.`
   )
   if (solo) {
     lines.push(
@@ -656,7 +701,7 @@ export function account(race: Race, girls: readonly string[]): string[] {
   lines.push(
     solo
       ? 'It was hard skating: the reader rolls off flushed and out of breath, still on the skates.'
-      : 'It was hard skating: all of them roll to a stop flushed and out of breath, still on their skates.'
+      : `It was hard skating: ${girls.length === 1 ? 'both' : 'all'} of them roll to a stop flushed and out of breath, still on their skates.`
   )
   return lines
 }
