@@ -74,6 +74,11 @@ const LATE_FROM = 0.65
 const COUNT_IN_MS = 3000
 /** The most one frame moves the clock on, in ms: a stall is not played through. */
 const FRAME_CAP_MS = 50
+/**
+ * How long the final scores stand before the table is cleared, where the box does not tell the
+ * buzzer: they are read off the cards, and want a moment, in ms.
+ */
+const FINAL_MS = 1500
 /** How long what a swing came to is shown over its hole, in ms. */
 const FLASH_MS = 450
 
@@ -455,20 +460,28 @@ export function WhackABun({ play }: { play: GamePlay }): JSX.Element {
       setLeft(0)
       setPhase('over')
       held.current.narrate(endLine())
-      if (girls.length === 0) {
-        held.current.finish({
-          outcome: 'played',
-          summary: soloSummary(pattern, mine),
-          account: soloAccount(pattern, mine)
-        })
+      if (girls.length > 0) held.current.situation(standing())
+      const result =
+        girls.length === 0
+          ? {
+              outcome: 'played' as const,
+              summary: soloSummary(pattern, mine),
+              account: soloAccount(pattern, mine)
+            }
+          : {
+              outcome: outcomeOf(scores()),
+              summary: versusSummary(mine, rivals()),
+              account: versusAccount(pattern, mine, rivals(), game.halfway ?? scores())
+            }
+      // Told on the box, the buzzer has its time there; otherwise the scores stand a moment.
+      if (held.current.playByPlay) {
+        held.current.finish(result)
         return
       }
-      held.current.situation(standing())
-      held.current.finish({
-        outcome: outcomeOf(scores()),
-        summary: versusSummary(mine, rivals()),
-        account: versusAccount(pattern, mine, rivals(), game.halfway ?? scores())
-      })
+      held.current.progress(result.account)
+      setTimeout(() => {
+        if (onTable()) held.current.finish(result)
+      }, FINAL_MS)
     }
 
     const loop = (now: number): void => {

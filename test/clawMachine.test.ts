@@ -8,6 +8,7 @@ import {
   carryPoint,
   choicesOf,
   cueOf,
+  goShown,
   goTold,
   holdChance,
   holdFor,
@@ -294,5 +295,21 @@ describe('whose doing a slip was', () => {
     expect(luckOf(onWhale)).toContain(`about ${Math.round(onWhale.chance * 100)} times in 100`)
     expect(luckOf(wide(duck))).toContain('his own doing')
     expect(luckOf(takeGo([duck], over(duck), () => 0.999))).toContain('plain bad luck')
+  })
+})
+
+describe('what the front shows of a go', () => {
+  it('says in a few words what the claw did, and whether it was the toy she wanted', () => {
+    const toys = pile()
+    const duck = toy(toys, 'duckling')
+    const whale = toy(toys, 'whale')
+    const caught = takeGo(toys, over(duck), () => 0.5)
+    expect(goShown(caught, null)).toBe('Won the duckling!')
+    expect(goShown(caught, 'duckling')).toBe('Won the duckling she wanted!')
+    expect(goShown(caught, 'whale')).toBe('Won the duckling!')
+    expect(goShown(takeGo(toys, over(whale), () => 0.5), null)).toBe('The big whale slipped free')
+    expect(goShown(takeGo(toys, { x: HOME.x, z: HOME.z }, never), null)).toMatch(/^Missed/)
+    // Short enough for the machine's front, whatever the toy.
+    for (const each of toys) expect(`Go 5: ${goShown({ ...caught, aimed: each }, each.id)}`.length).toBeLessThanOrEqual(40)
   })
 })

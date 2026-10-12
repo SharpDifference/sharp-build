@@ -606,6 +606,12 @@ export function Paradiso({ play }: { play: GamePlay }): JSX.Element {
         aria-valuemax={100}
       >
         <span className="vu-paradiso-through" />
+        {/* The halfway mark, where the scores are taken: lit once the song is past it. */}
+        <span
+          className="vu-paradiso-half"
+          style={{ left: `${((halfwayAt / chart.lengthMs) * 100).toFixed(2)}%` }}
+          data-passed={live.current.halfway || undefined}
+        />
       </div>
 
       <div className="vu-paradiso-screen">

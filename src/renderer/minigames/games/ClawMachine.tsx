@@ -10,6 +10,7 @@ import {
   carryPoint,
   choicesOf,
   cueOf,
+  goShown,
   goTold,
   layPile,
   outcomeOf,
@@ -56,6 +57,11 @@ const CARRY_MS = 1700
 const LET_MS = 380
 /** How long a toy that slips takes to fall back onto the pile. */
 const FALL_MS = 280
+/**
+ * How long the last go stands on the machine before the table is cleared, where the box does not
+ * tell it: the result is read off the front and the count, and wants a moment.
+ */
+const LAST_GO_MS = 1800
 /** The longest step of the clock a frame may take, so a stalled frame is not a jump. */
 const FRAME_CAP_MS = 50
 /** How much quicker the drop is shown to a reader who asked for less motion. */
@@ -241,7 +247,8 @@ function ToyMarks({ wanted }: { wanted: boolean }): JSX.Element | null {
  * key or a button: across, then back into the cabinet; then the claw drops by itself and the
  * rules say what it closes on and whether it holds. It is the reader's game: a girl with him
  * says which toy she wants before the first go, is shown her toy marked, and has a word at the
- * moments worth one. What happens is said in the scene's dialogue box.
+ * moments worth one. How each go came out is written on the machine's front until the next;
+ * the scene's dialogue box tells it too where the play-by-play is on.
  */
 export function ClawMachine({ play }: { play: GamePlay }): JSX.Element {
   const her = play.opponents[0]
@@ -380,11 +387,20 @@ export function ClawMachine({ play }: { play: GamePlay }): JSX.Element {
     }
     finished.current = true
     to('over')
-    play.finish({
+    const result = {
       outcome: outcomeOf(live.goes, her ? (live.wanted?.id ?? '') : null),
       summary: summaryOf(name, live.wanted, live.goes, tries),
       account: accountOf(name, live.wanted, live.goes, tries)
-    })
+    }
+    // Told on the box, the last go has its time there; otherwise it stands on the front a moment.
+    if (play.playByPlay) {
+      play.finish(result)
+      return
+    }
+    play.progress(result.account)
+    setTimeout(() => {
+      if (onTable()) latest.current.finish(result)
+    }, LAST_GO_MS)
   }
 
   /** Which toy she wants is settled, by her or for her, and the first go is his. */
@@ -635,6 +651,8 @@ export function ClawMachine({ play }: { play: GamePlay }): JSX.Element {
     (a, b) => Number(Boolean(pinnedBy(live.pile, b))) - Number(Boolean(pinnedBy(live.pile, a)))
   )
   const won = wonIn(live.goes)
+  // The last go, said on the machine's front until the next one comes down.
+  const lastGo = live.goes[live.goes.length - 1]
   const goNow = Math.min(tries, live.goes.length + 1)
   const acrossDead = phase !== 'ready-x' && phase !== 'moving-x'
   const backDead = phase !== 'ready-z' && phase !== 'moving-z'
@@ -652,7 +670,7 @@ export function ClawMachine({ play }: { play: GamePlay }): JSX.Element {
               : phase === 'drop'
                 ? 'The claw drops…'
                 : phase === 'reading'
-                  ? play.stepped
+                  ? play.stepped && play.playByPlay
                     ? 'Continue to go on'
                     : 'Get ready…'
                   : 'Out of goes'
@@ -668,7 +686,7 @@ export function ClawMachine({ play }: { play: GamePlay }): JSX.Element {
         className="vu-claw-cabinet"
         viewBox={`0 0 ${FRONT.width} ${FRONT.height}`}
         role="img"
-        aria-label={`The cabinet from the front: ${live.pile.length} toys on the floor`}
+        aria-label={`The cabinet from the front: ${live.pile.length} toys on the floor${lastGo ? `; go ${live.goes.length}: ${goShown(lastGo, live.wanted?.id ?? null)}` : ''}`}
       >
         <rect className="vu-claw-back" x="0" y="0" width={FRONT.width} height={FRONT.height} rx="2" />
         <path
@@ -678,6 +696,12 @@ export function ClawMachine({ play }: { play: GamePlay }): JSX.Element {
         <rect className="vu-claw-lip" x="0" y={FRONT.floor} width={FRONT.width} height={FRONT.height - FRONT.floor} />
         {/* The chute, at the front left, under where the claw waits. */}
         <path className="vu-claw-chute" d={`M 2 ${floorY(11)} H 17 V ${FRONT.height} H 2 Z`} />
+        {/* How the last go came out, on the front under the glass, beside the chute. */}
+        {lastGo && (
+          <text className="vu-claw-told" x="58.5" y={(FRONT.floor + FRONT.height) / 2}>
+            {`Go ${live.goes.length}: ${goShown(lastGo, live.wanted?.id ?? null)}`}
+          </text>
+        )}
         <path className="vu-claw-track" d={`M 1 ${railY(0)} L 4 ${railY(DEPTH)} M 99 ${railY(0)} L 96 ${railY(DEPTH)}`} />
         <ellipse ref={shadow} className="vu-claw-shadow" cx={HOME.x} cy={floorY(0)} rx="4.4" ry="1.3" />
         {[...lying]
@@ -796,7 +820,11 @@ export function ClawMachine({ play }: { play: GamePlay }): JSX.Element {
             </span>
           )}
           <span className="vu-claw-won">
-            {won.length > 0 ? `Won: ${won.map((toy) => toy.name).join(', ')}` : 'Nothing won yet'}
+            {won.length > 0
+              ? `Won: ${won.map((toy) => toy.name).join(', ')}`
+              : phase === 'over'
+                ? 'Nothing won'
+                : 'Nothing won yet'}
           </span>
         </div>
 

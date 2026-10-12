@@ -424,6 +424,27 @@ export function goTold(go: Go, wanted: string | null): string {
 }
 
 /**
+ * How a go came out, in a few words: what the machine's front shows until the next go, the
+ * dialogue box keeping to what people say. `wanted` is the id of the toy she wants.
+ */
+export function goShown(go: Go, wanted: string | null): string {
+  const toy = go.aimed
+  if (!toy) return 'Missed: bare floor'
+  switch (go.kind) {
+    case 'catch':
+      return toy.id === wanted ? `Won the ${toy.name} she wanted!` : `Won the ${toy.name}!`
+    case 'slip':
+      return `The ${toy.name} slipped free`
+    case 'nudge':
+      return `Knocked the ${toy.name} aside`
+    case 'pinned':
+      return `The ${toy.name} is held down`
+    default:
+      return `Missed the ${toy.name}`
+  }
+}
+
+/**
  * What a girl watching is told of a go, and whether it is a moment worth a word from her: a
  * catch, a slip part-way or a near miss. `left` is how many goes he still has.
  */

@@ -144,6 +144,14 @@
   font: 700 4.4px var(--font-body);
 }
 
+/* How the last go came out, written on the machine's front under the glass. */
+.vu-claw-told {
+  fill: var(--vu-text);
+  font: 700 3.2px var(--font-body);
+  text-anchor: middle;
+  dominant-baseline: central;
+}
+
 /* How well a toy holds: three dots easy, two fair, one hard. */
 .vu-claw-pips circle {
   fill: var(--vu-text);
