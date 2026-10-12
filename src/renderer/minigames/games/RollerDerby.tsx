@@ -99,6 +99,8 @@ const WORD: Readonly<Record<Stride, string>> = {
   same: 'Same foot!'
 }
 
+const ORDINAL = ['1st', '2nd', '3rd', '4th']
+
 /** One line of the board beside the rink. */
 interface Row {
   who: number
@@ -217,7 +219,9 @@ export function RollerDerby({ play }: { play: GamePlay }): JSX.Element {
             ? 'time called'
             : skater.downMs > 0
               ? 'down!'
-              : `lap ${lapOf(race, index)}/${race.laps}`
+              : lapOf(race, index) === race.laps && race.laps > 1
+                ? 'last lap'
+                : `lap ${lapOf(race, index)}/${race.laps}`
       const gap =
         ahead && skater.finishedAt === null && ahead.finishedAt === null
           ? `+${Math.max(0, ahead.dist - skater.dist).toFixed(0)} m`
@@ -515,6 +519,19 @@ export function RollerDerby({ play }: { play: GamePlay }): JSX.Element {
   const over = phase === 'over'
   const racing = phase === 'racing'
   const call = !racing ? null : view.bend ? (view.lean ? null : 'lean') : view.lean ? 'free' : null
+  // Once it is over the lean's line says how it came out for the reader.
+  const mine = over ? placings(race).find((placing) => placing.who === 0) : undefined
+  const result = !mine
+    ? ''
+    : mine.time === null
+      ? 'Time called'
+      : girls.length === 0
+        ? 'Finished'
+        : mine.place !== 1
+          ? `You come ${ORDINAL[mine.place - 1] ?? `${mine.place}th`}`
+          : placings(race).filter((placing) => placing.place === 1).length > 1
+            ? 'Dead heat'
+            : 'You win'
 
   return (
     <div
@@ -622,7 +639,7 @@ export function RollerDerby({ play }: { play: GamePlay }): JSX.Element {
         </span>
         {/* The lean has its own line: wanted in a bend, to be let go of on a straight. */}
         <span className="vu-rink-call" data-call={call || undefined} role="status">
-          {call === 'lean' ? 'Lean!' : call === 'free' ? 'Let go' : ' '}
+          {call === 'lean' ? 'Lean!' : call === 'free' ? 'Let go' : result || ' '}
         </span>
 
         <div className="vu-rink-pads" inert={!racing || undefined} data-waiting={!racing || undefined}>

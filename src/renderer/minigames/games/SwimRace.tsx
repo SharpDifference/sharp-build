@@ -421,6 +421,8 @@ export function SwimRace({ play }: { play: GamePlay }): JSX.Element {
         }
       } else if (event.kind === 'dive') {
         if (index !== 0) return
+        // His start stays on his lane until his first turn takes its place.
+        board(0, { word: swimmer.falseStart ? 'Called back' : `Dive ${timeOf(swimmer.reactionMs)}` })
         held.current.narrate(
           swimmer.falseStart
             ? 'You go before the whistle and are called back; by the time you dive the water ahead is already churning.'
@@ -592,6 +594,20 @@ export function SwimRace({ play }: { play: GamePlay }): JSX.Element {
     ? placesOf(live.current.race.swimmers.map((swimmer) => swimmer.finishMs ?? Infinity))
     : null
   const timedOut = over && live.current.race.swimmers.some((swimmer) => swimmer.finishMs === null)
+  // How it came out for the reader, in the starter's place: time called on him, or his place.
+  const result = !finalPlaces
+    ? ''
+    : live.current.race.swimmers[0].finishMs === null
+      ? 'Time!'
+      : names.length === 1
+        ? timedOut
+          ? 'Time!'
+          : 'Finished'
+        : finalPlaces[0] !== 1
+          ? `You come ${ORDINAL[finalPlaces[0] - 1]}`
+          : finalPlaces.filter((place) => place === 1).length > 1
+            ? 'Dead heat'
+            : 'You win'
   const zone = `${((TURN_ZONE_M / LENGTH_M) * 100).toFixed(1)}%`
 
   return (
@@ -611,7 +627,7 @@ export function SwimRace({ play }: { play: GamePlay }): JSX.Element {
           0.00
         </span>
         <span className="vu-swimrace-call" role="status">
-          {phase === 'marks' ? 'Take your marks…' : racing && whistled ? 'Go!' : over ? (timedOut ? 'Time!' : 'Finished') : ' '}
+          {phase === 'marks' ? 'Take your marks…' : racing && whistled ? 'Go!' : over ? result : ' '}
         </span>
       </div>
 

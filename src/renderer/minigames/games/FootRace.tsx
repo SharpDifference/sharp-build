@@ -71,6 +71,15 @@ const CALL: Readonly<Record<Phase, string>> = {
   over: 'Finished'
 }
 
+/** How the race came out for the reader, in a few words for the starter's place at the top. */
+function resultCall(times: readonly (number | null)[]): string {
+  if (times.length <= 1) return times[0] === null ? 'Did not finish' : 'Finished'
+  const places = placesOf(times)
+  if (times[0] === null) return 'Did not finish'
+  if (places[0] !== 1) return `You come ${ordinal(places[0])}`
+  return places.slice(1).includes(1) ? 'Dead heat' : 'You win'
+}
+
 /** The race as it is being run: read and written by the frame loop, never rendered from. */
 interface Live {
   phase: Phase
@@ -92,6 +101,8 @@ interface Live {
   falseStarts: number[]
   /** A girl has already gone early once: nobody does again. */
   jumped: boolean
+  /** The seat of the last runner to go before the gun, shown on her lane while everyone walks back. */
+  jumper: number
   /** How long after the gun the reader is held, and how long he then took to move. */
   release: number
   reaction: number | null
@@ -126,6 +137,8 @@ export function FootRace({ play }: { play: GamePlay }): JSX.Element {
   const [phase, setPhase] = useState<Phase>('ready')
   const [paused, setPaused] = useState(false)
   const [held, setHeld] = useState(0)
+  // How it came out, from the reader's side, in place of the starter's last call.
+  const [result, setResult] = useState('')
 
   const live = useRef<Live>({
     phase: 'ready',
@@ -140,6 +153,7 @@ export function FootRace({ play }: { play: GamePlay }): JSX.Element {
     strides: noStrides(),
     falseStarts: [0, ...girls.map(() => 0)],
     jumped: false,
+    jumper: -1,
     release: 0,
     reaction: null,
     half: null,
@@ -243,6 +257,7 @@ export function FootRace({ play }: { play: GamePlay }): JSX.Element {
   function falseStart(seat: number): void {
     const game = live.current
     const count = ++game.falseStarts[seat]
+    game.jumper = seat
     toPhase('recall')
     if (seat === 0) {
       game.release = falseStartPenaltyS(count)
@@ -307,6 +322,7 @@ export function FootRace({ play }: { play: GamePlay }): JSX.Element {
       placeAtHalf: game.half?.[seat] ?? 0,
       placeAtLast: game.last?.[seat] ?? 0
     }))
+    if (mounted.current) setResult(resultCall(told.map((one) => one.time)))
     toPhase('over')
     if (girls.length === 0) {
       latest.current.finish({
@@ -410,15 +426,23 @@ export function FootRace({ play }: { play: GamePlay }): JSX.Element {
     const game = live.current
     const running = game.phase === 'running' || game.phase === 'over'
     const order = placesNow(game.runners)
+    const finalPlaces = game.over
+      ? placesOf(game.runners.map((runner) => shownTime(course, runner.finishedAt)))
+      : []
     game.runners.forEach((runner, seat) => {
       const marker = markers.current[seat]
       if (marker) marker.style.left = `${((running ? runner.pos : 0) / course.metres) * 100}%`
       const place = places.current[seat]
       if (!place) return
+      // Before the gun a lane says who went early: called back just now, or warned already.
       const text = !running
-        ? ''
+        ? game.phase === 'recall' && game.jumper === seat
+          ? 'false start'
+          : game.falseStarts[seat] > 0
+            ? 'warned'
+            : ''
         : runner.finishedAt !== null
-          ? timeText(shownTime(course, runner.finishedAt))
+          ? `${game.over && girls.length > 0 ? `${ordinal(finalPlaces[seat])} ` : ''}${timeText(shownTime(course, runner.finishedAt))}`
           : game.over
             ? 'DNF'
             : game.raceT > 0.6
@@ -519,7 +543,7 @@ export function FootRace({ play }: { play: GamePlay }): JSX.Element {
       <div className="vu-footrace-head">
         <span className="vu-footrace-distance">{course.metres} m</span>
         <span key={phase} className="vu-footrace-call" role="status">
-          {CALL[phase]}
+          {phase === 'over' && result ? result : CALL[phase]}
         </span>
         <span ref={clock} className="vu-footrace-clock" aria-label="Clock" />
       </div>
