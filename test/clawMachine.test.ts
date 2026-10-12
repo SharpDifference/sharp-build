@@ -4,11 +4,18 @@ import {
   HOME,
   LIFT_SHARE,
   LIMIT,
+  accountOf,
   carryPoint,
+  choicesOf,
+  cueOf,
+  goTold,
   holdChance,
   holdFor,
   layPile,
+  luckOf,
   outcomeOf,
+  pickAsk,
+  pickToy,
   pinnedBy,
   reachOf,
   stopOf,
@@ -204,5 +211,88 @@ describe('an ordinary reader', () => {
     expect(got.fair).toBeLessThan(0.7)
     expect(got.hard).toBeGreaterThan(0.18)
     expect(got.hard).toBeLessThan(0.32)
+  })
+})
+
+describe('the toy she wants', () => {
+  it('is never the pinned one with fewer than three goes, asked or chosen for her', () => {
+    const rand = seededRand('choices')
+    for (let cabinet = 0; cabinet < 200; cabinet++) {
+      const toys = layPile(rand)
+      const buried = toys.find((each) => pinnedBy(toys, each)) as Toy
+      for (const tries of [1, 2]) {
+        expect(choicesOf(toys, tries)).toHaveLength(11)
+        expect(pickAsk('Lia', toys, tries).names).not.toContain(buried.name)
+        expect(pickAsk('Lia', toys, tries).brief).not.toContain('pinned')
+        for (let pick = 0; pick < 30; pick++) expect(pickToy(toys, rand, tries).id).not.toBe(buried.id)
+      }
+      expect(choicesOf(toys, 3)).toHaveLength(12)
+    }
+    // The last of the stream is still a toy.
+    expect(pickToy(pile(), () => 0.9999, 1)).toBeDefined()
+    expect(pickToy(pile(), () => 0.9999)).toBeDefined()
+  })
+
+  it('is told in the brief to lie under another where the pinned one may be chosen', () => {
+    const toys = pile()
+    const buried = toys.find((each) => pinnedBy(toys, each)) as Toy
+    const top = pinnedBy(toys, buried) as Toy
+    const asked = pickAsk('Lia', toys, 3)
+    expect(asked.names).toContain(buried.name)
+    expect(asked.brief).toContain(`The ${buried.name} lies pinned under the ${top.name}`)
+    expect(asked.brief).toContain(asked.names.join(', '))
+  })
+})
+
+describe('a go at the pinned toy', () => {
+  it('closes on the toy across it, and is told as a go at the pinned one, in every pile', () => {
+    const rand = seededRand('meant')
+    for (let cabinet = 0; cabinet < 2000; cabinet++) {
+      const toys = layPile(rand)
+      const buried = toys.find((each) => pinnedBy(toys, each)) as Toy
+      const top = pinnedBy(toys, buried) as Toy
+      const go = takeGo(toys, over(buried), () => 0)
+      expect(go.kind).toBe('catch')
+      expect(go.aimed?.id).toBe(top.id)
+      expect(go.meant?.id).toBe(buried.id)
+      expect(go.top?.id).toBe(top.id)
+    }
+  })
+
+  it('says he went for the pinned toy and the claw took the one on top', () => {
+    const toys = pile()
+    const buried = toys.find((each) => pinnedBy(toys, each)) as Toy
+    const top = pinnedBy(toys, buried) as Toy
+    const caught = takeGo(toys, over(buried), () => 0)
+    const slipped = takeGo(toys, over(buried), () => 0.999)
+    for (const go of [caught, slipped]) {
+      const line = accountOf('Lia', buried, [go], 3)[2]
+      expect(line).toContain(`he went for the ${buried.name}, which is under the ${top.name}, and stopped dead on; the claw took the ${top.name} instead`)
+      expect(goTold(go, buried.id)).toContain(`comes down over the ${buried.name}, but the ${top.name} lies across it`)
+      expect(goTold(go, buried.id)).not.toContain('too far')
+      expect(cueOf(go, 'Lia', buried, [go], 2).text).toContain(`He was going for the ${buried.name}, the toy Lia said she wanted`)
+    }
+    expect(luckOf(slipped)).not.toContain('his own doing')
+    // A go at the toy on top itself is told as it always was.
+    const plain = takeGo(toys, over(top), () => 0)
+    expect(plain.meant).toBeNull()
+    expect(accountOf('Lia', buried, [plain], 3)[2]).toContain(`he went for the ${top.name} and stopped dead on`)
+  })
+})
+
+describe('whose doing a slip was', () => {
+  it('is his centring only where that cost more than the toy\'s own grip did', () => {
+    const toys = pile()
+    const whale = { ...toy(toys, 'whale'), x: 50, z: 30 }
+    const duck = { ...toy(toys, 'duckling'), x: 50, z: 30 }
+    const wide = (at: Toy): Go => takeGo([at], { x: at.x + reachOf(at) * 0.7, z: at.z }, () => 0.999)
+    const onWhale = wide(whale)
+    expect(onWhale.kind).toBe('slip')
+    expect(onWhale.off).toBeGreaterThan(0.6)
+    expect(luckOf(onWhale)).not.toContain('his own doing')
+    expect(luckOf(onWhale)).toContain('about 25 times in 100')
+    expect(luckOf(onWhale)).toContain(`about ${Math.round(onWhale.chance * 100)} times in 100`)
+    expect(luckOf(wide(duck))).toContain('his own doing')
+    expect(luckOf(takeGo([duck], over(duck), () => 0.999))).toContain('plain bad luck')
   })
 })

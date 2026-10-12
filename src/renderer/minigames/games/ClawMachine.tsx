@@ -8,10 +8,12 @@ import {
   WIDTH,
   accountOf,
   carryPoint,
+  choicesOf,
   cueOf,
   goTold,
   layPile,
   outcomeOf,
+  pickAsk,
   pickToy,
   pinnedBy,
   standingTold,
@@ -21,6 +23,7 @@ import {
   tierOf,
   wonIn,
   type Go,
+  type Tier,
   type Toy
 } from '@shared/minigameRules/clawMachine'
 import { seededRand } from '@shared/minigameKit'
@@ -68,6 +71,9 @@ const HANG = 6
 const LIE = 0.85
 const restY = (toy: Toy, z: number): number => floorY(z) - toy.size * scaleAt(z) * LIE
 const mix = (from: number, to: number, share: number): number => from + (to - from) * share
+
+/** How many dots a toy is marked with, by how easily the claw holds it: the legend says so in words. */
+const PIPS: Record<Tier, number> = { easy: 3, fair: 2, hard: 1 }
 
 type Axis = 'x' | 'z'
 /**
@@ -384,8 +390,9 @@ export function ClawMachine({ play }: { play: GamePlay }): JSX.Element {
   /** Which toy she wants is settled, by her or for her, and the first go is his. */
   function settlePick(got: Record<string, string> | null): void {
     if (live.phase !== 'picking' || !her || !onTable()) return
-    const named = got ? live.pile.find((toy) => toy.name === got.toy) : undefined
-    const wanted = named ?? pickToy(live.pile, live.rand)
+    // A toy held down is not hers to want in a game too short to free it.
+    const named = got ? choicesOf(live.pile, tries).find((toy) => toy.name === got.toy) : undefined
+    const wanted = named ?? pickToy(live.pile, live.rand, tries)
     live.wanted = wanted
     let told: Promise<void>
     if (named && got?.line) {
@@ -415,12 +422,12 @@ export function ClawMachine({ play }: { play: GamePlay }): JSX.Element {
     play.narrate(
       `You feed the claw machine for ${tries} ${tries === 1 ? 'go' : 'goes'} while ${her.name} looks over the toys behind the glass.`
     )
-    const names = live.pile.map((toy) => toy.name)
+    const asked = pickAsk(her.name, live.pile, tries)
     void Promise.resolve()
       .then(() =>
         play.round({
-          brief: `${her.name} is watching the reader play a claw machine and does not play herself. Before his first go she says which one of the plush toys in the cabinet she has her eye on. "toy" is that toy, one of: ${names.join(', ')}. The small ones are easy for the claw to hold; the giant bear and the big whale are very hard. "line" is what she says out loud to him about it, in one short sentence that names the toy.`,
-          fields: { toy: names, line: 'text' }
+          brief: asked.brief,
+          fields: { toy: asked.names, line: 'text' }
         })
       )
       .then(
@@ -457,8 +464,10 @@ export function ClawMachine({ play }: { play: GamePlay }): JSX.Element {
     const axis = axisOf(event)
     if (!axis) return
     event.preventDefault()
-    // A go begun by key is him moving on from what was on the box, as a press on the stick is.
-    if (!event.repeat && hold(axis)) play.moved()
+    // A key already down when its way's turn comes takes hold on its next repeat: hold() takes
+    // only the way that is live. A go begun by key is him moving on from what was on the box,
+    // as a press on the stick is.
+    if (hold(axis)) play.moved()
   })
 
   // The one clock: the runs, the countdown and the drop, stopped while the window is away.
@@ -470,6 +479,8 @@ export function ClawMachine({ play }: { play: GamePlay }): JSX.Element {
     const draw = (): void => {
       const go = live.go
       const toy = go && (go.kind === 'catch' || go.kind === 'slip') ? go.aimed : null
+      // The toy a near miss knocks aside: it goes as the claw closes, and lies there after.
+      const pushed = go && go.kind === 'nudge' && go.landed ? go.aimed : null
       let at = { ...stopOf(live.msX, live.msZ), up: 1 }
       let closed = false
       // The toy in the claw's keeping: where it is on the floor plan, how high it is drawn, how faint.
@@ -523,6 +534,10 @@ export function ClawMachine({ play }: { play: GamePlay }): JSX.Element {
           } else {
             kept = hung(at)
           }
+        } else if (pushed && go.landed) {
+          const knocked = Math.min(1, Math.max(0, (live.t - DOWN_MS) / CLOSE_MS))
+          const z = mix(pushed.z, go.landed.z, knocked)
+          kept = { x: mix(pushed.x, go.landed.x, knocked), z, y: restY(pushed, z), faint: 0 }
         }
         const scale = scaleAt(at.z)
         const y = hubY(at)
@@ -547,12 +562,13 @@ export function ClawMachine({ play }: { play: GamePlay }): JSX.Element {
       shadow.current?.setAttribute('rx', String(4.4 * scale * (1.25 - 0.45 * (1 - at.up))))
       shadow.current?.setAttribute('ry', String(1.3 * scale * (1.25 - 0.45 * (1 - at.up))))
       clawTop.current?.setAttribute('transform', `translate(${at.x} ${DEPTH - at.z})`)
-      if (toy && kept) {
+      const shown = toy ?? pushed
+      if (shown && kept) {
         heldFront.current?.setAttribute(
           'transform',
-          `translate(${kept.x} ${kept.y}) scale(${toy.size * scaleAt(kept.z)})`
+          `translate(${kept.x} ${kept.y}) scale(${shown.size * scaleAt(kept.z)})`
         )
-        heldTop.current?.setAttribute('transform', `translate(${kept.x} ${DEPTH - kept.z}) scale(${toy.size})`)
+        heldTop.current?.setAttribute('transform', `translate(${kept.x} ${DEPTH - kept.z}) scale(${shown.size})`)
         heldFront.current?.setAttribute('opacity', String(1 - kept.faint))
         heldTop.current?.setAttribute('opacity', String(1 - kept.faint))
       }
@@ -608,16 +624,23 @@ export function ClawMachine({ play }: { play: GamePlay }): JSX.Element {
   })
 
   const going = phase === 'drop' ? live.go : null
-  // The toy the claw has, drawn by the loop and left out of the pile while it is.
-  const taken = going && (going.kind === 'catch' || going.kind === 'slip') ? going.aimed : null
+  // The toy the claw has, or knocks aside, drawn by the loop and left out of the pile while it is.
+  const taken =
+    going && (going.kind === 'catch' || going.kind === 'slip' || (going.kind === 'nudge' && going.landed))
+      ? going.aimed
+      : null
   const lying = live.pile.filter((toy) => toy.id !== taken?.id)
+  // From above, what lies on top is drawn on top: the toys held down go first.
+  const fromAbove = [...lying].sort(
+    (a, b) => Number(Boolean(pinnedBy(live.pile, b))) - Number(Boolean(pinnedBy(live.pile, a)))
+  )
   const won = wonIn(live.goes)
   const goNow = Math.min(tries, live.goes.length + 1)
   const acrossDead = phase !== 'ready-x' && phase !== 'moving-x'
   const backDead = phase !== 'ready-z' && phase !== 'moving-z'
   const prompt =
     phase === 'picking'
-      ? `${her?.name ?? 'She'} is choosing…`
+      ? `${her?.name ?? 'She'} is choosing which toy she wants…`
       : phase === 'ready-x'
         ? 'Hold → to run the claw across'
         : phase === 'moving-x'
@@ -626,9 +649,13 @@ export function ClawMachine({ play }: { play: GamePlay }): JSX.Element {
             ? 'Hold ↑ to run it back'
             : phase === 'moving-z'
               ? 'Let go to drop'
-              : phase === 'drop' || phase === 'reading'
-                ? '…'
-                : 'Out of goes'
+              : phase === 'drop'
+                ? 'The claw drops…'
+                : phase === 'reading'
+                  ? play.stepped
+                    ? 'Continue to go on'
+                    : 'Get ready…'
+                  : 'Out of goes'
 
   const toyClass = (toy: Toy): string =>
     `vu-claw-toy${pinnedBy(live.pile, toy) ? ' vu-claw-toy--pinned' : ''}`
@@ -676,6 +703,17 @@ export function ClawMachine({ play }: { play: GamePlay }): JSX.Element {
             <ToyMarks wanted={taken.id === live.wanted?.id} />
           </g>
         )}
+        {/* How well each toy holds, in dots on the floor under it: over the pile, so none is hidden. */}
+        {lying.map((toy) => {
+          const pips = PIPS[tierOf(toy)]
+          return (
+            <g key={toy.id} className="vu-claw-pips" transform={`translate(${toy.x} ${floorY(toy.z) + 1.2})`}>
+              {Array.from({ length: pips }, (_, index) => (
+                <circle key={index} cx={(index - (pips - 1) / 2) * 1.7} cy="0" r="0.62" />
+              ))}
+            </g>
+          )
+        })}
         <line ref={rail} className="vu-claw-rail" x1="1" x2="99" y1={railY(0)} y2={railY(0)} />
         <line ref={cable} className="vu-claw-cable" x1={HOME.x} x2={HOME.x} y1={railY(0)} y2={railY(0) + 7} />
         <g ref={clawFront} className="vu-claw-claw" transform={`translate(${HOME.x} ${railY(0) + 7})`}>
@@ -696,7 +734,7 @@ export function ClawMachine({ play }: { play: GamePlay }): JSX.Element {
           >
             <rect className="vu-claw-floor" x="0" y="0" width={WIDTH} height={DEPTH} rx="2" />
             <rect className="vu-claw-chute" x="2" y={DEPTH - 11} width="15" height="11" />
-            {lying.map((toy) => (
+            {fromAbove.map((toy) => (
               <g
                 key={toy.id}
                 className={toyClass(toy)}
@@ -716,6 +754,23 @@ export function ClawMachine({ play }: { play: GamePlay }): JSX.Element {
                 <ToyShape id={taken.id} />
               </g>
             )}
+            {/* A toy held down says so in a word, on the side clear of what lies on it. */}
+            {lying.map((toy) => {
+              const top = pinnedBy(live.pile, toy)
+              if (!top) return null
+              const side = toy.x >= top.x ? 1 : -1
+              return (
+                <text
+                  key={toy.id}
+                  className="vu-claw-under"
+                  x={Math.min(WIDTH - 8, Math.max(8, toy.x + side * 3))}
+                  y={Math.max(4.5, DEPTH - toy.z - toy.size - 0.8)}
+                  textAnchor="middle"
+                >
+                  under
+                </text>
+              )
+            })}
             <g ref={clawTop} className="vu-claw-sight" transform={`translate(${HOME.x} ${DEPTH - HOME.z})`}>
               <circle cx="0" cy="0" r="3.6" />
               <path d="M -6 0 H 6 M 0 -6 V 6" />
@@ -723,6 +778,11 @@ export function ClawMachine({ play }: { play: GamePlay }): JSX.Element {
           </svg>
           <figcaption>from above: the glass is at the bottom</figcaption>
         </figure>
+
+        <p className="vu-claw-legend">
+          dots under a toy: <span>●●●</span> easy to hold · <span>●●</span> fair · <span>●</span> hard to hold
+          <br />a grab off a toy’s middle is likelier to slip
+        </p>
 
         <div className="vu-claw-state">
           <span className="vu-claw-go">

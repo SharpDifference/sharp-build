@@ -135,6 +135,22 @@
   stroke-dasharray: 3 3;
 }
 
+/* The word on the plan over a toy held down, readable over whatever it lies by. */
+.vu-claw-under {
+  fill: var(--vu-text);
+  stroke: var(--vu-tint);
+  stroke-width: 1.2px;
+  paint-order: stroke;
+  font: 700 4.4px var(--font-body);
+}
+
+/* How well a toy holds: three dots easy, two fair, one hard. */
+.vu-claw-pips circle {
+  fill: var(--vu-text);
+  stroke: var(--vu-surface);
+  stroke-width: 0.3;
+}
+
 /* The one she wants: ringed, with a heart over it. */
 .vu-claw-want {
   fill: none;
@@ -173,6 +189,19 @@
 .vu-claw-plan figcaption {
   color: var(--vu-text-muted);
   font: 500 12px var(--font-body);
+}
+
+/* What the dots mean, in words. */
+.vu-claw-legend {
+  margin: -6px 0 0;
+  color: var(--vu-text-muted);
+  font: 500 12px var(--font-body);
+  text-align: center;
+}
+
+.vu-claw-legend span {
+  color: var(--vu-text);
+  letter-spacing: 1px;
 }
 
 /* The claw on the plan: a ring and a cross. */

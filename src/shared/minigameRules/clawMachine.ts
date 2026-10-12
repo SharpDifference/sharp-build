@@ -185,6 +185,11 @@ export interface Go {
   aimed: Toy | null
   /** The toy lying across a pinned one. */
   top: Toy | null
+  /**
+   * For a grab: the pinned toy the stop was nearer the middle of than of the toy the claw closed
+   * on. He went for that one, and the claw took what lay over it. `top` is then what pins it.
+   */
+  meant: Toy | null
   /** How far off the aimed toy's middle the claw stopped, as a share of what it closes on. */
   off: number
   /** For a grab: the chance it had of holding, and the machine's roll against it. */
@@ -213,7 +218,8 @@ function settle(others: readonly Toy[], toy: Toy, at: { x: number; z: number }, 
 
 /**
  * One go: the claw drops at `stop` on `pile`. It closes on the free toy whose middle it is
- * nearest, if it is within that toy's reach; the toy then holds to the chute if the machine's
+ * nearest, if it is within that toy's reach, and a stop nearer still to a toy pinned under
+ * another is kept as the toy he `meant`; the toy then holds to the chute if the machine's
  * roll comes under its chance, and otherwise slips out along the way, sooner the worse the roll.
  * Just outside a toy's reach it knocks the toy aside. The same go for the same pile, stop and
  * stream.
@@ -223,7 +229,7 @@ export function takeGo(pile: readonly Toy[], stop: Stop, rand: () => number): Go
   const nearest = (toys: readonly Toy[]): Toy | undefined =>
     toys.reduce<Toy | undefined>((best, toy) => (!best || offOf(toy) < offOf(best) ? toy : best), undefined)
   const free = pile.filter((toy) => !pinnedBy(pile, toy))
-  const base = { stop, top: null, chance: 0, roll: 0, slipAt: 0, landed: null }
+  const base = { stop, top: null, meant: null, chance: 0, roll: 0, slipAt: 0, landed: null }
 
   const grabbed = nearest(free.filter((toy) => offOf(toy) <= 1))
   if (grabbed) {
@@ -231,7 +237,13 @@ export function takeGo(pile: readonly Toy[], stop: Stop, rand: () => number): Go
     const chance = holdChance(grabbed, off)
     const roll = rand()
     const others = pile.filter((toy) => toy.id !== grabbed.id)
-    if (roll < chance) return { ...base, kind: 'catch', aimed: grabbed, off, chance, roll, pile: others }
+    // A stop nearer the middle of a toy held down was a go at that toy, whatever the claw took.
+    const meant =
+      pile
+        .filter((toy) => pinnedBy(pile, toy) && offOf(toy) <= 1 && apart(toy, stop) < apart(grabbed, stop))
+        .sort((a, b) => apart(a, stop) - apart(b, stop))[0] ?? null
+    const top = meant ? (pinnedBy(pile, meant) ?? null) : null
+    if (roll < chance) return { ...base, kind: 'catch', aimed: grabbed, top, meant, off, chance, roll, pile: others }
     // The nearer the roll came to holding, the further the toy rides before it goes.
     const slipAt = 0.9 - 0.75 * ((roll - chance) / (1 - chance))
     const landed = settle(others, grabbed, carryPoint(stop, slipAt), rand)
@@ -239,6 +251,8 @@ export function takeGo(pile: readonly Toy[], stop: Stop, rand: () => number): Go
       ...base,
       kind: 'slip',
       aimed: grabbed,
+      top,
+      meant,
       off,
       chance,
       roll,
@@ -289,9 +303,40 @@ export function outcomeOf(goes: readonly Go[], wanted: string | null): 'won' | '
   return won.some((toy) => toy.id === wanted) ? 'won' : won.length > 0 ? 'draw' : 'lost'
 }
 
-/** The toy she is taken to want where she could not be asked: any of them, off `rand`. */
-export function pickToy(pile: readonly Toy[], rand: () => number): Toy {
-  return pile[Math.min(pile.length - 1, Math.floor(rand() * pile.length))]
+/** The fewest goes in which a toy that starts pinned is still worth wanting: two to get at it, one to spare. */
+const PINNED_FROM = 3
+
+/**
+ * The toys she may say she wants in a game of `tries` goes: all of them, less any held down by
+ * another where the goes are too few to free it and still have a fair go at it.
+ */
+export function choicesOf(pile: readonly Toy[], tries: number): Toy[] {
+  return tries >= PINNED_FROM ? [...pile] : pile.filter((toy) => !pinnedBy(pile, toy))
+}
+
+/** The toy she is taken to want where she could not be asked: any she may choose, off `rand`. */
+export function pickToy(pile: readonly Toy[], rand: () => number, tries = PINNED_FROM): Toy {
+  const from = choicesOf(pile, tries)
+  return from[Math.min(from.length - 1, Math.floor(rand() * from.length))]
+}
+
+/**
+ * What she is asked before the first go: the toys she may name, and the round's brief, which
+ * says of any toy among them that is held down what lies on top of it.
+ */
+export function pickAsk(her: string, pile: readonly Toy[], tries: number): { names: string[]; brief: string } {
+  const choices = choicesOf(pile, tries)
+  const names = choices.map((toy) => toy.name)
+  const held = choices.flatMap((toy) => {
+    const top = pinnedBy(pile, toy)
+    return top
+      ? [` The ${toy.name} lies pinned under the ${top.name}: it cannot be taken until the ${top.name} has been won first, so it takes at least two catches.`]
+      : []
+  })
+  return {
+    names,
+    brief: `${her} is watching the reader play a claw machine and does not play herself. He has paid for ${tries} ${tries === 1 ? 'go' : 'goes'}. Before his first go she says which one of the plush toys in the cabinet she has her eye on. "toy" is that toy, one of: ${names.join(', ')}. The small ones are easy for the claw to hold; the giant bear and the big whale are very hard.${held.join('')} "line" is what she says out loud to him about it, in one short sentence that names the toy.`
+  }
 }
 
 // How a game is told: the narration, her cues, the summary and the account.
@@ -310,12 +355,16 @@ const TIER_TOLD: Record<Tier, string> = {
   hard: 'one of the two big ones the claw can hardly hold'
 }
 
-/** Which way a stop was off the toy it was after: "short and too deep", or "dead on". */
+/**
+ * Which way a stop was off the toy it was after: "short and too deep", or "dead on". The toy he
+ * meant, where the claw took another lying over it.
+ */
 export function strayOf(go: Go): string {
-  if (!go.aimed) return 'over bare floor'
-  const slack = reachOf(go.aimed) * 0.3
-  const dx = go.stop.x - go.aimed.x
-  const dz = go.stop.z - go.aimed.z
+  const after = go.meant ?? go.aimed
+  if (!after) return 'over bare floor'
+  const slack = reachOf(after) * 0.3
+  const dx = go.stop.x - after.x
+  const dz = go.stop.z - after.z
   const ways = [
     ...(Math.abs(dx) > slack ? [dx < 0 ? 'short' : 'too far across'] : []),
     ...(Math.abs(dz) > slack ? [dz < 0 ? 'not deep enough' : 'too deep'] : [])
@@ -333,8 +382,18 @@ export function luckOf(go: Go): string {
     return `a decent grab and some luck: it holds ${perHundred(go.chance)}`
   }
   if (go.kind !== 'slip') return ''
-  if (go.off > 0.6) return 'a poorly centred grab, his own doing'
+  // His centring is to blame only where it cost the grab more than the toy's own grip did.
+  const grip = go.aimed?.grip ?? go.chance
+  const wide = go.off > 0.6
+  if (wide && grip - go.chance > 1 - grip) {
+    return go.meant
+      ? 'a grab well off its middle, because he was aiming at the toy under it'
+      : 'a poorly centred grab, his own doing'
+  }
   if (go.chance >= 0.65) return 'plain bad luck: a good grab the claw let go of'
+  if (wide) {
+    return `the machine more than his aim: dead centre the claw holds that toy ${perHundred(grip)}, and that grab holds ${perHundred(go.chance)}`
+  }
   return `a toy the claw hardly holds: even a grab that good holds ${perHundred(go.chance)}`
 }
 
@@ -343,13 +402,18 @@ export function goTold(go: Go, wanted: string | null): string {
   const toy = go.aimed
   if (!toy) return 'The claw comes down on bare floor and comes up empty.'
   const stray = strayOf(go)
+  // He went for a toy held down, and the claw took what lies over it.
+  const over = go.meant
+    ? `The claw comes down over ${the(go.meant)}, but ${the(toy)} ${go.meant.under === toy.id ? 'lies across it' : 'is in the way'}, and it is ${the(toy)} the claw closes on`
+    : null
   switch (go.kind) {
     case 'catch':
+      if (over) return `${over} and holds all the way to the chute. ${toy.id === wanted ? `You have ${the(toy)}: the one she wanted.` : `You have ${the(toy)}.`}`
       return `The claw drops ${stray === 'dead on' ? 'square onto' : 'onto'} ${the(toy)}, closes, and holds it all the way to the chute. ${toy.id === wanted ? `You have ${the(toy)}: the one she wanted.` : `You have ${the(toy)}.`}`
     case 'slip':
       return go.slipAt <= LIFT_SHARE
-        ? `The claw closes on ${the(toy)}${stray === 'dead on' ? '' : `, ${stray}`}, and lifts it, but it slides out before it is clear of the pile.`
-        : `The claw closes on ${the(toy)}${stray === 'dead on' ? '' : `, ${stray}`}, and carries it part of the way back before it slips free and drops into the pile again.`
+        ? `${over ?? `The claw closes on ${the(toy)}${stray === 'dead on' ? '' : `, ${stray}`}`}, and lifts it, but it slides out before it is clear of the pile.`
+        : `${over ?? `The claw closes on ${the(toy)}${stray === 'dead on' ? '' : `, ${stray}`}`}, and carries it part of the way back before it slips free and drops into the pile again.`
     case 'nudge':
       return `The claw comes down just wide of ${the(toy)}, ${stray}, closes on air and knocks it aside.`
     case 'pinned':
@@ -383,10 +447,13 @@ export function cueOf(
           : go.kind === 'pinned'
             ? `The reader's claw closed on ${which}, which is pinned under ${go.top ? the(go.top) : 'another toy'} and did not come.`
             : `The reader's claw came down wide of ${which}, ${strayOf(go)}, and came up empty.`
+  const meant = go.meant
+    ? ` He was going for ${the(go.meant)}${go.meant.id === wanted?.id ? `, the toy ${her} said she wanted` : ''}, which is pinned under ${go.top ? the(go.top) : 'another toy'}: his stop was right for it, and the claw took ${toy ? the(toy) : 'the toy'} lying over it instead.`
+    : ''
   const won = wonIn(goes)
   const last =
     left === 1 ? ` He has one go left${won.length === 0 ? ' and nothing won yet' : ''}.` : ''
-  return { notable: go.kind === 'catch' || go.kind === 'slip' || go.kind === 'nudge', text: `${what}${last}` }
+  return { notable: go.kind === 'catch' || go.kind === 'slip' || go.kind === 'nudge', text: `${what}${meant}${last}` }
 }
 
 /** How the game stands, for anything said at the glass. */
@@ -437,12 +504,14 @@ export function accountOf(her: string | null, wanted: Toy | null, goes: readonly
     ...goes.map((go, index) => {
       const toy = go.aimed
       if (!toy) return `Go ${index + 1}: the claw came down on bare floor.`
-      const where = `he went for ${the(toy)} and stopped ${strayOf(go)}`
+      const where = go.meant
+        ? `he went for ${the(go.meant)}, which is under ${go.top ? the(go.top) : 'another toy'}, and stopped ${strayOf(go)}; the claw took ${the(toy)} instead`
+        : `he went for ${the(toy)} and stopped ${strayOf(go)}`
       const result =
         go.kind === 'catch'
           ? `grabbed and held to the chute: ${luckOf(go)}`
           : go.kind === 'slip'
-            ? `grabbed, and it slipped out ${go.slipAt <= LIFT_SHARE ? 'on the lift' : 'part-way back'}: ${luckOf(go)}`
+            ? `grabbed, and ${go.meant ? the(toy) : 'it'} slipped out ${go.slipAt <= LIFT_SHARE ? 'on the lift' : 'part-way back'}: ${luckOf(go)}`
             : go.kind === 'nudge'
               ? 'a near miss that knocked it aside'
               : go.kind === 'pinned'
