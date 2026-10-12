@@ -18,6 +18,7 @@ import {
   knownEquity,
   legal,
   nextButton,
+  pokerProgress,
   potOf,
   proceed,
   seeded,
@@ -603,6 +604,35 @@ describe('Poker, her play', () => {
     expect(girlChoice(0.2, spot(), 5, '', () => 0.13).kind).toBe('check')
   })
 
+  it('has each skill beat the one below it heads-up', () => {
+    // Every deal is played twice, the two changing seats, so the luck of the cards cancels.
+    const won = (deck: Card[], button: number, no: number, skills: [Skill, Skill], rand: () => number): number => {
+      let hand = dealHand([300, 300], button, no, deck)
+      while (!hand.over) {
+        hand = hand.toAct === null ? proceed(hand) : act(hand, girlAction(hand, hand.toAct, skills[hand.toAct], '', rand, 30))
+      }
+      return hand.seats[0].stack - 300
+    }
+    // The top two are the closest, and take more deals to tell apart.
+    const ladder: [Skill, number, number][] = [
+      [2, 700, 1.5],
+      [3, 700, 1.5],
+      [4, 700, 1.5],
+      [5, 6000, 0]
+    ]
+    for (const [better, deals, least] of ladder) {
+      const worse = (better - 1) as Skill
+      const rand = seeded(100 + better)
+      let ahead = 0
+      for (let no = 1; no <= deals; no++) {
+        const deck = freshDeck(rand)
+        ahead += won(deck, no % 2, no, [better, worse], rand) - won(deck, no % 2, no, [worse, better], rand)
+      }
+      // In chips a hand, over many seeds: about 5.5, 6.5 and 6 for the lower rungs, 1 for the top.
+      expect(ahead / (2 * deals), `skill ${better} against ${worse}`).toBeGreaterThan(least)
+    }
+  })
+
   it('makes only moves the table allows, and plays better the higher her skill', () => {
     const rand = seeded(31)
     let ahead = 0
@@ -667,6 +697,62 @@ describe('Poker, the telling', () => {
     expect(told.line).toContain('pair of kings')
     expect(told.seen).not.toContain('kings')
     expect(told.seen).not.toContain('seven')
+  })
+
+  it('does not call a raise that takes the blinds a bluff, nor a bet with the best hand', () => {
+    // The reader raises seven-two before the flop and takes 50 from two callers of the blind.
+    const deck = stacked(['7c 2s', 'Kh Qd', 'Ah Jd'], 'Ks 9d 4c 3h Jh')
+    const early = play(dealHand([200, 200, 200], 0, 1, deck), raise(60), fold, fold)
+    const pre = handTold(['Ana', 'Bea'], early, 200)
+    expect(pre.bluffer).toBeNull()
+    expect(pre.line).not.toContain('bluff')
+    const limped = play(dealHand([200, 200], 1, 1, stacked(['7c 2s', 'Kh Qd'], 'Ks 9d 4c 3h Jh')), call, raise(60), fold)
+    expect(handTold(['Ana'], limped, 100).bluffer).toBeNull()
+    // On the flop with the best hand of those still in: a bet, however weak the hand.
+    const ahead = play(dealHand([200, 200], 1, 1, stacked(['7c 2s', '5h 3d'], '7s 9d 4c Kh Jh')), raise(40), call, 'deal', check, raise(60), fold)
+    const best = handTold(['Ana'], ahead, 100)
+    expect(best.bluffer).toBeNull()
+    expect(best.line).not.toContain('bluffed')
+  })
+
+  it('takes a girl at her word for a bluff: the flag her move carried, not the look of her hand', () => {
+    const deck = stacked(['Kh Qd', '7c 2s'], 'Ks 9d 4c 3h Jh')
+    const to = (bluff: boolean): HandState =>
+      play(dealHand([200, 200], 0, 1, deck), raise(30), call, 'deal', { kind: 'raise', to: 40, bluff }, fold)
+    const meant = to(true)
+    expect(meant.log[meant.log.length - 2]).toMatchObject({ seat: 1, kind: 'bet', bluff: true })
+    expect(handTold(['Ana'], meant, 100)).toMatchObject({ bluffer: 1 })
+    expect(handTold(['Ana'], meant, 100).line).toContain('Ana bluffed the reader')
+    const plain = to(false)
+    expect(plain.log[plain.log.length - 2]).not.toHaveProperty('bluff')
+    expect(handTold(['Ana'], plain, 100).bluffer).toBeNull()
+  })
+
+  it('judges nobody for an all-in the blinds forced', () => {
+    // The reader has 6 on the small blind: 5 posted, and his last chip completes it.
+    const short = play(dealHand([6, 200], 0, 1, stacked(['7c 2s', 'Ah Ad'], '7s 7d 2c 4s 9h')), call, 'deal', 'deal', 'deal', 'deal')
+    expect(short.showdown).toBe(true)
+    expect(stacks(short)).toEqual([12, 194])
+    const beat = handTold(['Ana'], short, 200).line
+    expect(beat).toContain('he blinds put the reader all-in')
+    expect(beat).not.toMatch(/bad call|bad beat|pushed/)
+    // The same with the aces holding: no bad call by a man who had none to make.
+    const held = play(dealHand([6, 200], 0, 1, stacked(['7c 2s', 'Ah Ad'], 'Ks 8d 3c 4s 9h')), call, 'deal', 'deal', 'deal', 'deal')
+    const lost = handTold(['Ana'], held, 200).line
+    expect(lost).toContain('he blinds put the reader all-in')
+    expect(lost).not.toMatch(/bad call|bad beat|pushed/)
+    // A big blind posted short, with no move in the log at all.
+    const blind = play(dealHand([200, 4], 0, 1, stacked(['Ah Ad', '7c 2s'], '7s 7d 2c 4s 9h')), 'deal', 'deal', 'deal', 'deal')
+    const told = handTold(['Ana'], blind, 200).line
+    expect(told).toContain('he blinds put Ana all-in')
+    expect(told).not.toMatch(/bad call|bad beat|pushed/)
+  })
+
+  it('says how far a game has got without anybody\'s cards', () => {
+    const lines = pokerProgress(['Ana', 'Bea'], [260, 140, 200], 2, 200, 5)
+    expect(lines[1]).toContain('2 of the 5 hands')
+    expect(lines[2]).toBe('Chips after hand 2: the reader 260, Ana 140, Bea 200: the reader was ahead.')
+    expect(lines.join(' ')).not.toMatch(/ace|king|queen|jack|spades|hearts|diamonds|clubs/)
   })
 
   it('tells a bad beat from a bad push when the chips go in early', () => {

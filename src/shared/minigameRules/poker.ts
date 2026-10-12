@@ -224,6 +224,8 @@ export interface ActionMade {
   pot: number
   /** What the seat had to put in to stay. */
   toCall: number
+  /** A bet or a raise its maker meant as a bluff, where she said so. */
+  bluff?: boolean
 }
 
 /** A pot, who could win it, and once the hand is over who did. */
@@ -319,9 +321,8 @@ export function sidePots(totals: readonly number[], dead: readonly boolean[]): O
   for (const level of levels) {
     const amount = totals.reduce((sum, total) => sum + Math.min(total, level) - Math.min(total, under), 0)
     const eligible = totals.flatMap((total, i) => (!dead[i] && total >= level ? [i] : []))
-    const last = pots[pots.length - 1]
-    if (last && last.eligible.length === eligible.length) last.amount += amount
-    else pots.push({ amount, eligible })
+    // Every level is some live seat's whole stake, so each pot has fewer in it than the one before.
+    pots.push({ amount, eligible })
     under = level
   }
   const over = totals.reduce((sum, total) => sum + Math.max(0, total - under), 0)
@@ -491,6 +492,8 @@ export function legal(hand: HandState, at: number): Legal {
 export interface Move {
   kind: 'fold' | 'check' | 'call' | 'raise'
   to?: number
+  /** A raise meant as a bluff: it is kept with the move in the hand's log. */
+  bluff?: boolean
 }
 
 /**
@@ -548,7 +551,14 @@ export function act(hand: HandState, move: Move): HandState {
       lastRaise: full ? to - hand.currentBet : hand.lastRaise,
       log: [
         ...hand.log,
-        { ...base, kind: hand.currentBet === 0 ? 'bet' : 'raise', to, paid, allIn: raised.allIn }
+        {
+          ...base,
+          kind: hand.currentBet === 0 ? 'bet' : 'raise',
+          to,
+          paid,
+          allIn: raised.allIn,
+          ...(move.bluff ? { bluff: true } : {})
+        }
       ]
     },
     at
@@ -973,6 +983,7 @@ const percent = (share: number): string => `${Math.round(share * 100)}%`
  * A finished hand for the scene's writer, who is told the cards nobody showed: whether a bet
  * that took the pot was a bluff and who folded the better hand to it, and at a showdown whether
  * the loser was unlucky (ahead when the chips went in), called badly, or was caught bluffing.
+ * A seat the blinds put all-in is judged for none of it.
  * `stack` is what everyone started the game with, the measure of a big pot.
  */
 export function handTold(names: readonly string[], hand: HandState, stack: number): HandTold {
@@ -994,13 +1005,18 @@ export function handTold(names: readonly string[], hand: HandState, stack: numbe
     const made = hand.log[at]
     const street = made.street
     const folders = hand.log.slice(at + 1).flatMap((later) => (later.kind === 'fold' ? [later.seat] : []))
-    const mine = strengthAt(hand, winner, street)
     const worth = (seat: number): number =>
       street === 'preflop'
         ? strengthAt(hand, seat, street) - (seat === winner ? 0 : 0.08)
         : evaluate([...hand.seats[seat].hole, ...hand.board.slice(0, SHOWN[street])]).score
     const better = folders.filter((seat) => worth(seat) > worth(winner))
-    const bluff = mine < 0.45
+    // A girl's bluff is the one she meant as one. The reader's is read from the cards: a bet or a
+    // raise once the flop was out, with a hand behind every hand still in. Taking the blinds
+    // with a raise before the flop is not one.
+    const bluff =
+      winner === 0
+        ? street !== 'preflop' && folders.length > 0 && better.length === folders.length
+        : made.bluff === true
     const gave = listed(folders.map(who))
     const seen = `${head} ${who(winner)} ${made.kind === 'bet' ? 'bet' : 'raised to'} ${made.to}${made.allIn ? ', all-in,' : ''} ${ON[street]} and ${gave} folded; ${who(winner)} took the pot of ${pot} without showing.`
     const lost = better.length
@@ -1019,6 +1035,13 @@ export function handTold(names: readonly string[], hand: HandState, stack: numbe
   const losers = alive.filter((seat) => !winners.has(seat))
   const lastBy = (seat: number): ActionMade | undefined => [...hand.log].reverse().find((made) => made.seat === seat)
   const notes: string[] = []
+  // A seat the blinds put all-in chose nothing: it made no move at all, or it sat in a blind
+  // with no more than the big blind and could only complete it.
+  const forced = (seat: number): boolean =>
+    hand.seats[seat].total === hand.start[seat] &&
+    (!lastBy(seat) || ((seat === hand.smallBlind || seat === hand.bigBlind) && hand.start[seat] <= BIG_BLIND))
+  const put = alive.filter(forced)
+  if (put.length) notes.push(`the blinds put ${listed(put.map(who))} all-in, with no choice in it`)
   if (hand.runoutFrom !== null && hand.runoutFrom < 5) {
     const when = ON[STREETS[Math.max(0, hand.runoutFrom - 2)]]
     const share = knownEquity(
@@ -1028,12 +1051,16 @@ export function handTold(names: readonly string[], hand: HandState, stack: numbe
       400
     )
     const ahead = share.indexOf(Math.max(...share))
+    // No bad beat where a forced seat is on either side of it: nobody chose to be in that spot.
+    const chosen = !forced(alive[ahead]) && !top.winners.every(forced)
     if (!top.winners.includes(alive[ahead]) && share[ahead] >= 0.7) {
-      notes.push(`a bad beat for ${who(alive[ahead])}, who was ${percent(share[ahead])} to win when the chips went in ${when}`)
+      if (chosen) {
+        notes.push(`a bad beat for ${who(alive[ahead])}, who was ${percent(share[ahead])} to win when the chips went in ${when}`)
+      }
     } else {
       for (const seat of losers) {
         const chance = share[alive.indexOf(seat)]
-        if (chance >= 0.3) continue
+        if (chance >= 0.3 || forced(seat)) continue
         notes.push(
           lastBy(seat)?.kind === 'call'
             ? `a bad call by ${who(seat)}, only ${percent(chance)} to win when the chips went in ${when}`
@@ -1105,6 +1132,27 @@ export function pokerSummary(names: readonly string[], stacks: readonly number[]
 
 /** The most hands the account tells one by one. */
 const TOLD_AT_MOST = 6
+
+/**
+ * A game still being played, for the scene should the reader walk away from it: the terms, how
+ * many hands are done and everyone's chips. Nobody's cards are in it.
+ */
+export function pokerProgress(
+  names: readonly string[],
+  stacks: readonly number[],
+  played: number,
+  stack: number,
+  agreed: number
+): string[] {
+  const top = Math.max(...stacks)
+  const leaders = ['the reader', ...names].filter((_, seat) => stacks[seat] === top)
+  const lead = leaders.length === 1 ? `${leaders[0]} was ahead` : `${listed(leaders)} were level on top`
+  return [
+    `It was Texas hold'em between the reader and ${listed(names)} for play chips that are only counters: ${stack} each to start, blinds ${SMALL_BLIND} and ${BIG_BLIND}, ${agreed} hand${agreed === 1 ? '' : 's'} at most, most chips at the end wins.`,
+    `${played} of the ${agreed} hand${agreed === 1 ? '' : 's'} had been played and the game was not finished.`,
+    `Chips after hand ${played}: ${chipsLine(names, stacks, 'the reader')}: ${lead}.`
+  ]
+}
 
 /**
  * How a game went, for the scene's writer: the terms, the hands that mattered with what nobody
