@@ -113,6 +113,16 @@
   animation: vu-skeeball-pop 0.32s ease-out;
 }
 
+.vu-skeeball-paused {
+  fill: var(--vu-text-muted);
+  stroke: var(--vu-surface);
+  stroke-width: 0.4;
+  paint-order: stroke;
+  font: 500 2.6px var(--font-body);
+  text-anchor: middle;
+  pointer-events: none;
+}
+
 .vu-skeeball-pop[data-still] {
   animation: none;
 }

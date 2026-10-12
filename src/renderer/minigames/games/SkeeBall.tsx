@@ -12,12 +12,14 @@ import {
   needOf,
   outcomeOf,
   powerY,
+  progressTold,
   readerRoll,
   rollTold,
   scoresOf,
   soloAccount,
   soloSummary,
   sweepAt,
+  sweepFrom,
   tableOf,
   totalsOf,
   versusAccount,
@@ -55,6 +57,8 @@ const TRIP = { rampMs: 620, hopMs: 380, dropMs: 420, settleMs: 620 } as const
 const SAY_CAP_MS = 2500
 /** Two stops closer together than this are one press, heard twice. */
 const PRESS_GAP_MS = 180
+/** How long after the reader looks back nothing he presses is a stop: the press that brought him back is not one. */
+const BACK_GAP_MS = 300
 /** The most one frame may move a clock: a stalled frame is not time the reader had. */
 const FRAME_CAP_MS = 50
 
@@ -153,6 +157,24 @@ export function SkeeBall({ play }: { play: GamePlay }): JSX.Element {
   const swept = useRef(0)
   const aim = useRef(0)
   const pressedAt = useRef(0)
+  // When the reader last looked away or back, heard as it happens and not a render later.
+  const turnedAt = useRef(-BACK_GAP_MS)
+  useEffect(() => {
+    const turned = (): void => {
+      turnedAt.current = performance.now()
+    }
+    document.addEventListener('visibilitychange', turned)
+    window.addEventListener('blur', turned)
+    window.addEventListener('focus', turned)
+    return () => {
+      document.removeEventListener('visibilitychange', turned)
+      window.removeEventListener('blur', turned)
+      window.removeEventListener('focus', turned)
+    }
+  }, [])
+  /** The sweep is stopped for a reader looking elsewhere, and nothing he presses on the way back stops it for him. */
+  const paused = (): boolean =>
+    away || document.hidden || !document.hasFocus() || performance.now() - turnedAt.current < BACK_GAP_MS
 
   // With company the game is on from the moment the balls rattle down, and the terms are said.
   useEffect(() => {
@@ -173,7 +195,7 @@ export function SkeeBall({ play }: { play: GamePlay }): JSX.Element {
 
   /** The reader stops whatever is sweeping; the second stop is the roll. */
   function stop(): void {
-    if (waiting) return
+    if (waiting || paused()) return
     const now = performance.now()
     if (now - pressedAt.current < PRESS_GAP_MS) return
     pressedAt.current = now
@@ -243,6 +265,7 @@ export function SkeeBall({ play }: { play: GamePlay }): JSX.Element {
     setRolling(null)
     setStage(0)
     void play.narrate(told.narration)
+    play.progress(progressTold(names, all, balls))
     // At the reader's own pace a girl's ball waits until he has moved past the line for the one before it.
     if (play.stepped) {
       const onBox = (): void => {
@@ -303,6 +326,8 @@ export function SkeeBall({ play }: { play: GamePlay }): JSX.Element {
   // The sweep under the reader's hand: the ball across the lane, then the spot up the board.
   useEffect(() => {
     if (waiting || away) return
+    // Each sweep begins somewhere of its own, and begins again when the reader looks back.
+    sweepClock.current = sweepFrom(STAGES[stage].sweepMs)
     let last = performance.now()
     let frame = 0
     const tick = (now: number): void => {
@@ -326,20 +351,22 @@ export function SkeeBall({ play }: { play: GamePlay }): JSX.Element {
     return () => cancelAnimationFrame(frame)
   }, [waiting, stage, away])
 
-  // The ball in the hand between rolls, and the meter at rest.
+  // The ball in the hand between rolls and while the reader looks away, and the meter at rest.
   useEffect(() => {
     if (rolling) return
+    // A line already set is kept: only the sweep still running begins again.
+    const x = String(stage === 1 ? aimX(aim.current) : 0)
     const ball = ballMark.current
     if (ball) {
-      ball.setAttribute('cx', '0')
+      ball.setAttribute('cx', x)
       ball.setAttribute('cy', String(START_Y))
       ball.setAttribute('r', String(BALL_R))
       ball.style.opacity = '1'
     }
-    lineMark.current?.setAttribute('x1', '0')
-    lineMark.current?.setAttribute('x2', '0')
+    lineMark.current?.setAttribute('x1', x)
+    lineMark.current?.setAttribute('x2', x)
     if (meterMark.current) meterMark.current.style.bottom = '0%'
-  }, [rolling === null, rolls.length])
+  }, [rolling === null, rolls.length, away])
 
   // The ball on its way: up the ramp on its line, the hop, down where it dropped, and the count.
   const roll = rolling?.roll
@@ -406,7 +433,7 @@ export function SkeeBall({ play }: { play: GamePlay }): JSX.Element {
     // A button under focus answers Space itself.
     if (event.target instanceof Element && event.target.closest('button, a')) return
     event.preventDefault()
-    if (waiting) return
+    if (waiting || paused()) return
     play.moved()
     stop()
   }
@@ -418,7 +445,21 @@ export function SkeeBall({ play }: { play: GamePlay }): JSX.Element {
 
   const totals = totalsOf(rolls, girls.length)
   const players = ['You', ...names]
-  const prompt = table.over ? 'Game over' : rolling ? '…' : her ? `${her.name} is up` : STAGES[stage].label
+  // Looking elsewhere with a stop to make, the sweep is put away until he is back.
+  const hidden = away && !waiting
+  // Her ball waits on a line the reader has yet to move past, where he steps through them himself.
+  const held = her !== undefined && play.stepped && reached < rolls.length
+  const prompt = table.over
+    ? 'Game over'
+    : rolling
+      ? '…'
+      : her
+        ? held
+          ? `${her.name} is up: Continue to go on`
+          : `${her.name} is up`
+        : hidden
+          ? 'Paused'
+          : STAGES[stage].label
   const shown = rolling?.down ? rolling.roll : null
   // What the power meter's marks stand beside: each ring's height up the board.
   const marks = [20, 30, 40, 50, 100].map((value) => {
@@ -459,7 +500,7 @@ export function SkeeBall({ play }: { play: GamePlay }): JSX.Element {
         <line
           ref={lineMark}
           className="vu-skeeball-line"
-          data-live={!waiting || undefined}
+          data-live={(!waiting && !hidden) || undefined}
           x1="0"
           x2="0"
           y1="1"
@@ -468,12 +509,17 @@ export function SkeeBall({ play }: { play: GamePlay }): JSX.Element {
         <circle
           ref={spotMark}
           className="vu-skeeball-spot"
-          data-live={(!waiting && stage === 1) || undefined}
+          data-live={(!waiting && !hidden && stage === 1) || undefined}
           cx="0"
           cy={LIP_Y}
           r="1"
         />
         <circle ref={ballMark} className="vu-skeeball-ball" cx="0" cy={START_Y} r={BALL_R} />
+        {hidden && (
+          <text className="vu-skeeball-paused" x="0" y={LIP_Y + 7}>
+            Paused
+          </text>
+        )}
         {shown && (
           <text
             className="vu-skeeball-pop"
@@ -489,8 +535,8 @@ export function SkeeBall({ play }: { play: GamePlay }): JSX.Element {
       {/* The power meter stands beside the alley, the height of each ring marked on it. */}
       <div
         className="vu-skeeball-meter"
-        data-live={(!waiting && stage === 1) || undefined}
-        data-waiting={waiting || undefined}
+        data-live={(!waiting && !hidden && stage === 1) || undefined}
+        data-waiting={waiting || hidden || undefined}
         onClick={stop}
       >
         <span className="vu-skeeball-meterlabel">power</span>
@@ -550,7 +596,7 @@ export function SkeeBall({ play }: { play: GamePlay }): JSX.Element {
             {...gestures(waiting, lift, press)}
             onClick={(event) => {
               // Pressed by key, it is the reader moving on, as a press on the table is.
-              if (event.detail === 0 && !waiting) play.moved()
+              if (event.detail === 0 && !waiting && !paused()) play.moved()
               stop()
             }}
             // Enter held on the button is one press, as Space is.

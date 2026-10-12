@@ -9,6 +9,7 @@ import {
   RIM,
   RINGS,
   SCATTER,
+  WEIGHT_SCATTER,
   herRoll,
   herTarget,
   landOn,
@@ -17,6 +18,7 @@ import {
   needOf,
   outcomeOf,
   powerY,
+  progressTold,
   readerRoll,
   rollTold,
   scoresOf,
@@ -25,6 +27,7 @@ import {
   stillOpen,
   stopsFor,
   sweepAt,
+  sweepFrom,
   tableOf,
   tallyOf,
   totalsOf,
@@ -116,6 +119,25 @@ describe('the board', () => {
     expect(sweepAt(1000, 1000)).toBe(1)
     expect(sweepAt(1750, 1000)).toBe(0.25)
   })
+
+  it('begins each sweep somewhere of its own, going either way, by the dice', () => {
+    expect(sweepFrom(1000, () => 0)).toBe(0)
+    expect(sweepFrom(800, () => 0.5)).toBe(800)
+    const rand = seeded(3)
+    const starts = Array.from({ length: 400 }, () => sweepFrom(1000, rand))
+    for (const start of starts) {
+      expect(start).toBeGreaterThanOrEqual(0)
+      expect(start).toBeLessThan(2000)
+    }
+    // Both ways along it, and every part of it: no beat to learn.
+    const rising = starts.filter((start) => start < 1000).length
+    expect(rising).toBeGreaterThan(150)
+    expect(rising).toBeLessThan(250)
+    const tenths = new Set(starts.map((start) => Math.floor(sweepAt(start, 1000) * 10)))
+    expect(tenths.size).toBe(10)
+    // The same dice, the same sweep.
+    expect(sweepFrom(1000, seeded(3))).toBe(starts[0])
+  })
 })
 
 describe('the turns', () => {
@@ -174,9 +196,9 @@ describe('the turns', () => {
 })
 
 describe('her roll', () => {
-  it('goes for the middle with nothing to chase, the better players for the 50, and asks no dice of them', () => {
+  it('goes for the middle with nothing to chase, only the best for the 50, and asks no dice of the good ones', () => {
     expect(herTarget(5, 0, never)).toBe(50)
-    expect(herTarget(4, 0, never)).toBe(50)
+    expect(herTarget(4, 0, never)).toBe(40)
     expect(herTarget(3, 0, () => 0.9)).toBe(40)
     expect(herTarget(1, 0, () => 0.9)).toBe(40)
   })
@@ -201,9 +223,32 @@ describe('her roll', () => {
       for (let k = 0; k < 4000; k++) total += herRoll(skill, 0, rand).score
       return total / 4000
     })
-    for (let k = 1; k < means.length; k++) expect(means[k]).toBeGreaterThan(means[k - 1])
+    // A ladder: each skill a clear step above the one below.
+    for (let k = 1; k < means.length; k++) expect(means[k] - means[k - 1]).toBeGreaterThan(2)
     expect(SCATTER[5]).toBeLessThan(SCATTER[1])
-    // A corner is a gamble even for the best: she makes fewer than half.
+  })
+
+  it('has each girl at home on the middle ring that pays her best', () => {
+    const bell = (rand: () => number): number =>
+      Math.sqrt(-2 * Math.log(Math.max(rand(), 1e-9))) * Math.cos(2 * Math.PI * rand())
+    /** What a ball of hers averages rolled at a ring every time. */
+    const at = (skill: Skill, value: number): number => {
+      const rand = seeded(500 + skill * 13 + value)
+      const target = ring(value)
+      let total = 0
+      for (let k = 0; k < 40000; k++) {
+        total += landOn(target.x + bell(rand) * SCATTER[skill], target.y + bell(rand) * SCATTER[skill] * WEIGHT_SCATTER, rand).score
+      }
+      return total / 40000
+    }
+    for (const skill of [1, 2, 3, 4, 5] as Skill[]) {
+      const home = herTarget(skill, 0, () => 0.99)
+      for (const other of [30, 40, 50]) if (other !== home) expect(at(skill, home)).toBeGreaterThan(at(skill, other))
+    }
+  })
+
+  it('makes a corner a gamble even for the best', () => {
+    // She makes fewer than half.
     const rand = seeded(99)
     let made = 0
     for (let k = 0; k < 4000; k++) if (herRoll(5, 100, rand).score === 100) made++
@@ -259,6 +304,50 @@ describe('the balance', () => {
   it('makes the corners a gamble for the reader: worse on average than the safe 40', () => {
     expect(versus(3, 100).mine).toBeLessThan(versus(3, 40).mine)
   })
+
+  /**
+   * A reader stopping the two sweeps as they are run, each begun wherever the dice put it: he
+   * lets the marker come round to where he wants it and is off by a bell curve `ms` wide.
+   */
+  function timed(value: number, ms: number, rand: () => number): number {
+    const bell = (): number => Math.sqrt(-2 * Math.log(Math.max(rand(), 1e-9))) * Math.cos(2 * Math.PI * rand())
+    const stopAt = (want: number, period: number): number => {
+      const from = sweepFrom(period, rand)
+      // The marker passes the spot going up and coming back; he takes the first pass he has had time to read.
+      const passes = [want * period, (2 - want) * period].map((pass) => {
+        let wait = pass - from
+        while (wait < 300) wait += 2 * period
+        return wait
+      })
+      return sweepAt(from + Math.max(0, Math.min(...passes) + bell() * ms), period)
+    }
+    const target = ring(value, value === 100 && rand() < 0.5 ? 1 : 0)
+    const { aim, power } = stopsFor(target.x, target.y)
+    return readerRoll(stopAt((aim + 1) / 2, AIM_SWEEP_MS) * 2 - 1, stopAt(power, POWER_SWEEP_MS), rand).score
+  }
+
+  /** What a ball averages rolled for one ring every time, at a timing error. */
+  function average(value: number, ms: number): number {
+    const rand = seeded(9000 + value * 7 + ms)
+    let total = 0
+    for (let k = 0; k < 40000; k++) total += timed(value, ms, rand)
+    return total / 40000
+  }
+
+  it('pays a very sharp reader for the corners and makes them a losing gamble for an ordinary one', () => {
+    const table = [25, 40, 60].map((ms) => ({ ms, forty: average(40, ms), fifty: average(50, ms), corner: average(100, ms) }))
+    console.log(
+      table.map((row) => `${row.ms} ms: the 40 ${row.forty.toFixed(1)}, the 50 ${row.fifty.toFixed(1)}, corners ${row.corner.toFixed(1)}`).join('\n')
+    )
+    const [sharp, fair, loose] = table
+    // Within 25 ms the corners pay, and well.
+    expect(sharp.corner).toBeGreaterThan(sharp.forty + 4)
+    // From 40 ms on they are worse than the safe 40, and worse the looser he is.
+    expect(fair.corner).toBeLessThan(fair.forty - 1)
+    expect(loose.corner).toBeLessThan(loose.forty - 4)
+    // The 40 stays the steady ball: the 50 is no better than it from 40 ms on.
+    expect(fair.fifty).toBeLessThan(fair.forty)
+  })
 })
 
 describe('the result', () => {
@@ -287,6 +376,16 @@ describe('the result', () => {
     const two = versusAccount(['Ana'], game([40, 30], [20, 50], [40, 40]), 3)
     expect(two.some((line) => line.includes('played it safe'))).toBe(true)
     expect(two[two.length - 1]).toContain('the reader 100, Ana 120')
+  })
+
+  it('says how the game stands after any ball, for a game walked away from', () => {
+    const told = progressTold(['Ana'], game([40, 30], [100]), 6)
+    expect(told[0]).toContain('6 balls each')
+    expect(told[1]).toBe('So far: the reader 140 after 2 balls, 4 left; Ana 30 after 1 ball, 5 left.')
+    expect(progressTold([], game([40]), 3)).toEqual([
+      'The reader was rolling 3 balls of Skee-Ball alone.',
+      'So far: the reader 40 after 1 ball, 2 left.'
+    ])
   })
 
   it('is on paper what it is on the board', () => {

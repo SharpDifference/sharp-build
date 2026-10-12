@@ -42,13 +42,24 @@ export const POWER_SPAN = 36
 export const AIM_SWEEP_MS = 1000
 export const POWER_SWEEP_MS = 800
 
-/** How far a ball strays from where the reader's two stops put it, as any hand's does. */
-export const HAND = 0.3
+/**
+ * How far a ball strays from where the reader's two stops put it, as any hand's does: enough that
+ * a small corner pocket is not a sure thing even on two good stops.
+ */
+export const HAND = 0.7
 
 /** A sweep back and forth between 0 and 1, from the time since it began. */
 export function sweepAt(elapsed: number, period: number): number {
   const turn = (((elapsed / period) % 2) + 2) % 2
   return turn <= 1 ? turn : 2 - turn
+}
+
+/**
+ * Where a sweep begins, as time already run on it: anywhere along it and going either way, so no
+ * two balls keep the same beat and each has to be read off the marker, not counted.
+ */
+export function sweepFrom(period: number, rand: () => number = Math.random): number {
+  return rand() * 2 * period
 }
 
 /** Where an aim from -1 to 1 puts the ball's line, and how far up a power from 0 to 1 sends it. */
@@ -140,8 +151,11 @@ export type Skill = 1 | 2 | 3 | 4 | 5
 /** How far her ball strays across the lane, by skill; the weight is harder to judge than the line. */
 export const SCATTER: Record<Skill, number> = { 1: 2.3, 2: 1.8, 3: 1.15, 4: 0.95, 5: 0.75 }
 export const WEIGHT_SCATTER = 1.6
-/** The ring she rolls for with nothing to chase: the safe 40, or the 50 for a girl who can hold it. */
-const HOME: Record<Skill, number> = { 1: 40, 2: 40, 3: 40, 4: 50, 5: 50 }
+/**
+ * The ring she rolls for with nothing to chase, where her hand scores best: the safe 40, and the
+ * 50 only for the best, the one girl who can hold it.
+ */
+const HOME: Record<Skill, number> = { 1: 40, 2: 40, 3: 40, 4: 40, 5: 50 }
 /** How often the corners tempt her for no reason at all: a poor player cannot leave them alone. */
 const TEMPTED: Record<Skill, number> = { 1: 0.3, 2: 0.18, 3: 0.06, 4: 0, 5: 0 }
 
@@ -351,6 +365,25 @@ export function rollTold(names: readonly string[], rolls: readonly Roll[], balls
   }
   if (girls > 0) parts.push(`The totals: ${standing(who, totals)}.`)
   return { narration, cue: parts.join(' '), moments }
+}
+
+/**
+ * The game so far, for the scene's writer should the reader walk away from it: what is being
+ * played, everyone's total and how many balls each has left.
+ */
+export function progressTold(names: readonly string[], rolls: readonly Roll[], balls: number): string[] {
+  const who = ['the reader', ...names]
+  const totals = totalsOf(rolls, names.length)
+  const each = who.map((name, k) => {
+    const rolled = scoresOf(rolls, k).length
+    return `${name} ${totals[k]} after ${times(rolled, 'ball')}, ${balls - rolled} left`
+  })
+  return [
+    names.length === 0
+      ? `The reader was rolling ${times(balls, 'ball')} of Skee-Ball alone.`
+      : `They were rolling ${times(balls, 'ball')} each at Skee-Ball, one ball each in turn, the reader first.`,
+    `So far: ${each.join('; ')}.`
+  ]
 }
 
 /** How one player's game went, counted. */
