@@ -219,31 +219,31 @@
 /* Under the table: what to do, and the power as it is brought up. */
 .vu-pool-foot {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: space-between;
   gap: 20px;
   width: 680px;
 }
 
+/* The line wraps rather than cutting off: what to do is read in full, beside the meter or not. */
 .vu-pool-status {
   flex: 1;
   min-width: 0;
   margin: 0;
-  overflow: hidden;
   color: var(--vu-text-body);
-  font: 700 13px var(--font-mono);
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  font: 700 13px/1.4 var(--font-mono);
+  text-wrap: pretty;
 }
 
 /* The last shot told, in full ink: it stays until the next. */
 .vu-pool-status[data-told] {
   color: var(--vu-text);
-  font: 600 13px var(--font-body);
+  font: 600 13px/1.4 var(--font-body);
 }
 
 .vu-pool-meter {
   flex: none;
+  margin-top: 2px;
   width: 240px;
   height: 14px;
   border: 2.5px solid var(--vu-border);

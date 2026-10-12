@@ -740,7 +740,7 @@ export function Pool({ play }: { play: GamePlay }): JSX.Element {
       </div>
 
       <div className="vu-pool-foot">
-        <p className="vu-pool-status" data-told={lastTold ? '' : undefined} title={line} aria-live="polite">
+        <p className="vu-pool-status" data-told={lastTold ? '' : undefined} aria-live="polite">
           {line}
         </p>
         <span
