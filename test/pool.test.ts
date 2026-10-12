@@ -8,6 +8,7 @@ import {
   TABLE_W,
   aimGuide,
   ballsLeft,
+  canBreakFrom,
   canPlace,
   cloneBalls,
   energyOf,
@@ -16,12 +17,15 @@ import {
   herShot,
   legalTargets,
   matchAccount,
+  matchProgress,
   matchSummary,
   placeCue,
   rackedBalls,
   racksWon,
   resolveShot,
+  shotLine,
   simulate,
+  soloProgress,
   stepBalls,
   strike,
   tallyOf,
@@ -264,6 +268,19 @@ describe('eight-ball', () => {
     expect(got.rack.balls[8].potted).toBe(false)
     expect(got.record.potted).toEqual([3])
     expect(got.rack.groups.reader).toBe('solids')
+    // And says so, in the shot's line.
+    expect(got.record.eightBack).toBe(true)
+    expect(shotLine('Ana', got.record)).toBe(
+      'You break. The 3 drops. The eight drops on the break and is put back on its spot. You are solids.'
+    )
+    const alone = freshRack('reader')
+    const before = cloneBalls(alone.balls)
+    alone.balls[8].potted = true
+    const only = resolveShot(alone, before, log(1, [8]))
+    expect(shotLine('Ana', only.record)).toBe(
+      'You break. The eight drops on the break and is put back on its spot.'
+    )
+    expect(judge(rackWith(spread), log(1, [1])).record.eightBack).toBe(false)
   })
 
   it('tells a pot struck straight in from one that went in off something', () => {
@@ -405,13 +422,91 @@ describe('her play', () => {
     expect(played.potted).not.toContain(0)
   })
 
-  it('breaks at the head ball as hard as she can', () => {
-    const rack = freshRack('her')
-    const shot = herShot(rack, 3, () => 0.5)
-    expect(shot.place).toBeNull()
-    expect(shot.power).toBeGreaterThan(0.85)
-    expect(simulate(cloneBalls(rack.balls), shot.angle, shot.power).firstHit).toBe(1)
+  it('breaks at the head ball as hard as she can, from a spot of her own behind the head string', () => {
+    for (const seed of [1, 2, 3, 4, 5, 6]) {
+      const rack = freshRack('her')
+      const shot = herShot(rack, 3, seeded(seed))
+      expect(shot.place).not.toBeNull()
+      expect(canBreakFrom(rack.balls, shot.place!)).toBe(true)
+      expect(shot.place!.y).not.toBeCloseTo(HEAD_SPOT.y)
+      expect(shot.power).toBeGreaterThan(0.85)
+      const balls = cloneBalls(rack.balls)
+      placeCue(balls, shot.place!)
+      expect(simulate(balls, shot.angle, shot.power).firstHit).toBe(1)
+      // The rack she was shown is as it was.
+      expect(rack.balls[0]).toMatchObject(HEAD_SPOT)
+    }
   })
+
+  it('lets a break be played from anywhere behind the head string and nowhere past it', () => {
+    const balls = rackedBalls()
+    expect(canBreakFrom(balls, HEAD_SPOT)).toBe(true)
+    expect(canBreakFrom(balls, { x: 60, y: 90 })).toBe(true)
+    expect(canBreakFrom(balls, { x: HEAD_SPOT.x + 1, y: 200 })).toBe(false)
+    expect(canBreakFrom(balls, { x: 2, y: 200 })).toBe(false)
+  })
+
+  it('plays a legal safety when her nearest ball is hidden', () => {
+    const groups = { reader: 'solids', her: 'stripes' } as const
+    // Her nearest ball dead behind the reader's, nothing of hers to pot; another of hers in the open, tight on a rail.
+    const rack = rackWith(
+      { 0: [100, 200], 1: [150, 200], 9: [200, 200], 2: [224, 200], 10: [700, 389], 3: [730, 380], 4: [670, 380], 8: [400, 60] },
+      { groups, turn: 'her' }
+    )
+    for (const skill of [3, 4, 5] as const) {
+      const shot = herShot(rack, skill, seeded(skill))
+      const balls = cloneBalls(rack.balls)
+      const played = simulate(balls, shot.angle - shot.aimError, shot.power)
+      const { record } = resolveShot({ ...rack, balls }, rack.balls, played)
+      expect(record.foul).toBeNull()
+    }
+  })
+
+  /**
+   * Racks played through, her at a skill against a middling player: how many shots she took after
+   * the break, and how many of them struck the wrong ball first or nothing at all.
+   */
+  function fouled(skill: Skill, many: number): { shots: number; missed: number; ms: number } {
+    const rand = seeded(500 + skill)
+    let shots = 0
+    let missed = 0
+    let ms = 0
+    for (let n = 0; n < many; n++) {
+      let rack = freshRack(n % 2 ? 'her' : 'reader')
+      for (let turn = 0; turn < 150 && !rack.winner; turn++) {
+        const hers = rack.turn === 'her'
+        const before = performance.now()
+        const shot = herShot(rack, hers ? skill : 3, rand)
+        if (hers) ms = Math.max(ms, performance.now() - before)
+        const balls = cloneBalls(rack.balls)
+        if (shot.place) placeCue(balls, shot.place)
+        const pre = cloneBalls(balls)
+        const played = simulate(balls, shot.angle, shot.power)
+        const got = resolveShot({ ...rack, balls, inHand: false }, pre, played, shot.expected, shot.aimError)
+        if (hers && !got.record.breakShot) {
+          shots++
+          if (got.record.foul === 'wrong-ball' || got.record.foul === 'no-hit') missed++
+        }
+        rack = got.rack
+      }
+    }
+    return { shots, missed, ms }
+  }
+
+  it('fouls by the wrong ball or none less the better she is, and hardly ever at her best', () => {
+    const rate = ([1, 2, 3, 4, 5] as const).map((skill) => {
+      const got = fouled(skill, 120)
+      expect(got.shots).toBeGreaterThan(1000)
+      // A safety looked for is still a shot chosen in good time.
+      expect(got.ms).toBeLessThan(50)
+      return got.missed / got.shots
+    })
+    expect(rate[0]).toBeGreaterThan(rate[2])
+    expect(rate[1]).toBeGreaterThan(rate[3])
+    expect(rate[2]).toBeGreaterThan(rate[4])
+    expect(rate[3]).toBeLessThan(0.02)
+    expect(rate[4]).toBeLessThan(0.01)
+  }, 120000)
 
   /** Her pots and fouls over the same scattered tables, at a skill. */
   function trial(skill: Skill): { pots: number; fouls: number; ms: number } {
@@ -474,6 +569,7 @@ describe('the telling', () => {
     onEightNow: false,
     atEight: false,
     eight: null,
+    eightBack: false,
     winner: null,
     next: by,
     aimError: by === 'her' ? 0.02 : null,
@@ -496,7 +592,7 @@ describe('the telling', () => {
 
   it('counts what each side did', () => {
     expect(tallyOf(rack.shots, 'her')).toEqual({
-      visits: 3,
+      shots: 3,
       pots: 2,
       fouls: 1,
       flukes: 1,
@@ -506,6 +602,39 @@ describe('the telling', () => {
     })
     expect(tallyOf(rack.shots, 'reader')).toMatchObject({ pots: 3, long: 1, bestRun: 3, fouls: 0 })
     expect(racksWon([rack, { ...rack, winner: 'her' }, rack])).toEqual({ reader: 2, her: 1 })
+    // A ball that went down on a foul is no pot of hers.
+    const foulPot = [shot('her', { potted: [9], own: [9], foul: 'scratch' }), shot('her', { potted: [10], own: [10], run: 1 })]
+    expect(tallyOf(foulPot, 'her')).toMatchObject({ shots: 2, pots: 1, fouls: 1 })
+    expect(matchAccount('Ana', [{ ...rack, shots: [...foulPot, ...rack.shots.slice(4)] }], 1).join('\n')).toContain(
+      'Ana: 1 ball potted in 2 shots'
+    )
+  })
+
+  it('says an eight that dropped on the break was put back', () => {
+    const shots = [shot('reader', { breakShot: true, eightBack: true }), ...rack.shots.slice(1)]
+    expect(matchAccount('Ana', [{ ...rack, shots }], 1).join('\n')).toContain(
+      'the reader broke and the eight dropped on the break and was put back on its spot, the reader potted the eight to win it'
+    )
+    expect(matchAccount('Ana', [rack], 1).join('\n')).not.toContain('put back')
+  })
+
+  it('says how a game stands for one walked away from', () => {
+    const groups = { reader: 'solids', her: 'stripes' } as const
+    const mid = rackWith({ 0: [200, 200], 1: [300, 100], 2: [300, 300], 8: [400, 200] }, { groups, turn: 'her', inHand: true })
+    const told = matchProgress('Ana', mid, { reader: 1, her: 0 }, 2).join('\n')
+    expect(told).toContain('best of three racks')
+    expect(told).toContain('Racks won so far: the reader 1, Ana 0.')
+    expect(told).toContain('the reader was solids with 2 of 7 still to pot; Ana was stripes with only the eight left')
+    expect(told).toContain("It was Ana's shot, with the cue ball in hand after a foul.")
+    const open = matchProgress('Ana', rackWith({ 0: [200, 200], 1: [300, 100], 9: [300, 300], 8: [400, 200] }), { reader: 0, her: 0 }, 1).join('\n')
+    expect(open).toContain('a single rack')
+    expect(open).not.toContain('Racks won')
+    expect(open).toContain('no groups were settled')
+    expect(matchProgress('Ana', freshRack('her'), { reader: 1, her: 0 }, 2).join('\n')).toContain('Ana was about to break')
+    const alone = { ...rackWith({ 0: [200, 200], 8: [400, 200], 9: [500, 100] }), solo: true }
+    expect(soloProgress(alone, [shot('reader'), shot('reader', { foul: 'scratch' })])[0]).toContain(
+      '13 of 15 balls potted in 2 shots, 1 foul, 2 still on the table'
+    )
   })
 
   it('says who won, how close it was and who potted the eight', () => {

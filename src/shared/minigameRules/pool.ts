@@ -25,7 +25,7 @@ const CUSHION_BOUNCE = 0.74
 const BALL_BOUNCE = 0.95
 /** The longest a shot is run for: nothing struck at full power rolls longer. */
 export const MAX_STEPS = 2400
-/** Where the cue ball is broken from, and where the head of the rack stands. */
+/** Where the cue ball stands for the break until it is moved, and where the head of the rack stands. */
 export const HEAD_SPOT: Point = { x: TABLE_W / 4, y: TABLE_H / 2 }
 export const FOOT_SPOT: Point = { x: (TABLE_W * 3) / 4, y: TABLE_H / 2 }
 /** How far the cue ball and then the object ball travel in a pot worth calling long. */
@@ -354,6 +354,11 @@ export function canPlace(balls: readonly Ball[], at: Point): boolean {
   return true
 }
 
+/** Whether the cue ball may be put down at a point for the break: anywhere it has room on or behind the head string. */
+export function canBreakFrom(balls: readonly Ball[], at: Point): boolean {
+  return at.x <= HEAD_SPOT.x && canPlace(balls, at)
+}
+
 /** The free spot nearest a point, looking outward from it in rings; `clearOfCue` for a ball that is not the cue ball. */
 function freeSpotNear(balls: readonly Ball[], want: Point, clearOfCue = false): Point {
   const cue = balls[0]
@@ -477,6 +482,8 @@ export interface ShotRecord {
   atEight: boolean
   /** How the eight ended the rack: potted in turn, potted early, or lost by a foul on it. */
   eight: 'win' | 'early' | 'foul' | null
+  /** The eight dropped on the break and was put back on its spot. */
+  eightBack: boolean
   winner: Side | null
   /** Whose shot is next. */
   next: Side
@@ -519,10 +526,12 @@ export function resolveShot(
 
   let eight: ShotRecord['eight'] = null
   let winner: Side | null = null
+  let eightBack = false
   if (!rack.solo) {
     if (potted.includes(8)) {
       if (rack.breaking) {
         // Off the break it is put back on its spot and the rack goes on.
+        eightBack = true
         potted = potted.filter((id) => id !== 8)
         const black = balls[8]
         black.potted = false
@@ -624,6 +633,7 @@ export function resolveShot(
       onEightNow,
       atEight,
       eight,
+      eightBack,
       winner,
       next,
       aimError
@@ -650,7 +660,7 @@ const POWER_ERROR: Record<Skill, number> = { 1: 0.3, 2: 0.2, 3: 0.12, 4: 0.07, 5
 
 /** The shot she plays. */
 export interface HerShot {
-  /** Where she puts the cue ball down, where it was in her hand. */
+  /** Where she puts the cue ball down, where it was in her hand or the break is hers. */
   place: Point | null
   /** The shot as struck, her error in it. */
   angle: number
@@ -745,6 +755,134 @@ function worth(rack: Rack, angle: number, power: number): { score: number; pots:
   return { score, pots: record.foul ? [] : record.own.concat(record.eight === 'win' ? [8] : []) }
 }
 
+/** How many lines round the cue ball she looks along for a safety, and how many of them she plays through, by skill. */
+export const SCANNED: Record<Skill, number> = { 1: 8, 2: 16, 3: 32, 4: 64, 5: 96 }
+const SAFETIES: Record<Skill, number> = { 1: 2, 2: 3, 3: 4, 4: 6, 5: 8 }
+
+/** The first ball a cue ball sent along a line would meet, off as many as three cushions, and how far it rolls to it. */
+function firstMet(
+  balls: readonly Ball[],
+  from: Point,
+  angle: number
+): { hit: number | null; far: number; cushions: number } {
+  let at: Point = from
+  let dx = Math.cos(angle)
+  let dy = Math.sin(angle)
+  let far = 0
+  for (let cushions = 0; cushions <= 3; cushions++) {
+    const guide = aimGuide(balls, at, Math.atan2(dy, dx))
+    far += Math.hypot(guide.ghost.x - at.x, guide.ghost.y - at.y)
+    if (guide.hit !== null) return { hit: guide.hit, far, cushions }
+    at = guide.ghost
+    // Off the cushion as the table has it: what went into it comes back the weaker.
+    if (at.x <= BALL_R + 0.01 || at.x >= TABLE_W - BALL_R - 0.01) dx = -dx * CUSHION_BOUNCE
+    if (at.y <= BALL_R + 0.01 || at.y >= TABLE_H - BALL_R - 0.01) dy = -dy * CUSHION_BOUNCE
+  }
+  return { hit: null, far, cushions: 3 }
+}
+
+/**
+ * The safety she plays with no pot on: she looks along a spread of lines, more of them the better
+ * she is, keeps those that reach one of her balls first, straight or off a cushion, plays some of
+ * them through in her head at two weights, and takes one that is no foul and leaves the other
+ * player the hardest pot. Where no line is legal she takes what costs her least. Null on a table
+ * with nothing to hit.
+ */
+function safetyOn(
+  table: Rack,
+  skill: Skill,
+  rand: () => number
+): { score: number; angle: number; power: number; pots: number[] } | null {
+  const balls = table.balls
+  const cue = balls[0]
+  const targets = legalTargets(table)
+  if (targets.length === 0) return null
+  const lines: { angle: number; far: number; rank: number }[] = []
+  // Full at each of her balls she can see: the line her hands can least spoil.
+  for (const id of targets) {
+    const angle = Math.atan2(balls[id].y - cue.y, balls[id].x - cue.x)
+    const met = firstMet(balls, cue, angle)
+    if (met.hit === id && met.cushions === 0) lines.push({ angle, far: met.far, rank: 0 })
+  }
+  // Then round the table: a line counts for more where a little either side of it is legal too.
+  const wobble = AIM_ERROR[skill] * 2
+  const turn = rand() * Math.PI * 2
+  const round: { angle: number; far: number; rank: number }[] = []
+  for (let k = 0; k < SCANNED[skill]; k++) {
+    const angle = turn + (k / SCANNED[skill]) * Math.PI * 2
+    const met = firstMet(balls, cue, angle)
+    const far = met.far * (1 + met.cushions * 0.6)
+    if (met.hit === null || !targets.includes(met.hit)) {
+      round.push({ angle, far, rank: 9 })
+      continue
+    }
+    const sure = [angle - wobble, angle + wobble].every((near) => {
+      const hit = firstMet(balls, cue, near).hit
+      return hit !== null && targets.includes(hit)
+    })
+    round.push({ angle, far, rank: (sure ? 1 : 3) + (met.cushions > 0 ? 1 : 0) })
+  }
+  // The surest first, and among lines as sure as each other a spread, so that what they leave differs.
+  const spread = <T>(list: readonly T[]): T[] => list.map((_, k) => list[(k * 7919) % list.length])
+  const queue: { angle: number; far: number; rank: number }[] = []
+  for (const rank of [0, 1, 2, 3, 4, 9]) {
+    queue.push(...spread((rank === 0 ? lines : round).filter((line) => line.rank === rank)))
+  }
+
+  type Played = { score: number; angle: number; power: number; pots: number[] }
+  /** What a line at a weight comes to, played exactly so. */
+  const play = (angle: number, power: number): Played => {
+    const after = cloneBalls(balls)
+    const log = simulate(after, angle, power)
+    const got = resolveShot({ ...table, balls: after }, balls, log)
+    const record = got.record
+    let score: number
+    if (record.winner === table.turn) score = 1000
+    else if (record.winner) score = -1000
+    else if (record.foul) score = record.foul === 'scratch' ? -260 : -250
+    else {
+      score = record.own.length * 100 - record.other.length * 40
+      if (record.next !== table.turn) {
+        // What it leaves: the less the other player has on from where the cue ball stops, the better.
+        const left = potsOn(got.rack.balls, got.rack.balls[0], legalTargets(got.rack))
+        score += 50 * (1 - Math.min(1, left.reduce((most, pot) => Math.max(most, pot.ease), 0)))
+      }
+    }
+    return { score, angle, power, pots: record.foul || record.winner ? [] : record.own }
+  }
+
+  // A good player goes on looking where the first lines came to nothing, and trusts no line her
+  // own hands could turn into a foul.
+  const many = SAFETIES[skill]
+  const rounds = skill >= 4 ? 4 : skill === 3 ? 2 : 1
+  const checked = skill >= 3 ? 3 : 1
+  const slip = AIM_ERROR[skill] * 1.5
+  let best: Played | null = null
+  let least: Played | null = null
+  for (let n = 0; n < rounds && n * many < queue.length; n++) {
+    const found: Played[] = []
+    for (const line of queue.slice(n * many, (n + 1) * many)) {
+      // Lines she could not see to be legal are played firmer, to reach something.
+      for (const weight of line.rank === 9 ? [1.3, 2.2] : [0.85, 1.25]) {
+        found.push(play(line.angle, Math.min(1, powerFor(line.far, 1) * weight)))
+      }
+    }
+    found.sort((a, b) => b.score - a.score)
+    for (const one of found) if (!least || one.score > least.score) least = one
+    for (const one of found.slice(0, checked)) {
+      if (one.score < 0) break
+      const off =
+        Math.min(0, play(one.angle + slip, Math.min(1, one.power * (1 - POWER_ERROR[skill]))).score) +
+        Math.min(0, play(one.angle - slip, Math.min(1, one.power * (1 + POWER_ERROR[skill]))).score)
+      if (off === 0) return one
+      // Legal as meant but easily spoiled: kept in case nothing better turns up.
+      if (!best || one.score + off > best.score) best = { ...one, score: one.score + off }
+    }
+  }
+  if (best && least && least.score > best.score) return least
+  return best ?? least
+}
+
 /**
  * Where she puts the cue ball with it in her hand: behind one of her balls, in line with a
  * pocket, a comfortable distance back. A good player takes the easiest of them, a poor one any.
@@ -776,7 +914,9 @@ export function herPlacement(rack: Rack, skill: Skill, rand: () => number = Math
 /**
  * The shot she plays from a rack on which it is her turn. She lists the pots that are on, plays
  * as many through in her head as her skill allows, the likeliest first where she can judge that,
- * and takes the best; with nothing on she settles for hitting one of her balls. Then her hands
+ * and takes the best; with nothing on she plays a safety: one of her balls struck first, the cue
+ * ball left where the other player has least. On the break she puts the cue ball down behind the
+ * head string. Then her hands
  * add their error to the line and the weight. The rack is not changed.
  */
 export function herShot(rack: Rack, skill: Skill, rand: () => number = Math.random): HerShot {
@@ -789,13 +929,22 @@ export function herShot(rack: Rack, skill: Skill, rand: () => number = Math.rand
     place = { x: balls[0].x, y: balls[0].y }
     table = { ...rack, balls, inHand: false }
   }
-  const cue = table.balls[0]
+  let cue = table.balls[0]
 
   let angle: number
   let power: number
   let expected: number[] = []
   if (rack.breaking) {
-    // The break: straight at the head ball, as hard as she can.
+    // The break: from a little to one side behind the head string, at the head ball, as hard as she can.
+    const want = {
+      x: HEAD_SPOT.x - BALL_R,
+      y: HEAD_SPOT.y + (rand() < 0.5 ? -1 : 1) * (30 + rand() * 40)
+    }
+    const balls = cloneBalls(table.balls)
+    placeCue(balls, canBreakFrom(balls, want) ? want : HEAD_SPOT)
+    place = { x: balls[0].x, y: balls[0].y }
+    table = { ...table, balls, inHand: false }
+    cue = table.balls[0]
     const head = table.balls.reduce((a, b) => (b.id !== 0 && !b.potted && b.x < a.x ? b : a), table.balls[1])
     angle = Math.atan2(head.y - cue.y, head.x - cue.x)
     power = 1
@@ -818,19 +967,9 @@ export function herShot(rack: Rack, skill: Skill, rand: () => number = Math.rand
       if (!best || score > best.score) best = { score, angle: shot.angle, power: shot.power, pots: got.pots }
     }
     if (!best || best.score < 0) {
-      // Nothing to pot: play at the nearest of her balls she can see, or failing that toward one.
-      let safe: { angle: number; power: number; far: number } | null = null
-      for (const id of targets) {
-        const ball = table.balls[id]
-        const far = Math.hypot(ball.x - cue.x, ball.y - cue.y)
-        const line = Math.atan2(ball.y - cue.y, ball.x - cue.x)
-        const seen = aimGuide(table.balls, cue, line).hit === id
-        const rank = far + (seen ? 0 : 5000)
-        if (!safe || rank < safe.far) safe = { angle: line, power: powerFor(far, 1) * 0.8, far: rank }
-      }
-      if (safe && (!best || worth(table, safe.angle, safe.power).score > best.score)) {
-        best = { score: 0, angle: safe.angle, power: safe.power, pots: [] }
-      }
+      // Nothing to pot: a safety, where there is one, and otherwise whatever costs her least.
+      const safe = safetyOn(table, skill, rand)
+      if (safe && (!best || safe.score > best.score)) best = safe
     }
     angle = best ? best.angle : 0
     power = best ? best.power : 0.4
@@ -898,9 +1037,10 @@ export function shotLine(name: string, shot: ShotRecord, solo = false): string {
     parts.push(shot.breakShot ? `${lead} ${shot.potted.length > 1 ? 'drop' : 'drops'}.` : `${lead}.`)
   } else if (!shot.foul && !shot.breakShot) {
     parts.push(`${who} ${verb('miss', 'misses')}.`)
-  } else if (!shot.foul) {
+  } else if (!shot.foul && !shot.eightBack) {
     parts.push('Nothing drops.')
   }
+  if (shot.eightBack) parts.push('The eight drops on the break and is put back on its spot.')
   if (shot.foul) {
     // Said of whoever played it where nothing before it in the line has named them.
     const lead = parts.length > 0 ? 'A foul' : `${who} ${verb('foul', 'fouls')}`
@@ -1001,9 +1141,61 @@ export function matchSituation(
   return `${terms} In this rack ${side('reader')}; ${side('her')}. ${turn}${stake ? ` Riding on it: ${stake}` : ''}`
 }
 
+/**
+ * The match so far for the scene's writer, should it be walked away from: the racks won, who is on
+ * which group and what each has left, and whose shot it was.
+ */
+export function matchProgress(
+  name: string,
+  rack: Rack,
+  won: Record<Side, number>,
+  race: number
+): string[] {
+  const called = (side: Side): string => (side === 'reader' ? 'the reader' : name)
+  const lines = [
+    `It was eight-ball pool, ${race > 1 ? 'best of three racks' : 'a single rack'}, and it was not played to the end.`
+  ]
+  if (race > 1) {
+    lines.push(`Racks won so far: the reader ${won.reader}, ${name} ${won.her}.`)
+  }
+  if (rack.winner) {
+    lines.push(`The last rack had just gone to ${called(rack.winner)}; the next was not begun.`)
+    return lines
+  }
+  if (rack.breaking) {
+    lines.push(`The balls were racked and ${called(rack.turn)} was about to break.`)
+    return lines
+  }
+  const side = (who: Side): string => {
+    const group = rack.groups[who]
+    const left = ballsLeft(rack, who).length
+    return `${called(who)} was ${group} with ${left === 0 ? 'only the eight left' : `${left} of 7 still to pot`}`
+  }
+  lines.push(
+    rack.groups.reader
+      ? `In the rack on the table ${side('reader')}; ${side('her')}.`
+      : 'In the rack on the table nobody had potted a ball yet: no groups were settled.'
+  )
+  lines.push(
+    `It was ${rack.turn === 'reader' ? "the reader's" : `${name}'s`} shot${rack.inHand ? ', with the cue ball in hand after a foul' : ''}.`
+  )
+  return lines
+}
+
+/** A table being cleared alone so far, the same way. */
+export function soloProgress(rack: Rack, shots: readonly ShotRecord[]): string[] {
+  const left = ballsLeft(rack, 'reader').length
+  const fouls = shots.filter((shot) => shot.foul).length
+  return [
+    `The reader was clearing a pool table alone and stopped before it was clear: ${15 - left} of 15 balls potted in ${shots.length} ${shots.length === 1 ? 'shot' : 'shots'}, ${fouls} ${fouls === 1 ? 'foul' : 'fouls'}, ${left} still on the table.`
+  ]
+}
+
 /** What a side did over a rack. */
 export interface Tally {
-  visits: number
+  /** Shots played, the break included. */
+  shots: number
+  /** Balls of their own potted on a shot that was no foul. */
   pots: number
   fouls: number
   flukes: number
@@ -1013,11 +1205,11 @@ export interface Tally {
 }
 
 export function tallyOf(shots: readonly ShotRecord[], side: Side): Tally {
-  const tally: Tally = { visits: 0, pots: 0, fouls: 0, flukes: 0, clean: 0, long: 0, bestRun: 0 }
+  const tally: Tally = { shots: 0, pots: 0, fouls: 0, flukes: 0, clean: 0, long: 0, bestRun: 0 }
   for (const shot of shots) {
     if (shot.by !== side) continue
-    tally.visits++
-    tally.pots += shot.own.length
+    tally.shots++
+    if (!shot.foul) tally.pots += shot.own.length
     if (shot.foul) tally.fouls++
     if (shot.fluke) tally.flukes++
     if (shot.clean) tally.clean++
@@ -1084,15 +1276,17 @@ export function matchAccount(name: string, racks: readonly RackRecord[], race: n
           : left <= 2
             ? `${called(loser)} had only ${left} left: close`
             : `${called(loser)} still had ${left} balls on the table: not close`
+    // An eight down off the break is no win and no loss, and is said so nobody takes it for either.
+    const back = rack.shots[0]?.eightBack ? ' and the eight dropped on the break and was put back on its spot' : ''
     lines.push(
-      `${racks.length > 1 ? `Rack ${i + 1}` : 'The rack'}: ${called(rack.breaker)} broke, ${ending}; ${close}.`
+      `${racks.length > 1 ? `Rack ${i + 1}` : 'The rack'}: ${called(rack.breaker)} broke${back}, ${ending}; ${close}.`
     )
   })
 
   const all = racks.flatMap((rack) => rack.shots)
   for (const side of ['reader', 'her'] as const) {
     const t = tallyOf(all, side)
-    const bits = [`${t.pots} balls potted in ${t.visits} shots`]
+    const bits = [`${t.pots} ${t.pots === 1 ? 'ball' : 'balls'} potted in ${t.shots} ${t.shots === 1 ? 'shot' : 'shots'}`]
     if (t.bestRun >= RUN_WORTH) bits.push(`a best run of ${t.bestRun} in a row`)
     if (t.long) bits.push(`${t.long} long ${t.long === 1 ? 'pot' : 'pots'}`)
     if (t.flukes) bits.push(`${t.flukes} of the pots ${t.flukes === 1 ? 'was a fluke' : 'were flukes'}, luck not aim`)

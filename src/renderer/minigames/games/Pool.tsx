@@ -8,6 +8,7 @@ import {
   TABLE_W,
   aimGuide,
   ballsLeft,
+  canBreakFrom,
   canPlace,
   cloneBalls,
   freshLog,
@@ -15,6 +16,7 @@ import {
   groupOf,
   herShot,
   matchAccount,
+  matchProgress,
   matchSituation,
   matchSummary,
   otherSide,
@@ -24,6 +26,7 @@ import {
   shotCue,
   shotLine,
   soloAccount,
+  soloProgress,
   soloSummary,
   stepBalls,
   strike,
@@ -35,7 +38,7 @@ import {
   type ShotRecord,
   type Side
 } from '@shared/minigameRules/pool'
-import type { GamePlay } from '../kit'
+import { useAway, type GamePlay } from '../kit'
 import '../../vu_styles/Pool.css'
 
 /** How many times in a match she says something about a shot, by how talkative she is to be. */
@@ -73,6 +76,8 @@ interface Hud {
   shots: number
   fouls: number
   winner: Side | null
+  /** The next shot is the break: the cue ball may still be moved behind the head string. */
+  breaking: boolean
 }
 
 /** A ball drawn about its own centre: the cue ball plain, a solid filled, a stripe banded, the eight dark. */
@@ -133,13 +138,15 @@ const hudOf = (rack: Rack, phase: Phase, racks: readonly RackRecord[], shots: re
   won: racksWon(racks),
   shots: shots.length,
   fouls: shots.filter((shot) => shot.foul).length,
-  winner: rack.winner
+  winner: rack.winner,
+  breaking: rack.breaking
 })
 
 /**
  * Pool: an eight-ball table seen from above. The reader aims with the pointer, a line and a
  * ghost ball showing where the cue ball will first land, holds the button down to bring the
- * power up and lets go to play; with the cue ball in hand a click puts it down. Her shots are the
+ * power up and lets go to play; with the cue ball in hand a click puts it down, and before a break
+ * a click behind the head string moves it there. Her shots are the
  * rules' own, at her skill, shown for a beat before they are played. The table runs a fixed step
  * at a time; every shot is said in the scene's dialogue box.
  */
@@ -151,6 +158,9 @@ export function Pool({ play }: { play: GamePlay }): JSX.Element {
   // The framework's side of the game as it is now, for a loop that outlives any one render.
   const latest = useRef(play)
   latest.current = play
+  // Whether he is looking elsewhere, for the same loop: nothing of hers is played unseen.
+  const away = useRef(false)
+  away.current = useAway()
 
   const field = useRef<SVGSVGElement>(null)
   const ballMarks = useRef<(SVGGElement | null)[]>([])
@@ -205,6 +215,8 @@ export function Pool({ play }: { play: GamePlay }): JSX.Element {
     let last = performance.now()
     let owed = 0
     let begun = false
+    // What was due was held back while he looked elsewhere.
+    let held = false
     let ended = false
     let gone = false
 
@@ -364,9 +376,10 @@ export function Pool({ play }: { play: GamePlay }): JSX.Element {
           herPlay(at)
           return
         }
+        // Through the clock, so that it too waits while he looks elsewhere.
         const go = (): void => {
           if (gone || ended) return
-          herPlay(performance.now())
+          due = { at: performance.now(), run: herPlay }
         }
         void latest.current.read().then(go, go)
         return
@@ -410,6 +423,10 @@ export function Pool({ play }: { play: GamePlay }): JSX.Element {
       shots.push(got.record)
       const now = latest.current
       now.narrate(shotLine(her?.name ?? '', got.record, solo))
+      // What the scene is to know of it, should he walk away from here.
+      const tell = (): void => {
+        now.progress(her ? matchProgress(her.name, rack, racksWon(racks), race) : soloProgress(rack, shots))
+      }
 
       if (rack.winner && solo) {
         ended = true
@@ -435,6 +452,7 @@ export function Pool({ play }: { play: GamePlay }): JSX.Element {
         }
         phase = 'between'
         sync()
+        tell()
         remark(got.record)
         // At his own pace the next rack waits on him, not on the clock.
         due = { at: now.stepped ? at : at + RACK_PAUSE_MS, run: nextRack }
@@ -442,6 +460,7 @@ export function Pool({ play }: { play: GamePlay }): JSX.Element {
       }
       phase = 'settled'
       sync()
+      tell()
       remark(got.record)
       if (now.stepped) {
         // At his own pace his turn is his at once, whatever she is saying; hers waits on a word
@@ -469,6 +488,12 @@ export function Pool({ play }: { play: GamePlay }): JSX.Element {
         return
       }
       if (phase !== 'aim') return
+      // Before a break, a click behind the head string moves the cue ball there and is no shot.
+      if (rack.breaking && canBreakFrom(rack.balls, pointer)) {
+        placeCue(rack.balls, pointer)
+        sync()
+        return
+      }
       try {
         field.current?.setPointerCapture(event.pointerId)
       } catch {
@@ -499,7 +524,15 @@ export function Pool({ play }: { play: GamePlay }): JSX.Element {
       if (gone) return
       const passed = Math.max(0, Math.min((at - last) / 1000, MAX_FRAME_S))
       last = at
-      if (phase === 'rolling') {
+      // While he looks elsewhere nothing of hers goes on: her shot stands where it is and
+      // whatever was due waits, then is given a beat once he is back.
+      const out = away.current
+      if (out) held = true
+      else if (held) {
+        held = false
+        if (due) due.at = Math.max(due.at, at + TURN_PAUSE_MS)
+      }
+      if (phase === 'rolling' && !(out && plan)) {
         owed += passed
         while (owed >= STEP) {
           owed -= STEP
@@ -518,7 +551,7 @@ export function Pool({ play }: { play: GamePlay }): JSX.Element {
         const held = (Math.max(0, performance.now() - chargeFrom) / 1000 / CHARGE_S) % 2
         power = held <= 1 ? held : 2 - held
       }
-      if (due && !speaking && !ended && at >= due.at) {
+      if (due && !speaking && !ended && !out && at >= due.at) {
         const run = due.run
         due = null
         run(at)
@@ -571,7 +604,9 @@ export function Pool({ play }: { play: GamePlay }): JSX.Element {
               ? `${name} is at the table`
               : hud.phase === 'charging'
                 ? 'let go to play'
-                : 'aim with the pointer, hold for power, let go to play'
+                : hud.breaking
+                  ? 'your break: click behind the line to move the cue ball; aim, hold for power, let go to play'
+                  : 'aim with the pointer, hold for power, let go to play'
   const groupWord = (side: Side): string =>
     hud.groups[side] ? (hud.left[side].length === 0 ? `${hud.groups[side]}: on the eight` : `${hud.groups[side]}`) : 'open table'
 
