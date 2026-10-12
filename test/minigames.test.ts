@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   gamesOffered,
+  gamesSuggested,
   seatsFor,
   settledOptions,
   suggestRate,
@@ -81,5 +82,26 @@ describe('gamesOffered', () => {
     // The player's own switch lifts every game to often, and still not into a busy scene.
     expect(suggestRate(cabinetGame, 'pub', false, true)).toBe('often')
     expect(suggestRate(cabinetGame, 'pub', true, true)).toBe('never')
+  })
+})
+
+describe('gamesSuggested', () => {
+  const deck = game('deck', { suggest: 'never', suggestAt: { room: 'sometimes' } })
+  const race = game('race')
+
+  it('tells the model only of games a girl may bring up at this place', () => {
+    expect(ids(gamesSuggested([deck, race], 'room', false))).toEqual(['deck', 'race'])
+    expect(ids(gamesSuggested([deck, race], 'arcade', false))).toEqual(['race'])
+    expect(ids(gamesSuggested([deck, race], null, false))).toEqual(['race'])
+  })
+
+  it('tells it of none in a busy scene, and of all when he wants them often', () => {
+    expect(gamesSuggested([deck, race], 'room', true)).toEqual([])
+    expect(ids(gamesSuggested([deck, race], 'arcade', false, true))).toEqual(['deck', 'race'])
+  })
+
+  it('follows his own rate for a game over its places', () => {
+    const his = { ...deck, suggest: 'rarely' as const, suggestAt: undefined }
+    expect(ids(gamesSuggested([his], 'arcade', false))).toEqual(['deck'])
   })
 })

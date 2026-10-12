@@ -29,8 +29,8 @@ const HIGH_LOW: MiniGameDef = {
       default: 0
     }
   ],
-  // A deck in a pocket: it comes up where people sit around with time to spare, and seldom elsewhere.
-  suggest: 'rarely',
+  // A deck in a pocket: she brings it up where people sit around with time to spare; elsewhere it is his to ask for.
+  suggest: 'never',
   suggestAt: { cutetea: 'sometimes', lowrise_dorms: 'sometimes', room: 'sometimes' },
   players: { min: 0, max: 1 },
   controls: 'Click Higher or Lower.',

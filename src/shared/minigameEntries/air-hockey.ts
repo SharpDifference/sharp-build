@@ -21,7 +21,7 @@ const AIR_HOCKEY: MiniGameDef = {
   ],
   // A table that needs a room built around it: the arcade, the student lounge, the boardwalk.
   locations: ['btb_arcade', 'bowling_alley', 'pino_cola_lounge', 'pier_44'],
-  suggest: 'rarely',
+  suggest: 'never',
   suggestAt: { btb_arcade: 'often', bowling_alley: 'sometimes' },
   players: { min: 1, max: 1 },
   surface: 'board',

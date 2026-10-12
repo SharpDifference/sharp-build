@@ -535,7 +535,7 @@ describe('air hockey: the pack', () => {
     expect(ids('btb_arcade', 0)).not.toContain('air-hockey')
     expect(ids('room', 1)).not.toContain('air-hockey')
     expect(suggestRate(def!, 'btb_arcade', false)).toBe('often')
-    expect(suggestRate(def!, 'pier_44', false)).toBe('rarely')
+    expect(suggestRate(def!, 'pier_44', false)).toBe('never')
   })
 
   it('comes as a mod of its own that requires the framework', () => {

@@ -21,8 +21,8 @@ const BEER_PONG: MiniGameDef = {
     }
   ],
   locations: ['stalestein_bar', 'lowrise_dorms', 'room', 'apogee_club', 'pino_cola_lounge'],
-  suggest: 'sometimes',
-  suggestAt: { stalestein_bar: 'often' },
+  suggest: 'never',
+  suggestAt: { stalestein_bar: 'often', lowrise_dorms: 'sometimes', apogee_club: 'sometimes' },
   surface: 'board',
   keys: true,
   players: { min: 1, max: 3 },

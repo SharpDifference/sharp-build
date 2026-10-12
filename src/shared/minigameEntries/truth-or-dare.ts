@@ -41,7 +41,7 @@ const TRUTH_OR_DARE: MiniGameDef = {
     'cutetea'
   ],
   // A game for a room with the door shut or a table with drinks on it.
-  suggest: 'rarely',
+  suggest: 'never',
   suggestAt: { room: 'sometimes', lowrise_dorms: 'sometimes', stalestein_bar: 'sometimes' },
   players: { min: 1, max: 3 },
   surface: 'table',

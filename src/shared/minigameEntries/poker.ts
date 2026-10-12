@@ -30,7 +30,7 @@ const POKER: MiniGameDef = {
     }
   ],
   // A deck and something to count with: it comes up over a drink or a slow evening in.
-  suggest: 'rarely',
+  suggest: 'never',
   suggestAt: {
     lowrise_dorms: 'sometimes',
     room: 'sometimes',

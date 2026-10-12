@@ -345,7 +345,7 @@ switch, and a page for each game saying what it is, with whom and where it is pl
 suggests it. A pack writes no screen of its own for any of that.
 
 **What the model is told, and why the wording matters.** On every turn the reader takes with a
-girl where the game can be played, the model is given `name`, `blurb`, `format`, each option and
+girl where she may suggest the game, the model is given `name`, `blurb`, `format`, each option and
 how readily she suggests it. It is also told that this is the whole of what the table can do, and
 that she steers back to it or says no when asked for anything else. So `format` has to say exactly
 what the component does: who goes first, how it is scored, how it ends, whether there can be a
@@ -388,10 +388,15 @@ opens straight on it.
 `suggestAt` gives a rate by location id and wins at that place (`suggestRate`). The framework
 overrides both: in a class, on a shift or on a project nobody suggests a game, and with the
 player's "Girls suggest games often" on, every game is `often` wherever else it can be played.
-None of it limits the reader, who may ask for any game on offer.
+A game that comes out `never` at a place is left out of what the model is told there
+(`gamesSuggested`), which keeps every turn's request short; the girls cannot bring it up and the
+scene cannot agree to it on its own. None of it limits the reader, who may ask for any game on
+offer from the table: his proposal is its own turn and tells the model about that game.
+
+So name the places a game belongs and leave it `never` everywhere else it can be played:
 
 ```ts
-suggest: 'rarely',
+suggest: 'never',
 suggestAt: { cutetea: 'sometimes', lowrise_dorms: 'sometimes', room: 'sometimes' },
 ```
 

@@ -325,6 +325,6 @@ describe('Beer Pong on offer', () => {
     expect(gamesOffered({ location: 'library', girls: 2 }, on, [BEER_PONG])).toHaveLength(0)
     expect(groupsFor(BEER_PONG, ['a', 'b', 'c', 'd'])).toHaveLength(4)
     expect(suggestRate(BEER_PONG, 'stalestein_bar', false)).toBe('often')
-    expect(suggestRate(BEER_PONG, 'room', false)).toBe('sometimes')
+    expect(suggestRate(BEER_PONG, 'room', false)).toBe('never')
   })
 })

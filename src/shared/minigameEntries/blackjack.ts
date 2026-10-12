@@ -19,8 +19,8 @@ const BLACKJACK: MiniGameDef = {
       default: 3
     }
   ],
-  // A deck in a pocket: it comes up where people sit around with time to spare, and seldom elsewhere.
-  suggest: 'rarely',
+  // A deck in a pocket: she brings it up where people sit around with time to spare; elsewhere it is his to ask for.
+  suggest: 'never',
   suggestAt: { cutetea: 'sometimes', lowrise_dorms: 'sometimes', room: 'sometimes' },
   players: { min: 1, max: 3 },
   surface: 'table',

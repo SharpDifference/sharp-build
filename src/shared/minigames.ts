@@ -227,6 +227,20 @@ export function suggestRate(
   return (location && game.suggestAt?.[location]) || game.suggest || 'sometimes'
 }
 
+/**
+ * The games the model is told about in a scene: those a girl may bring up herself here. A game
+ * she never suggests at this place is left out of the standing offer altogether, to keep it short;
+ * the reader can still ask for it from the table, which sends its own turn.
+ */
+export function gamesSuggested(
+  games: readonly MiniGameDef[],
+  location: string | null,
+  busy: boolean,
+  keen = false
+): MiniGameDef[] {
+  return games.filter((game) => suggestRate(game, location, busy, keen) !== 'never')
+}
+
 /** What a player has set for one game on its page: his own usual options, and how often it comes up. */
 export interface GamePrefs {
   /** The value he would rather an option started at, by option id. */
