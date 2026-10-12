@@ -34,7 +34,7 @@ const PARADISO: MiniGameDef = {
   // A cabinet: it is played where it stands, and it is what people come to the arcade for.
   locations: ['btb_arcade'],
   suggest: 'often',
-  surface: 'screen',
+  surface: 'board',
   keys: true,
   players: { min: 0, max: 1 },
   controls: 'Arrow keys, or D F J K, as each arrow reaches the top. The targets can be clicked too.',

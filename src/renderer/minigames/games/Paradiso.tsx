@@ -51,7 +51,7 @@ const BREAK_TOLD = 20
 const FINAL_STRETCH = 0.8
 
 /** The lanes' height and where the targets stand in them, in stage units: Paradiso.css's own. */
-const FIELD_HEIGHT = 540
+const FIELD_HEIGHT = 340
 const TARGET_TOP = 14
 /** How long a note that went by unstepped is still drawn, drifting on past its target, in ms. */
 const PAST_MS = 260

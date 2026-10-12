@@ -1,6 +1,6 @@
 /* PARADISO: a dance machine's screen. The song's bar across the top; under it the reader's
    board, the lanes the arrows climb (hers beside his, narrower, when she is on the second pad)
-   and her board. Drawn on the mini-game screen surface; the button is base.css's. The frame
+   and her board. Drawn on the mini-game board surface; the button is base.css's. The frame
    loop places the notes and hands the root `--beat` and `--through`. */
 
 .vu-paradiso {
@@ -125,12 +125,13 @@
   gap: 22px;
 }
 
-/* A set of lanes: 540 tall, the targets 14 down from its top, as Paradiso.tsx has them. */
+/* A set of lanes: 340 tall, the targets 14 down from its top, as Paradiso.tsx has them: short
+   enough that the cabinet stands clear of the dialogue box and who is talking in it. */
 .vu-paradiso-pad {
   --lane: 92px;
   position: relative;
   width: calc(var(--lane) * 4);
-  height: 540px;
+  height: 340px;
   overflow: hidden;
   border: 3.5px solid var(--vu-border);
   border-radius: 22px;
