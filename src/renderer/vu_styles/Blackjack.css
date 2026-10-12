@@ -128,6 +128,18 @@
   font-size: 12px;
 }
 
+/* How the hand just finished came out, after which hand it was, in the accent. */
+.vu-blackjack-said {
+  margin-left: 10px;
+  color: var(--vu-accent);
+}
+
+/* What a side has done that its cards do not show: stood, or gone over. */
+.vu-blackjack-did {
+  color: var(--vu-text-muted);
+  white-space: nowrap;
+}
+
 .vu-blackjack-moves {
   display: flex;
   gap: 26px;

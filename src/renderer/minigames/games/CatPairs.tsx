@@ -60,6 +60,12 @@ const SAY_WAIT_MS = 3000
 /** The least the cards lie there once the wait for her line is over. */
 const AFTER_REMARK_MS = 400
 
+/**
+ * How long the last pair lies on the table before the game is handed back, where the moves are
+ * kept off the dialogue box: the last turn and how the game came out are read off the table.
+ */
+const LAST_PAIR_MS = 2000
+
 /** The gap between two cards, in pixels. */
 const GAP = 10
 
@@ -176,8 +182,9 @@ function Paw(): JSX.Element {
  * a pair is kept and earns another go, anything else is turned back and the turn passes, the
  * reader first and the girls after him in the order they sit. Now and then a café cat crosses
  * the table and two face-down cards trade places in plain sight. Each girl plays from what she
- * remembers, at her skill. Alone it is the same table, counted in turns. What happens is said
- * in the scene's dialogue box; the table shows the cards and the count.
+ * remembers, at her skill. Alone it is the same table, counted in turns. The table shows every
+ * move, whose turn it is, the count and how it came out; the dialogue box tells the moves only
+ * where play-by-play is on.
  */
 export function CatPairs({ play }: { play: GamePlay }): JSX.Element {
   const girls = play.opponents
@@ -186,6 +193,9 @@ export function CatPairs({ play }: { play: GamePlay }): JSX.Element {
   const seated = girls.length > 0
   const pairs = play.options.pairs ?? PAIRS
   const withCat = (play.options.cats ?? 1) === 1
+  // Read at his own pace with every turn on the box, the table waits on its lines. With the turns
+  // kept off the box a line is only a short beat, so the table keeps its own time instead.
+  const paced = play.stepped && play.playByPlay
   // The cards are laid once.
   const [game, setGame] = useState<Game>(() => newGame(girls.length + 1, pairs, withCat))
   // The cards lying face up this turn, in the order they were turned.
@@ -278,7 +288,7 @@ export function CatPairs({ play }: { play: GamePlay }): JSX.Element {
       setSpeaking(false)
       freed.current?.()
     }
-    if (play.stepped) {
+    if (paced) {
       hold.current = new Promise((resolve) => {
         freed.current = resolve
       })
@@ -304,11 +314,17 @@ export function CatPairs({ play }: { play: GamePlay }): JSX.Element {
     setPhase('over')
     finished.current = true
     const final = pairCounts(now)
-    play.finish({
-      outcome: seated ? gameOutcome(final) : 'played',
+    const result = {
+      outcome: seated ? gameOutcome(final) : ('played' as const),
       summary: gameSummary(names, final, now.turns),
       account: gameAccount(names, now, withCat)
-    })
+    }
+    // Told on the box, the last turn has had its time there; otherwise the table holds it.
+    if (play.playByPlay) play.finish(result)
+    else
+      setTimeout(() => {
+        if (live.current) play.finish(result)
+      }, LAST_PAIR_MS)
   }
 
   /**
@@ -394,7 +410,7 @@ export function CatPairs({ play }: { play: GamePlay }): JSX.Element {
   function flip(at: number): void {
     if (finished.current || !live.current) return
     // At his own pace, a press on any card while a turn lies shown is him moving on, and no more.
-    if (play.stepped && phase === 'show') {
+    if (paced && phase === 'show') {
       play.moved()
       return
     }
@@ -430,7 +446,7 @@ export function CatPairs({ play }: { play: GamePlay }): JSX.Element {
         `${turnLine(who, made)}${seated && made.run > 0 ? ` ${countLine('You', names, pairCounts(now))}.` : ''}`
       )
       setPhase('show')
-      if (play.stepped) void settled(now, made.run > 0, [first, at])
+      if (paced) void settled(now, made.run > 0, [first, at])
       else remark(now)
       return
     }
@@ -457,7 +473,7 @@ export function CatPairs({ play }: { play: GamePlay }): JSX.Element {
 
   // A girl's turn, a card at a time after a beat: from what she remembers, at her skill.
   useEffect(() => {
-    if (play.stepped || phase !== 'pick' || speaking || game.turn === 0) return
+    if (paced || phase !== 'pick' || speaking || game.turn === 0) return
     const timer = setTimeout(() => {
       const at = game.turn - 1
       const memory = memories.current[at] ?? []
@@ -474,7 +490,7 @@ export function CatPairs({ play }: { play: GamePlay }): JSX.Element {
   // Two cards lie face up: after a look a pair is left as taken and a miss is turned back, and
   // where a cat is due it comes now, with every card face down.
   useEffect(() => {
-    if (play.stepped || phase !== 'show' || speaking) return
+    if (paced || phase !== 'show' || speaking) return
     const pair = (turnsMade(game).at(-1)?.run ?? 0) > 0
     // Counted from when the cards were turned, so time spent waiting on her line is not added to.
     const lain = performance.now() - shownAt.current
@@ -494,7 +510,7 @@ export function CatPairs({ play }: { play: GamePlay }): JSX.Element {
 
   // The cat's crossing: the two cards are seen to trade places, and then they have.
   useEffect(() => {
-    if (play.stepped || phase !== 'cat' || !swap) return
+    if (paced || phase !== 'cat' || !swap) return
     const [a, b] = swap
     const timer = setTimeout(() => {
       if (finished.current) return
@@ -517,6 +533,15 @@ export function CatPairs({ play }: { play: GamePlay }): JSX.Element {
   }
 
   const owner = (seat: number): string => (seat === 0 ? 'you' : names[seat - 1])
+  /** How the game came out, as the table shows it once it is over: "you win", "Ana wins", "level". */
+  const outcomeWord = (): string => {
+    const outcome = gameOutcome(counts)
+    if (outcome === 'won') return 'you win'
+    if (outcome === 'draw') return 'level'
+    const top = Math.max(...counts)
+    const leaders = names.filter((_, i) => counts[i + 1] === top)
+    return leaders.length === 1 ? `${leaders[0]} wins` : `${listed(leaders)} share it`
+  }
   return (
     <div className="vu-catpairs">
       <div className="vu-catpairs-grid" style={
@@ -532,7 +557,7 @@ export function CatPairs({ play }: { play: GamePlay }): JSX.Element {
           const faceUp = takenBy !== null || up.includes(at) || held.includes(at)
           // A miss left lying for him to read is turned back by his next card, which may be one of the two.
           // While a turn lies shown at his pace every card takes a press, as his way on.
-          const dead = !(play.stepped && phase === 'show') && (!myTurn || takenBy !== null || up.includes(at))
+          const dead = !(paced && phase === 'show') && (!myTurn || takenBy !== null || up.includes(at))
           const moving = swap?.includes(at) ?? false
           return (
             // The swap moves this wrapper; the card inside keeps its own gestures.
@@ -614,7 +639,7 @@ export function CatPairs({ play }: { play: GamePlay }): JSX.Element {
         )}
         <span className="vu-catpairs-round">
           {phase === 'over'
-            ? `game over · ${game.turns} turns`
+            ? `game over · ${game.turns} turns${seated ? ` · ${outcomeWord()}` : ''}`
             : phase === 'cat'
               ? 'a cat on the table'
               : seated

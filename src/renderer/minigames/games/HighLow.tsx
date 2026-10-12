@@ -16,7 +16,7 @@ import {
   type Call
 } from '@shared/minigameRules/highLow'
 import { freshDeck, rankMark, rankWord, type Card, type Suit } from '@shared/minigameKit'
-import { BunnyMark, gestures, lift, press, type GamePlay } from '../kit'
+import { BunnyMark, gestures, lift, press, type GamePlay, type PlayResult } from '../kit'
 import '../../vu_styles/HighLow.css'
 
 const SUIT_MARK: Record<Suit, string> = { spades: '♠', hearts: '♥', diamonds: '♦', clubs: '♣' }
@@ -32,6 +32,12 @@ const REMARK_WAIT_MS = 3000
 
 /** How long she takes over a call: long enough for the reader's own to be read first. */
 const HER_PAUSE_MS = 1700
+
+/**
+ * How long the last card lies on the table before the game is handed back, where the moves are
+ * kept off the dialogue box: the last call and how the game came out are read off the table.
+ */
+const LAST_CARD_MS = 2000
 
 /** One call that has been made, and whether it came good. */
 interface Made {
@@ -56,8 +62,9 @@ function CardFace({ card }: { card: Card }): JSX.Element {
 /**
  * High-Low: one deck, each call made on the card the last one turned, the cards stacking as they
  * are turned. Alone it is five calls; against a girl the two take turns, the reader first, five
- * calls each, and the better count wins. Her calls are the rules' own, at her skill. What happens
- * is said in the scene's dialogue box; the table shows the cards and the count.
+ * calls each, and the better count wins. Her calls are the rules' own, at her skill. The table
+ * shows the cards, the count and the last call with how it came out; the dialogue box tells the
+ * calls only where play-by-play is on.
  */
 export function HighLow({ play }: { play: GamePlay }): JSX.Element {
   // The deck is cut once; the top card is face up and the rest are turned from the front. Only
@@ -73,6 +80,8 @@ export function HighLow({ play }: { play: GamePlay }): JSX.Element {
   // Read at the reader's own pace: the card her call waits on him for, so it is asked for once.
   const awaited = useRef(-1)
   const mounted = useRef(true)
+  // The count of calls at which the turned cards were last shuffled in, for the table to show it.
+  const reshuffledAt = useRef(-1)
   useEffect(() => {
     mounted.current = true
     return () => {
@@ -80,6 +89,9 @@ export function HighLow({ play }: { play: GamePlay }): JSX.Element {
     }
   }, [])
   const her = play.opponents[0]
+  // Read at his own pace with every call on the box, her call waits on its own line. With the
+  // calls kept off the box a line is only a short beat, so she keeps her own pause instead.
+  const paced = play.stepped && play.playByPlay
 
   // Five calls each unless the two of them settled on fewer.
   const each = play.options.calls ?? CALLS_EACH
@@ -118,6 +130,7 @@ export function HighLow({ play }: { play: GamePlay }): JSX.Element {
       // Sudden death has outlasted the deck: the turned cards go round again.
       if (all.length + 1 >= deck.length) {
         setDeck(reshuffled(deck))
+        reshuffledAt.current = all.length
         void play.narrate('The deck is out. The turned cards are shuffled and the game goes on.')
       }
       play.progress(progressAccount(her ? her.name : null, deck, all))
@@ -127,16 +140,19 @@ export function HighLow({ play }: { play: GamePlay }): JSX.Element {
 
     const right = (side: boolean): number =>
       all.filter((turn) => turn.hers === side && turn.right).length
-    if (!her) {
-      play.finish({ outcome: 'played', summary: soloSummary(right(false), each) })
-      return
-    }
-    const [a, b] = [right(false), right(true)]
-    play.finish({
-      outcome: a > b ? 'won' : a < b ? 'lost' : 'draw',
-      summary: versusSummary(her.name, a, b),
-      account: versusAccount(her.name, deck, all, sudden)
-    })
+    const result: PlayResult = !her
+      ? { outcome: 'played', summary: soloSummary(right(false), each) }
+      : {
+          outcome: right(false) > right(true) ? 'won' : right(false) < right(true) ? 'lost' : 'draw',
+          summary: versusSummary(her.name, right(false), right(true)),
+          account: versusAccount(her.name, deck, all, sudden)
+        }
+    // Told on the box, the last call has had its time there; otherwise the table holds it.
+    if (play.playByPlay) play.finish(result)
+    else
+      setTimeout(() => {
+        if (mounted.current) play.finish(result)
+      }, LAST_CARD_MS)
   }
 
   /**
@@ -194,7 +210,7 @@ export function HighLow({ play }: { play: GamePlay }): JSX.Element {
   // Her call, after a beat: read off every card turned so far, at her skill.
   useEffect(() => {
     if (!her || !herTurn || speaking) return
-    if (play.stepped) {
+    if (paced) {
       // At the reader's own pace there is no beat: her line waits behind what he is reading,
       // and her card is turned as it reaches the box.
       if (awaited.current === made.length) return
@@ -213,14 +229,23 @@ export function HighLow({ play }: { play: GamePlay }): JSX.Element {
   }, [herTurn, made.length, speaking])
 
   const played = Math.floor(made.length / (her ? 2 : 1))
+  // The call the card showing answered, on the card until the next is turned.
+  const last = made[made.length - 1]
+  const lastSaid = last
+    ? `${her ? `${last.hers ? her.name : 'you'} ` : ''}${last.call} · ${last.right ? 'right' : 'miss'}`
+    : null
+  const outcome = mine > hers ? 'you win' : mine < hers ? `${her?.name ?? ''} wins` : 'level'
   const round = sudden ? played + (over ? 0 : 1) : Math.min(played + 1, each)
 
   return (
     <div className="vu-highlow">
       <div className="vu-highlow-table">
         {/* The deck face down, the app's own mark on its back. */}
-        <span className="vu-highlow-deck" aria-hidden="true">
-          <BunnyMark />
+        <span className="vu-highlow-deck">
+          <span aria-hidden="true">
+            <BunnyMark />
+          </span>
+          {reshuffledAt.current === made.length && <span className="vu-highlow-said">reshuffled</span>}
         </span>
         {/* Keyed on the count, so each card turned lands on the last as a new one. */}
         <motion.div
@@ -231,13 +256,18 @@ export function HighLow({ play }: { play: GamePlay }): JSX.Element {
           transition={{ duration: 0.28, ease: 'easeOut' }}
         >
           <CardFace card={shown} />
+          {lastSaid && (
+            <span className="vu-highlow-said" data-right={last.right || undefined}>
+              {lastSaid}
+            </span>
+          )}
         </motion.div>
       </div>
 
       <p className="vu-highlow-count">
         {her ? `you ${mine} · ${her.name} ${hers}` : `${mine} right`}
         <span className="vu-highlow-round">
-          {over ? 'game over' : sudden ? `sudden death · call ${round}` : `call ${round} of ${each}`}
+          {over ? (her ? `game over · ${outcome}` : 'game over') : sudden ? `sudden death · call ${round}` : `call ${round} of ${each}`}
         </span>
       </p>
 

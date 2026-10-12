@@ -89,6 +89,38 @@
   opacity: 0.35;
 }
 
+/* The card showing and the deck carry their call-outs on their lower edge. */
+.vu-highlow-shown,
+.vu-highlow-deck {
+  position: relative;
+}
+
+/* The mark keeps the deck's middle, whatever is tagged on its edge. */
+.vu-highlow-deck > span:first-child {
+  display: flex;
+}
+
+/* The call the card showing answered, or the deck shuffled anew: a tag on the card's lower edge
+   that stays until the next card is turned. */
+.vu-highlow-said {
+  position: absolute;
+  bottom: -12px;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 2px 10px;
+  border: 2px solid var(--vu-border);
+  border-radius: 999px;
+  background: var(--vu-surface);
+  color: var(--vu-text-muted);
+  font: 700 12px var(--font-mono);
+  white-space: nowrap;
+}
+
+/* A call that came good is said in the accent. */
+.vu-highlow-said[data-right] {
+  color: var(--vu-accent);
+}
+
 /* The mark on the card back: a third of the card's width, quiet against the accent. */
 .vu-highlow-deck svg {
   width: 52px;

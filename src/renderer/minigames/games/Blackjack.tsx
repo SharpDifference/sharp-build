@@ -16,6 +16,7 @@ import {
   tableResult,
   tableSummary,
   tableTold,
+  tableWinner,
   tableWon,
   totalWord,
   type HerMoveMade,
@@ -48,6 +49,39 @@ const SAY_WAIT_MS = 3000
 
 /** The least a hand lies there once the wait for her line is over. */
 const AFTER_REMARK_MS = 600
+
+/**
+ * How long the last hand lies on the table before the game is handed back, where the moves are
+ * kept off the dialogue box: how it and the game came out are read off the table.
+ */
+const LAST_HAND_MS = 2400
+
+/**
+ * What a side has done that its cards do not show, beside its total: stood, or gone over. A hit
+ * shows itself as a new card.
+ */
+function didWord(cards: readonly Card[], stood: boolean): string | null {
+  if (handTotal(cards).total > 21) return 'bust'
+  if (isNatural(cards)) return null
+  return stood ? 'stands' : null
+}
+
+/** Who took a finished hand, as the table shows it: "your hand", "Ana's hand", "a push". */
+function handTakenWord(names: readonly string[], cards: readonly (readonly Card[])[]): string {
+  const winner = tableWinner(cards)
+  if (winner === null) return 'a push'
+  return winner === 0 ? 'your hand' : `${names[winner - 1]}'s hand`
+}
+
+/** How the game came out, as the table shows it once it is over: "you win", "Ana wins", "level". */
+function gameWord(names: readonly string[], won: readonly number[]): string {
+  const outcome = gameOutcome(won)
+  if (outcome === 'won') return 'you win'
+  if (outcome === 'draw') return 'level'
+  const top = Math.max(...won)
+  const leaders = names.filter((_, i) => won[i + 1] === top)
+  return leaders.length === 1 ? `${leaders[0]} wins` : `${listed(leaders)} share it`
+}
 
 /** A girl's side of the hand on the table. */
 interface Seat {
@@ -164,8 +198,8 @@ function Hand({
  * Blackjack with no dealer, heads-up or with two or three girls, everyone against everyone: a
  * few hands, each a card or two towards 21. The reader hits or stands first; each girl in turn
  * then turns her face-down card and plays knowing the hands finished before hers, at her skill.
- * Most hands won takes the game. What happens is said in the scene's dialogue box; the table
- * shows the hands and the count.
+ * Most hands won takes the game. The table shows the hands, who stood or bust, the count and
+ * how each hand came out; the dialogue box tells the moves only where play-by-play is on.
  */
 export function Blackjack({ play }: { play: GamePlay }): JSX.Element | null {
   const girls = play.opponents
@@ -202,6 +236,9 @@ export function Blackjack({ play }: { play: GamePlay }): JSX.Element | null {
   }, [])
 
   const seated = girls.length > 0
+  // Read at his own pace with every move on the box, each step waits on its own line. With the
+  // moves kept off the box a line is only a short beat, so the table keeps its own pauses instead.
+  const paced = play.stepped && play.playByPlay
   const score = tableWon(table.done, girls.length)
   const over = gameOver(score, table.done.length, hands)
   const handNo = table.done.length + (table.phase === 'over' ? 0 : 1)
@@ -243,7 +280,7 @@ export function Blackjack({ play }: { play: GamePlay }): JSX.Element | null {
     const done = [...table.done, hand]
     const won = tableWon(done, girls.length)
     const line = play.narrate(`${tableResult(names, hand)} ${countLine('You', names, won)}.`)
-    if (play.stepped) {
+    if (paced) {
       // The hands stay as they lie until he has read the move that ended it.
       closing.current = true
       setSettling(true)
@@ -264,11 +301,17 @@ export function Blackjack({ play }: { play: GamePlay }): JSX.Element | null {
       return
     }
     finished.current = true
-    play.finish({
+    const result = {
       outcome: gameOutcome(won),
       summary: tableSummary(names, won),
       account: tableAccount(names, done, hands)
-    })
+    }
+    // Told on the box, the result has had its time there; otherwise the table holds it.
+    if (play.playByPlay) play.finish(result)
+    else
+      setTimeout(() => {
+        if (live.current) play.finish(result)
+      }, LAST_HAND_MS)
   }
 
   /**
@@ -328,7 +371,7 @@ export function Blackjack({ play }: { play: GamePlay }): JSX.Element | null {
       if (several) setTable({ ...now, phase: 'girls' })
       else {
         // At his own pace his card is on the table at once; the result waits to be read.
-        if (play.stepped) setTable(now)
+        if (paced) setTable(now)
         void settle(now)
       }
       return
@@ -363,7 +406,7 @@ export function Blackjack({ play }: { play: GamePlay }): JSX.Element | null {
     const told = async (text: string): Promise<boolean> => (await reached(play.narrate(text))) && !gone()
     if (!seat.turned) {
       const line = `${name} turns her card: ${rankWord(seat.cards[1].rank)}. She has ${totalWord(seat.cards)}.`
-      if (!play.stepped) play.narrate(line)
+      if (!paced) play.narrate(line)
       else if (!(await told(line))) return
       setTable({ ...table, seats: put({ ...seat, turned: true }) })
       return
@@ -373,7 +416,7 @@ export function Blackjack({ play }: { play: GamePlay }): JSX.Element | null {
       if (at + 1 < now.seats.length) setTable({ ...now, at: at + 1 })
       else {
         // At his own pace her last card is on the table while the result waits to be read.
-        if (play.stepped) setTable(now)
+        if (paced) setTable(now)
         void settle(now)
       }
     }
@@ -386,7 +429,7 @@ export function Blackjack({ play }: { play: GamePlay }): JSX.Element | null {
     const moves = [...seat.moves, made]
     if (move === 'stand') {
       const line = `${name} stands on ${before}.`
-      if (!play.stepped) play.narrate(line)
+      if (!paced) play.narrate(line)
       else if (!(await told(line))) return
       pass({ ...table, seats: put({ ...seat, moves }) })
       return
@@ -397,13 +440,13 @@ export function Blackjack({ play }: { play: GamePlay }): JSX.Element | null {
     const now: Table = { ...table, deck, seats: put({ ...seat, cards, moves }) }
     if (total > 21) {
       const line = `${name} hits on ${before}: ${rankWord(card.rank)}. ${total}, bust.`
-      if (!play.stepped) play.narrate(line)
+      if (!paced) play.narrate(line)
       else if (!(await told(line))) return
       pass(now)
       return
     }
     const line = `${name} hits on ${before}: ${rankWord(card.rank)}. ${total}.`
-    if (!play.stepped) play.narrate(line)
+    if (!paced) play.narrate(line)
     else if (!(await told(line))) return
     setTable(now)
   }
@@ -446,7 +489,7 @@ export function Blackjack({ play }: { play: GamePlay }): JSX.Element | null {
     let off = false
     const timer = setTimeout(
       () => void girlStep(() => off),
-      play.stepped ? 0 : several ? GIRLS_PAUSE_MS : HER_PAUSE_MS
+      paced ? 0 : several ? GIRLS_PAUSE_MS : HER_PAUSE_MS
     )
     return () => {
       off = true
@@ -469,10 +512,10 @@ export function Blackjack({ play }: { play: GamePlay }): JSX.Element | null {
           tableDeal(names, next.done.length + 1, next.mine, next.seats.map((seat) => seat.cards[0]))
         )
         // At his own pace the cards are dealt once he has read how the last hand came out.
-        if (play.stepped && (!(await reached(line)) || off)) return
+        if (paced && (!(await reached(line)) || off)) return
         setTable(next)
       },
-      play.stepped ? 0 : Math.max(NEXT_HAND_MS - lain, AFTER_REMARK_MS)
+      paced ? 0 : Math.max(NEXT_HAND_MS - lain, AFTER_REMARK_MS)
     )
     return () => {
       off = true
@@ -499,6 +542,11 @@ export function Blackjack({ play }: { play: GamePlay }): JSX.Element | null {
             <p className="vu-blackjack-who">
               {names[i]}
               <span className="vu-blackjack-total">{seat.turned ? totalWord(seat.cards) : '?'}</span>
+              {seat.turned && didWord(seat.cards, seat.moves.at(-1)?.move === 'stand') && (
+                <span className="vu-blackjack-did">
+                  {didWord(seat.cards, seat.moves.at(-1)?.move === 'stand')}
+                </span>
+              )}
             </p>
             <Hand key={`hers:${dealt}`} cards={seat.cards} hidden={!seat.turned} small={several} />
             {several && <p className="vu-blackjack-won">{`${score[i + 1]} won`}</p>}
@@ -511,6 +559,9 @@ export function Blackjack({ play }: { play: GamePlay }): JSX.Element | null {
         <p className="vu-blackjack-who">
           you
           <span className="vu-blackjack-total">{totalWord(table.mine)}</span>
+          {didWord(table.mine, table.phase !== 'mine') && (
+            <span className="vu-blackjack-did">{didWord(table.mine, table.phase !== 'mine')}</span>
+          )}
         </p>
       </div>
 
@@ -520,6 +571,14 @@ export function Blackjack({ play }: { play: GamePlay }): JSX.Element | null {
           : `you ${score[0]} · ${names[0]} ${score[1]}`}
         <span className="vu-blackjack-round">
           {over ? 'game over' : `hand ${Math.min(handNo, hands)} of ${hands}`}
+          {/* How the hand just finished came out, or the game: it stands until the next deal. */}
+          {table.phase === 'over' && (
+            <span className="vu-blackjack-said">
+              {over
+                ? gameWord(names, score)
+                : handTakenWord(names, [table.mine, ...table.seats.map((seat) => seat.cards)])}
+            </span>
+          )}
         </span>
       </p>
 
