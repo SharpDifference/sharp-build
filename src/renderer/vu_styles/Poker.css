@@ -215,6 +215,11 @@
   font-size: 12px;
 }
 
+/* A hand over: who took the pot and who is out, and at the end who won, said a shade louder. */
+.vu-poker-round[data-called] {
+  color: var(--vu-text-body);
+}
+
 /* The reader's moves in a row: fold, check or call, and the three sizes of bet. */
 .vu-poker-moves {
   display: flex;

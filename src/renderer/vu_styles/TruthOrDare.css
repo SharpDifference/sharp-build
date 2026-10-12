@@ -1,6 +1,7 @@
 /* Truth or Dare: the scorecard. The tally, one line of what is wanted now, what was put to the
-   reader while he answers it, and the buttons that apply. Drawn on the mini-game table, as small
-   as that comes to; the buttons are base.css's. Everything said is on the dialogue box. */
+   reader while he answers it, how the last turn went, and the buttons that apply. Drawn on the mini-game table, as small
+   as that comes to; the buttons are base.css's. Everything said is on the dialogue box;
+   what is only seen, a dare done, is on the card too. */
 
 .vu-tod {
   display: flex;
@@ -69,6 +70,20 @@
   padding: 0 4px;
   color: var(--vu-text-body);
   font: 500 13px/1.45 var(--font-body);
+  overflow-wrap: anywhere;
+}
+
+/* How the last turn went: a dare as she did it, a turn backed out of. A few lines at the most. */
+.vu-tod-called {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  margin: 0;
+  overflow: hidden;
+  padding: 0 4px;
+  color: var(--vu-text-body);
+  font: 500 13px/1.45 var(--font-body);
+  text-align: center;
   overflow-wrap: anywhere;
 }
 

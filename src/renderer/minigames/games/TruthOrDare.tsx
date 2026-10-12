@@ -23,6 +23,7 @@ import {
   poseRound,
   posedOf,
   remarkCue,
+  scored,
   seatName,
   situationOf,
   skippedLine,
@@ -73,11 +74,49 @@ interface Now {
 const BLANK: Now = { kind: null, prompt: '' }
 
 /**
+ * What the last turn came to, kept on the surface until the next: a dare as she was seen to do
+ * it, a turn backed out of, one that went too far. `mark` is the point, or that there was none.
+ */
+interface Called {
+  mark: string
+  text: string
+}
+
+/** The longest the last turn stands on the table before the game is handed back, where the box is not saying it. */
+const LAST_TURN_MS = 6000
+
+/** How a played turn came out, for the surface. */
+function calledOf(terms: Terms, turn: Turn): Called {
+  const name = seatName(terms, turn.player)
+  const mark = scored(turn.verdict) ? '+1' : 'no point'
+  if (turn.verdict === 'skipped') return { mark, text: skippedLine(name) }
+  if (turn.verdict === 'void') return { mark, text: VOID_LINE }
+  if (turn.deed) return { mark, text: turn.deed }
+  const did =
+    turn.verdict === 'honest'
+      ? 'answered'
+      : turn.verdict === 'dodged'
+        ? 'dodged the question'
+        : turn.verdict === 'done'
+          ? 'did the dare'
+          : 'backed out of the dare'
+  return { mark, text: `${name} ${did}.` }
+}
+
+/** Who won, once the last turn is played. */
+function winnerOf(terms: Terms, points: readonly number[]): string {
+  const best = Math.max(...points)
+  const top = points.flatMap((p, seat) => (p === best ? [seat === READER ? 'you' : terms.names[seat - 1]] : []))
+  if (top.length > 1) return `${listed(top)} share the top`
+  return top[0] === 'you' ? 'you win' : `${top[0]} wins`
+}
+
+/**
  * Truth or Dare: turns go round the table, the reader first. Whoever's turn it is picks truth or
  * dare and the player before them puts it. The girls' picks, questions, answers and verdicts are
  * the model's, a round at a time; the reader types his own into the scene's line under the dialogue
  * box. Everything said is said there, once; the surface is the scorecard: the tally, whose turn
- * it is, what is wanted now, and the buttons that apply.
+ * it is, what is wanted now, how the last turn went, and the buttons that apply.
  */
 export function TruthOrDare({ play }: { play: GamePlay }): JSX.Element {
   // The table as it was when the game opened: who sits where does not change under a game.
@@ -94,6 +133,12 @@ export function TruthOrDare({ play }: { play: GamePlay }): JSX.Element {
   const [now, setNow] = useState<Now>(BLANK)
   /** What the reader is waiting on, in words; empty where a line is simply being read. */
   const [waiting, setWaiting] = useState('')
+  // The terms first, until there is a turn to say.
+  const [called, setCalled] = useState<Called>(() => ({
+    mark: '',
+    text: `${terms.rounds === 1 ? 'One turn each' : `${terms.rounds} turns each`}, kept ${HEAT_WORD[terms.heat]}.`
+  }))
+  const calledText = useRef('')
 
   // The framework's handle is read through a ref: a turn's chain of rounds outlives a render.
   const latest = useRef(play)
@@ -122,6 +167,12 @@ export function TruthOrDare({ play }: { play: GamePlay }): JSX.Element {
   function show(next: Now): void {
     turnNow.current = next
     setNow(next)
+  }
+
+  /** What a turn came to, on the surface from now until the next. */
+  function callOut(next: Called): void {
+    calledText.current = next.text
+    setCalled(next)
   }
 
   function stand(next: Phase): void {
@@ -180,6 +231,12 @@ export function TruthOrDare({ play }: { play: GamePlay }): JSX.Element {
       tell('')
       finished.current = true
       stand('over')
+      // Where the box is not saying it, how the last turn went stands a while before the table
+      // closes: long enough to read.
+      if (!latest.current.playByPlay) {
+        await pause(Math.min(LAST_TURN_MS, 1600 + calledText.current.length * 35))
+        if (!live.current) return
+      }
       latest.current.finish({
         outcome: outcomeOf(tally(terms, done)),
         summary: summaryOf(terms, done),
@@ -239,19 +296,7 @@ export function TruthOrDare({ play }: { play: GamePlay }): JSX.Element {
       if (!on()) return
     }
     const answered = answeredOf(got, kind)
-    if (answered.verdict === 'skipped') {
-      await narrated(skippedLine(name))
-    } else if (answered.verdict === 'void') {
-      await speak(player, answered.line)
-      if (!on()) return
-      await narrated(VOID_LINE)
-    } else {
-      // What she says, and then what she is seen to do, each given its time.
-      await speak(player, answered.line)
-      if (!on()) return
-      if (answered.deed) await narrated(answered.deed)
-    }
-    await close({
+    const turn: Turn = {
       player,
       asker: askerAt(terms, done.length),
       kind,
@@ -259,7 +304,23 @@ export function TruthOrDare({ play }: { play: GamePlay }): JSX.Element {
       reply: answered.line,
       deed: answered.deed,
       verdict: answered.verdict
-    })
+    }
+    if (answered.verdict === 'skipped') {
+      callOut(calledOf(terms, turn))
+      await narrated(skippedLine(name))
+    } else if (answered.verdict === 'void') {
+      await speak(player, answered.line)
+      if (!on()) return
+      callOut(calledOf(terms, turn))
+      await narrated(VOID_LINE)
+    } else {
+      // What she says, and then what she is seen to do, each given its time.
+      await speak(player, answered.line)
+      if (!on()) return
+      callOut(calledOf(terms, turn))
+      if (answered.deed) await narrated(answered.deed)
+    }
+    await close(turn)
   }
 
   /** The turn is played: it is counted, somebody watching may say a word, and the next opens. */
@@ -363,10 +424,10 @@ export function TruthOrDare({ play }: { play: GamePlay }): JSX.Element {
     const done = played.current
     const asker = askerAt(terms, done.length)
     if (reply === null) {
+      const passed = kind === 'truth' ? 'You pass on the question.' : 'You back out of the dare.'
+      callOut({ mark: '', text: passed })
       // Not waited on: her line queues behind it on the box.
-      void latest.current
-        .narrate(kind === 'truth' ? 'You pass on the question.' : 'You back out of the dare.')
-        .catch(() => undefined)
+      void latest.current.narrate(passed).catch(() => undefined)
       tell(`The reader backed out of the ${kind}: "${prompt}"`)
     } else {
       latest.current.readerSays(reply)
@@ -382,8 +443,7 @@ export function TruthOrDare({ play }: { play: GamePlay }): JSX.Element {
     const judged = judgedOf(got, kind, reply)
     await speak(asker, judged.line)
     if (!on()) return
-    if (judged.verdict === 'void') await narrated(VOID_LINE)
-    await close({
+    const turn: Turn = {
       player: READER,
       asker,
       kind,
@@ -391,7 +451,10 @@ export function TruthOrDare({ play }: { play: GamePlay }): JSX.Element {
       reply: reply ?? '',
       deed: '',
       verdict: judged.verdict
-    })
+    }
+    callOut(calledOf(terms, turn))
+    if (judged.verdict === 'void') await narrated(VOID_LINE)
+    await close(turn)
   }
 
   /** The reader's question or dare for the girl whose turn it is. */
@@ -433,7 +496,7 @@ export function TruthOrDare({ play }: { play: GamePlay }): JSX.Element {
   const ideas = phase === 'ask' && kind ? stock(kind, terms.heat, askedSoFar(log), 3, turn) : []
   /** What is happening and what is wanted now, in one line. */
   const state = over
-    ? 'That is the game.'
+    ? `That is the game: ${winnerOf(terms, score)}.`
     : phase === 'pick'
       ? 'Your turn: truth or dare?'
       : phase === 'ask'
@@ -467,6 +530,14 @@ export function TruthOrDare({ play }: { play: GamePlay }): JSX.Element {
       >
         {state}
       </p>
+
+      {/* How the last turn went, until the next has gone the same way; out of the way while he answers or asks. */}
+      {(phase === 'pick' || phase === 'wait' || over) && called.text && (
+        <p className="vu-tod-called" title={called.text}>
+          {called.mark && <span className="vu-tod-kind">{called.mark}</span>}
+          {called.text}
+        </p>
+      )}
 
       {kept && (
         <p className="vu-tod-kept" title={kept}>

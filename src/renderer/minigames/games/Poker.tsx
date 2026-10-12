@@ -6,6 +6,7 @@ import {
   BIG_BLIND,
   SMALL_BLIND,
   act,
+  bustedIn,
   actionLine,
   actionsLine,
   chipsLine,
@@ -33,7 +34,8 @@ import {
   streetLine,
   type ActionMade,
   type HandState,
-  type Move
+  type Move,
+  type Pot
 } from '@shared/minigameRules/poker'
 import { gestures, lift, press, useReducedMotion } from '../kit'
 import { BunnyMark } from '../kit'
@@ -65,6 +67,9 @@ const AFTER_REMARK_MS = 600
 
 /** At the reader's own pace, the beat a move takes on the board once the text allows it. */
 const STEP_MS = 400
+
+/** How long the last hand lies on the table before the game is handed back, where the box is not saying how it ended. */
+const LAST_HAND_MS = 2800
 
 /** The table: the hand on it, and the hands already finished, this one among them once it is over. */
 interface Table {
@@ -134,12 +139,44 @@ function placeOf(hand: HandState, at: number): string {
 }
 
 /**
+ * How a finished hand came out, short enough for the line under the pot: who took which pot,
+ * and who lost the last of their chips in it. "Ana takes 120 · side pot: you take 40 · Bea is out"
+ */
+function handOutcome(names: readonly string[], hand: HandState): string {
+  const who = (seat: number): string => (seat === 0 ? 'you' : names[seat - 1])
+  // Pots that went to the same players are said as one.
+  const taken: Pot[] = []
+  for (const pot of hand.pots) {
+    if (pot.amount <= 0) continue
+    const last = taken[taken.length - 1]
+    if (last && last.winners.join() === pot.winners.join()) last.amount += pot.amount
+    else taken.push({ ...pot })
+  }
+  const said = taken.map((pot, i) => {
+    const verb = pot.winners.length > 1 ? 'split' : pot.winners[0] === 0 ? 'take' : 'takes'
+    return `${i > 0 ? 'side pot: ' : ''}${listed(pot.winners.map(who))} ${verb} ${pot.amount}`
+  })
+  const gone = bustedIn(hand)
+  if (gone.length) said.push(`${listed(gone.map(who))} ${gone.length > 1 || gone[0] === 0 ? 'are' : 'is'} out`)
+  return said.join(' · ')
+}
+
+/** Who won the game, once it is over: the most chips, alone or level. */
+function gameWinner(names: readonly string[], stacks: readonly number[]): string {
+  const top = Math.max(...stacks)
+  const leaders = stacks.flatMap((chips, i) => (chips === top ? [i === 0 ? 'you' : names[i - 1]] : []))
+  if (leaders.length > 1) return `${listed(leaders)} finish level`
+  return leaders[0] === 'you' ? 'you win the game' : `${leaders[0]} wins the game`
+}
+
+/**
  * Texas hold'em for play chips, heads-up or with two or three girls, each for herself. Everyone
  * starts with the same stack; a set number of hands is played, or fewer if the reader loses his
  * chips or one player takes them all, and the most chips at the end wins. The reader folds,
  * checks or calls, or bets half the pot, the pot or everything; each girl plays her own hand at
- * her skill. What happens is said in the scene's dialogue box; the board shows the cards, the
- * chips and the pot.
+ * her skill. The board shows the cards, the chips, the pot, what each seat last did and, under
+ * the pot, how a hand and the game came out; with the play-by-play on, the scene's dialogue box
+ * says it too.
  */
 export function Poker({ play }: { play: GamePlay }): JSX.Element | null {
   const girls = play.opponents
@@ -201,6 +238,9 @@ export function Poker({ play }: { play: GamePlay }): JSX.Element | null {
   const over = hand.over && gameOver(chips, done.length, hands)
   const myTurn = hand.toAct === 0 && !hand.over
   const can = legal(hand, 0)
+  // The text is read at the reader's own pace and the moves are in it: stepping past a line is
+  // what moves the game on. Otherwise the board keeps its own time, so nothing flashes past.
+  const paced = play.stepped && play.playByPlay
 
   // The game is on from the moment they sit down, and the first deal is said.
   useEffect(() => {
@@ -260,11 +300,18 @@ export function Poker({ play }: { play: GamePlay }): JSX.Element | null {
         return
       }
       finished.current = true
-      play.finish({
+      const result = {
         outcome: gameOutcome(stacks),
         summary: pokerSummary(names, stacks, all.length),
         account: pokerAccount(names, all, stack, hands)
-      })
+      }
+      // Where the box says how it ended, the table stands while that is read. Where it does not,
+      // the last hand and who won lie on the board a while before the game is handed back.
+      if (play.playByPlay) play.finish(result)
+      else
+        setTimeout(() => {
+          if (live.current) play.finish(result)
+        }, LAST_HAND_MS)
     }
     // The board shows a girl's move, a card or a result only once its line is on the box, at
     // the reader's own pace or the text's. His own move shows at once, and so does one that
@@ -398,7 +445,7 @@ export function Poker({ play }: { play: GamePlay }): JSX.Element | null {
           if (!gone) step()
         })
       },
-      play.stepped ? STEP_MS : wait
+      paced ? STEP_MS : wait
     )
     return () => {
       gone = true
@@ -427,7 +474,7 @@ export function Poker({ play }: { play: GamePlay }): JSX.Element | null {
           })
         })
       },
-      play.stepped ? STEP_MS : Math.max(NEXT_HAND_MS - lain, AFTER_REMARK_MS)
+      paced ? STEP_MS : Math.max(NEXT_HAND_MS - lain, AFTER_REMARK_MS)
     )
     return () => {
       gone = true
@@ -509,8 +556,12 @@ export function Poker({ play }: { play: GamePlay }): JSX.Element | null {
         </div>
         <p className="vu-poker-pot">
           {hand.over ? 'pot won' : 'pot'} {hand.over ? hand.pots.reduce((sum, each) => sum + each.amount, 0) : pot}
-          <span className="vu-poker-round">
-            {over ? 'game over' : `hand ${hand.no} of ${hands} · blinds ${SMALL_BLIND}/${BIG_BLIND}`}
+          <span className="vu-poker-round" data-called={hand.over || undefined}>
+            {over
+              ? `game over · ${handOutcome(names, hand)} · ${gameWinner(names, chips)}`
+              : hand.over
+                ? `hand ${hand.no} of ${hands} · ${handOutcome(names, hand)}`
+                : `hand ${hand.no} of ${hands} · blinds ${SMALL_BLIND}/${BIG_BLIND}`}
           </span>
         </p>
       </div>
