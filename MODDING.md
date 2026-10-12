@@ -263,7 +263,7 @@ import BLACKJACK from '../minigameEntries/blackjack'
 
 export default packMod({
   id: 'morrowkiln-card-games',
-  name: "Morrowkiln's Card Games",
+  name: '[MK] Card Games',
   author: 'morrowkiln',
   version: '0.1.0',
   blurb: 'Cards on the table: quick ones for anywhere, and longer ones for an evening in.',

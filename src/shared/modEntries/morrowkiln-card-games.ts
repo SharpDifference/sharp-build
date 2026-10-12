@@ -7,7 +7,7 @@ import CAT_PAIRS from '../minigameEntries/cat-pairs'
 /** A pack: one mod bringing several games, each with a switch of its own among the options. */
 export default packMod({
   id: 'morrowkiln-card-games',
-  name: "Morrowkiln's Card Games",
+  name: '[MK] Card Games',
   author: 'morrowkiln',
   version: '0.1.0',
   blurb: 'Cards on the table: quick ones for anywhere, and longer ones for an evening in.',

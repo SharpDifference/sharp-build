@@ -11,7 +11,7 @@ import CLAW_MACHINE from "../minigameEntries/claw-machine";
 /** A pack: one mod bringing several games, each with a switch of its own among the options. */
 export default packMod({
   id: "morrowkiln-arcade-games",
-  name: "Morrowkiln's Arcade & Bar Games",
+  name: '[MK] Arcade & Bar Games',
   author: "morrowkiln",
   version: "0.1.0",
   blurb: "What the arcade, the bar and the bowling alley are for.",
