@@ -17,6 +17,26 @@
   box-shadow: 6px 6px 0 var(--vu-panel-shadow);
   overflow: hidden;
   line-height: 0;
+  position: relative;
+}
+
+/* He is looking elsewhere, or being counted back in: the table dimmed under a word or a number,
+   the puck still to be seen where it stopped. */
+.vu-airhockey-table--held .vu-airhockey-field {
+  opacity: 0.4;
+}
+
+.vu-airhockey-held {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0;
+  color: var(--vu-text);
+  font: 400 44px var(--font-display);
+  line-height: 1;
+  pointer-events: none;
 }
 
 /* Sized in the table's own units: a pointer is read through this box, whatever the stage's scale. */

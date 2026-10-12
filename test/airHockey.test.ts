@@ -3,6 +3,7 @@ import {
   GOAL_W,
   MALLET_R,
   MAX_SPEED,
+  READER_SPEED,
   PUCK_R,
   STALL_S,
   STEP,
@@ -16,6 +17,7 @@ import {
   homeOf,
   inHalf,
   matchAccount,
+  matchAccountSoFar,
   matchOver,
   matchSituation,
   matchSummary,
@@ -24,6 +26,7 @@ import {
   servedPuck,
   stalled,
   stepTable,
+  sunk,
   swingAt,
   type Point,
   type Side,
@@ -97,6 +100,40 @@ function simulate(skill: number, seconds: number, seed: number): { mine: number;
     if (!goal) continue
     goals.push(goal)
     table = freshTable(goal === 'her' ? 'reader' : 'her')
+    mind = freshMind()
+    hand = homeOf('reader')
+  }
+  return scoreOf(goals)
+}
+
+/** A hand that only keeps level with the puck across the table, in front of its own goal. */
+function tracking(table: Table): Point {
+  return { x: table.puck.x, y: homeOf('reader').y }
+}
+
+/**
+ * Plays her at `skill` for `points` points against a hand, as the table itself runs a match: a
+ * puck at rest in a mouth is a goal, and one nobody plays is served again.
+ */
+function points(
+  skill: number,
+  count: number,
+  seed: number,
+  handOf: (table: Table, hand: Point) => Point
+): { mine: number; hers: number } {
+  const random = seeded(seed)
+  let table = freshTable('reader')
+  let mind = freshMind()
+  let hand: Point = homeOf('reader')
+  const goals: Side[] = []
+  // Ten minutes of table at the most: a hand nobody scores on does not hang the test.
+  for (let t = 0; t < 600 && goals.length < count; t += STEP) {
+    hand = handOf(table, hand)
+    const goal = advance(table, mind, hand, skill, random) ?? sunk(table, mind)
+    const again = goal ? null : stalled(table, mind)
+    if (!goal && !again) continue
+    if (goal) goals.push(goal)
+    table = freshTable(again ?? (goal === 'her' ? 'reader' : 'her'))
     mind = freshMind()
     hand = homeOf('reader')
   }
@@ -244,6 +281,49 @@ describe('air hockey: her play', () => {
   })
 })
 
+/**
+ * THE BALANCE AS IT STANDS, NOT AS IT SHOULD BE. The gradient above is proved against a slow hand
+ * (420 a second). The reader's mallet goes at READER_SPEED, and against hands that use it her
+ * skill counts for little. These tests assert what is true today so the numbers can be seen; the
+ * owner is to decide the balance after playing. A change to her play, the mallet speeds or the
+ * table that moves them must change the numbers here on purpose.
+ */
+describe('air hockey: the balance as it stands against a fast scripted hand', () => {
+  const SEEDS = [1, 2, 3, 4, 5]
+  const SKILLS = [1, 2, 3, 4, 5]
+
+  it('today a quick get-behind-and-hit hand takes two points in three or more at every skill', () => {
+    const quick = (table: Table, hand: Point): Point => scripted(table, hand, READER_SPEED)
+    const shares = SKILLS.map((skill) => {
+      let mine = 0
+      let hers = 0
+      for (const seed of SEEDS) {
+        const result = points(skill, 20, seed, quick)
+        mine += result.mine
+        hers += result.hers
+      }
+      // Every point was played out.
+      expect(mine + hers).toBe(SEEDS.length * 20)
+      return mine / (mine + hers)
+    })
+    // Measured, of 100 points at each skill from 1 to 5: 86, 74, 83, 80, 66 to the hand.
+    for (const share of shares) {
+      expect(share).toBeGreaterThanOrEqual(0.6)
+      expect(share).toBeLessThanOrEqual(0.9)
+    }
+    // Even the best of them loses to it.
+    expect(shares[4]).toBeGreaterThan(0.6)
+  })
+
+  it('today a hand that only keeps level with the puck is never scored on, at any skill', () => {
+    for (const skill of SKILLS)
+      for (const seed of SEEDS.slice(0, 2)) {
+        // Ten minutes of table each: she does not get one past it, and it never hits one back.
+        expect(points(skill, 20, seed, tracking), `skill ${skill}`).toEqual({ mine: 0, hers: 0 })
+      }
+  })
+})
+
 describe('air hockey: a puck nobody plays', () => {
   /** Runs a match step by step with his hand held at `hand`, for `seconds`. */
   function wait(table: Table, hand: Point, seconds: number): Side | null {
@@ -270,7 +350,9 @@ describe('air hockey: a puck nobody plays', () => {
   it('serves again a puck held in a corner under his mallet', () => {
     const table = freshTable('reader')
     table.puck = { x: PUCK_R, y: TABLE_H - PUCK_R, vx: 0, vy: 0 }
-    const corner = { x: MALLET_R, y: TABLE_H - MALLET_R }
+    // Up against it, not on top of it: a mallet put through a puck at the end wall throws it
+    // along into the mouth, which is another matter.
+    const corner = { x: PUCK_R + 22, y: TABLE_H - PUCK_R - 22 }
     table.reader = { ...corner, vx: 0, vy: 0 }
     expect(wait(table, corner, STALL_S + 1)).toBe('reader')
   })
@@ -289,6 +371,56 @@ describe('air hockey: a puck nobody plays', () => {
             table.puck.y > TABLE_H / 2 + PUCK_R
         expect(out, `${x}, ${y}`).toBe(true)
       }
+  })
+})
+
+describe('air hockey: a puck at rest in a goal mouth', () => {
+  const lain = (): ReturnType<typeof freshMind> => ({ ...freshMind(), still: STALL_S })
+
+  it('is a goal for whoever it was hit by, not a serve', () => {
+    const top = tableWith({ y: PUCK_R - 1 })
+    expect(sunk(top, lain())).toBe('reader')
+    expect(stalled(top, lain())).toBeNull()
+    const bottom = tableWith({ y: TABLE_H - PUCK_R + 1 })
+    expect(sunk(bottom, lain())).toBe('her')
+    expect(stalled(bottom, lain())).toBeNull()
+    // Past the line altogether and still short of going through.
+    expect(sunk(tableWith({ y: -PUCK_R + 1 }), lain())).toBe('reader')
+  })
+
+  it('is not one until it has lain there, nor anywhere but in a mouth', () => {
+    const top = tableWith({ y: PUCK_R - 1 })
+    expect(sunk(top, { ...freshMind(), still: STALL_S - STEP })).toBeNull()
+    // Against the end wall beside the mouth, and in front of the mouth on the table.
+    const beside = tableWith({ x: PUCK_R + 4, y: PUCK_R })
+    expect(sunk(beside, lain())).toBeNull()
+    expect(stalled(beside, lain())).toBe('her')
+    const before = tableWith({ y: PUCK_R })
+    expect(sunk(before, lain())).toBeNull()
+    expect(stalled(before, lain())).toBe('her')
+  })
+
+  it('scores a puck that slides into the mouth and dies there', () => {
+    const table = tableWith({ y: 30, vy: -8 })
+    const mind = freshMind()
+    let by: Side | null = null
+    let after = 0
+    // Her mallet kept out of it, as his is: the stall is counted as a match counts it.
+    for (let t = 0; t < 30 && !by; t += STEP) {
+      expect(stepTable(table, table.reader, table.her, 0)).toBeNull()
+      const { puck } = table
+      if (!mind.from || Math.hypot(puck.x - mind.from.x, puck.y - mind.from.y) > 12) {
+        mind.from = { x: puck.x, y: puck.y }
+        mind.still = 0
+      } else mind.still += STEP
+      expect(stalled(table, mind)).toBeNull()
+      by = sunk(table, mind)
+      after = t
+    }
+    expect(by).toBe('reader')
+    expect(table.puck.y).toBeLessThan(PUCK_R)
+    expect(table.puck.y).toBeGreaterThan(-PUCK_R)
+    expect(after).toBeGreaterThanOrEqual(STALL_S)
   })
 })
 
@@ -331,6 +463,21 @@ describe('air hockey: the match', () => {
     expect(line).toContain('the reader 1, Mia 2')
     expect(line).toContain('Mia scored the last goal.')
     expect(line).toContain('Riding on it: Loser buys the drinks.')
+  })
+
+  it('tells a match left unfinished as far as it got', () => {
+    const led = matchAccountSoFar('Mia', [R, H, R, R, R], 5)
+    expect(led).toEqual([
+      expect.stringContaining('first to 5 goals'),
+      'The goals so far, in order: the reader, Mia, the reader, the reader, the reader.',
+      'The score when it stopped: the reader 4, Mia 1.',
+      'The reader was leading by 3 goals, and one more goal would have won it.'
+    ])
+    expect(led[0]).toContain('not played to the end')
+    expect(led.join(' ')).not.toContain('Final score')
+    expect(matchAccountSoFar('Mia', [H], 5)).toContain('Mia was leading by a goal, 4 short of winning.')
+    expect(matchAccountSoFar('Mia', [H, R], 5)).toContain('They were level.')
+    expect(matchAccountSoFar('Mia', [], 5)).toContain('Nobody had scored yet.')
   })
 
   it('tells a shutout as one', () => {

@@ -14,16 +14,18 @@ import {
   goalLine,
   homeOf,
   matchAccount,
+  matchAccountSoFar,
   matchOver,
   matchSituation,
   matchSummary,
   scoreOf,
   stalled,
+  sunk,
   swingAt,
   type Point,
   type Side
 } from '@shared/minigameRules/airHockey'
-import type { GamePlay } from '../kit'
+import { pointIn, useAway, type GamePlay } from '../kit'
 import '../../vu_styles/AirHockey.css'
 
 /** A count of goals as the narration says it. */
@@ -46,13 +48,17 @@ const GOAL_PAUSE_MS = 1100
 const REMARK_WAIT_MS = 6000
 /** The most time one frame may ask the table to make up, after a stall. */
 const MAX_FRAME_S = 0.1
+/** How long the table is held once he is back at it, counted down from this many. */
+const RESUME_MS = 2400
+const RESUME_COUNT = 3
 
 /**
  * Air hockey: one table seen from above, the reader's end at the bottom and hers at the top. His
  * mallet follows the pointer inside his half; hers is the rules' own, at her skill. The table
  * runs in real time, a fixed step at a time, and stops for a beat at each goal, when the puck is
- * served to whoever let it in. The goals are said in the scene's dialogue box; the table shows
- * the play and the score.
+ * served to whoever let it in. It stops too for as long as he is looking elsewhere, and counts
+ * him back in before the puck moves again. The goals are said in the scene's dialogue box; the
+ * table shows the play and the score.
  */
 export function AirHockey({ play }: { play: GamePlay }): JSX.Element {
   const her = play.opponents[0]
@@ -60,6 +66,11 @@ export function AirHockey({ play }: { play: GamePlay }): JSX.Element {
   const [goals, setGoals] = useState<Side[]>([])
   // Between a goal and the serve.
   const [waiting, setWaiting] = useState(false)
+  // He is looking elsewhere: the table stands as it is. Back, he is counted in from `count`.
+  const away = useAway()
+  const awayNow = useRef(away)
+  awayNow.current = away
+  const [count, setCount] = useState<number | null>(null)
 
   // The framework's side of the game as it is now, for a loop that outlives any one render.
   const latest = useRef(play)
@@ -112,30 +123,18 @@ export function AirHockey({ play }: { play: GamePlay }): JSX.Element {
     let serveTo: Side | null = null
     let ended = false
     let gone = false
+    // He was away at the last frame; back, the table is held until `resumeAt`, `shown` on it.
+    let wasAway = false
+    let resumeAt = 0
+    let shown = 0
 
     const follow = (event: PointerEvent): void => {
       const svg = field.current
       if (!svg) return
       // Through the drawing's own mapping, so the stage's scale and the surface's lean are both
-      // undone exactly.
-      try {
-        const map = svg.getScreenCTM()?.inverse()
-        if (map) {
-          const at = new DOMPoint(event.clientX, event.clientY).matrixTransform(map)
-          if (Number.isFinite(at.x) && Number.isFinite(at.y)) {
-            hand = { x: at.x, y: at.y }
-            return
-          }
-        }
-      } catch {
-        // A drawing with no size has no mapping: its box below, or nothing.
-      }
-      const box = svg.getBoundingClientRect()
-      if (box.width === 0 || box.height === 0) return
-      hand = {
-        x: ((event.clientX - box.left) / box.width) * TABLE_W,
-        y: ((event.clientY - box.top) / box.height) * TABLE_H
-      }
+      // undone exactly. A drawing with no size has no mapping, and the hand stays where it was.
+      const at = pointIn(svg, event)
+      if (at && Number.isFinite(at.x) && Number.isFinite(at.y)) hand = at
     }
     // A finger put down on the table keeps the mallet wherever it then goes.
     const keep = (event: PointerEvent): void => {
@@ -196,6 +195,7 @@ export function AirHockey({ play }: { play: GamePlay }): JSX.Element {
         })
         return
       }
+      latest.current.progress(matchAccountSoFar(her.name, scored, toWin))
       remark()
       serveTo = by === 'her' ? 'reader' : 'her'
       stillUntil = at + GOAL_PAUSE_MS
@@ -216,6 +216,29 @@ export function AirHockey({ play }: { play: GamePlay }): JSX.Element {
       frame = requestAnimationFrame(tick)
       const passed = Math.max(0, Math.min((at - last) / 1000, MAX_FRAME_S))
       last = at
+      // Looking elsewhere, nothing moves: not the puck, not her mallet, not his.
+      if (awayNow.current) {
+        wasAway = true
+        return
+      }
+      if (wasAway) {
+        wasAway = false
+        resumeAt = at + RESUME_MS
+        owed = 0
+      }
+      if (resumeAt) {
+        if (at < resumeAt) {
+          const left = Math.ceil(((resumeAt - at) / RESUME_MS) * RESUME_COUNT)
+          if (left !== shown) {
+            shown = left
+            setCount(left)
+          }
+          return
+        }
+        resumeAt = 0
+        shown = 0
+        setCount(null)
+      }
       if (at < stillUntil || speaking) return
       if (serveTo) {
         serve(serveTo)
@@ -231,6 +254,13 @@ export function AirHockey({ play }: { play: GamePlay }): JSX.Element {
         if (by) {
           draw()
           goal(by, at)
+          return
+        }
+        // A puck come to rest in a mouth is a goal, as if it had gone through.
+        const resting = sunk(table, mind)
+        if (resting) {
+          draw()
+          goal(resting, at)
           return
         }
         // A puck nobody is going to play is served again, to whoever's half it lies in.
@@ -258,6 +288,7 @@ export function AirHockey({ play }: { play: GamePlay }): JSX.Element {
   }, [])
 
   const mouth = (TABLE_W - GOAL_W) / 2
+  const held = !over && (away || count !== null)
 
   return (
     <div className="vu-airhockey">
@@ -272,7 +303,7 @@ export function AirHockey({ play }: { play: GamePlay }): JSX.Element {
         </p>
       </div>
 
-      <div className="vu-airhockey-table">
+      <div className={`vu-airhockey-table${held ? ' vu-airhockey-table--held' : ''}`}>
         <svg
           ref={field}
           className="vu-airhockey-field"
@@ -280,7 +311,13 @@ export function AirHockey({ play }: { play: GamePlay }): JSX.Element {
           role="img"
           aria-label={`Air hockey table. You ${mine}, ${her?.name ?? 'her'} ${hers}.`}
         >
-          <line className="vu-airhockey-line" x1={0} y1={TABLE_H / 2} x2={TABLE_W} y2={TABLE_H / 2} />
+          <line
+            className="vu-airhockey-line"
+            x1={0}
+            y1={TABLE_H / 2}
+            x2={TABLE_W}
+            y2={TABLE_H / 2}
+          />
           <circle className="vu-airhockey-line" cx={TABLE_W / 2} cy={TABLE_H / 2} r={38} />
           <path
             className="vu-airhockey-line"
@@ -292,7 +329,13 @@ export function AirHockey({ play }: { play: GamePlay }): JSX.Element {
           />
           {/* The goal mouths: the gap in each end wall. */}
           <rect className="vu-airhockey-mouth" x={mouth} y={0} width={GOAL_W} height={5} />
-          <rect className="vu-airhockey-mouth" x={mouth} y={TABLE_H - 5} width={GOAL_W} height={5} />
+          <rect
+            className="vu-airhockey-mouth"
+            x={mouth}
+            y={TABLE_H - 5}
+            width={GOAL_W}
+            height={5}
+          />
 
           <g ref={herMark} className="vu-airhockey-mallet vu-airhockey-mallet--hers">
             <circle r={MALLET_R - 1.5} />
@@ -304,12 +347,25 @@ export function AirHockey({ play }: { play: GamePlay }): JSX.Element {
           </g>
           <circle ref={puckMark} className="vu-airhockey-puck" r={PUCK_R - 1} />
         </svg>
+        {held && (
+          <p className="vu-airhockey-held" role="status">
+            {away ? 'Paused' : count}
+          </p>
+        )}
       </div>
 
       <div className="vu-airhockey-side vu-airhockey-side--notes">
         <p className="vu-airhockey-note">first to {toWin}</p>
         <p className="vu-airhockey-note vu-airhockey-note--state">
-          {over ? 'game over' : waiting ? 'goal' : 'in play'}
+          {over
+            ? 'game over'
+            : away
+              ? 'paused'
+              : count
+                ? 'get ready'
+                : waiting
+                  ? 'goal'
+                  : 'in play'}
         </p>
         <p className="vu-airhockey-note">your mallet follows the pointer</p>
       </div>

@@ -2,7 +2,8 @@
  * Air hockey's rules, with no table in them: the puck and the two mallets, the walls and the goal
  * mouths, how she plays at her skill, and how a match is told afterwards. The reader has the
  * bottom half of the table and she the top; a goal is the puck going through the mouth in the
- * other side's wall. Lengths are in the table's own units, times in seconds.
+ * other side's wall, or coming to rest in it. Lengths are in the table's own units, times in
+ * seconds.
  */
 
 /** The table: its width and its length, the reader's end at the bottom. */
@@ -247,12 +248,28 @@ export function halfOf(puck: Point): Side {
 }
 
 /**
+ * Who has scored with a puck that never went all the way through: it has lain as long as a
+ * stalled one, across the line of a goal mouth, where no mallet can get behind it. Null for a
+ * puck anywhere else, or one still moving.
+ */
+export function sunk(table: Table, mind: Mind): Side | null {
+  if (mind.still < STALL_S) return null
+  const { puck } = table
+  if (!inMouth(puck.x)) return null
+  if (puck.y < PUCK_R) return 'reader'
+  if (puck.y > TABLE_H - PUCK_R) return 'her'
+  return null
+}
+
+/**
  * Who the puck is to be served to again, having lain in one place too long: pinned to a wall,
  * left at the line where neither will fetch it, or just not played. Null while it is still in
- * play. A serve nobody has touched yet is left to wait for whoever it is with.
+ * play. A serve nobody has touched yet is left to wait for whoever it is with, and a puck at
+ * rest in a goal mouth is no serve but a goal: {@link sunk}.
  */
 export function stalled(table: Table, mind: Mind): Side | null {
   if (mind.still < STALL_S) return null
+  if (sunk(table, mind)) return null
   const side = halfOf(table.puck)
   const serve = servedPuck(side)
   const { puck } = table
@@ -449,6 +466,36 @@ export function matchSituation(
         : `${goals[goals.length - 1] === 'her' ? name : 'The reader'} scored the last goal.`,
     ...(stake ? [`Riding on it: ${stake}`] : [])
   ].join(' ')
+}
+
+/**
+ * How a match stands partway through, for the scene's writer should the reader walk away from
+ * it: what is being played, the goals so far in order, the score and who leads. Nothing in it
+ * says the match ended.
+ */
+export function matchAccountSoFar(name: string, goals: readonly Side[], toWin: number): string[] {
+  const { mine, hers } = scoreOf(goals)
+  const called = (side: Side): string => (side === 'her' ? name : 'the reader')
+  const lines = [
+    `It was air hockey, first to ${toWin} goals: a fast, physical game played standing at the table, all reflexes and quick hands. It was not played to the end.`
+  ]
+  if (goals.length === 0) return [...lines, 'Nobody had scored yet.']
+
+  lines.push(`The goals so far, in order: ${goals.map(called).join(', ')}.`)
+  lines.push(`The score when it stopped: the reader ${mine}, ${name} ${hers}.`)
+  if (mine === hers) lines.push('They were level.')
+  else {
+    const leader: Side = mine > hers ? 'reader' : 'her'
+    const ahead = Math.abs(mine - hers)
+    const short = toWin - Math.max(mine, hers)
+    const leading = `${called(leader).charAt(0).toUpperCase()}${called(leader).slice(1)} was leading by ${ahead === 1 ? 'a goal' : `${ahead} goals`}`
+    lines.push(
+      short === 1
+        ? `${leading}, and one more goal would have won it.`
+        : `${leading}, ${short} short of winning.`
+    )
+  }
+  return lines
 }
 
 /**
