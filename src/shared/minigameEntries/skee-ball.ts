@@ -4,6 +4,7 @@ const SKEE_BALL: MiniGameDef = {
   id: 'skee-ball',
   modId: 'morrowkiln-arcade-games',
   name: 'Skee-Ball',
+  calledAs: ['skeeball'],
   icon: '🎯',
   blurb:
     'skee-ball on an arcade alley: balls rolled up a ramp to hop into rings worth 10 to 50, with two small 100 pockets in the top corners',

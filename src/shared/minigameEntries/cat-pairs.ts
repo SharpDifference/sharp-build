@@ -4,6 +4,7 @@ const CAT_PAIRS: MiniGameDef = {
   id: 'cat-pairs',
   modId: 'morrowkiln-card-games',
   name: 'Cat Pairs',
+  calledAs: ['pairs', 'matching game', 'memory game'],
   icon: '🐾',
   blurb:
     "a calm memory game with the café's own deck: cards lie face down, each café cat is on two of them, and players turn two at a time looking for pairs",

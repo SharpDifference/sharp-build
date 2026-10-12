@@ -4,6 +4,7 @@ const BOWLING: MiniGameDef = {
   id: 'bowling',
   modId: 'morrowkiln-arcade-games',
   name: 'Bowling',
+  calledAs: ['bowl'],
   icon: '🎳',
   blurb:
     'ten-pin bowling on a short lane: two balls a frame at ten pins, strikes and spares scored as they are in any alley',

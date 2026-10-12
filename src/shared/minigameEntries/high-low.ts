@@ -4,6 +4,7 @@ const HIGH_LOW: MiniGameDef = {
   id: 'high-low',
   modId: 'morrowkiln-card-games',
   name: 'High-Low',
+  calledAs: ['higher or lower', 'cards', 'card game'],
   icon: '🃏',
   blurb:
     'a quick card game: a card is turned face up and the player calls whether the next is higher or lower',

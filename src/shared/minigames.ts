@@ -99,6 +99,11 @@ export interface MiniGameDef {
   format: string
   /** What may be varied by agreement; absent, the game is always played the one way. */
   options?: readonly GameOption[]
+  /**
+   * Other words the reader might call it by, beyond its name ("cards", "race"): a turn whose
+   * action names it tells the model of it even where she would never suggest it.
+   */
+  calledAs?: readonly string[]
   /** How readily a girl suggests it herself; `sometimes` where it does not say. */
   suggest?: SuggestRate
   /** The same, at particular places, by location id: an arcade game at the arcade is `often`. */
@@ -239,6 +244,28 @@ export function gamesSuggested(
   keen = false
 ): MiniGameDef[] {
   return games.filter((game) => suggestRate(game, location, busy, keen) !== 'never')
+}
+
+/** Words only, lower case, one space apart, padded so a whole word can be looked for. */
+function wordsOf(text: string): string {
+  return ` ${text.toLowerCase().replace(/[^\p{L}\p{N}]+/gu, ' ').trim()} `
+}
+
+/**
+ * The games a reader's action names, by name or by another word for them, a plural or a
+ * possessive included: "poker", "a game of high low", "the claw machines".
+ */
+export function gamesNamed(games: readonly MiniGameDef[], action: string): MiniGameDef[] {
+  const said = wordsOf(action)
+  return games.filter((game) =>
+    [game.name, ...(game.calledAs ?? [])].some((term) => {
+      const words = wordsOf(term).trim()
+      return (
+        words !== '' &&
+        [' ', 's ', 'es ', ' s '].some((end) => said.includes(` ${words}${end}`))
+      )
+    })
+  )
 }
 
 /** What a player has set for one game on its page: his own usual options, and how often it comes up. */

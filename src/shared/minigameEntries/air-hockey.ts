@@ -4,6 +4,7 @@ const AIR_HOCKEY: MiniGameDef = {
   id: 'air-hockey',
   modId: 'morrowkiln-arcade-games',
   name: 'Air Hockey',
+  calledAs: ['hockey'],
   icon: '🏒',
   blurb:
     'a fast table game: each player has a mallet and bats a floating puck at the goal in the other end',

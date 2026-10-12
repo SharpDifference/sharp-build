@@ -4,6 +4,7 @@ const HOOP_SHOT: MiniGameDef = {
   id: 'hoop-shot',
   modId: 'morrowkiln-arcade-games',
   name: 'Hoop Shot',
+  calledAs: ['hoop', 'basketball'],
   icon: '🏀',
   blurb:
     'an arcade basketball machine: a row of cabinets side by side, everyone shooting as many baskets as they can before the buzzer',

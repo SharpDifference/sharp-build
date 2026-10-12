@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
+  gamesNamed,
   gamesOffered,
   gamesSuggested,
   seatsFor,
@@ -103,5 +104,32 @@ describe('gamesSuggested', () => {
   it('follows his own rate for a game over its places', () => {
     const his = { ...deck, suggest: 'rarely' as const, suggestAt: undefined }
     expect(ids(gamesSuggested([his], 'arcade', false))).toEqual(['deck'])
+  })
+})
+
+describe('gamesNamed', () => {
+  const poker = game('poker', { name: 'Poker', calledAs: ['hold em', 'cards'] })
+  const highLow = game('high-low', { name: 'High-Low', calledAs: ['cards'] })
+  const claw = game('claw', { name: 'Claw Machine', calledAs: ['claw'] })
+  const race = game('race', { name: 'Foot Race', calledAs: ['race'] })
+  const all = [poker, highLow, claw, race]
+
+  it('finds a game by its name, however it is written', () => {
+    expect(ids(gamesNamed(all, 'Want to play POKER?'))).toEqual(['poker'])
+    expect(ids(gamesNamed(all, 'a round of high low'))).toEqual(['high-low'])
+    expect(ids(gamesNamed(all, "Let's try the claw machines"))).toEqual(['claw'])
+  })
+
+  it('finds it by another word for it, plural or possessive included', () => {
+    expect(ids(gamesNamed(all, "Hold'em, then?"))).toEqual(['poker'])
+    expect(ids(gamesNamed(all, 'I brought cards.'))).toEqual(['poker', 'high-low'])
+    expect(ids(gamesNamed(all, 'Race you to the fountain!'))).toEqual(['race'])
+    expect(ids(gamesNamed(all, 'two races'))).toEqual(['race'])
+  })
+
+  it('does not find a word inside another', () => {
+    expect(gamesNamed(all, 'She clawed at the racetrack, then hold me')).toEqual([])
+    expect(gamesNamed(all, 'I raced here')).toEqual([])
+    expect(gamesNamed(all, '')).toEqual([])
   })
 })

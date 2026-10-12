@@ -332,6 +332,7 @@ theme-role variables (`--vu-accent`, `--vu-text`, `--vu-text-muted`, `--vu-text-
 | `format` | How a game goes, as the table really runs it. Told to the model as what she can agree to. |
 | `options` | What may be settled before it starts; absent, the game is played the one way. |
 | `suggest`, `suggestAt` | How readily a girl brings it up herself, and the same at particular places. |
+| `calledAs` | Other words the player might call it by ("cards", "race"), beyond its `name`. |
 | `surface` | `table` (the default), `board` or `screen`. |
 | `keys` | `true` for a game played on the keyboard. |
 | `skillBrief` | What makes someone good at it, in a sentence. |
@@ -390,8 +391,11 @@ overrides both: in a class, on a shift or on a project nobody suggests a game, a
 player's "Girls suggest games often" on, every game is `often` wherever else it can be played.
 A game that comes out `never` at a place is left out of what the model is told there
 (`gamesSuggested`), which keeps every turn's request short; the girls cannot bring it up and the
-scene cannot agree to it on its own. None of it limits the reader, who may ask for any game on
-offer from the table: his proposal is its own turn and tells the model about that game.
+scene cannot agree to it on its own, unless the player's action that turn names it: by its
+`name` or a word in `calledAs`, as whole words, a plural included (`gamesNamed`). Then that game
+is added to that turn's request, so "want to play poker?" typed at the arcade still opens the
+table when she says yes. None of it limits the reader, who may also ask for any game on offer
+from the table: his proposal is its own turn and tells the model about that game.
 
 So name the places a game belongs and leave it `never` everywhere else it can be played:
 

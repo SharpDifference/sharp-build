@@ -4,6 +4,7 @@ const ROLLER_DERBY: MiniGameDef = {
   id: 'roller-derby',
   modId: 'morrowkiln-sports',
   name: 'Rink Race',
+  calledAs: ['race', 'skate'],
   icon: '🛼',
   blurb:
     'a race on quad skates round the roller rink\'s oval: steady alternating strides for speed, a lean through each bend, first one home',

@@ -4,6 +4,7 @@ const CLAW_MACHINE: MiniGameDef = {
   id: 'claw-machine',
   modId: 'morrowkiln-arcade-games',
   name: 'Claw Machine',
+  calledAs: ['claw', 'crane game'],
   icon: '🧸',
   blurb:
     'a claw machine full of plush toys: the reader works the claw for a few paid goes and tries to fish a toy out, with whoever is with him watching at the glass',

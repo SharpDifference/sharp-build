@@ -4,6 +4,7 @@ import {
   MINI_GAMES,
   MINI_GAMES_LIST,
   SUGGEST_OFTEN,
+  gamesNamed,
   gamesSuggested,
   type MiniGameDef
 } from '@shared/minigames'
@@ -28,6 +29,12 @@ function gamesWith(cast: readonly Character[], location: string | null): MiniGam
   return gamesOffered({ location, girls: cast.length }, gameIsOn)
     .filter((game) => game.players.max >= 1 && Boolean(gameComponent(game.id)))
     .map(tunedGame)
+}
+
+/** What the reader did this turn, off the request's own line for it. */
+function actionOf(user: string): string {
+  const lines = user.split('\n').filter((line) => line.startsWith("Reader's action:"))
+  return lines.at(-1)?.slice("Reader's action:".length) ?? ''
 }
 
 /** Whether the scene has something else going on, and whether he wants games to come up often. */
@@ -95,10 +102,14 @@ registerHooks(MINI_GAMES, {
       // Every other turn the reader takes with a girl carries the standing offer. A scene's
       // closing is not one: it has no action of his, and nothing more is going to be played.
       if (!request.user.includes("Reader's action:")) return request
-      // Only the games a girl may bring up here are on it: the rest are his to ask for.
+      // Only the games a girl may bring up here are on it, and any his action names: the rest
+      // are his to ask for from the table.
       const location = ctx.state.sceneLocation ?? null
       const { busy, keen } = sceneTerms()
-      const games = gamesSuggested(gamesWith(ctx.cast, location), location, busy, keen)
+      const here = gamesWith(ctx.cast, location)
+      const suggested = gamesSuggested(here, location, busy, keen)
+      const named = gamesNamed(here, actionOf(request.user))
+      const games = here.filter((game) => suggested.includes(game) || named.includes(game))
       if (games.length === 0) return request
       return withOffer(request, games, ctx.cast, location, busy, keen)
     }
@@ -126,13 +137,8 @@ registerHooks(MINI_GAMES, {
 
     // No proposal of his own was out: the two of them may still have agreed in the scene.
     if (ending) return
-    const location = useGameStore.getState().sceneLocation ?? null
-    const { busy, keen } = sceneTerms()
-    const agreed = agreedOf(
-      reply,
-      gamesSuggested(gamesWith(cast, location), location, busy, keen),
-      cast
-    )
+    // The reply can only name a game its request offered: the field allows no other.
+    const agreed = agreedOf(reply, gamesWith(cast, useGameStore.getState().sceneLocation), cast)
     if (agreed) agree(agreed.game, agreed.characters, agreed.stake, agreed.options)
   },
 

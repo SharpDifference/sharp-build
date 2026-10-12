@@ -4,6 +4,7 @@ const BLACKJACK: MiniGameDef = {
   id: 'blackjack',
   modId: 'morrowkiln-card-games',
   name: 'Blackjack',
+  calledAs: ['twenty one', 'cards', 'card game'],
   icon: '♠️',
   blurb:
     'blackjack with no dealer, heads-up or around a table: everyone draws towards 21 without going over, and the closest hand wins',

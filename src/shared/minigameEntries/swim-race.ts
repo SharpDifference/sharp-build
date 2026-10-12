@@ -4,6 +4,7 @@ const SWIM_RACE: MiniGameDef = {
   id: 'swim-race',
   modId: 'morrowkiln-sports',
   name: 'Swim Race',
+  calledAs: ['race', 'swim'],
   icon: '🏊',
   blurb:
     'a freestyle swimming race, side by side in the water: long even strokes, a breath at the right moment and a clean turn at each end',

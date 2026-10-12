@@ -4,6 +4,7 @@ const BEER_PONG: MiniGameDef = {
   id: 'beer-pong',
   modId: 'morrowkiln-party-games',
   name: 'Beer Pong',
+  calledAs: ['pong'],
   icon: '🍺',
   blurb:
     'beer pong across a table: a triangle of cups at each end, a ball lobbed into the other side\'s cups, and whoever\'s cup is hit drinks it',

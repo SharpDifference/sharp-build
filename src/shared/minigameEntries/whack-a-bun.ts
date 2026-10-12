@@ -4,6 +4,7 @@ const WHACK_A_BUN: MiniGameDef = {
   id: 'whack-a-bun',
   modId: 'morrowkiln-arcade-games',
   name: 'Whack-a-Bun',
+  calledAs: ['whack a mole', 'bunnies'],
   icon: '🔨',
   blurb:
     'an arcade cabinet with nine holes: toy bunnies pop up for a moment and are bopped with a padded mallet before they duck, for points against the clock',

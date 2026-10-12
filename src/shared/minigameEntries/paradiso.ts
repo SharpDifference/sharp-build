@@ -4,6 +4,7 @@ const PARADISO: MiniGameDef = {
   id: 'paradiso',
   modId: 'morrowkiln-arcade-games',
   name: 'PARADISO',
+  calledAs: ['dance machine', 'dance game', 'dance off'],
   icon: '💃',
   blurb:
     'an arcade dance machine: arrows climb the screen and the dancer stamps the matching pad on the beat',

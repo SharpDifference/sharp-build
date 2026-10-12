@@ -4,6 +4,7 @@ const POOL: MiniGameDef = {
   id: 'pool',
   modId: 'morrowkiln-arcade-games',
   name: 'Pool',
+  calledAs: ['billiards', 'eight ball', '8 ball'],
   icon: '🎱',
   blurb:
     'eight-ball on a pool table: each player pots their seven balls, solids or stripes, and then the black eight',

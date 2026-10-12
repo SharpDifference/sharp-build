@@ -4,6 +4,7 @@ const POKER: MiniGameDef = {
   id: 'poker',
   modId: 'morrowkiln-card-games',
   name: 'Poker',
+  calledAs: ['hold em', 'cards', 'card game'],
   icon: '🃏',
   blurb:
     "Texas hold'em for play chips, heads-up or around a table: two cards each, five on the board, bet or fold, and the most chips at the end wins",
