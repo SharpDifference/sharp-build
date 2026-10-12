@@ -331,6 +331,10 @@ export async function readerSaysAtTable(
   await sayAtTable(charId, situation, `The reader says across the table: "${text}"`)
 }
 
+/** How often, and how long apart, a result is tried again while the scene is busy: a minute in all. */
+const FILE_TRIES = 120
+const FILE_WAIT_MS = 500
+
 /** Who a game was played with and for what, as far as filing its result goes. */
 export interface PlayedWith {
   game: MiniGameDef
@@ -350,9 +354,14 @@ export interface PlayedWith {
  * her reaction is the next thing written, and what the game has to say about how it went rides
  * with that one request.
  */
-export function fileResult(result: PlayResult, played: PlayedWith): void {
-  // The game's first move took the turn, and its narration has stood on the box since.
-  if (!reachTurn()) return
+export function fileResult(result: PlayResult, played: PlayedWith, tries = 0): void {
+  // The game's first move took the turn, and its narration has stood on the box since. Where the
+  // scene is busy with something of its own just now, the result waits for it rather than being
+  // lost: the model was promised it would be told how the game went.
+  if (!reachTurn()) {
+    if (tries < FILE_TRIES) setTimeout(() => fileResult(result, played, tries + 1), FILE_WAIT_MS)
+    return
+  }
 
   if (played.names.length > 0) {
     const who = listed(played.names)
