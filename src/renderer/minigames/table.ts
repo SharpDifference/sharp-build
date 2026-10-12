@@ -192,6 +192,14 @@ export function stepTable(): void {
   waiting?.()
 }
 
+/**
+ * A finished game at a table read at the reader's own pace: it stands until he moves on, whether
+ * or not anything is left on the box for him to read. Its ending is on the table itself.
+ */
+export function holdForReader(): void {
+  if (stepped) unread = true
+}
+
 /** Resolves once everything the table has said has been read past, at the reader's own pace. */
 export function tableRead(): Promise<void> {
   chain = chain.then(stepPast)

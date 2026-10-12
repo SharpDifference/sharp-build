@@ -39,6 +39,7 @@ import {
   compactTable,
   fileResult,
   nameOf,
+  holdForReader,
   moveAtTable,
   narrateAtTable,
   openTable,
@@ -378,6 +379,7 @@ export function MiniGamePanel({ theme, onClose }: ScenePanelProps): JSX.Element 
     // read at the reader's pace, once he has stepped past the last of it.
     if (seated?.game.stepped) {
       let live = true
+      holdForReader()
       void tableRead().then(() => {
         if (live) leave(result)
       })
