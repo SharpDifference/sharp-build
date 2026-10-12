@@ -6,7 +6,10 @@ import {
   callTold,
   callWins,
   herCall,
+  progressAccount,
+  reshuffled,
   soloSummary,
+  turnedCards,
   versusAccount,
   versusOver,
   versusSummary,
@@ -23,6 +26,9 @@ const NUMBER: Record<number, string> = { 2: 'Two', 3: 'Three', 4: 'Four', 5: 'Fi
 
 /** How many times in a game she says something about a call, by how talkative she is to be. */
 const REMARKS = { quiet: 0, some: 3, lots: 8 } as const
+
+/** The longest her next call waits on a remark of hers: the model may be slow, the game is not. */
+const REMARK_WAIT_MS = 3000
 
 /** How long she takes over a call: long enough for the reader's own to be read first. */
 const HER_PAUSE_MS = 1700
@@ -54,12 +60,16 @@ function CardFace({ card }: { card: Card }): JSX.Element {
  * is said in the scene's dialogue box; the table shows the cards and the count.
  */
 export function HighLow({ play }: { play: GamePlay }): JSX.Element {
-  // The deck is cut once; the top card is face up and the rest are turned from the front.
-  const [deck] = useState(() => freshDeck())
+  // The deck is cut once; the top card is face up and the rest are turned from the front. Only
+  // sudden death can run it out, and then the turned cards are shuffled in behind it.
+  const [deck, setDeck] = useState(() => freshDeck())
   const [made, setMade] = useState<Made[]>([])
   // She is saying something about the last call: her own next call waits for it.
   const [speaking, setSpeaking] = useState(false)
   const remarks = useRef(0)
+  // A remark has been asked for and has not come back: no other is asked for meanwhile.
+  const saying = useRef(false)
+  const opened = useRef(false)
   // Read at the reader's own pace: the card her call waits on him for, so it is asked for once.
   const awaited = useRef(-1)
   const mounted = useRef(true)
@@ -85,6 +95,9 @@ export function HighLow({ play }: { play: GamePlay }): JSX.Element {
 
   // Against her the game is on from the moment she sits down, and the deal is said.
   useEffect(() => {
+    // Said once, where the effect is run twice over.
+    if (opened.current) return
+    opened.current = true
     if (her) play.narrate(`${her.name} cuts the deck and turns the top card: ${rankWord(deck[0].rank)}. ${sudden ? 'Sudden death: a call each until one of you is ahead' : each === 1 ? 'One call each' : `${NUMBER[each] ?? each} calls each`}, yours first.`)
     // Once, as the table opens.
   }, [])
@@ -102,6 +115,12 @@ export function HighLow({ play }: { play: GamePlay }): JSX.Element {
     const all = [...made, { hers: byHer, call: called, right: callWins(shown, next, called) }]
     setMade(all)
     if (!isOver(all)) {
+      // Sudden death has outlasted the deck: the turned cards go round again.
+      if (all.length + 1 >= deck.length) {
+        setDeck(reshuffled(deck))
+        void play.narrate('The deck is out. The turned cards are shuffled and the game goes on.')
+      }
+      play.progress(progressAccount(her ? her.name : null, deck, all))
       remark(all)
       return
     }
@@ -126,7 +145,7 @@ export function HighLow({ play }: { play: GamePlay }): JSX.Element {
    * call, which the scene's own reply answers.
    */
   function remark(all: readonly Made[]): void {
-    if (!her || remarks.current >= REMARKS[play.chattiness]) return
+    if (!her || saying.current || remarks.current >= REMARKS[play.chattiness]) return
     const told = callTold(her.name, deck, all, all.length - 1)
     const lead = (calls: readonly Made[]): number =>
       Math.sign(
@@ -141,8 +160,19 @@ export function HighLow({ play }: { play: GamePlay }): JSX.Element {
     const cue = turned
       ? `${told.line} That puts ${lead(all) > 0 ? 'the reader' : her.name} ahead.`
       : told.line
+    saying.current = true
     setSpeaking(true)
-    void play.say(her.charId, cue).finally(() => setSpeaking(false))
+    // Her next call waits for her line, but not for long: a late one may land over the next call.
+    const said = Promise.resolve()
+      .then(() => play.say(her.charId, cue))
+      .catch(() => undefined)
+      .then(() => {
+        saying.current = false
+      })
+    const cap = new Promise<void>((resolve) => setTimeout(resolve, REMARK_WAIT_MS))
+    void Promise.race([said, cap]).then(() => {
+      if (mounted.current) setSpeaking(false)
+    })
   }
 
   // How the game stands, for anything said at the table.
@@ -169,14 +199,14 @@ export function HighLow({ play }: { play: GamePlay }): JSX.Element {
       // and her card is turned as it reaches the box.
       if (awaited.current === made.length) return
       awaited.current = made.length
-      const called = herCall(shown, deck.slice(0, made.length + 1), her.skill)
+      const called = herCall(shown, turnedCards(deck, made.length), her.skill)
       void play.narrate(callLine(her.name, called, shown, deck[made.length + 1])).then(() => {
         if (mounted.current) turn(called, true)
       })
       return
     }
     const timer = setTimeout(() => {
-      call(herCall(shown, deck.slice(0, made.length + 1), her.skill), true)
+      call(herCall(shown, turnedCards(deck, made.length), her.skill), true)
     }, HER_PAUSE_MS)
     return () => clearTimeout(timer)
     // Her turn comes round once per card turned, which the count alone says.

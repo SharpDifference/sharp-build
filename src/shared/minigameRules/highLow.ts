@@ -1,4 +1,4 @@
-import { rankWord, type Card, type SkillLevel } from '../minigameKit'
+import { rankWord, shuffle, type Card, type SkillLevel } from '../minigameKit'
 
 /** High-Low's rules: the deck, a call, and whether the next card made it good. */
 
@@ -20,6 +20,25 @@ export function callLine(who: string, call: Call, shown: Card, next: Card): stri
       ? `${rankWord(next.rank)} again: a miss`
       : `${rankWord(next.rank)}: ${callWins(shown, next, call) ? 'right' : 'a miss'}`
   return `${who} ${verb} ${call}. ${came.charAt(0).toUpperCase()}${came.slice(1)}.`
+}
+
+/** How many cards a pack turns before it is out: all of a deck but the one left showing. */
+const PACK_TURNS = 51
+
+/**
+ * The cards as dealt once the deck has run out, which only sudden death can come to: every card
+ * turned but the one showing is shuffled into a new pack and dealt on after it.
+ */
+export function reshuffled(deck: readonly Card[], rand: () => number = Math.random): Card[] {
+  return [...deck, ...shuffle(deck.slice(-(PACK_TURNS + 1), -1), rand)]
+}
+
+/**
+ * The cards out of the pack with card `i` showing, that card among them: every card turned so
+ * far, or since the turned cards were last shuffled back in.
+ */
+export function turnedCards(deck: readonly Card[], i: number): Card[] {
+  return deck.slice(Math.floor(i / PACK_TURNS) * PACK_TURNS, i + 1)
 }
 
 /** How a girl plays, from 1 (on hunches) to 5 (counts every card). */
@@ -97,7 +116,7 @@ export interface CallTold {
 /**
  * Call `i` of a game, judged: who called what on which card and what came, and whether it was a
  * call that could not win, a bad one, a long shot that came in, a safe one that failed, or the
- * same card turning up twice. `deck` is the deck as it was dealt.
+ * same rank turning up twice. `deck` is the deck as it was dealt.
  */
 export function callTold(
   name: string,
@@ -108,14 +127,14 @@ export function callTold(
   const made = calls[i]
   const shown = deck[i]
   const next = deck[i + 1]
-  const { call: favoured, edge } = oddsCall(shown, deck.slice(0, i + 1))
+  const { call: favoured, edge } = oddsCall(shown, turnedCards(deck, i))
   const hopeless =
     (made.call === 'lower' && shown.rank === 2) || (made.call === 'higher' && shown.rank === 14)
   const poor = made.call !== favoured && edge >= 0.3
   const note = hopeless
     ? `, a call that could not win: nothing is ${made.call} than ${rankWord(shown.rank)}`
     : next.rank === shown.rank
-      ? ', the same card again'
+      ? ', the same rank again'
       : poor && made.right
         ? ', a long shot that came in'
         : poor
@@ -163,6 +182,9 @@ export function versusAccount(
         ]
       : []),
     `Each called ${each === 1 ? 'once' : `${each} times`}, in turn, on whether the next card would be higher or lower. Twos are low and aces high; the same rank again is a miss.`,
+    ...(calls.length > PACK_TURNS
+      ? ['The deck ran out along the way: the turned cards were shuffled into a new one.']
+      : []),
     ...lines,
     played('The reader', against.reader),
     played(name, against.her),
@@ -171,20 +193,37 @@ export function versusAccount(
 }
 
 /**
+ * How a game stands part-way, for the scene's writer should the reader walk away from it: the
+ * calls made so far, each judged as the account judges them, and the count. `her` is her name,
+ * or null for a game played alone.
+ */
+export function progressAccount(
+  her: string | null,
+  deck: readonly Card[],
+  calls: readonly CallMade[]
+): string[] {
+  const count = (side: boolean): number =>
+    calls.filter((made) => made.hers === side && made.right).length
+  if (her === null) {
+    return [
+      `The reader had made ${calls.length} call${calls.length === 1 ? '' : 's'} and got ${count(false)} right.`
+    ]
+  }
+  return [
+    ...calls.map((_, i) => callTold(her, deck, calls, i).line),
+    `Count so far: the reader ${count(false)}, ${her} ${count(true)}.`
+  ]
+}
+
+/**
  * Whether a game against her is over after `made` calls. A normal game ends when both have made
  * `each` calls. Sudden death ends the first time the counts differ with both having called the
- * same number of times, or when the deck has no card left for another pair of calls.
+ * same number of times, and not before: a deck that runs out is {@link reshuffled}.
  */
-export function versusOver(
-  made: readonly CallMade[],
-  each: number,
-  sudden: boolean,
-  deckSize = 52
-): boolean {
+export function versusOver(made: readonly CallMade[], each: number, sudden: boolean): boolean {
   if (!sudden) return made.length >= each * 2
   if (made.length === 0 || made.length % 2 === 1) return false
   const count = (side: boolean): number =>
     made.filter((call) => call.hers === side && call.right).length
-  // Every call turns one card, and the first card is already up.
-  return count(false) !== count(true) || made.length + 2 > deckSize - 1
+  return count(false) !== count(true)
 }

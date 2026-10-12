@@ -8,7 +8,7 @@ const HIGH_LOW: MiniGameDef = {
   blurb:
     'a quick card game: a card is turned face up and the player calls whether the next is higher or lower',
   format:
-    'One deck. A card is face up; the player whose turn it is calls whether the next card will be higher or lower, the card is turned, and a right call scores. The two take turns, the reader first, each making the same number of calls, and the better count wins; level counts are a draw. In sudden death they keep going a call each at a time until one is ahead after equal turns, so there is always a winner. Twos are low, aces high, and the same rank again is a miss.',
+    'One deck. A card is face up; the player whose turn it is calls whether the next card will be higher or lower, the card is turned, and a right call scores. The two take turns, the reader first, each making the same number of calls, and the better count wins; level counts are a draw. In sudden death they keep going a call each at a time until one is ahead after equal turns, so there is always a winner; should the deck run out, the turned cards are shuffled into a new one and the game goes on. Twos are low, aces high, and the same rank again is a miss.',
   options: [
     {
       id: 'calls',
