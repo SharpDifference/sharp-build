@@ -1,11 +1,11 @@
-# Feed Comments
+# Bunnyfeeds
 
 Comment on your contacts' posts, and they answer you. Works on its own; with Photo Feature on too,
 it takes over Photo Feature's post comments and photo posts get the same threads.
 
 ## Playing
 
-- Turn on **Feed Comments** in Mods. Photo Feature can be on or off, and either can be switched
+- Turn on **Bunnyfeeds** in Mods. Photo Feature can be on or off, and either can be switched
   at any time: threads carry on whichever is on.
 - In the feed a post shows one comment (yours if you left one, otherwise the newest), its reply
   count, **View all N comments**, and a speech-bubble pill with the count beside the heart.
@@ -60,7 +60,7 @@ it takes over Photo Feature's post comments and photo posts get the same threads
 - If you talk about one of her posts or your comment on it in her DMs, the end-of-slot texting
   memory can file it as something said over text ("…cute over text"), beside the right
   "…, on the feed" memory. The texting bookkeeping reads only the messages and has no hook a
-  mod can add a line to. A `requests['text-ledger']` hook in core would let Feed Comments tell
+  mod can add a line to. A `requests['text-ledger']` hook in core would let Bunnyfeeds tell
   it that comments happen on the feed.
 
 ## For modders
@@ -69,9 +69,9 @@ it takes over Photo Feature's post comments and photo posts get the same threads
 
 | File | What it is |
 | --- | --- |
-| `src/shared/modEntries/feed-comments.ts` | The entry: anytime, off by default, no requirements. |
+| `src/shared/modEntries/bunnyfeeds.ts` | The entry: anytime, off by default, no requirements. |
 | `src/shared/feedComments.ts` | The optional fields it adds to comments, posts and her record, and `threadWork`, what a thread still owes. |
-| `src/renderer/modEntries/feed-comments.ts` | Registers the comment hand-off and the hooks. |
+| `src/renderer/modEntries/bunnyfeeds.ts` | Registers the comment hand-off and the hooks. |
 | `src/renderer/prompts/feedCommentsPrompt.ts` | The slot opening's reply lines, the replier block and the thread call's prompt. |
 | `src/renderer/stores/feedComments.ts` | Who may reply under a post, and how the slot opening's replies are filed. |
 | `src/renderer/stores/feedThreads.ts` | The thread call: what is owed, sending on phone close, filing the answers. |
@@ -86,7 +86,7 @@ it takes over Photo Feature's post comments and photo posts get the same threads
   the hand-off instead, so replies are never asked for twice.
 
 - **Photo Feature's comment hand-off** (`stores/commentHandoff.ts`, Photo Feature 1.3.0): while
-  Feed Comments is on, the slot opening asks for replies in its words and its schema (each reply
+  Bunnyfeeds is on, the slot opening asks for replies in its words and its schema (each reply
   names who wrote it), a filed post's replies are dressed by it with the picture's tier already
   known, `PostComments` draws its preview, and `CommentAction` puts its comment pill beside the like.
 - `requests['slot-intro']` adds the replier block. `prompts.dm` and `prompts.scene` add her two
@@ -104,5 +104,5 @@ of his comments is one of her ordinary memories, ending ", on the feed", which i
 one finds and replaces it.
 
 Comments keep Photo Feature's `comments` field. A comment written by Photo Feature alone reads as
-a stranger's. While Feed Comments is off, Photo Feature's own view leaves out the comments only
-Feed Comments writes (yours, roster girls', replies); they stay saved and come back with it.
+a stranger's. While Bunnyfeeds is off, Photo Feature's own view leaves out the comments only
+Bunnyfeeds writes (yours, roster girls', replies); they stay saved and come back with it.
