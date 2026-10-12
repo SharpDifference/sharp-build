@@ -194,9 +194,17 @@
   font: 400 30px var(--font-display);
 }
 
-.vu-hoopshot[data-paused] .vu-hoopshot-view,
 .vu-hoopshot[data-phase='over'] .vu-hoopshot-view {
   opacity: 0.5;
+}
+
+/* Away: the cabinet is covered, so nothing can be read off a hoop or a meter standing still. */
+.vu-hoopshot[data-paused] .vu-hoopshot-view,
+.vu-hoopshot[data-paused] .vu-hoopshot-call,
+.vu-hoopshot[data-paused] .vu-hoopshot-three,
+.vu-hoopshot[data-paused] .vu-hoopshot-band,
+.vu-hoopshot[data-paused] .vu-hoopshot-marker {
+  visibility: hidden;
 }
 
 /* The power meter: a recessed rail, the band a ball finds the rim in, the stretch of it that

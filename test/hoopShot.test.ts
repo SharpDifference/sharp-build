@@ -63,21 +63,21 @@ function bell(rand: () => number): number {
  * the meter's next crossing of the band's middle, one time in four the crossing after, out by
  * about 60 ms either way, and by a third more once the band is moving under him.
  */
-function readerRound(lengthMs: number, rand: () => number, errorMs = 60): Shooter {
+function readerRound(lengthMs: number, rand: () => number, errorMs = 60, waitMs = 120, skips = 0.25, slip = 1.35): Shooter {
   let shooter = freshShooter()
   let ready = 0
   for (;;) {
-    let at = ready + 120
+    let at = ready + waitMs
     const side = (t: number): number => Math.sign(meterAt(t) - zoneAt(t, lengthMs))
     const before = side(at)
     while (at < lengthMs && side(at) === before) at += 4
     // Now and then he is not set for it, and lets a crossing go by.
-    if (rand() < 0.25) {
-      ready = at + 60 - 120
+    if (rand() < skips) {
+      ready = at + 60 - waitMs
       continue
     }
     const moving = at >= movingFrom(lengthMs)
-    const release = at + bell(rand) * errorMs * (moving ? 1.35 : 1)
+    const release = at + bell(rand) * errorMs * (moving ? slip : 1)
     if (release >= lengthMs) return shooter
     shooter = counted(shooter, judgeShot(meterAt(release), zoneAt(release, lengthMs), rand), release >= movingFrom(lengthMs))
     ready = release + RELOAD_MS
@@ -239,6 +239,34 @@ describe('Hoop Shot, how she shoots', () => {
       expect(share[3]).toBeLessThan(0.42)
       expect(share[4]).toBeLessThan(0.25)
     }
+  })
+
+  // The test above flatters her: its reader waits 120 ms on every ball and lets a quarter of the
+  // crossings go by. This one does neither. It records how the game stands today, not how it
+  // should: the balance is the owner's to decide after playing, and whoever changes how she
+  // shoots or how fast a ball comes back has to change these numbers on purpose.
+  it('a reader who shoots every crossing currently out-scores every girl', () => {
+    const length = roundMs(1)
+    const games = 3000
+    const rand = seeded(424242)
+    let mine = 0
+    for (let i = 0; i < games; i++) mine += readerRound(length, rand, 50, 0, 0, 1).score
+    const reader = mine / games
+    const hers = SKILLS.map((skill) => {
+      const draw = seeded(8100 + skill)
+      let sum = 0
+      for (let i = 0; i < games; i++) sum += herRound(length, skill, draw).score
+      return sum / games
+    })
+    if (process.env.HOOP_REPORT) console.log(`every crossing, 50 ms out: reader ${reader.toFixed(1)} v ${hers.map((score) => score.toFixed(1)).join(', ')}`)
+    for (const score of hers) expect(reader).toBeGreaterThan(score)
+    // Today's means over a 30-second round, to within a point or two: he is 50 ms out on every
+    // ball, the hoop sliding or not, and averages about 62 against about 55 for a girl of skill 5.
+    expect(reader).toBeGreaterThan(59.5)
+    expect(reader).toBeLessThan(64)
+    expect(hers[4]).toBeGreaterThan(53)
+    expect(hers[4]).toBeLessThan(56.5)
+    expect(reader - hers[4]).toBeGreaterThan(4)
   })
 })
 

@@ -61,6 +61,13 @@ const LAST_MS = 6000
 const CLOSE_BY = 4
 /** The most one frame may move the clock on, in ms: a stalled frame is not played through. */
 const FRAME_CAP_MS = 50
+/** Back from away: how long the count before the clock runs again, and each number of it. */
+const RESUME_MS = 1800
+const RESUME_BEAT_MS = 600
+/** A press this soon after the window is back is the one that brought it back, or its echo. */
+const BACK_MS = 300
+/** How often the scene is told how the round stands, should he walk away from it. */
+const PROGRESS_MS = 10000
 
 /** The reader's cabinet as it is drawn: HoopShot.css sizes the same box. */
 const VIEW = { width: 400, height: 250 }
@@ -103,6 +110,16 @@ interface Live {
   spoken: number[]
   count: number | null
   left: number
+  /** He has been away since the clock last ran: the loop owes him a count back in. */
+  wasGone: boolean
+  /** `performance.now()` when the window was last seen back. */
+  backAt: number
+  /** Ms of the count back in still to run, or 0 where there is none. */
+  resume: number
+  /** The clock's reading the meter last set off from: it restarts from its low end after a stop. */
+  meterFrom: number
+  /** The last ten seconds of the round the scene was told of, or -1 before any. */
+  told: number
 }
 
 /** Where the ball is drawn `since` ms after it was thrown, with the hoop's middle at `hoopX`. */
@@ -162,10 +179,11 @@ export function HoopShot({ play }: { play: GamePlay }): JSX.Element {
   const [sliding, setSliding] = useState(false)
   // How many presses found no ball to throw: what the hint's nudge is keyed on.
   const [early, setEarly] = useState(0)
+  // The count back in after the window was away, or null where none is running.
+  const [resuming, setResuming] = useState<number | null>(null)
 
   const away = useAway()
   const gone = useRef(away)
-  gone.current = away
   const still = useReducedMotion()
   const calm = useRef(still)
   calm.current = still
@@ -190,8 +208,18 @@ export function HoopShot({ play }: { play: GamePlay }): JSX.Element {
     speaking: false,
     spoken: girls.map(() => 0),
     count: null,
-    left: lengthMs / 1000
+    left: lengthMs / 1000,
+    wasGone: false,
+    backAt: 0,
+    resume: 0,
+    meterFrom: 0,
+    told: -1
   })
+  if (away) live.current.wasGone = true
+  else if (gone.current) live.current.backAt = performance.now()
+  gone.current = away
+  // A Space or Enter on the button was acted on as it went down: the click it ends in is not another.
+  const keyed = useRef(false)
 
   // What the frame loop writes to, between renders.
   const marker = useRef<HTMLSpanElement>(null)
@@ -263,6 +291,40 @@ export function HoopShot({ play }: { play: GamePlay }): JSX.Element {
     }
   }
 
+  /**
+   * What the scene is to know should he walk away now: the scores and the time left, and the
+   * scores as the hoops started to slide once they have.
+   */
+  function tellProgress(): void {
+    const game = live.current
+    const everyone = ['the reader', ...names]
+    const scores = game.shooters.map((shooter) => shooter.score)
+    const secondsLeft = Math.max(0, Math.ceil((lengthMs - Math.max(0, game.at)) / 1000))
+    const lines: string[] = []
+    if (game.at <= 0) {
+      lines.push(
+        girls.length
+          ? `A ${lengthMs / 1000}-second round of Hoop Shot between ${listed(everyone)} had only just started, with no ball thrown yet.`
+          : `A ${lengthMs / 1000}-second round of Hoop Shot alone had only just started, with no ball thrown yet.`
+      )
+    } else {
+      lines.push(
+        girls.length
+          ? `In a ${lengthMs / 1000}-second round of Hoop Shot, with ${secondsLeft} seconds left on the clock, the score was ${listed(everyone.map((who, seat) => `${who} ${scores[seat]}`))}.`
+          : `In a ${lengthMs / 1000}-second round of Hoop Shot alone, the reader had ${scores[0]} points with ${secondsLeft} seconds left on the clock.`
+      )
+    }
+    const mark = game.mark
+    if (mark) {
+      lines.push(
+        girls.length
+          ? `As the hoops started to slide for the last third, the score was ${listed(everyone.map((who, seat) => `${who} ${mark[seat] ?? 0}`))}.`
+          : `The reader had ${mark[0]} points as the hoop started to slide for the last third.`
+      )
+    }
+    held.current.progress(lines)
+  }
+
   /** The first move: the count-in starts, and from here leaving is walking away. */
   function begin(): void {
     const game = live.current
@@ -272,13 +334,18 @@ export function HoopShot({ play }: { play: GamePlay }): JSX.Element {
     held.current.started()
     void held.current.narrate(startLine(names, lengthMs))
     standing()
+    tellProgress()
     setPhase('playing')
   }
 
   /** The reader lets the ball go, if he has one: the meter is read as it stands this instant. */
   function shoot(): void {
     const game = live.current
-    if (!game.running || game.over || gone.current) return
+    if (!game.running || game.over) return
+    // Away, or only just back: the press that brings the window back is not a shot, nor is one
+    // made before the count back in is done. Nothing is read off a meter that stood still.
+    if (gone.current || document.hidden || !document.hasFocus()) return
+    if (game.wasGone || game.resume > 0 || performance.now() - game.backAt < BACK_MS) return
     // The clock as it is now, not as the last frame left it.
     const at = game.at + Math.min(FRAME_CAP_MS, Math.max(0, performance.now() - game.frameAt))
     if (at < 0 || at >= lengthMs) return
@@ -287,7 +354,7 @@ export function HoopShot({ play }: { play: GamePlay }): JSX.Element {
       setEarly((presses) => presses + 1)
       return
     }
-    const power = meterAt(at)
+    const power = meterAt(at - game.meterFrom)
     const zone = zoneAt(at, lengthMs)
     game.thrown = {
       at,
@@ -351,6 +418,31 @@ export function HoopShot({ play }: { play: GamePlay }): JSX.Element {
       game.frameAt = now
       // Away: the clock stands, and so does everything read off it.
       if (gone.current) {
+        game.wasGone = true
+        frame = requestAnimationFrame(loop)
+        return
+      }
+      // Back: the count-in starts over, or a short count runs before the clock does. Either way
+      // the meter sets off again from its low end, so nothing seen before the stop is of use.
+      if (game.wasGone) {
+        game.wasGone = false
+        if (game.at < 0) {
+          game.at = -COUNT_IN_MS
+          game.meterFrom = game.at
+        } else {
+          game.resume = RESUME_MS
+          if (marker.current) marker.current.style.left = '0%'
+        }
+      }
+      if (game.resume > 0) {
+        game.resume -= passed
+        if (game.resume > 0) {
+          setResuming(Math.ceil(game.resume / RESUME_BEAT_MS))
+        } else {
+          game.resume = 0
+          game.meterFrom = game.at
+          setResuming(null)
+        }
         frame = requestAnimationFrame(loop)
         return
       }
@@ -359,7 +451,7 @@ export function HoopShot({ play }: { play: GamePlay }): JSX.Element {
 
       // The meter, the band on it, and the hoop the band follows.
       const slid = hoopAt(at, lengthMs)
-      if (marker.current) marker.current.style.left = `${(meterAt(at) * 100).toFixed(2)}%`
+      if (marker.current) marker.current.style.left = `${(meterAt(at - game.meterFrom) * 100).toFixed(2)}%`
       if (band.current) band.current.style.left = `${((zoneAt(at, lengthMs) - RIM) * 100).toFixed(2)}%`
       hoop.current?.setAttribute('transform', `translate(${(slid * HOOP.slide).toFixed(1)} 0)`)
 
@@ -410,11 +502,12 @@ export function HoopShot({ play }: { play: GamePlay }): JSX.Element {
         setSliding(true)
         void held.current.narrate(movingLine(names, game.shooters))
         standing()
-        held.current.progress(
-          girls.length
-            ? [`In a round of Hoop Shot, as the hoops started to slide for the last third, the score was ${listed(['the reader', ...names].map((who, seat) => `${who} ${game.mark?.[seat] ?? 0}`))}.`]
-            : [`In a round of Hoop Shot alone, the reader had ${game.mark[0]} points as the hoop started to slide for the last third.`]
-        )
+        tellProgress()
+      }
+      const tenth = at < 0 ? -1 : Math.floor(at / PROGRESS_MS)
+      if (tenth > game.told && at < lengthMs) {
+        game.told = tenth
+        tellProgress()
       }
       if (!game.lastTold && at >= lengthMs - LAST_MS) {
         game.lastTold = true
@@ -446,9 +539,9 @@ export function HoopShot({ play }: { play: GamePlay }): JSX.Element {
   const mine = shooters[0]
   const scores = shooters.map((shooter) => shooter.score)
   const ahead = scores.some((score) => score > 0) ? leadersOf(scores) : []
-  const canShoot = playing && count === null && !away
+  const canShoot = playing && count === null && resuming === null && !away
   const dead = over || (playing && !canShoot)
-  const label = !playing ? (over ? 'Buzzer' : 'Start') : count !== null ? 'Get ready' : 'Shoot'
+  const label = !playing ? (over ? 'Buzzer' : 'Start') : count !== null || resuming !== null ? 'Get ready' : 'Shoot'
   const clock = `0:${String(left).padStart(2, '0')}`.replace('0:60', '1:00')
 
   return (
@@ -527,10 +620,25 @@ export function HoopShot({ play }: { play: GamePlay }): JSX.Element {
               {count}
             </motion.span>
           )}
+          {playing && resuming !== null && !away && (
+            <motion.span
+              key={`back-${resuming}`}
+              className="vu-hoopshot-count"
+              role="status"
+              initial={{ opacity: 0.3, scale: 1.5 }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{ duration: 0.25, ease: 'easeOut' }}
+            >
+              {resuming}
+            </motion.span>
+          )}
           {playing && away && (
             <div className="vu-hoopshot-card" role="status">
               <p className="vu-hoopshot-paused">Paused</p>
-              <p className="vu-hoopshot-how">The clock waits while the window is away.</p>
+              <p className="vu-hoopshot-how">
+                The clock waits while the window is away. Back, it counts you in and the meter starts
+                over.
+              </p>
             </div>
           )}
         </div>
@@ -581,12 +689,27 @@ export function HoopShot({ play }: { play: GamePlay }): JSX.Element {
               onPointerDown={(event) => {
                 if (event.button === 0) act()
               }}
-              // A click with no pointer behind it is the keyboard's, on a button under focus.
-              onClick={(event) => {
-                if (event.detail === 0) act()
-              }}
+              // Space or Enter on a button under focus is the shot as the key goes down, not as
+              // it comes up; the window's own key handler leaves a button's keys to it.
               onKeyDown={(event) => {
-                if (event.repeat) event.preventDefault()
+                if (event.code !== 'Space' && event.code !== 'Enter' && event.code !== 'NumpadEnter') return
+                if (event.ctrlKey || event.metaKey || event.altKey) return
+                event.preventDefault()
+                if (event.repeat) return
+                keyed.current = true
+                act()
+              }}
+              onKeyUp={(event) => {
+                if (!keyed.current) return
+                // The click a key ends in comes with the key-up: it is let go by, then forgotten.
+                event.preventDefault()
+                setTimeout(() => {
+                  keyed.current = false
+                }, 0)
+              }}
+              // A click with neither pointer nor key behind it is an assistive press.
+              onClick={(event) => {
+                if (event.detail === 0 && !keyed.current) act()
               }}
             >
               {label}
