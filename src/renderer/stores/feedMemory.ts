@@ -1,6 +1,9 @@
-import type { HeldFeedMemory } from '@shared/feedComments'
-import type { CharMemory } from '@shared/types'
-import { useGameStore } from './gameStore'
+import { BUNNYFEEDS, type HeldFeedMemory } from '@shared/feedComments'
+import { memoryStatusLine } from '@shared/relationship'
+import type { CharMemory, SceneLine } from '@shared/types'
+import { TEXT_LEDGER_FEED_LINES } from '../prompts/feedCommentsPrompt'
+import { UNKNOWN_NAME, useGameStore } from './gameStore'
+import { modIsOn } from './modsStore'
 
 /** How a memory from the feed says where it happened, and how the last one is found again. */
 const FEED_MEMORY_TAG = ', on the feed'
@@ -61,4 +64,44 @@ export function fileDueFeedMemories(through: number): void {
   }
   const { date } = useGameStore.getState()
   for (const { charId, type, desc } of due) fileFeedMemory(charId, { date, type, desc })
+}
+
+/** Every memory held for global slot `through` or before, not yet filed. */
+function dueFeedMemories(through: number): HeldFeedMemory[] {
+  const game = useGameStore.getState()
+  return game.chars.flatMap((charId) =>
+    (game.charInfo[charId]?.feed ?? []).flatMap((post) =>
+      (post.heldMemories ?? []).filter((one) => one.at <= through)
+    )
+  )
+}
+
+/**
+ * The closing's lines for the feed memories the slot after this one files, in the words the
+ * closing gives every other memory; none while Bunnyfeeds is off.
+ */
+export function feedStatusLines(through: number): SceneLine[] {
+  if (!modIsOn(BUNNYFEEDS)) return []
+  const game = useGameStore.getState()
+  return dueFeedMemories(through).map(({ charId, type, desc }) => {
+    const character = game.characters[charId]
+    const name =
+      character && game.charInfo[charId]?.nameKnown ? character.firstName : UNKNOWN_NAME
+    return memoryStatusLine(name, { type, desc: `${desc}${FEED_MEMORY_TAG}` })
+  })
+}
+
+/**
+ * What the texting bookkeeping is told while Bunnyfeeds is on and a girl he texted has his
+ * comments under her posts: the feed is not the texts.
+ */
+export function textLedgerFeedLines(charKeys: readonly string[]): string[] {
+  if (!modIsOn(BUNNYFEEDS)) return []
+  const { charKeyToId, charInfo } = useGameStore.getState()
+  const commented = charKeys.some((key) =>
+    (charInfo[charKeyToId[key] ?? '']?.feed ?? []).some((post) =>
+      (post.comments ?? []).some((one) => one.player)
+    )
+  )
+  return commented ? [...TEXT_LEDGER_FEED_LINES, ''] : []
 }

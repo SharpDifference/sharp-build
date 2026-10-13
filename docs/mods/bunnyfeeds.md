@@ -30,8 +30,8 @@ it takes over Photo Feature's post comments and photo posts get the same threads
 - Strangers' posts, and the slot's random student post, take no comments.
 - She keeps one memory of your comments among her own, arriving with her answers, the newest replacing the last, as her
   texting memory does. It shows in her Memories ("…, on the feed"), can be edited there, counts
-  in her affection like any memory, and every scene, text and slot opening can bring it up. It
-  does not appear in the scene-end status lines.
+  in her affection like any memory, and every scene, text and slot opening can bring it up. The
+  closing before her answers show announces it, as it does any memory.
 - A roster girl who has met you and answers you under somebody else's post keeps the same kind of
   memory, saying whose post it was under, so she can bring it up in her own texts and scenes.
   It comes out of the same call and replaces her last feed memory, whether she posted or commented.
@@ -54,14 +54,6 @@ it takes over Photo Feature's post comments and photo posts get the same threads
   is still unanswered.
 - Off, no call is made, and posts go back to Photo Feature's plain stranger comments, or none if
   Photo Feature is off too.
-
-## Known issues
-
-- If you talk about one of her posts or your comment on it in her DMs, the end-of-slot texting
-  memory can file it as something said over text ("…cute over text"), beside the right
-  "…, on the feed" memory. The texting bookkeeping reads only the messages and has no hook a
-  mod can add a line to. A `requests['text-ledger']` hook in core would let Bunnyfeeds tell
-  it that comments happen on the feed.
 
 ## For modders
 
@@ -89,6 +81,10 @@ it takes over Photo Feature's post comments and photo posts get the same threads
   Bunnyfeeds is on, the slot opening asks for replies in its words and its schema (each reply
   names who wrote it), a filed post's replies are dressed by it with the picture's tier already
   known, `PostComments` draws its preview, and `CommentAction` puts its comment pill beside the like.
+- Two direct edits, where no hook exists: `textLedgerPrompt.ts` adds `textLedgerFeedLines`, telling
+  the end-of-slot texting bookkeeping that comments under her posts are the feed's, so talk about a
+  post in her DMs is not filed as something said over text; `gameLoop.ts` adds `feedStatusLines` to
+  the closing's memories. Both do nothing while the mod is off.
 - `requests['slot-intro']` adds the replier block. `prompts.dm` and `prompts.scene` add her two
   newest posts with his comments and her answers. `slotSettled` sends whatever is still owed. `gameEntered` drops a visit not yet sent.
 - The thread call is not blocked by a save: a save taken while it is out simply leaves those
