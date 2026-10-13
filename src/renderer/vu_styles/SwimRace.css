@@ -185,6 +185,12 @@
   text-overflow: ellipsis;
 }
 
+/* With one or two lanes the water is shorter than what is said over it before the start: it
+   stands tall enough for the whole card until the marks are taken. */
+.vu-swimrace-water:has(.vu-swimrace-over) {
+  min-height: 220px;
+}
+
 /* Over the water before the start and while the window is away. */
 .vu-swimrace-over {
   position: absolute;
