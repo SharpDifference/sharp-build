@@ -39,6 +39,8 @@ export interface HeldFeedMemory {
   at: number
   type: MemoryType
   desc: string
+  /** The girl whose post it happened under; her own when it is the poster's memory. */
+  posterId?: string
 }
 
 /**

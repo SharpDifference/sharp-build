@@ -29,11 +29,11 @@ it takes over Photo Feature's post comments and photo posts get the same threads
   Reply is hidden. Reading stays open.
 - Strangers' posts, and the slot's random student post, take no comments.
 - She keeps one memory of your comments among her own, arriving with her answers, the newest replacing the last, as her
-  texting memory does. It shows in her Memories ("…, on the feed"), can be edited there, counts
+  texting memory does. It shows in her Memories ("…, on her post"), can be edited there, counts
   in her affection like any memory, and every scene, text and slot opening can bring it up. The
   closing before her answers show announces it, as it does any memory.
 - A roster girl who has met you and answers you under somebody else's post keeps the same kind of
-  memory, saying whose post it was under, so she can bring it up in her own texts and scenes.
+  memory ending "…, under <name>'s post", so she can bring it up in her own texts and scenes.
   It comes out of the same call and replaces her last feed memory, whether she posted or commented.
 - In her texts and in scenes with her, she sees her two newest posts, with what you commented
   under them and what she answered, so she knows what she posted and what you said there.
@@ -96,7 +96,7 @@ All optional, so a save without the mod loads as before, and switching it off ke
 `charId`, `player`, `replyTo` and `tags` on a comment; `threadedThrough` and `heldMemories` on a post.
 A memory the thread call writes waits in `heldMemories` until the slot its answers show, and is
 filed into her memories as the slot before it settles, so it arrives with the answers. What she made
-of his comments is one of her ordinary memories, ending ", on the feed", which is how the next
+of his comments is one of her ordinary memories, ending ", on her post" or ", under <name>'s post", which is how the next
 one finds and replaces it.
 
 Comments keep Photo Feature's `comments` field. A comment written by Photo Feature alone reads as

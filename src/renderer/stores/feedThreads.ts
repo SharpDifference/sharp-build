@@ -253,6 +253,8 @@ function fileReplies(
   const filed = new Map<string, PostComment[]>()
   // Girls who know him, other than the poster, who answered him here; each keeps a memory too.
   const answeredHim = new Set<string>()
+  // Whose post each girl's memory happened under: the first post she was owed or answered on.
+  const posterOf = new Map<string, string>()
   const capLeft = new Map<string, number>(owed.map(({ post, work }) => [post.id, work.othersLeft]))
   const owedIds = new Set(
     owed.flatMap(({ work }) => [...work.player, ...work.others].map((one) => one.id))
@@ -303,6 +305,7 @@ function fileReplies(
     const known = fromId ? game.charInfo[fromId] : undefined
     if (fromId && fromId !== posterId && known && (known.nameKnown || known.memories.length > 0)) {
       answeredHim.add(fromId)
+      if (!posterOf.has(fromId)) posterOf.set(fromId, posterId)
     }
   }
 
@@ -312,6 +315,9 @@ function fileReplies(
     patchPost(charId, post.id, (one) => ({ ...one, threadedThrough: now }))
   }
 
+  for (const { charId, work } of owed) {
+    if (work.player.length > 0) posterOf.set(charId, charId)
+  }
   const commentedOn = new Set([
     ...owed.filter(({ work }) => work.player.length > 0).map((o) => o.charId),
     ...answeredHim
@@ -325,7 +331,8 @@ function fileReplies(
     if (!charId || !commentedOn.has(charId) || !type || !desc) continue
     // One a call: a girl met under two posts keeps what the first of them left her.
     commentedOn.delete(charId)
-    held.push({ charId, at: shownAt, type, desc })
+    const posterId = posterOf.get(charId)
+    held.push({ charId, at: shownAt, type, desc, ...(posterId ? { posterId } : {}) })
     remembered.push(game.characters[charId]?.firstName ?? charId)
   }
 
