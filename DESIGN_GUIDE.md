@@ -67,8 +67,6 @@
 
 **Sound.** Every sound is levelled in one mix file and nowhere else. The player's whole control over it is one slider per group; the first run's "No NSFW sound" box is no setting of its own, only the NSFW slider put at 0. The interface's own sounds fire from where the interface is, never from the loop. Nothing is ever said by sound alone. A text rings only while the phone is on screen; what lands under the curtain or during a slot's opening is rung for once by the landing, a landing reached by loading a save rings once for whatever is unread, and the boundary's own texts (a raise, BunnyMap's handover) land under the curtain.
 
-**Incoming Texts.** When enabled, the player may direct a character to initiate a text without sending a reader message. Directions enter the model request separately from the conversation and are not stored as message data; the summary prompt excludes them. An incoming turn cannot consent to a hangout or settle a standing invitation. It uses the ordinary texting availability, delivery, retry and mod hooks. Disabling the mod prevents new incoming requests and retains received texts; a turn already started can finish or be retried.
-
 ## 3. Repo map
 
 ```
