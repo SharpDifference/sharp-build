@@ -100,6 +100,8 @@ export interface ThreadLine {
 
 /** One post with something to answer, and everything its answers need. */
 export interface FeedThread {
+  /** The ref a new comment on the post itself answers. */
+  postRef: string
   character: Character
   info: CharInfo
   charKey: string
@@ -250,7 +252,7 @@ function threadLines(thread: FeedThread): string[] {
       `${other.firstName} ("${key}", ${friend ? 'her friend' : 'barely knows her'})`
   )
   return [
-    `POST by ${fullNameOf(character)} ("${charKey}"), ${when}: ${post.text}`,
+    `POST ${thread.postRef} by ${fullNameOf(character)} ("${charKey}"), ${when}: ${post.text}`,
     ...(post.picture ? [`Her picture: ${post.picture}`] : []),
     ...thread.lines.map(
       (line) =>
@@ -270,8 +272,8 @@ function threadLines(thread: FeedThread): string[] {
     ...(thread.mustAnswer.length > 0
       ? [
           repliers.length > 0
-            ? `Besides her, ${repliers.join(', ')} and strangers may react to the reader's comments here.`
-            : 'Besides her, strangers may react to the reader\'s comments here.'
+            ? `Besides her, ${repliers.join(', ')} and strangers may react here: to the reader, to each other, to her, or to the post itself as ${thread.postRef}.`
+            : `Besides her, strangers may react here: to the reader, to each other, to her, or to the post itself as ${thread.postRef}.`
         ]
       : [])
   ]
@@ -292,9 +294,9 @@ export function buildFeedThreadsPrompt(
     ),
     '',
     'YOUR TURN',
-    'Fill "replies" with the new comments under these posts. "to" is the ref of the comment it answers, exactly as written. "from" is who writes it: the poster\'s or another girl\'s key exactly as written in LOREBOOK, or an empty string for a stranger, one of the four thousand students on campus who does not know the poster.',
+    'Fill "replies" with the new comments under these posts. "to" is the ref of the comment it answers, or the post\'s own ref for a new comment on the post, exactly as written. "from" is who writes it: the poster\'s or another girl\'s key exactly as written in LOREBOOK, or an empty string for a stranger, one of the four thousand students on campus who does not know the poster.',
     'The poster answers exactly what her post says she answers, as herself: how she talks, how she feels about whoever she is answering, and what she remembers of the reader. A girl answering the reader can flirt back, tease, brush him off or ignore the question, whatever she actually would.',
-    'Other girls and strangers only react to the reader\'s comments, one or two at most per post, and only where it is natural. A reaction answers what he said or how the poster answered him, never the post on its own. Nobody else speaks for the reader, and nobody @s anybody or writes a handle in "text".',
+    'Other girls and strangers react where it is natural, one or two at most per post and none is fine: to the reader\'s comment, to another comment in the thread, or to the post itself. The thread is a conversation, not a line of people answering him: they can talk to each other and to the poster too. Nobody else speaks for the reader, nobody answers herself, and nobody @s anybody or writes a handle in "text".',
     'The crowd is not there to mock him. Most of the time it agrees, hypes, adds to the joke with him or says nothing at all; teasing him is the exception, and a pile-on happens only when the poster herself has just brushed him off. Never more than one reaction poking fun at him under a post.',
     'All of this happens in front of the whole campus, and everybody types like it. Nobody settles anything here: no meeting up, no date, no time or place agreed, whoever suggests it. A girl who likes the idea can say so in a way that keeps it open, or tell him to message her; one who does not can laugh it off. Nothing she would only say to him alone goes in a comment: feelings she has not shown in public, what passed between them in private, anything explicit. Strangers know nothing about the reader beyond the comment in front of them.',
     'Fill "memories" with one entry per poster the reader commented under, and one per other girl who has met him and answers him in "replies", saying what she made of what he said: "char" is her key, "type" how she felt about it, and "desc" what happened, in a few words, starting with "the reader". Say only what he said or did: never the post, whose post it was, or where it happened, since the game adds that.'
