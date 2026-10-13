@@ -725,6 +725,23 @@ export function endInDebt(): void {
 }
 
 /**
+ * The entries of a slot-opening reply whose "char" is one of the girls the prompt listed for
+ * them; any other is dropped with a warning.
+ */
+function onlyAsked<T extends { char: string }>(
+  entries: readonly T[] | undefined,
+  listed: readonly { charKey: string }[],
+  what: string
+): T[] {
+  const keys = new Set(listed.map(({ charKey }) => charKey))
+  return (entries ?? []).filter((entry) => {
+    if (keys.has(entry.char)) return true
+    console.warn(`[slot] dropped ${what} from ${entry.char}: not asked for one`)
+    return false
+  })
+}
+
+/**
  * The slot opening as playback lines, plus the invitations the call rolled and the
  * plans the ledger found. `call` names the cancel group it is sent under and what else, beside
  * the run being left, abandons it.
@@ -906,8 +923,10 @@ async function fetchSlotIntro(
       const said = rumorPlace?.id ? rumorSentenceFor(rumorPlace, written) : null
       return {
         lines: narrate([opening, ...written]),
-        hangouts: result.data.hangouts,
-        breakups: result.data.breakups,
+        // Only the girls this slot asked: the model sometimes files a post here, and an invite
+        // from somebody who was never asking would make her a contact.
+        hangouts: onlyAsked(result.data.hangouts, askers, 'invite'),
+        breakups: onlyAsked(result.data.breakups, breakups, 'breakup'),
         ...(occasion ? { askOccasionId: occasion.id } : {}),
         posts: result.data.posts,
         events: [...events],
