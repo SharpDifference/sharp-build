@@ -45,6 +45,7 @@ not a timer or a system that sends messages automatically in the background.
   is bundled here.
 - In the combined package, Text Regeneration continues to work for normal replies.
   Incoming texts cannot be regenerated. Start another incoming request instead.
+  Its existing invitation restrictions still apply to normal replies around a hangout invitation.
 
 ## Implementation and review
 
@@ -67,3 +68,5 @@ Review checks: normal send and incoming send; empty direction; off switch;
 disabled/blocked/busy threads; new and standing invitations; failure/retry and
 cancellation; save/reload; photo hooks; normal versus incoming regeneration;
 keyboard controls and the four supported viewport sizes.
+
+Tester-reported gameplay results are recorded in [the manual test report](incoming-texts-testing.md).
