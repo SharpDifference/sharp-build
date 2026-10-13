@@ -132,9 +132,21 @@ body:has(.vu-minigame-veil) .vu-scene-divider {
   font: 400 26px var(--font-display);
 }
 
-/* The way out, a quiet utility under the game. */
+/* The way out, a quiet utility under the game, with the bug report beside it. */
+.vu-minigame-foot {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 10px;
+}
+
 .vu-minigame-leave {
   margin-top: 2px;
+}
+
+.vu-minigame-report {
+  margin-top: 2px;
+  opacity: 0.75;
 }
 
 /* Room kept in the table's row for the parts of the scene's row it does not offer: the same

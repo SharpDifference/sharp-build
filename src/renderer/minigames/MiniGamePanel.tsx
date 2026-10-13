@@ -56,6 +56,9 @@ import {
   useGamesOffered,
   usePresentGirls
 } from './table'
+import { noteFault } from './faults'
+import { GameGuard } from './GameGuard'
+import { ReportButton } from './ReportButton'
 import '../vu_styles/MiniGames.css'
 
 /** One thing the table can be opened for: a game alone, or one a girl or several are asked to play. */
@@ -460,7 +463,29 @@ export function MiniGamePanel({ theme, onClose }: ScenePanelProps): JSX.Element 
         >
           <p className="vu-minigame-name">{seated.game.name}</p>
           {seated.opponents ? (
-            <Game play={play} />
+            <GameGuard
+              onFault={(error) => {
+                noteFault(seated.game.id, error)
+                if (result) return
+                if (!underWay) {
+                  onClose()
+                  return
+                }
+                leave({
+                  outcome: 'broken',
+                  summary: `The game of ${seated.game.name}${
+                    tableNames.length > 0 ? ` with ${listed(tableNames)}` : ''
+                  } breaks off before it is over.`,
+                  ...(soFar.current.length > 0
+                    ? { account: soFar.current }
+                    : situation.current
+                      ? { account: [`How it stood when it broke off: ${situation.current}`] }
+                      : {})
+                })
+              }}
+            >
+              <Game play={play} />
+            </GameGuard>
           ) : (
             <p className="vu-empty">
               {tableNames.length > 1 ? 'They are getting settled…' : 'She is getting settled…'}
@@ -479,32 +504,50 @@ export function MiniGamePanel({ theme, onClose }: ScenePanelProps): JSX.Element 
               Continue
             </motion.button>
           )}
-          {/* Standing through the result's beat, dead, so the table does not jump as it ends. */}
-          <motion.button
-            id="minigame-walk"
-            className="vu-pill vu-minigame-leave"
-            type="button"
-            disabled={result !== null}
-            {...gestures(result !== null, quietLift, quietPress)}
-            onClick={() =>
-              underWay
-                ? leave({
-                    outcome: 'abandoned',
-                    summary: `You walk away from the game of ${seated.game.name}${
-                      tableNames.length > 0 ? ` with ${listed(tableNames)}` : ''
-                    } before it is over.`,
-                    // What the game said of itself so far, or failing that how it last stood.
-                    ...(soFar.current.length > 0
-                      ? { account: soFar.current }
-                      : situation.current
-                        ? { account: [`How it stood when he left: ${situation.current}`] }
-                        : {})
-                  })
-                : onClose()
-            }
-          >
-            {underWay ? 'Walk away' : 'Not now'}
-          </motion.button>
+          <div className="vu-minigame-foot">
+            {/* Standing through the result's beat, dead, so the table does not jump as it ends. */}
+            <motion.button
+              id="minigame-walk"
+              className="vu-pill vu-minigame-leave"
+              type="button"
+              disabled={result !== null}
+              {...gestures(result !== null, quietLift, quietPress)}
+              onClick={() =>
+                underWay
+                  ? leave({
+                      outcome: 'abandoned',
+                      summary: `You walk away from the game of ${seated.game.name}${
+                        tableNames.length > 0 ? ` with ${listed(tableNames)}` : ''
+                      } before it is over.`,
+                      // What the game said of itself so far, or failing that how it last stood.
+                      ...(soFar.current.length > 0
+                        ? { account: soFar.current }
+                        : situation.current
+                          ? { account: [`How it stood when he left: ${situation.current}`] }
+                          : {})
+                    })
+                  : onClose()
+              }
+            >
+              {underWay ? 'Walk away' : 'Not now'}
+            </motion.button>
+            {/* For the beta: what a bug report needs, copied in one press. */}
+            <ReportButton
+              id="minigame-report"
+              report={() => ({
+                game: seated.game,
+                girls: seated.opponents?.length ?? 0,
+                options: seated.options,
+                account:
+                  soFar.current.length > 0
+                    ? soFar.current
+                    : situation.current
+                      ? // What was riding on it stays out of a report that may be pasted anywhere.
+                        [situation.current.replace(/\s*Riding on it:.*$/s, '')]
+                      : []
+              })}
+            />
+          </div>
         </motion.div>
 
         {/* A word across the table, for a game with someone to say it to: the scene's own well,

@@ -12,7 +12,8 @@ import {
 import { SelectField } from '../components/SelectField'
 import type { ModDetailProps } from '../mods/hooks'
 import { gestures, quietLift, quietPress, rowLift, rowPress } from '../views/motion'
-import { usePrefsStore } from './prefs'
+import { tunedGame, usePrefsStore } from './prefs'
+import { ReportButton } from './ReportButton'
 import '../vu_styles/MiniGames.css'
 
 /**
@@ -97,6 +98,7 @@ function GamePage({ game, onBack }: { game: MiniGameDef; onBack: () => void }): 
           </>
         )}
       </dl>
+      <ReportButton id={`minigame-page-report-${game.id}`} report={() => ({ game: tunedGame(game) })} />
 
       {(game.options ?? []).length > 0 && (
         <>
