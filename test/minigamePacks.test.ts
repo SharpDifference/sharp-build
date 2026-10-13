@@ -57,3 +57,37 @@ describe('a game pack reaches for nothing outside the kits', () => {
     }
   })
 })
+
+describe('switching the games off', () => {
+  it('takes every pack and every game with the framework, and leaves the rest of the game alone', async () => {
+    const { MODS, NO_SWITCHES, modOn, withMod } = await import('../src/shared/mods')
+    const { MINI_GAMES, MINI_GAMES_LIST, gamesOffered } = await import('../src/shared/minigames')
+    const off = withMod(NO_SWITCHES, MINI_GAMES, false)
+    const packs = [...new Set(MINI_GAMES_LIST.map((game) => game.modId))]
+    expect(packs.length).toBeGreaterThan(0)
+    for (const pack of packs) {
+      expect(modOn(NO_SWITCHES, pack)).toBe(true)
+      expect(modOn(off, pack)).toBe(false)
+    }
+    // Nothing is offered anywhere once the packs are off.
+    const isOn = (modId: string): boolean => modOn(off, modId)
+    for (const location of ['btb_arcade', 'room', null]) {
+      expect(gamesOffered({ location, girls: 2 }, isOn)).toEqual([])
+    }
+    // Every other mod answers as it did.
+    for (const mod of MODS.filter((m) => m.id !== MINI_GAMES && !packs.includes(m.id))) {
+      expect(modOn(off, mod.id)).toBe(modOn(NO_SWITCHES, mod.id))
+    }
+  })
+
+  it('takes the games of one pack and no other', async () => {
+    const { NO_SWITCHES, modOn, withMod } = await import('../src/shared/mods')
+    const { MINI_GAMES_LIST, gamesOffered } = await import('../src/shared/minigames')
+    const pack = 'morrowkiln-card-games'
+    const off = withMod(NO_SWITCHES, pack, false)
+    const offered = gamesOffered({ location: 'room', girls: 1 }, (modId) => modOn(off, modId))
+    expect(offered.some((game) => game.modId === pack)).toBe(false)
+    expect(offered.length).toBeGreaterThan(0)
+    expect(MINI_GAMES_LIST.some((game) => game.modId === pack)).toBe(true)
+  })
+})
