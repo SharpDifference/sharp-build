@@ -5,22 +5,29 @@ import { TEXT_LEDGER_FEED_LINES } from '../prompts/feedCommentsPrompt'
 import { UNKNOWN_NAME, useGameStore } from './gameStore'
 import { modIsOn } from './modsStore'
 
-/** How a memory from the feed says where it happened, and how the last one is found again. */
+/** Where a held memory without a poster says it happened, as earlier test builds wrote it. */
 const FEED_MEMORY_TAG = ', on the feed'
-/** The tag earlier test builds wrote, still found so their memory is replaced, not kept beside. */
-const OLD_FEED_MEMORY_TAG = ', on Bunnyboard'
+
+/** How a feed memory is found again to be replaced, earlier test builds' wordings included. */
+const FEED_MEMORY_END = /, (on the feed|on Bunnyboard|on her post|under [^,]+'s post)$/
+
+/** Where a feed memory says it happened: her own post, or the girl's she answered under. */
+function whereTag(charId: string, posterId: string | undefined): string {
+  if (!posterId) return FEED_MEMORY_TAG
+  if (posterId === charId) return ', on her post'
+  const poster = useGameStore.getState().characters[posterId]
+  return poster ? `, under ${poster.firstName}'s post` : FEED_MEMORY_TAG
+}
 
 /**
  * Files what his comments left her with as one of her own memories, replacing the last one the
  * feed left her: one at a time, the newest winning, as her texting memory does.
  */
-function fileFeedMemory(charId: string, entry: CharMemory): void {
+function fileFeedMemory(charId: string, entry: CharMemory, where: string): void {
   const store = useGameStore.getState()
-  const previous = store.charInfo[charId]?.memories.find(
-    (one) => one.desc.endsWith(FEED_MEMORY_TAG) || one.desc.endsWith(OLD_FEED_MEMORY_TAG)
-  )
+  const previous = store.charInfo[charId]?.memories.find((one) => FEED_MEMORY_END.test(one.desc))
   if (previous) store.replaceMemory(charId, previous, null)
-  store.recordMemory(charId, { ...entry, desc: `${entry.desc}${FEED_MEMORY_TAG}` })
+  store.recordMemory(charId, { ...entry, desc: `${entry.desc}${where}` })
 }
 
 /** Keeps a thread's memories on one of its posts until the slot its answers show. */
@@ -63,7 +70,9 @@ export function fileDueFeedMemories(through: number): void {
     })
   }
   const { date } = useGameStore.getState()
-  for (const { charId, type, desc } of due) fileFeedMemory(charId, { date, type, desc })
+  for (const { charId, type, desc, posterId } of due) {
+    fileFeedMemory(charId, { date, type, desc }, whereTag(charId, posterId))
+  }
 }
 
 /** Every memory held for global slot `through` or before, not yet filed. */
@@ -83,11 +92,11 @@ function dueFeedMemories(through: number): HeldFeedMemory[] {
 export function feedStatusLines(through: number): SceneLine[] {
   if (!modIsOn(BUNNYFEEDS)) return []
   const game = useGameStore.getState()
-  return dueFeedMemories(through).map(({ charId, type, desc }) => {
+  return dueFeedMemories(through).map(({ charId, type, desc, posterId }) => {
     const character = game.characters[charId]
     const name =
       character && game.charInfo[charId]?.nameKnown ? character.firstName : UNKNOWN_NAME
-    return memoryStatusLine(name, { type, desc: `${desc}${FEED_MEMORY_TAG}` })
+    return memoryStatusLine(name, { type, desc: `${desc}${whereTag(charId, posterId)}` })
   })
 }
 
