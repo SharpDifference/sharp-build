@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import { updatesFeed } from '../src/renderer/stores/feedView'
-// The mod plugs into the game's hooks as the app does at boot.
+// The mod plugs into the game's hooks as the app does at boot, switched on as a player would.
 import '../src/renderer/mods'
+import { useModsStore } from '../src/renderer/stores/modsStore'
 import type { SocialPost } from '../src/shared/types'
 import { character, charactersById, charInfo } from './fixtures'
 
@@ -9,6 +10,8 @@ import { character, charactersById, charInfo } from './fixtures'
  * The slot's teaser, when the stranger's post came with a picture: it is the post the feed
  * surfaces, and like every post it stays off the feed until the picture is drawn.
  */
+useModsStore.setState({ switches: { on: { 'photo-feature': true }, options: {} } })
+
 const DATE = 10
 const NOW = 1
 
