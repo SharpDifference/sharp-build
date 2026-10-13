@@ -1,4 +1,5 @@
 import { slotSettled } from '../mods/hooks'
+import { feedStatusLines } from './feedMemory'
 import { currentStorySnapshot } from './storyMemory'
 import { finishBreakthrough, rearmBreakthrough, withBreakthrough } from './breakthrough'
 import { GAME_OVER_SCENES, gameOverReasonOf, gameOverSceneOf } from '@shared/gameOver'
@@ -2530,13 +2531,17 @@ function showStatusLines(): boolean {
     // What each girl took away from the slot, read against the reader's post-scene
     // stats, so her requirement cannot contradict a tier announced above. How her present landed
     // sits with the rest of her paragraph, so a slot with no ledger still reports it.
-    memories: memoryStatusLines(
-      ledger,
-      after,
-      game.sceneGifts,
-      game.sceneIgnoredInvites,
-      game.sceneTurnedDown
-    ),
+    memories: [
+      ...memoryStatusLines(
+        ledger,
+        after,
+        game.sceneGifts,
+        game.sceneIgnoredInvites,
+        game.sceneTurnedDown
+      ),
+      // Bunnyfeeds: the feed memories the next slot files, with its answers.
+      ...feedStatusLines(globalSlotOf(game.date, game.time) + 1)
+    ],
     // Milestones last, one screen apiece, the thing the player is left on.
     milestones: projected ? milestoneReports(projected) : []
   })
