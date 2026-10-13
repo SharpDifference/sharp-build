@@ -35,6 +35,7 @@ import {
   type SceneState,
   type BankedOpening,
   type BankedTextLedger,
+  type SlotIntroResponse,
   type SlotOpening,
   type StructuredRequest,
   type TimeSlot
@@ -742,6 +743,36 @@ function onlyAsked<T extends { char: string }>(
 }
 
 /**
+ * A slot-opening reply's invitations and posts, each from the girls the prompt asked for it.
+ * The model sometimes files a girl's post under "hangouts": one who was asked to post and has
+ * not is given it back as her post, and any other stray invitation is dropped, since an
+ * invitation from somebody who was never asking would make her a contact.
+ */
+function askedInvitesAndPosts(
+  reply: SlotIntroResponse,
+  askers: readonly { charKey: string }[],
+  posters: readonly { charKey: string }[]
+): Required<Pick<SlotIntroResponse, 'hangouts' | 'posts'>> {
+  const askerKeys = new Set(askers.map(({ charKey }) => charKey))
+  const posterKeys = new Set(posters.map(({ charKey }) => charKey))
+  const posts = [...(reply.posts ?? [])]
+  const posted = new Set(posts.map(({ char }) => char))
+  const hangouts = (reply.hangouts ?? []).filter((hangout) => {
+    if (askerKeys.has(hangout.char)) return true
+    const text = hangout.text?.trim()
+    if (text && posterKeys.has(hangout.char) && !posted.has(hangout.char)) {
+      posts.push({ char: hangout.char, text })
+      posted.add(hangout.char)
+      console.warn(`[slot] filed invite from ${hangout.char} as her post: she was asked to post`)
+    } else {
+      console.warn(`[slot] dropped invite from ${hangout.char}: not asked for one`)
+    }
+    return false
+  })
+  return { hangouts, posts }
+}
+
+/**
  * The slot opening as playback lines, plus the invitations the call rolled and the
  * plans the ledger found. `call` names the cancel group it is sent under and what else, beside
  * the run being left, abandons it.
@@ -923,12 +954,9 @@ async function fetchSlotIntro(
       const said = rumorPlace?.id ? rumorSentenceFor(rumorPlace, written) : null
       return {
         lines: narrate([opening, ...written]),
-        // Only the girls this slot asked: the model sometimes files a post here, and an invite
-        // from somebody who was never asking would make her a contact.
-        hangouts: onlyAsked(result.data.hangouts, askers, 'invite'),
+        ...askedInvitesAndPosts(result.data, askers, posters),
         breakups: onlyAsked(result.data.breakups, breakups, 'breakup'),
         ...(occasion ? { askOccasionId: occasion.id } : {}),
-        posts: result.data.posts,
         events: [...events],
         cancellations: [...cancellations],
         // Banked with the narration it was rolled beside.
