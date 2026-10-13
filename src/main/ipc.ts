@@ -1,4 +1,4 @@
-import { generateEchoArt, cancelEchoArt, uploadEchoArt, readEchoArt } from './services/echoService'
+import { generateEchoArt, cancelEchoArt, uploadEchoArt, readEchoArt, installLocalEchoModels } from './services/echoService'
 import { writeFile } from 'fs/promises'
 import type { EchoArtRequest } from '@shared/echo'
 import { prepareStoryRequest, inspectStoryMemory } from './services/storyMemoryService'
@@ -265,6 +265,7 @@ export function registerIpcHandlers(): void {
   // The photo feature's three channels, which keep their own module and their own queue.
   registerPhotoIpc(handle)
   handle('echo:generate',(event,request: EchoArtRequest) => generateEchoArt(request,event.sender.id))
+  handle('echo:installLocalModels', (event, id: string) => installLocalEchoModels(id, event.sender.id))
   handle('echo:cancel',(event,id: string) => cancelEchoArt(id,event.sender.id))
   handle('echo:read',(_event,id: string,generated?: boolean) => readEchoArt(id,generated))
   handle('echo:export',async (event,id:string,name:string,generated:boolean) => {

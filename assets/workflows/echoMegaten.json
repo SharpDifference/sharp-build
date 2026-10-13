@@ -108,25 +108,5 @@
       ],
       "filename_prefix": "echo_sources/raw"
     }
-  },
-  "10": {
-    "inputs": {
-      "image": [
-        "8",
-        0
-      ],
-      "torchscript_jit": "default"
-    },
-    "class_type": "InspyrenetRembg"
-  },
-  "13": {
-    "inputs": {
-      "filename_prefix": "echo_cutouts/echo",
-      "images": [
-        "10",
-        0
-      ]
-    },
-    "class_type": "SaveImage"
   }
 }

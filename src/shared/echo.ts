@@ -37,6 +37,8 @@ export interface EchoState {
 export type EchoProfile = Pick<Character,'firstName'|'lastName'|'personality'|'backstory'>
 export interface EchoArtRequest { requestId: string; identity: EchoIdentity; name: string; bio: string; backstory?: string }
 export interface EchoApi {
+  /** Desktop only: explicit, hash-verified downloads into an existing ComfyUI install. */
+  installLocalModels?: (requestId: string) => Promise<Result<null>>
   generate: (request: EchoArtRequest) => Promise<Result<string>>
   cancel: (requestId: string) => Promise<Result<null>>
   upload: () => Promise<Result<string | null>>

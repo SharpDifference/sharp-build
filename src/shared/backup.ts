@@ -1,4 +1,5 @@
 import { isCharFileRel } from './characterFiles'
+import { echoArtIdOf } from './echoArtwork'
 import { SAFE_CHAR_ID } from './characterRules'
 import { isArchiveCruft } from './characterTransfer'
 import {
@@ -70,6 +71,8 @@ export interface BackupPlaythrough {
 
 /** Everything a backup carries beside the images. */
 export interface BackupFile {
+  /** Immutable Echo PNG IDs, with bytes under echoes/art; absent in older backups. */
+  exEchoArt?: string[]
   schemaVersion: number
   /** As the renderer sees them, so no backup can ever carry the API key. */
   settings: RendererSettings
@@ -186,6 +189,7 @@ function isBackgroundPicture(name: string): boolean {
  * archive carries that no unpack keeps, or something this build never wrote.
  */
 export function classifyBackupEntry(name: string): 'record' | 'image' | 'audio' | 'skip' | 'reject' {
+  if (echoArtIdOf(name)) return 'image'
   if (name.startsWith(SOUNDTRACK_BACKUP_DIR + '/') && SOUNDTRACK_FILE.test(name.slice(SOUNDTRACK_BACKUP_DIR.length + 1))) return 'audio'
   if (name === BACKUP_NAME) return 'record'
   if (isArchiveCruft(name)) return 'skip'

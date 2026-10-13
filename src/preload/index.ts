@@ -9,6 +9,7 @@ import { photoApi } from './photoApi'
 const api: VenusUniversityApi = {
   platform: 'desktop',
   echo: {
+    installLocalModels: id => ipcRenderer.invoke('echo:installLocalModels', id),
     generate: request => ipcRenderer.invoke('echo:generate',request),
     cancel: id => ipcRenderer.invoke('echo:cancel',id),
     upload: () => ipcRenderer.invoke('echo:upload'),

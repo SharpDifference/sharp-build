@@ -9,7 +9,8 @@ import { modOn, optionOn } from '@shared/mods'
 import { getModSwitches } from './modsService'
 import { clearEchoMatte } from './echoMatte'
 import { generateLocalEcho } from './echoLocalImage'
-import { cutoutEchoImage, prepareEchoCutout } from './echoCutout'
+import { installEchoModels } from './echoModelSetup'
+import { cutoutEchoImage, prepareEchoCutout, releaseEchoCutout } from './echoCutout'
 
 const jobs = new Map<string, { owner: number; controller: AbortController }>()
 const folder = (): string => join(getDataPath(),'echoes','art')
@@ -47,13 +48,8 @@ export async function generateEchoArt(value: EchoArtRequest, owner: number): Pro
     const local = optionOn(switches,'echo','megaten-art')
     const signal = AbortSignal.any([controller.signal,AbortSignal.timeout(local ? 900000 : 600000)])
     const prompt = (local ? echoLocalImagePrompt : echoImagePrompt)({...value,identity})
-    if (local) {
-      const bytes = await generateLocalEcho(prompt,signal)
-      signal.throwIfAborted()
-      return await storeArt(bytes)
-    }
     await prepareEchoCutout(signal)
-    const bytes = await generateImage(prompt,{aspectRatio:'3:4',signal})
+    const bytes = local ? await generateLocalEcho(prompt,signal) : await generateImage(prompt,{aspectRatio:'3:4',signal})
     signal.throwIfAborted()
     const png = decodeArt(bytes).toPNG()
     const sourceFolder = join(getDataPath(),'echoes','sources')
@@ -68,12 +64,20 @@ export async function generateEchoArt(value: EchoArtRequest, owner: number): Pro
       signal.throwIfAborted()
       throw new Error(`Echo background removal failed. Your previous artwork is unchanged. The original image is kept in data/echoes/sources/${sourceId}.png; no automatic paid retry was made.`,{cause:error})
     }
-  } finally { jobs.delete(value.requestId) }
+  } finally { releaseEchoCutout(); jobs.delete(value.requestId) }
 }
 export function cancelEchoArt(id: string, owner: number): null {
   const job = jobs.get(id)
   if (job?.owner === owner) job.controller.abort()
   return null
+}
+export async function installLocalEchoModels(id: string, owner: number): Promise<null> {
+  if (typeof id !== 'string' || !ECHO_ART_ID.test(id)) throw Error('Invalid Echo setup request.')
+  if (jobs.size) throw Error('An Echo job is already running. Wait or cancel it first.')
+  const controller = new AbortController()
+  jobs.set(id, { owner, controller })
+  try { await installEchoModels(AbortSignal.any([controller.signal, AbortSignal.timeout(3_600_000)])); return null }
+  finally { jobs.delete(id) }
 }
 export async function uploadEchoArt(path: string): Promise<string> {
   if (!modOn(await getModSwitches(),'echo')) throw Error('Enable Echo in Mods first.')

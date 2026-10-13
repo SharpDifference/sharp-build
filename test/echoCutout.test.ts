@@ -1,35 +1,49 @@
 import { beforeEach, expect, it, vi } from 'vitest'
-const mocks = vi.hoisted(() => ({ exec: vi.fn(), stat: vi.fn(), write: vi.fn(), read: vi.fn(), rm: vi.fn(), mkdir: vi.fn() }))
-vi.mock('child_process', () => ({ execFile: mocks.exec }))
-vi.mock('fs/promises', () => ({ stat: mocks.stat, writeFile: mocks.write, readFile: mocks.read, rm: mocks.rm, mkdir: mocks.mkdir }))
-vi.mock('../src/main/paths', () => ({ getComfyPythonPath: () => 'python.exe', getComfyUiPath: () => 'comfy', getTempPath: () => 'tmp', getWorkflowPath: (name: string) => `assets/workflows/${name}` }))
-import { cutoutEchoImage, prepareEchoCutout } from '../src/main/services/echoCutout'
-beforeEach(() => {
-  vi.resetAllMocks()
-  mocks.stat.mockResolvedValue({ isFile: () => true })
-  mocks.read.mockResolvedValue(Buffer.from('cutout'))
-  mocks.exec.mockImplementation((_exe, _args, _options, callback) => callback(null))
+const mocks = vi.hoisted(() => ({ options: [] as unknown[], windows: [] as any[], load: vi.fn(), execute: vi.fn() }))
+vi.mock('electron', () => ({ BrowserWindow: class {
+  static getAllWindows() { return [] }
+  destroyed = false
+  webContents = { setWindowOpenHandler: vi.fn(), on: vi.fn(), executeJavaScript: mocks.execute }
+  constructor(options: unknown) { mocks.options.push(options); mocks.windows.push(this) }
+  loadFile = mocks.load
+  loadURL = mocks.load
+  once() { return this }
+  isDestroyed() { return this.destroyed }
+  destroy() { this.destroyed = true }
+} }))
+import { prepareEchoCutout, cutoutEchoImage, releaseEchoCutout } from '../src/main/services/echoCutout'
+const png = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVQIHWP4z8DwHwAFgAI/ScLbtAAAAABJRU5ErkJggg==', 'base64')
+beforeEach(() => { releaseEchoCutout(); vi.resetAllMocks(); mocks.options.length = 0; mocks.windows.length = 0 })
+it('uses a hidden sandbox without a game preload or Python runtime', async () => {
+  await prepareEchoCutout(new AbortController().signal)
+  expect(mocks.options[0]).toMatchObject({ show: false, webPreferences: { sandbox: true, contextIsolation: true, nodeIntegration: false } })
+  expect(mocks.options[0]).not.toHaveProperty('webPreferences.preload')
+  expect(mocks.execute).toHaveBeenCalledWith('window.echoCutout.prepare()')
 })
-it('checks the installed remover without diffusion models or automatic downloads', async () => {
-  const signal = new AbortController().signal
-  await prepareEchoCutout(signal)
-  expect(mocks.exec.mock.calls[0][1]).toContain('--check')
-  expect(mocks.exec.mock.calls[0][2]).toMatchObject({ signal, windowsHide: true, timeout: 180000 })
-  expect(JSON.stringify(mocks.stat.mock.calls)).not.toMatch(/safetensors|loras/)
+it('fails preparation before asking the image API and closes the failed helper', async () => {
+  mocks.execute.mockRejectedValueOnce(Error('offline'))
+  await expect(prepareEchoCutout(new AbortController().signal)).rejects.toThrow('no image API request')
+  expect(mocks.windows[0].destroyed).toBe(true)
 })
-it('cleans job-owned scratch files on success and failure', async () => {
-  const signal = new AbortController().signal
-  await expect(cutoutEchoImage(Buffer.from('png'), signal)).resolves.toEqual(Buffer.from('cutout'))
-  expect(mocks.rm).toHaveBeenCalledTimes(2)
-  mocks.exec.mockImplementation((_exe, _args, _options, callback) => callback(Error('failed')))
-  await expect(cutoutEchoImage(Buffer.from('png'), signal)).rejects.toThrow('failed')
-  expect(mocks.rm).toHaveBeenCalledTimes(4)
-  expect(new Set(mocks.rm.mock.calls.map(call => call[0])).size).toBe(4)
+it('cancels a loading helper and permits a fresh attempt', async () => {
+  mocks.load.mockImplementationOnce(() => new Promise(() => {}))
+  const controller = new AbortController(), pending = prepareEchoCutout(controller.signal)
+  controller.abort()
+  await expect(pending).rejects.toMatchObject({ name: 'AbortError' })
+  expect(mocks.windows[0].destroyed).toBe(true)
+  await expect(prepareEchoCutout(new AbortController().signal)).resolves.toBeUndefined()
 })
-it('preserves cancellation instead of suggesting an installation error', async () => {
+it('accepts only bounded PNG responses and releases only its helper', async () => {
+  await prepareEchoCutout(new AbortController().signal)
+  mocks.execute.mockResolvedValueOnce(png.toString('base64'))
+  expect(await cutoutEchoImage(png, new AbortController().signal)).toEqual(png)
+  mocks.execute.mockResolvedValueOnce('bad')
+  await expect(cutoutEchoImage(png, new AbortController().signal)).rejects.toThrow('PNG')
+  releaseEchoCutout()
+  expect(mocks.windows[0].destroyed).toBe(true)
+})
+it('does not launch a helper for an already cancelled request', async () => {
   const controller = new AbortController(); controller.abort()
   await expect(prepareEchoCutout(controller.signal)).rejects.toMatchObject({ name: 'AbortError' })
-  await expect(cutoutEchoImage(Buffer.from('png'), controller.signal)).rejects.toMatchObject({ name: 'AbortError' })
-  expect(mocks.exec).not.toHaveBeenCalled()
-  expect(mocks.write).not.toHaveBeenCalled()
+  expect(mocks.options).toHaveLength(0)
 })

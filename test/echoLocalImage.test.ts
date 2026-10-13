@@ -7,11 +7,7 @@ vi.mock('../src/main/services/comfyService',()=>({start:mocks.start,runGeneratio
 import { generateLocalEcho } from '../src/main/services/echoLocalImage'
 beforeEach(()=>{vi.resetAllMocks();mocks.stat.mockResolvedValue({});mocks.readFile.mockResolvedValue(Buffer.from('image'));mocks.rm.mockResolvedValue(undefined)})
 describe('Echo-only local artwork',()=>{
-  it('cuts the subject with segmentation and keeps a separate raw render',()=>{
-    expect(workflow['10'].class_type).toBe('InspyrenetRembg')
-    expect(workflow['10'].inputs).not.toHaveProperty('threshold')
-    expect(workflow['10'].inputs.image).toEqual(['8',0])
-    expect(workflow['13'].inputs.images).toEqual(['10',0])
+  it('returns raw artwork for the shared portable remover without a Python cutout node',()=>{
     expect(workflow['9'].inputs.images).toEqual(['8',0])
     expect(workflow['9'].inputs.filename_prefix).toBe('echo_sources/raw')
     expect(workflow['5'].inputs.text).toContain('silhouette')
@@ -32,7 +28,7 @@ describe('Echo-only local artwork',()=>{
   })
   it('refuses missing local assets without quietly making a paid request',async()=>{
     mocks.stat.mockRejectedValue(Error('missing'))
-    await expect(generateLocalEcho('wolf',new AbortController().signal)).rejects.toThrow('Turn off')
+    await expect(generateLocalEcho('wolf',new AbortController().signal)).rejects.toThrow('Install local art models')
     expect(mocks.start).not.toHaveBeenCalled();expect(mocks.run).not.toHaveBeenCalled()
   })
   it('honors cancellation and removes temporary files after render failure',async()=>{

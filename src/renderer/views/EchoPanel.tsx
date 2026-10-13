@@ -193,7 +193,7 @@ export function EchoPanel({hidden,gallery=false,owner,onClose,setup,theme}: {hid
   }
   async function generateOne(id:string):Promise<void> {
     const api=window.api.echo
-    if (!api) throw Error('Echo artwork requires the desktop game.')
+    if (!api) throw Error('Echo artwork is not available in this build.')
     const start=readGame(), current=id==='player'?start.exEcho.player:start.exEcho.girls[id]
     if(!current) throw Error('Echo assignment is missing.')
     const token=crypto.randomUUID();request.current=token
@@ -221,6 +221,14 @@ export function EchoPanel({hidden,gallery=false,owner,onClose,setup,theme}: {hid
       if(live.current)setMessage(batch.current?'Artwork saved.':'Generation stopped.')
     } catch(e) { if(live.current)setError(e instanceof Error?e.message:'Image generation failed.') }
     finally { request.current=null;batch.current=false;if(live.current){setBusy(false);setGeneratingId(null)} }
+  }
+  async function installModels():Promise<void> {
+    if(!window.api.echo?.installLocalModels)return
+    const id=crypto.randomUUID();request.current=id
+    setBusy(true);setError('');setMessage('Checking and downloading local art models… This may take a while. Stop generation cancels the download.')
+    try { const result=await window.api.echo.installLocalModels(id); if(!result.ok)throw Error(result.error.message); if(live.current&&request.current===id)setMessage('Local art models are installed and verified.') }
+    catch(e){if(live.current)setError(e instanceof Error?e.message:'Model setup failed.')}
+    finally {request.current=null;if(live.current)setBusy(false)}
   }
   async function upload():Promise<void> {
     if(!identity || !window.api.echo)return
@@ -293,8 +301,9 @@ export function EchoPanel({hidden,gallery=false,owner,onClose,setup,theme}: {hid
         <div className="echo-workspace">
           <div className="echo-preview">
           <div className="echo-card" style={{'--echo-tint':aspect.color} as CSSProperties}>{section==='stage'?<><EchoStagePreview identity={identity} charId={selected} height={game.characters[selected]?.height??1} placement={placement} opacity={opacity}/><p className="echo-help">Live positioning &amp; motion preview</p></>:<div className="echo-card-art"><EchoArt identity={identity} status/>{generatingId===selected&&<span className="echo-art-status" role="status">Creating Echo artwork…</span>}</div>}<small>{selected==='player'?'YOUR ECHO':label(selected)}</small><h2>{identity.name}</h2></div>
-          <label className="echo-provider">Artwork source<select aria-label="Artwork source" value={localArt?'local':'api'} disabled={busy||!safe} onChange={e=>void useModsStore.getState().setOption('echo','megaten-art',e.target.value==='local')}><option value="api">Gemini / image API (default)</option><option value="local">Local · Megaten LoRA</option></select></label><div className="echo-actions echo-art-actions"><button type="button" className="vu-btn vu-btn--primary vu-paper echo-action" disabled={busy||!safe||namePending||creaturePending||aspectPending} onClick={()=>void generate(false)}>{identity.art?'Regenerate artwork':'Generate artwork'}</button><button type="button" className="vu-btn vu-btn--quiet echo-action" disabled={busy||!safe} onClick={()=>void upload()}>Upload your own</button></div>
-          <p className="echo-help">{localArt?'Uses local ComfyUI with the Megaten style LoRA. No image API charge.':'Uses Gemini or your image API from Settings, then removes the background locally. Requires the installed background remover; API charges may apply.'} Uploads are free. Names and aspects stay the same.</p>
+          <label className="echo-provider">Artwork source<select aria-label="Artwork source" value={localArt?'local':'api'} disabled={busy||!safe} onChange={e=>void useModsStore.getState().setOption('echo','megaten-art',e.target.value==='local')}><option value="api">Gemini / image API (default)</option><option value="local" disabled={!window.api.echo?.installLocalModels}>Local · Megaten LoRA (desktop)</option></select></label><div className="echo-actions echo-art-actions"><button type="button" className="vu-btn vu-btn--primary vu-paper echo-action" disabled={busy||!safe||namePending||creaturePending||aspectPending} onClick={()=>void generate(false)}>{identity.art?'Regenerate artwork':'Generate artwork'}</button><button type="button" className="vu-btn vu-btn--quiet echo-action" disabled={busy||!safe} onClick={()=>void upload()}>Upload your own</button></div>
+          <p className="echo-help">{localArt?'Uses local ComfyUI with the Megaten style LoRA. No image API charge.':'Uses Gemini or your image API from Settings, then removes the background locally. First use downloads about 100 MB for local background removal; ComfyUI is not needed. API charges may apply.'} Uploads are free. Names and aspects stay the same. <a href="./echo-third-party-notices.txt" target="_blank" rel="noreferrer">Artwork software notices</a>.</p>
+          {localArt&&window.api.echo?.installLocalModels&&<details className="echo-help"><summary>Set up local artwork</summary><p>Install ComfyUI through the game’s Setup screen first. This downloads missing models: Megaten Style (218 MB) and Nova Anime XL (6.9 GB). Existing matching files are reused. Downloads come from the original hosts under their own terms. The creator does not grant image or model sales permission. <a href="https://civitai.com/models/1767059/megaten-style-kazuma-kaneko" target="_blank" rel="noreferrer">Megaten Style by emerjk</a>. <a href="./echo-model-license.txt" target="_blank" rel="noreferrer">Model license</a>.</p><button type="button" className="vu-btn vu-btn--quiet echo-action" disabled={busy||!safe} onClick={()=>void installModels()}>Install local art models</button></details>}
           <button type="button" className="vu-btn vu-btn--quiet echo-action echo-download" disabled={busy||downloading||!identity.art||preview.loading||preview.missing} onClick={()=>void downloadArt()}>{downloading?'Saving image…':'Download image'}</button>
           {(namePending||creaturePending)&&<p className="echo-help">Save your name and monster details before generating artwork.</p>}
           {!identity.art&&selected==='player'&&!imageReady&&<p className="echo-help">{setup?'Add an Image API key in Settings to generate artwork, or upload an image.':'Add an Image API key in Settings for automatic first-time artwork, or upload an image.'}</p>}

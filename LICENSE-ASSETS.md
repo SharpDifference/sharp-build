@@ -6,13 +6,30 @@ rights reserved. They are not covered by the licence in `LICENSE`. They are incl
 that the app builds from this source; no right is granted to reuse them in any other work or to
 distribute them on their own.
 
-Everything else in this repository, including the ComfyUI workflow JSON under `assets/workflows`,
-is licensed under AGPL-3.0-only as stated in `LICENSE`.
+The game's code, including the ComfyUI workflow JSON under `assets/workflows`,
+is licensed under AGPL-3.0-only as stated in `LICENSE`. Third-party components,
+model weights and their license texts retain their own licenses.
 
 ## Community Reckoning tracks
 
+**Track owner: [themaestroai](https://suno.com/@themaestroai).**
+
 `assets/sound/music/reckoning_breakthrough.mp3` (Breakthrough) and
-`assets/sound/music/reckoning_bloom.mp3` (Bloom) were supplied for inclusion in Venus
-Extracurriculars. They are not Venus Dev assets and are excluded from the blanket
-attribution above. No separate licence for standalone reuse was specified with these files;
-the code licence does not apply to them.
+`assets/sound/music/reckoning_bloom.mp3` (Bloom) use this separate asset permission:
+
+> Made by Maestro with Suno on a paid plan; may be redistributed with Venus Extracurriculars
+
+They are not Venus Dev assets and are excluded from the blanket attribution above.
+The code licence does not apply to them. The [music licence](assets/echo-public/echo-music-license.txt)
+is included in both desktop and browser builds.
+
+## Optional Echo model and artwork dependencies
+
+The Megaten Style LoRA is by **emerjk** and retains its creator permissions and
+Fair AI Public License 1.0-SD. It is downloaded separately from the creator's host;
+its weights are not relicensed as game source. The installer places its
+[separate model licence](assets/echo-public/echo-model-license.txt) beside the LoRA.
+
+See [the asset licence index](docs/mods/echo-asset-licenses.md) for the model,
+music and background-removal notices. These exceptions grant no rights to
+Venus Dev's other assets.

@@ -1,48 +1,60 @@
-import { execFile } from 'child_process'
-import { randomUUID } from 'crypto'
-import { mkdir, readFile, rm, stat, writeFile } from 'fs/promises'
+import { BrowserWindow } from 'electron'
 import { join } from 'path'
-import { getComfyPythonPath, getComfyUiPath, getTempPath, getWorkflowPath } from '../paths'
+import { assertEchoPng } from '@shared/echoArtwork'
 
-const script = (): string => getWorkflowPath('echoCutout.py')
-const model = (): string => join(getComfyUiPath(), '.transparent-background', 'ckpt_base.pth')
+let host: BrowserWindow | null = null
 
-/** Uses only the installed segmentation model, never a diffusion checkpoint or LoRA. */
-async function run(args: string[], signal: AbortSignal): Promise<void> {
-  signal.throwIfAborted()
-  await new Promise<void>((resolve, reject) => {
-    execFile(getComfyPythonPath(), ['-s', script(), '--model', model(), ...args], {
-      signal, windowsHide: true, timeout: 180_000, maxBuffer: 256 * 1024,
-      env: { ...process.env, TRANSPARENT_BACKGROUND_FILE_PATH: getComfyUiPath(), NO_ALBUMENTATIONS_UPDATE: '1' }
-    }, error => error ? reject(error) : resolve())
-  })
-  signal.throwIfAborted()
+/** Only the sandboxed segmentation page is destroyed; never a player's game window. */
+export function releaseEchoCutout(): void {
+  if (host && !host.isDestroyed()) host.destroy()
+  host = null
 }
 
-/** Check dependencies before asking a paid image provider for artwork. */
+async function abortable<T>(work: Promise<T>, signal: AbortSignal): Promise<T> {
+  signal.throwIfAborted()
+  let stop: () => void = () => {}
+  const cancelled = new Promise<never>((_resolve, reject) => {
+    stop = () => { releaseEchoCutout(); reject(new DOMException('Generation cancelled.', 'AbortError')) }
+    signal.addEventListener('abort', stop, { once: true })
+  })
+  try { return await Promise.race([work, cancelled]) }
+  finally { signal.removeEventListener('abort', stop) }
+}
+
+/** Initialize the portable model before any paid request; no Python, GPU or ComfyUI needed. */
 export async function prepareEchoCutout(signal: AbortSignal): Promise<void> {
+  signal.throwIfAborted()
+  releaseEchoCutout()
+  const parent = BrowserWindow.getAllWindows().find(window => window.isVisible())
+  const owned = new BrowserWindow({ show: false, ...(parent ? { parent } : {}), webPreferences: {
+    sandbox: true, contextIsolation: true, nodeIntegration: false, backgroundThrottling: false
+  } })
+  host = owned
+  owned.webContents.setWindowOpenHandler(() => ({ action: 'deny' }))
+  owned.webContents.on('will-navigate', event => event.preventDefault())
+  const closeWithParent = (): void => { if (!owned.isDestroyed()) owned.destroy() }
+  parent?.once('closed', closeWithParent)
+  owned.once('closed', () => parent?.removeListener('closed', closeWithParent))
   try {
-    for (const path of [getComfyPythonPath(), model(), script()]) {
-      if (!(await stat(path)).isFile()) throw Error('Missing cutout dependency')
-    }
-    await run(['--check'], signal)
+    const loading = process.env.ELECTRON_RENDERER_URL
+      ? owned.loadURL(`${process.env.ELECTRON_RENDERER_URL}/echoCutout.html`)
+      : owned.loadFile(join(__dirname, '../renderer/echoCutout.html'))
+    await abortable(loading, signal)
+    await abortable(owned.webContents.executeJavaScript('window.echoCutout.prepare()'), signal)
   } catch (error) {
+    releaseEchoCutout()
     signal.throwIfAborted()
-    throw new Error('Echo background removal needs the installed ComfyUI Python runtime, transparent-background package and background-removal model. No image API request was made.', { cause: error })
+    throw new Error('Could not prepare Echo background removal. First use downloads about 100 MB. Check your connection; no image API request was made.', { cause: error })
   }
 }
 
-/** Input is a bounded, decoded PNG. All temporary files belong to this single job. */
 export async function cutoutEchoImage(png: Uint8Array, signal: AbortSignal): Promise<Uint8Array> {
   signal.throwIfAborted()
-  await mkdir(getTempPath(), { recursive: true })
-  const input = join(getTempPath(), `echo-cutout-${randomUUID()}.png`)
-  const output = `${input}.cutout.png`
-  try {
-    await writeFile(input, png, { flag: 'wx' })
-    await run(['--input', input, '--output', output], signal)
-    return await readFile(output)
-  } finally {
-    await Promise.all([rm(input, { force: true }), rm(output, { force: true })])
-  }
+  assertEchoPng(png)
+  if (!host || host.isDestroyed()) throw Error('The Echo background remover is no longer available.')
+  const result: unknown = await abortable(host.webContents.executeJavaScript(`window.echoCutout.cutout(${JSON.stringify(Buffer.from(png).toString('base64'))})`), signal)
+  if (typeof result !== 'string' || result.length > 28 * 1024 * 1024) throw Error('Invalid Echo cutout response.')
+  const bytes = Buffer.from(result, 'base64')
+  assertEchoPng(bytes)
+  return bytes
 }

@@ -63,7 +63,7 @@ npm run dev
 ## Licence
 
 - Code is licensed under AGPL-3.0-only, as Venus Dev's is: see `LICENSE`.
-- Image, audio and video files are all rights reserved: see `LICENSE-ASSETS.md`.
+- Image, audio and video files are all rights reserved except the separately licensed community assets listed in `LICENSE-ASSETS.md`.
 - If you spot a security issue, please read `SECURITY.md` before reporting it.
 
 ## Thanks
