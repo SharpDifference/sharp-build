@@ -8,7 +8,7 @@ import { useGameStore } from '../stores/gameStore'
 import { useModOn, useModOption } from '../stores/modsStore'
 import { useAudioStore } from '../stores/audioStore'
 import { spriteUrl, useSpriteVersion } from '../stores/characterStore'
-import { answerReckoning, cancelReckoningRequest, canResumeReckoning, canStartReckoning, startReckoning, canContinueReckoning } from '../stores/reckoning'
+import { answerReckoning, cancelReckoningRequest, canResumeReckoning, canStartReckoning, startReckoning, canContinueReckoning, RECKONING_PREPARE_OPTION, watchReckoningPreparation, useReckoningPreparation, reckoningPreparationStatus, retryReckoningPreparation } from '../stores/reckoning'
 import { submitReckoningAftermath } from '../stores/gameLoop'
 import { StagedEcho } from './EchoPanel'
 import '../vu_styles/Reckoning.css'
@@ -20,13 +20,38 @@ export function ReckoningContinuation({blocked}:{blocked:boolean}):null {
   return null
 }
 
+export function ReckoningPreparation():null {
+  useEffect(()=>watchReckoningPreparation(),[])
+  return null
+}
+
 export function ReckoningEntry({charId,blocked,onOpen}:{charId:string;blocked:boolean;onOpen?:(id:string)=>void}):JSX.Element|null {
   const game=useGameStore(s=>s),on=useModOn(RECKONING_MOD)
+  const prepare=useModOption(RECKONING_MOD,RECKONING_PREPARE_OPTION)
+  useReckoningPreparation(s=>s.revision)
+  const [launching,setLaunching]=useState(false),[launchError,setLaunchError]=useState('')
+  const mounted=useRef(true)
+  useEffect(()=>{mounted.current=true;return()=>{mounted.current=false}},[])
+  useEffect(()=>setLaunchError(''),[charId])
   if(!on||!onOpen)return null
   const earned=dynamicFor(game.exCharacterDynamics,charId).growth,resume=game.exReckoning.active?.charId===charId
   const ready=resume?canResumeReckoning(game,charId):canStartReckoning(game,charId)
+  const prepared=reckoningPreparationStatus(game,charId),waiting=prepare&&!resume&&prepared.status!=='ready'
+  const open=async():Promise<void>=>{
+    if(launching)return
+    if(resume||!prepare){onOpen(charId);return}
+    setLaunching(true);setLaunchError('')
+    try{
+      // Commit the cached encounter before showing its modal: its first frame has question one.
+      await startReckoning(charId)
+      if(mounted.current)onOpen(charId)
+    }catch(error){if(mounted.current)setLaunchError(error instanceof Error?error.message:'The encounter could not be saved.')}
+    finally{if(mounted.current)setLaunching(false)}
+  }
   return <section className="vu-reckoning-entry"><strong>Reckoning</strong><p>{earned?`Earned growth · ${earned.name}`:resume?'An unfinished encounter awaits. Progress saved.':`Affection ${RECKONING_AFFECTION_MIN}+ · 100 spirit. Three thoughts. One attempt.`}</p>
-    {!earned&&<button type="button" className="vu-btn vu-btn--outline vu-paper" disabled={blocked||!ready} onClick={()=>onOpen(charId)}>{resume?'Resume Reckoning':'Face the reflection'}</button>}
+    {!earned&&ready&&waiting&&prepared.status==='error'?<><p role="alert">{prepared.error}</p><button type="button" className="vu-btn vu-btn--outline vu-paper" disabled={blocked} onClick={()=>retryReckoningPreparation(charId)}>Retry preparation</button></>:
+      !earned&&<button type="button" className="vu-btn vu-btn--outline vu-paper" disabled={blocked||!ready||waiting||launching} onClick={()=>void open()}>{launching?'Opening…':resume?'Resume Reckoning':ready&&waiting?'Preparing reflection…':'Face the reflection'}</button>}
+    {launchError&&<p role="alert">{launchError}</p>}
   </section>
 }
 

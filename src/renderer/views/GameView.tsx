@@ -1,4 +1,4 @@
-import { ReckoningModal, ReckoningContinuation } from './ReckoningModal'
+import { ReckoningModal, ReckoningContinuation, ReckoningPreparation } from './ReckoningModal'
 import { EchoAura, EchoPanel } from './EchoPanel'
 import { ensureEchoes } from '../modEntries/echo'
 import { StoryMemoryModal } from './StoryMemoryModal'
@@ -2690,6 +2690,7 @@ export function GameView(): JSX.Element {
           <PlotTwistModal key="plot-twist" theme={half} onClose={closePanel} />
         )}
 
+        <ReckoningPreparation/>
         <ReckoningContinuation blocked={blocked||covered}/>
         {panel?.kind === 'reckoning' && <ReckoningModal key={`reckoning-${panel.charId}`} charId={panel.charId} onClose={closePanel} />}
         {panel?.kind === 'echo' && (
