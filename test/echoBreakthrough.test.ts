@@ -73,6 +73,28 @@ describe('Echo Breakthrough prototype',()=>{
     expect(withBreakthrough(request,[a],false).user).toContain('ONE-TURN NARRATIVE ADVANTAGE')
     expect(game().exBreakthrough.pending).not.toHaveProperty('echoAspect')
   })
+  it.each(['', 'An unrelated action left in the normal Breakthrough box.'])('uses only the preset Echo action when a caller supplies %j',direction=>{
+    const ability=ECHO_BREAKTHROUGH_ABILITIES.horizonbound
+    let sent=''
+    activateBreakthrough('a',direction,action=>{sent=action;return true},'horizonbound')
+    expect(sent).toBe(ability.action)
+    expect(game().exBreakthrough.pending?.direction).toBe(ability.action)
+    expect(game().exBreakthrough.meters.a).toBe(100-ability.cost)
+    const prompt=withBreakthrough(request,[a],false)
+    expect(prompt.user).toContain(ability.action)
+    expect(prompt.user).not.toContain('An unrelated action')
+    expect(prompt.user).not.toContain('ONE-TURN NARRATIVE ADVANTAGE')
+  })
+  it('still requires and dispatches the custom action for normal Breakthrough',()=>{
+    expect(()=>activateBreakthrough('a','   ',()=>true)).toThrow()
+    expect(game().exBreakthrough.meters.a).toBe(100)
+    let sent=''
+    activateBreakthrough('a','  I admit my mistake and ask for a fresh start.  ',action=>{sent=action;return true})
+    expect(sent).toBe('I admit my mistake and ask for a fresh start.')
+    expect(game().exBreakthrough.pending?.direction).toBe(sent)
+    expect(game().exBreakthrough.meters.a).toBe(0)
+    expect(withBreakthrough(request,[a],false).user).toContain('ONE-TURN NARRATIVE ADVANTAGE')
+  })
   it.each(['mod','option','aspect'] as const)('refunds when the Echo %s becomes unavailable and refuses to rearm it',kind=>{
     activateBreakthrough('a','A new possibility.',()=>true,'horizonbound')
     const pending=game().exBreakthrough.pending!

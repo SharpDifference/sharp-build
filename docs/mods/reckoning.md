@@ -16,6 +16,8 @@ Each reply is judged against the current thought. The first two successes show a
 
 A completed encounter normally uses one opening request, three answer judgments and one scene continuation. The latter runs after closing victory and privately asks for a natural lighter/happier reaction. The student does not learn about the reflection, Echo activation, judgment or reward. The pending continuation survives save/reload and provider errors, then clears after a successful scene response.
 
+If the provider blocks that follow-up, **Manually edit prompt** opens the failed request in the standard scene editor. Cancel keeps the failed request waiting; Send retries with the edited text. The earned growth and already-paid spirit cost remain unchanged, and the private direction is never placed in the reader's dialogue.
+
 ## Growth and other mods
 
 The earned tag records this student's particular limiting belief and a more constructive response. It appears in Character Dynamics and nudges future scene, text and slot-opening prompts. It softens that pattern while preserving personality, memories, boundaries and agency; it does not replace the character library or erase every negative trait. One completed tag per student is supported.

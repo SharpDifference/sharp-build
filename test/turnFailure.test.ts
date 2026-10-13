@@ -63,16 +63,16 @@ afterEach(() => {
 })
 
 describe('a failed turn hands back only words the reader owns', () => {
-  it('keeps the Reckoning aftermath queued after provider failure without exposing a private cue',async()=>{
+  it.each(['LLM_HTTP', 'LLM_BLOCKED'])('keeps the Reckoning aftermath queued after %s without exposing a private cue',async(code)=>{
     const after={id:'won',charId:'a',date:7,time:0}
     const game=useGameStore.getState()
     useGameStore.setState({exReckoning:{version:1,active:null,aftermath:after},currentSceneTranscript:sceneLines('A quiet moment.'),waitingForLine:true})
     const snapshot:TurnSnapshot={scene:game.captureScene(),action:'',reckoning:'won'}
-    await runSceneTurn(failed('LLM_HTTP'),snapshot,[],[],false)
+    await runSceneTurn(failed(code),snapshot,[],[],false)
     expect(useGameStore.getState().exReckoning.aftermath).toEqual(after)
     expect(useGameStore.getState().inputDraft).toBe('')
     expect(useGameStore.getState().waitingForLine).toBe(true)
-    expect(useGameStore.getState().turnError?.code).toBe('LLM_HTTP')
+    expect(useGameStore.getState().turnError?.code).toBe(code)
     expect(dispatchTurn).not.toHaveBeenCalled()
   })
   it('clears only the matching Reckoning aftermath after a successful scene continuation',async()=>{

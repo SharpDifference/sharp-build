@@ -29,7 +29,7 @@ export function BreakthroughPanel({ hidden, blocked, onReckoning }: { hidden: bo
   const canUse = !blocked && canBreakthrough(game,id,ability?.aspect)
   const activate = (): void => {
     setError('')
-    try { activateBreakthrough(id,draft.trim()||ability?.action||'',interject,ability?.aspect); setDraft(''); setExpanded(false) }
+    try { activateBreakthrough(id,ability?.action??draft.trim(),interject,ability?.aspect); setDraft(''); setExpanded(false) }
     catch (e) { setError(e instanceof Error ? e.message : 'Could not activate Breakthrough.') }
   }
   return <aside className="vu-breakthrough vu-paper" data-ready={full} aria-label="Breakthrough spirit"
@@ -49,10 +49,11 @@ export function BreakthroughPanel({ hidden, blocked, onReckoning }: { hidden: bo
       <p>Liked +10 · Loved +20 · Hated −15 · Disliked unchanged. Spirit settles after the scene, up to +20 per character per time slot.</p>
       {available&&<label>Breakthrough ability<select aria-label="Breakthrough ability" value={mode} disabled={blocked||!!game.exBreakthrough.pending} onChange={e=>{setMode(e.target.value as 'echo'|'normal');setError('')}}><option value="echo">{available.name} · {available.cost} spirit</option><option value="normal">Normal Breakthrough · 100 spirit</option></select></label>}
       {ability&&<section className="vu-echo-breakthrough" aria-label="Echo ability"><small>{aspectOf(ability.aspect).name} · Your Echo</small><strong>{ability.name}</strong><p>{ability.summary}</p><small>{ability.strength} influence · {cost} spirit</small><small>{ability.scope} · One exchange</small></section>}
-      {ready ? <label>{ability?'Your approach (optional)':'What do you do, and what do you hope changes?'}
+      {ready && !ability && <label>What do you do, and what do you hope changes?
         <textarea value={draft} maxLength={1000} rows={4} disabled={blocked || !!game.exBreakthrough.pending}
-          onChange={e => setDraft(e.target.value)} placeholder={ability?.action||'I open up honestly and try to rebuild our trust…'} />
-      </label> : <p>{ability?`Need ${cost-amount} more spirit to use ${ability.name} (${amount} / ${cost}).`:'At 100 spirit, turn a meaningful moment into a Breakthrough.'}</p>}
+          onChange={e => setDraft(e.target.value)} placeholder="I open up honestly and try to rebuild our trust…" />
+      </label>}
+      {!ready && <p>{ability?`Need ${cost-amount} more spirit to use ${ability.name} (${amount} / ${cost}).`:'At 100 spirit, turn a meaningful moment into a Breakthrough.'}</p>}
       <p>{ability?`The ability shapes the next exchange; it gives no automatic relationship points. Costs ${cost} spirit; unspent spirit stays in the bar.`:'A strong positive opportunity, grounded in their personality and the situation. Spending it resets this character’s bar to 0.'}</p>
       {ready && <motion.button type="button" className="vu-btn vu-btn--outline vu-paper" disabled={!canUse || !ability&&!draft.trim()}
         {...gestures(!canUse || !ability&&!draft.trim(),lift,press)} onClick={activate}>{ability?`Use ${ability.name}`:'Unleash'} · {cost} spirit</motion.button>}

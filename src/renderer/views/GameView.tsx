@@ -2403,7 +2403,7 @@ export function GameView(): JSX.Element {
 
       {/* The player's turn failed; the scene behind it is already rewound to before Go.
           Two shapes, on whose words the action was: the reader's own are his to reword,
-          and an authored premise is only ever re-sent. */}
+          and an authored premise stays private, with its failed prompt editable after a refusal. */}
       <AnimatePresence>
         {turnFailed &&
           turnError &&
@@ -2419,6 +2419,8 @@ export function GameView(): JSX.Element {
               lockOut
               title="Couldn't continue the scene"
               retryMessage={`You can try again, or return to the main menu. ${AUTHORED_ABANDON_HINT}`}
+              extraText="Manually edit prompt"
+              onExtra={() => setPanel({ kind: 'editPrompt', source: 'turn' })}
               onRetry={retryTurn}
               onAbandon={() => toMenu()}
             />

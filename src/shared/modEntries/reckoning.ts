@@ -3,7 +3,7 @@ import { normalizeReckoning, RECKONING_AFFECTION_MIN, type ReckoningState } from
 import { registerTermCarry } from '../modCarry'
 declare module '../modCarry' { interface ModCarryFields { exReckoning?: ReckoningState } }
 registerTermCarry('exReckoning',save=>{const state=normalizeReckoning(save.exReckoning);return {version:1,active:state.active}})
-const mod:ModDef={id:'reckoning',name:'Reckoning',author:'Maestro Leeds',version:'0.5.0',scope:'anytime',defaultOn:true,
+const mod:ModDef={id:'reckoning',name:'Reckoning',author:'Maestro Leeds',version:'0.5.1',scope:'anytime',defaultOn:true,
   requires:['breakthrough'],blurb:`At ${RECKONING_AFFECTION_MIN}+ affection and 100 spirit, help a girl challenge three limiting beliefs and earn her own Character Dynamics growth tag.`,
   offNote:'Keeps saved encounters and earned tags. Character Dynamics can still apply earned growth when that mod is active.',
   options:[{id:'prepare-questions',label:'Prepare questions in the background',default:true,

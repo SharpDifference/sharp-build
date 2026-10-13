@@ -40,11 +40,13 @@ export function canBreakthrough(game:Game,id:string,echoAspect?:EchoBreakthrough
 export function activateBreakthrough(id: string, direction: string, dispatch: (text: string) => boolean, echoAspect?:EchoBreakthroughAspect): void {
   const game = useGameStore.getState()
   if(echoAspect!==undefined&&availableEchoBreakthrough(game)?.aspect!==echoAspect)throw Error('That Echo ability is not available to your current player Echo.')
-  const cost=echoAspect?availableEchoBreakthrough(game)!.cost:SPIRIT_MAX
+  const ability=echoAspect?availableEchoBreakthrough(game)!:null
+  const cost=ability?.cost??SPIRIT_MAX
+  const action=ability?.action??direction.trim()
   if (!canBreakthrough(game,id,echoAspect)) throw Error(`At least ${cost} spirit and an open reply window with this character are required.`)
-  if (!direction.trim() || direction.length > 1000) throw Error('Describe your action and hope in 1–1,000 characters.')
+  if (!action || action.length > 1000) throw Error('Describe your action and hope in 1–1,000 characters.')
   const state = normalizeBreakthrough(game.exBreakthrough)
-  const pending:BreakthroughPending = { id:crypto.randomUUID(), charId:id, direction:direction.trim(),
+  const pending:BreakthroughPending = { id:crypto.randomUUID(), charId:id, direction:action,
     date:game.date, time:game.time, playthroughId:game.playthroughId!,...(echoAspect?{echoAspect,spent:cost}:{}) }
   state.meters[id] = (state.meters[id]??0)-cost
   state.pending = pending
