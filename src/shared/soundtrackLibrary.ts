@@ -69,7 +69,7 @@ export class SoundtrackLibrary {
         throw appError('SOUNDTRACK_PICK', 'Choose the audio file again.')
       }
       const map = readSoundtrackMap(await this.storage.map())
-      map[key] = { file: picked.file, name: picked.name, loop: map[key]?.loop !== false }
+        map[key] = { file: picked.file, name: picked.name, loop: map[key]?.loop ?? key !== 'reckoning_victory' }
       await this.storage.write(map, { [picked.file]: picked.bytes })
       if (this.pending === picked) this.cancelPick()
       return map

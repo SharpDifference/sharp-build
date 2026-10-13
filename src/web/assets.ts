@@ -26,8 +26,8 @@ export function getQuickstart(): QuickstartBundle {
   return validateQuickstart(quickstartJson, QUICKSTART_PATH)
 }
 
-/** Every shipped sound, keyed the way the mix names one: `<group>/<name>.ogg`. */
-const SOUND_URLS = import.meta.glob<string>('../../assets/sound/*/*.ogg', {
+/** Every shipped sound, keyed the way the mix names one: `<group>/<name>.(ogg|mp3)`. */
+const SOUND_URLS = import.meta.glob<string>('../../assets/sound/*/*.{ogg,mp3}', {
   eager: true,
   query: '?url',
   import: 'default'

@@ -45,12 +45,19 @@ const ZIP_MTIME = new Date(2000, 0, 1, 0, 0, 0, 0)
 /** GitHub refuses a file at or over 100 MiB, so no character zip may reach it. */
 const MAX_ZIP_BYTES = 100 * 1024 * 1024
 
+/** Community tracks supplied for the Reckoning mod; no stock music is included. */
+const COMMUNITY_MUSIC = new Set([
+  'assets/sound/music/reckoning_breakthrough.mp3',
+  'assets/sound/music/reckoning_bloom.mp3'
+])
+
 /**
  * Whether one tracked path, as `git ls-tree` prints it, belongs in the public
  * repo. `assets/` holds gigabytes of art including explicit images, so it is
  * allowlisted: a folder added there is private until this names it. Under
  * `sound/`, the `music/` and `ambient_music/` folders stay private because
- * their licence does not allow redistribution. `private/` holds records that
+ * their licence does not allow redistribution, except the two explicitly listed
+ * community Reckoning tracks. `private/` holds records that
  * stay in this repo.
  */
 export function isPublic(path) {
@@ -61,6 +68,7 @@ export function isPublic(path) {
     const rest = path.slice('assets/'.length)
     if (!rest.includes('/')) return true
     if (rest.startsWith('sound/')) {
+      if (COMMUNITY_MUSIC.has(path)) return true
       return !rest.startsWith('sound/music/') && !rest.startsWith('sound/ambient_music/')
     }
     return (
@@ -286,6 +294,7 @@ function assertNothingPrivate(paths) {
   for (const path of paths) {
     const underAssets = path.startsWith('assets/')
     const allowedAsset =
+      COMMUNITY_MUSIC.has(path) ||
       /^assets\/characters\/[^/]+\.zip$/.test(path) ||
       /^assets\/[^/]+$/.test(path) ||
       /^assets\/(workflows|bg|bg_thumbs|pose)\//.test(path) ||

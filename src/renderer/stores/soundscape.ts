@@ -53,6 +53,8 @@ export interface Soundscape {
 
 /** Everything the mix is decided from, read off the stores by the caller. */
 export interface SoundFacts {
+  reckoning?: boolean
+  reckoningVictory?: boolean
   view: ViewName
   /** The half the menu is drawn in, which its ambience follows. */
   menuTheme: DayHalf
@@ -132,6 +134,7 @@ const LANDING_THEMES: readonly AudioKey[] = [
 
 /** What the four channels play, from the whole of what is on screen. */
 export function soundscapeOf(facts: SoundFacts): Soundscape {
+  if(facts.view==='game'&&facts.game&&!facts.game.gameOver&&facts.reckoning)return {...silence(.5),music:{key:facts.reckoningVictory?'reckoning_victory':'reckoning',fade:.7}}
   if (facts.view === 'game') return facts.game ? gameMix(facts) : silence(SILENCE)
   if (MENU_VIEWS.includes(facts.view)) return menuMix(facts)
   return silence(SILENCE)

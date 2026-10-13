@@ -1,3 +1,5 @@
+import type { ReckoningState } from './reckoning'
+import type { EchoState } from './echo'
 import type { StoryMemory, StoryRecallRequest } from './storyMemory'
 import type { BreakthroughState } from './breakthrough'
 import type { MeanwhileStore } from './meanwhile'
@@ -446,6 +448,10 @@ export const READER_SPEAKER = 'reader'
 
 /** A single remembered event, rendered as `"<Name> <type> that <desc>"`. */
 export interface CharMemory {
+  /** Echo v1 compatibility: a matching bond amplified this positive memory. */
+  echoBoosted?: boolean
+  /** Echo: affinity at the time this positive memory was earned. */
+  echoAffinity?: 'matching' | 'competing'
   /** Game date (days elapsed) it happened. */
   date: number
   type: MemoryType
@@ -1235,6 +1241,8 @@ export interface GameSave {
   /** Optional Story Memory facts and corrections, carried with this save. */
   exStoryMemory?: StoryMemory
   /** Optional, character-specific spirit and committed outcomes. */
+  exReckoning?: ReckoningState
+  exEcho?: EchoState
   exBreakthrough?: BreakthroughState
   /** Optional, noncanonical spectator conversations. */
   exNpcWatch?: MeanwhileStore

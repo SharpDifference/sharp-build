@@ -1,3 +1,6 @@
+import { ReckoningModal, ReckoningContinuation } from './ReckoningModal'
+import { EchoAura, EchoPanel } from './EchoPanel'
+import { ensureEchoes } from '../modEntries/echo'
 import { StoryMemoryModal } from './StoryMemoryModal'
 import { modIsOn } from '../stores/modsStore'
 import {
@@ -264,6 +267,8 @@ type OpenPanel =
   | { kind: 'controls' }
   | { kind: 'mods' }
   | { kind: 'plotTwist' }
+  | { kind: 'echo' }
+  | { kind: 'reckoning'; charId: string }
   | { kind: 'storyMemory' }
   | { kind: 'feedback' }
   | { kind: 'leaving' }
@@ -429,6 +434,7 @@ function PortraitSlot({
           : undefined
       }
     >
+      <EchoAura charId={charId} />
       {/* Both halves of a change breathe as one, so a crossfade never comes apart. */}
       <motion.div className="vu-stage-breath" animate={breathing}>
         {pair.from && pair.from !== pair.to && (
@@ -556,10 +562,13 @@ function InterruptEndingModal({
 /** Game View: renders `gameStore`; `gameLoop.ts` owns state changes. */
 export function GameView(): JSX.Element {
   const plotTwistOn = useModOn(PLOT_TWIST_MOD)
+  const echoOn = useModOn('echo')
   const bg = useGameStore((s) => s.bg)
   const time = useGameStore((s) => s.time)
   const date = useGameStore((s) => s.date)
   const playthroughId = useGameStore((s) => s.playthroughId)
+  const echoLoads = useGameStore((s) => s.loads)
+  useEffect(() => { if (echoOn && playthroughId) ensureEchoes() }, [echoOn, playthroughId, echoLoads])
   const slots = useGameStore((s) => s.slots)
   const emotions = useGameStore((s) => s.emotions)
   const flipped = useGameStore((s) => s.flipped)
@@ -2023,7 +2032,7 @@ export function GameView(): JSX.Element {
           arrow — the hand is the dialogue box's, which is the thing a click is *aimed* at. */}
       <div className="vu-stage-advance" onClick={onAdvanceClick} />
 
-      <BreakthroughPanel hidden={!sceneMode || cinematic || covered || uiHidden || !rowShown}
+      <BreakthroughPanel onReckoning={charId => setPanel({kind:'reckoning',charId})} hidden={!sceneMode || cinematic || covered || uiHidden || !rowShown}
         blocked={blocked || !!quizRow || (interjectRow ? interjectRow !== 'open' : !awaitingInput)} />
       {!covered && !uiHidden && <BreakthroughFlourish />}
 
@@ -2083,6 +2092,7 @@ export function GameView(): JSX.Element {
           calendarBadge={calendarBadge}
           bunnyboardBadge={bunnyboardBadge}
           railDead={false}
+          onEchoes={echoOn && !created && !replaying ? () => setPanel({ kind: 'echo' }) : undefined}
           onCalendar={() => setPanel({ kind: 'calendar' })}
           onBunnyboard={() => useBunnyboardStore.getState().openApp()}
           onSettings={() => setPanel({ kind: 'settings' })}
@@ -2141,6 +2151,7 @@ export function GameView(): JSX.Element {
              loses its own, an hour nobody is standing in having nothing to show. */
           bunnymapUnlocked={bunnymapShown}
           bunnyshopUnlocked={bunnyshopShown}
+          onEchoes={echoOn && !created && !replaying ? () => setPanel({ kind: 'echo' }) : undefined}
           onCalendar={() => setPanel({ kind: 'calendar' })}
           onBunnyboard={() => useBunnyboardStore.getState().openApp()}
           onShop={() => setPanel({ kind: 'shop' })}
@@ -2677,6 +2688,12 @@ export function GameView(): JSX.Element {
 
         {panel?.kind === 'plotTwist' && (
           <PlotTwistModal key="plot-twist" theme={half} onClose={closePanel} />
+        )}
+
+        <ReckoningContinuation blocked={blocked||covered}/>
+        {panel?.kind === 'reckoning' && <ReckoningModal key={`reckoning-${panel.charId}`} charId={panel.charId} onClose={closePanel} />}
+        {panel?.kind === 'echo' && (
+          <EchoPanel key="echo" hidden={covered || created || replaying} theme={half} onClose={closePanel} />
         )}
 
         {panel?.kind === 'loadGame' && (

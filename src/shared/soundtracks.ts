@@ -10,6 +10,8 @@ export const SOUNDTRACK_DEF: ModDef = {
   offNote: 'Turning this off plays the original music. Your imported tracks and choices are kept.'
 }
 export const SOUNDTRACK_LABELS = {
+  reckoning: 'Reckoning · inner conflict',
+  reckoning_victory: 'Reckoning · victory',
   title: 'Title screen', landing_day: 'Weekday · day', landing_night: 'Weekday · night',
   landing_day_alt: 'Weekend · day', landing_night_alt: 'Weekend · night', ending: 'Ending',
   venue_edm: 'Venue · electronic', venue_lofi: 'Venue · lo-fi', venue_pop: 'Venue · pop', venue_rock: 'Venue · rock'

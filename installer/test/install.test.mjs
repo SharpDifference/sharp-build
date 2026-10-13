@@ -14,6 +14,7 @@ const HERE = dirname(fileURLToPath(import.meta.url))
 const INSTALLER = join(HERE, '..')
 const GAME_VERSION = '9.9.9'
 const WORKFLOW = 'resources/assets/workflows/characterPhoto.json'
+const COMMUNITY_MUSIC = ['reckoning_breakthrough.mp3', 'reckoning_bloom.mp3']
 const sha = async (path) => createHash('sha256').update(await readFile(path)).digest('hex')
 
 async function put(path, text) {
@@ -33,6 +34,8 @@ async function fixture() {
   }
   await put(join(root, 'assets/workflows/characterBase.json'), '{\n  "base": true\n}\n')
   await put(join(root, 'assets/workflows/characterPhoto.json'), '{ "photo": true }\n')
+  for (const name of COMMUNITY_MUSIC) await put(join(root, 'assets/sound/music', name), `community audio: ${name}`)
+  await put(join(root, 'assets/sound/music/official-track.mp3'), 'not for redistribution')
 
   const app = join(root, 'app')
   await put(join(app, 'package.json'), '{"name":"venus-university","main":"out/main/index.js"}')
@@ -104,6 +107,10 @@ test('install puts the build and its added file in; uninstall restores the game 
   asar.extractAll(join(res, 'app.asar'), installed)
   assert.equal(await readFile(join(installed, 'out/main/index.js'), 'utf8'), "console.log('modded')\n")
   assert.equal(await readFile(join(game, WORKFLOW), 'utf8'), '{ "photo": true }\n')
+  for (const name of COMMUNITY_MUSIC) {
+    assert.equal(await readFile(join(res, 'assets/sound/music', name), 'utf8'), `community audio: ${name}`)
+  }
+  assert.equal(existsSync(join(res, 'assets/sound/music/official-track.mp3')), false)
   const again = run(patch, 'install', game)
   assert.notEqual(again.status, 0)
   assert.match(again.text, /already installed/)
@@ -158,6 +165,23 @@ test('a file of the game\'s own that differs stops the build', async () => {
   assert.throws(() => execFileSync(process.execPath, [
     join(INSTALLER, 'build.mjs'), '--base', join(root, 'base/out'), '--build', join(root, 'build/out'),
     '--game-version', GAME_VERSION, '--manifest', join(root, 'game/resources/build-manifest.json'),
+    '--assets', join(root, 'assets'), '--out', join(root, 'dist2')
+  ], { stdio: 'pipe' }), /is one of the game's own files and differs/)
+  await rm(root, { recursive: true, force: true })
+})
+
+test('the community music allowlist cannot replace a different official track', async () => {
+  const { root, res } = await fixture()
+  const manifestPath = join(res, 'build-manifest.json')
+  const manifest = JSON.parse(await readFile(manifestPath, 'utf8'))
+  manifest.files.push({
+    rel: `resources/assets/sound/music/${COMMUNITY_MUSIC[0]}`,
+    sha256: createHash('sha256').update('an official track with the same name').digest('hex')
+  })
+  await writeFile(manifestPath, JSON.stringify(manifest))
+  assert.throws(() => execFileSync(process.execPath, [
+    join(INSTALLER, 'build.mjs'), '--base', join(root, 'base/out'), '--build', join(root, 'build/out'),
+    '--game-version', GAME_VERSION, '--manifest', manifestPath,
     '--assets', join(root, 'assets'), '--out', join(root, 'dist2')
   ], { stdio: 'pipe' }), /is one of the game's own files and differs/)
   await rm(root, { recursive: true, force: true })

@@ -1,4 +1,5 @@
 import { finishBreakthrough } from '../breakthrough'
+import { finishReckoningAftermath } from '../reckoning'
 import { isPermanent } from '@shared/errors'
 import type { AppError, Character } from '@shared/types'
 import { shortenSceneSoFar } from '../../prompts/scenePrompt'
@@ -182,6 +183,7 @@ export async function runSceneTurn(
   // `end_scene` is stashed until playback reaches the last line; a solo scene is over
   // after its one turn.
   finishBreakthrough(snapshot.breakthrough?.id, false, result.data.lines, result.data.at)
+  finishReckoningAftermath(snapshot.reckoning)
   const ending = solo || result.data.end
   useGameStore.getState().setSceneEnding(ending)
 

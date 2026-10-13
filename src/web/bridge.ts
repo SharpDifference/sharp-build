@@ -258,6 +258,7 @@ export function buildApi(): VenusUniversityApi {
         result('write the status updates', () =>
           runAbortable(group, (signal) => completeStructured<EndingPostsResponse>(request, signal))
         ),
+      completeReckoning: (request, group) => result('write Reckoning', () => runAbortable(group, signal => completeStructured<unknown>(request, signal))),
       completeMeanwhile: (request, group) =>
         result('write the Meanwhile conversation', () =>
           runAbortable(group, signal => completeStructured<MeanwhileResponse>(request, signal))

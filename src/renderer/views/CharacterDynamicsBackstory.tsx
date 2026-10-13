@@ -19,7 +19,7 @@ interface Props {
 export function CharacterDynamicsBackstory(props: Props): JSX.Element | null {
   const [open, setOpen] = useState(false)
   const relationship = STARTING_RELATIONSHIPS.find(tag => tag.id === props.entry.relationship?.kind)
-  if (!relationship && props.entry.traits.length === 0) return null
+  if (!relationship && props.entry.traits.length === 0 && !props.entry.growth) return null
   return <>
     <div className="vu-dynamics-backstory-link">
       <motion.button type="button" className="vu-pill" aria-haspopup="dialog"
@@ -28,7 +28,7 @@ export function CharacterDynamicsBackstory(props: Props): JSX.Element | null {
       </motion.button>
       <span>{[props.entry.traits.length > 0
         ? props.entry.traits.length + (props.entry.traits.length === 1 ? ' personality nudge' : ' personality nudges') : '',
-        relationship?.name].filter(Boolean).join(' · ')}</span>
+        relationship?.name, props.entry.growth?.name].filter(Boolean).join(' · ')}</span>
     </div>
     <AnimatePresence propagate>
       {open && <CharacterDynamicsDetails key="dynamics" {...props} onClose={() => setOpen(false)} />}
@@ -51,9 +51,10 @@ function CharacterDynamicsDetails({ entry, character, theme, onClose }: Props & 
         <header className="vu-dynamics-details-head">
           <span>This playthrough</span>
           <h2>{fullNameOf(character)}</h2>
-          <p>Your setup choices. Her feelings can change as your story unfolds.</p>
+          <p>Her starting tendencies and the growth she has earned in this playthrough.</p>
         </header>
         <div className="vu-dynamics-details-scroll">
+          {entry.growth && <section className="vu-dynamics-earned" aria-label="Earned growth"><h3>Earned through Reckoning</h3><strong>{entry.growth.name}</strong><p>{entry.growth.description}</p><ul>{entry.growth.reframes.map((line,i)=><li key={i}>{line}</li>)}</ul><p>A change she can build on, while keeping her voice and personality.</p></section>}
           {relationship && <section className="vu-dynamics-starting-background">
             <h3>Starting background</h3>
             <strong>{relationship.name}</strong>

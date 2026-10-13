@@ -1,3 +1,4 @@
+import type { EchoApi } from '@shared/echo'
 import type { StoryRecallRequest, StoryRecall } from '@shared/storyMemory'
 import type { WhisperDraft, WhisperReply } from '../shared/venusWhisper'
 import type { MeanwhileResponse } from '../shared/meanwhile'
@@ -75,6 +76,7 @@ import type {
 
 /** The renderer-visible preload bridge: thin `Result`-returning IPC wrappers only. */
 export interface VenusUniversityApi {
+  echo?: EchoApi
   /** Which build the renderer is running in; the one thing on here that is not a call. */
   platform: 'desktop' | 'web'
   storyMemory: { inspect: (payload: StoryRecallRequest) => Promise<Result<StoryRecall>> }
@@ -177,6 +179,7 @@ export interface VenusUniversityApi {
       group: string
     ) => Promise<Result<EndingPostsResponse>>
     /** Writes a bounded, noncanonical spectator conversation; never streams. */
+    completeReckoning: (request: StructuredRequest, group: string) => Promise<Result<unknown>>
     completeMeanwhile: (request: StructuredRequest, group: string) => Promise<Result<MeanwhileResponse>>
     /** Sends a Bunnyboard texting turn; `group` enables cancellation. */
     completeWhisper: (request: StructuredRequest, group: string) => Promise<Result<WhisperDraft | WhisperReply>>

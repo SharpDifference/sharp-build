@@ -56,6 +56,8 @@ const SAVE_REQUIRED: Record<
     | 'replays'
     | 'exStoryMemory'
     | 'exBreakthrough'
+    | 'exEcho'
+    | 'exReckoning'
   >,
   true
 > = {

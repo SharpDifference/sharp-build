@@ -285,6 +285,7 @@ async function startOnce(onProgress?: (step: string) => void): Promise<void> {
     ],
     {
       cwd: getComfyUiPath(),
+      env: { ...process.env, TRANSPARENT_BACKGROUND_FILE_PATH: getComfyUiPath() },
       windowsHide: true,
       stdio: ['ignore', logFd ?? 'ignore', logFd ?? 'ignore']
     }

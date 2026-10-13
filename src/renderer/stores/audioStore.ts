@@ -37,6 +37,9 @@ import { useUiStore, type ViewName } from './uiStore'
  */
 
 interface AudioStoreState {
+  reckoningActive: boolean
+  reckoningVictory: boolean
+  setReckoningActive: (active: boolean, victory?: boolean) => void
   /** Whether the title theme has been started this session; it plays once and never again. */
   previewSoundtrack: (key: SoundtrackKey) => Promise<void>
   stopSoundtrackPreview: () => void
@@ -58,6 +61,9 @@ interface AudioStoreState {
 }
 
 export const useAudioStore = create<AudioStoreState>(() => ({
+  reckoningActive: false,
+  reckoningVictory: false,
+  setReckoningActive: (active,victory=false) => { useAudioStore.setState({ reckoningActive: active, reckoningVictory: active&&victory }); if(started)recompute() },
   previewSoundtrack: key => engine.previewSoundtrack(key),
   stopSoundtrackPreview: () => engine.stopSnippet(),
   currentMusic: () => ({ music: engine.current('music'), ambience: engine.current('ambience') }),
@@ -212,6 +218,8 @@ function factsOf(): SoundFacts {
     titleStarted: audio.titleStarted,
     titleDone: audio.titleDone,
     customTitle: soundtrackActive('title'),
+    reckoning: audio.reckoningActive,
+    reckoningVictory: audio.reckoningVictory,
     music: engine.current('music'),
     crossing: {
       phase: crossing.phase,

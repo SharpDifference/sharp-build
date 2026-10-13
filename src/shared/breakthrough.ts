@@ -1,5 +1,6 @@
 import type { CharInfo, SceneLine, TimeSlot } from './types'
 import { normalizeTermOrigin, type TermOrigin } from './termOrigin'
+import { isEchoBreakthroughAspect, type EchoBreakthroughAspect, type EchoSpiritCost } from './echoBreakthrough'
 
 export const BREAKTHROUGH_MOD = 'breakthrough'
 export const SPIRIT_MAX = 100
@@ -11,6 +12,10 @@ export interface BreakthroughPending {
   date: number
   time: TimeSlot
   playthroughId: string
+  /** Optional local Echo integration; omitted for an ordinary Breakthrough. */
+  echoAspect?: EchoBreakthroughAspect
+  /** Price actually charged for an Echo activation; absent in older, full-bar saves. */
+  spent?: EchoSpiritCost | 100
 }
 
 export interface BreakthroughMoment {
@@ -47,6 +52,19 @@ function slot(date: unknown, time: unknown): boolean {
 
 const meter = (n: number): number => Math.max(0, Math.min(SPIRIT_MAX, Number.isFinite(n) ? n : 0))
 
+function isSpiritPrice(value:unknown):value is EchoSpiritCost|100 {
+  return value===25||value===50||value===75||value===100
+}
+
+/** Ordinary and legacy activations always paid a full bar. Never infer an old price from today's catalog. */
+export function breakthroughSpent(pending:BreakthroughPending):EchoSpiritCost|100 {
+  return pending.echoAspect&&isSpiritPrice(pending.spent)?pending.spent:SPIRIT_MAX
+}
+
+export function refundSpirit(current:number,pending:BreakthroughPending):number {
+  return meter(current+breakthroughSpent(pending))
+}
+
 /** Imported optional data is bounded. Loading refunds an interrupted, uncommitted activation. */
 export function normalizeBreakthrough(value?: unknown, recover = false): BreakthroughState {
   const raw = record(value)
@@ -74,8 +92,9 @@ export function normalizeBreakthrough(value?: unknown, recover = false): Breakth
   const pending: BreakthroughPending | null = safeId(p.id) && safeId(p.charId) && safeId(p.playthroughId) &&
     slot(p.date,p.time) && typeof p.direction === 'string' && !!p.direction.trim() && p.direction.length <= 1000
     ? { id:p.id, charId:p.charId, playthroughId:p.playthroughId, date:p.date as number,
-      time:p.time as TimeSlot, direction:p.direction.trim() } : null
-  if (recover && pending) meters[pending.charId] = SPIRIT_MAX
+      time:p.time as TimeSlot, direction:p.direction.trim(),
+      ...(isEchoBreakthroughAspect(p.echoAspect)?{echoAspect:p.echoAspect,...(isSpiritPrice(p.spent)?{spent:p.spent}:{})}:{}) } : null
+  if (recover && pending) meters[pending.charId] = refundSpirit(meters[pending.charId]??0,pending)
   return { meters, settled, moments, pending:recover ? null : pending }
 }
 

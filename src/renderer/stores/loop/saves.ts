@@ -1,3 +1,6 @@
+import { normalizeReckoning, type ReckoningState } from '@shared/reckoning'
+import type { CharacterDynamics } from '@shared/characterDynamics'
+import { assertEchoEdit, normalizeEcho, type EchoState } from '@shared/echo'
 import { normalizeStoryMemory, type StoryMemory } from '@shared/storyMemory'
 import { appError, toAppError } from '@shared/errors'
 import { PLOT_TWIST_MOD, validatePlotTwist } from '@shared/plotTwists'
@@ -564,4 +567,63 @@ export async function persistMeanwhileScene(scene: MeanwhileScene, isCurrent: ()
     completed = true
   })
   if (!completed) throw Error('The game changed. Reopen Meanwhile to view saved conversations.')
+}
+
+/** Echo edits share the native save queue and reject stale playthroughs. */
+export async function writeEcho(next: EchoState, previous: EchoState, active: () => boolean): Promise<void> {
+  const start = useGameStore.getState()
+  const current = (): boolean => {
+    const now = useGameStore.getState()
+    return active() && modIsOn('echo') && now.playthroughId === start.playthroughId && now.loads === start.loads &&
+      now.exEcho === previous && now.date === start.date && now.time === start.time && !now.sceneEnding
+  }
+  if (!current() || manualSaveOffer() !== 'open') throw Error('Wait for a safe save point.')
+  const saved = normalizeEcho(next)
+  assertEchoEdit(previous,saved)
+  let written = false
+  manualWriting = true
+  try {
+    await queueWrite(async () => {
+      if (!current() || saveOffer(false) !== 'open') return
+      const now = useGameStore.getState()
+      const draft = manualSaveDraft() ?? (!sceneActiveOf(now) ? { ...now.toGameSave(), scene: null } : null)
+      if (!draft || !now.playthroughId) throw Error('No safe save point is available.')
+      assertEchoEdit(now.exEcho,saved)
+      const result = await window.api.saves.autosave(now.playthroughId, { ...draft, exEcho: saved })
+      if (!result.ok) throw Error(result.error.message)
+      if (!current()) return
+      if (loopState.statusBase) loopState.statusBase = { ...loopState.statusBase, exEcho: saved }
+      useGameStore.setState({ exEcho: saved })
+      written = true
+    })
+    if (!written) throw Error('The game changed. Reopen the Echo.')
+  } finally { manualWriting = false }
+}
+
+/** One atomic save holds the spirit charge, round progress and earned Character Dynamics tag. */
+export async function writeReckoningChange(next:ReckoningState,previous:ReckoningState,charge:0|100,charId:string,dynamics:CharacterDynamics|undefined,active:()=>boolean):Promise<void> {
+  const start=useGameStore.getState(),meterBefore=start.exBreakthrough
+  const current=():boolean=>{const now=useGameStore.getState();return active()&&now.exReckoning===previous&&now.exBreakthrough===meterBefore&&
+    now.exCharacterDynamics===start.exCharacterDynamics&&now.playthroughId===start.playthroughId&&now.loads===start.loads&&!now.sceneEnding}
+  if(!current()||manualSaveOffer()!=='open')throw Error('Wait for a safe save point.')
+  const saved=normalizeReckoning(next)
+  if(next.active&&!saved.active)throw Error('The encounter could not be saved.')
+  const meter=meterBefore.meters[charId]??0
+  if(charge&&meter<charge)throw Error('This encounter needs 100 spirit.')
+  const breakthrough=charge?{...meterBefore,meters:{...meterBefore.meters,[charId]:meter-charge}}:meterBefore
+  const patch={exReckoning:saved,exBreakthrough:breakthrough,...(dynamics?{exCharacterDynamics:dynamics}:{})}
+  let written=false;manualWriting=true
+  try {
+    await queueWrite(async()=>{
+      if(!current()||saveOffer(false)!=='open')return
+      const now=useGameStore.getState(),draft=manualSaveDraft()
+      if(!draft||!now.playthroughId)throw Error('No safe save point is available.')
+      const result=await window.api.saves.autosave(now.playthroughId,{...draft,...patch})
+      if(!result.ok)throw Error(result.error.message)
+      if(!current())return
+      if(loopState.statusBase)loopState.statusBase={...loopState.statusBase,...patch}
+      useGameStore.setState(patch);written=true
+    })
+    if(!written)throw Error('The game changed; reopen Reckoning.')
+  } finally {manualWriting=false}
 }

@@ -539,8 +539,8 @@ function armEnd(
     const state = channels[channel]
     if (state.live !== layer) return
     state.live = null
-    // Keep a finished replacement claimed until this cue is left: store updates must not restart it.
-    if (!layer.replacement) state.wanted = { key: null, semitones: 0 }
+    // Finished replacements and the victory song stay claimed until their screen is left.
+    if (!layer.replacement && layer.key !== 'reckoning_victory') state.wanted = { key: null, semitones: 0 }
     if (layer.endingTimer !== null) clearTimeout(layer.endingTimer)
     teardown(layer, channel)
     if (!layer.replacement) report(channel, layer.key)

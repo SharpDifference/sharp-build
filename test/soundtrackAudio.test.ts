@@ -69,6 +69,26 @@ it('loops a short custom title and never applies the stock thirty-second ending 
   expect(ending).not.toHaveBeenCalled()
 })
 
+it('plays the bundled Reckoning music on a loop, switches to Bloom once, and restores custom overrides', async () => {
+  await cue('reckoning')
+  expect(window.api.assets.readAudio).toHaveBeenCalledWith('music/reckoning_breakthrough.mp3')
+  expect(Source.made.at(-1)?.loop).toBe(true)
+  await cue('reckoning_victory')
+  expect(window.api.assets.readAudio).toHaveBeenCalledWith('music/reckoning_bloom.mp3')
+  const victory=Source.made.at(-1)!
+  expect(victory.loop).toBe(false)
+  victory.finish();const count=Source.made.length
+  await cue('reckoning_victory');expect(Source.made).toHaveLength(count)
+  await cue(null);await cue('reckoning_victory');expect(Source.made).toHaveLength(count+1)
+  store.useSoundtrackStore.setState({map:{reckoning:{...track,loop:false}}})
+  await cue('reckoning')
+  expect(Source.made.at(-1)?.buffer?.duration).toBe(2)
+  expect(Source.made.at(-1)?.loop).toBe(false)
+  flags.enabled=false;engine.refreshSoundtracks();await settle()
+  expect(Source.made.at(-1)?.buffer?.duration).toBe(120)
+  expect(Source.made.at(-1)?.loop).toBe(true)
+})
+
 it('leaves a play-once cue finished across repeated updates, then plays it on re-entry', async () => {
   store.useSoundtrackStore.setState({ map: { landing_day: { ...track, loop: false } } })
   await cue('landing_day')

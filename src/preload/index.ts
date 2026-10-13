@@ -8,6 +8,13 @@ import { photoApi } from './photoApi'
  */
 const api: VenusUniversityApi = {
   platform: 'desktop',
+  echo: {
+    generate: request => ipcRenderer.invoke('echo:generate',request),
+    cancel: id => ipcRenderer.invoke('echo:cancel',id),
+    upload: () => ipcRenderer.invoke('echo:upload'),
+    read: (id,generated) => ipcRenderer.invoke('echo:read',id,generated),
+    export: (id,name,generated) => ipcRenderer.invoke('echo:export',id,name,generated)
+  },
   storyMemory: { inspect: (payload) => ipcRenderer.invoke('storyMemory:inspect', payload) },
   soundtracks: {
     list: () => ipcRenderer.invoke('soundtracks:list'),
@@ -67,6 +74,7 @@ const api: VenusUniversityApi = {
     completeEndingPosts: (request, group) =>
       ipcRenderer.invoke('llm:completeEndingPosts', request, group),
     completeWhisper: (request, group) => ipcRenderer.invoke('llm:completeWhisper', request, group),
+    completeReckoning: (request, group) => ipcRenderer.invoke('llm:completeReckoning', request, group),
     completeMeanwhile: (request, group) => ipcRenderer.invoke('llm:completeMeanwhile', request, group),
     completeTexting: (request, group) =>
       ipcRenderer.invoke('llm:completeTexting', request, group),

@@ -1,4 +1,8 @@
 import { slotSettled } from '../mods/hooks'
+import { canContinueReckoning } from './reckoning'
+import { withReckoningAftermath } from '../prompts/reckoningPrompt'
+import { dynamicFor } from '@shared/characterDynamics'
+import { fullNameOf } from '@shared/types'
 import { currentStorySnapshot } from './storyMemory'
 import { finishBreakthrough, rearmBreakthrough, withBreakthrough } from './breakthrough'
 import { GAME_OVER_SCENES, gameOverReasonOf, gameOverSceneOf } from '@shared/gameOver'
@@ -1127,7 +1131,8 @@ function settlePlans(
 
 /** Re-runs a rewound turn down the path it came from. */
 function dispatchTurn(snapshot: TurnSnapshot): void {
-  if (snapshot.created) void startCreatedOpening()
+  if (snapshot.reckoning) void submitReckoningAftermath()
+  else if (snapshot.created) void startCreatedOpening()
   else if (snapshot.intro) void startOrientationScene()
   else if (snapshot.farewell) void startFarewellScene(snapshot.farewell)
   else if (snapshot.charId)
@@ -1325,6 +1330,21 @@ export async function submitAction(
     castCharacters,
     solo
   )
+}
+
+/** A private, saved direction resumes the current scene once after a Reckoning victory. */
+export async function submitReckoningAftermath():Promise<void> {
+  const game=useGameStore.getState()
+  if(!canContinueReckoning(game))return
+  const after=game.exReckoning.aftermath!,target=game.characters[after.charId]
+  const growth=dynamicFor(game.exCharacterDynamics,after.charId).growth!
+  const snapshot:TurnSnapshot={scene:game.captureScene(),action:'',reckoning:after.id}
+  loopState.lastTurn=snapshot
+  game.setAwaitingInput(false);game.setBusy(true);game.setStreaming(true);game.setWaitingForLine(true)
+  loopState.turnStartedAt=performance.now()
+  const cast=presentCastOf(game.cast)
+  const request=withReckoningAftermath(buildTurnRequest('Continue the present moment without new reader speech.',cast,true,false),fullNameOf(target),growth)
+  await runSceneTurn(streamScene(request),snapshot,game.cast,cast,false)
 }
 
 /** What the casting step decided: who is in the scene and what it reads. */

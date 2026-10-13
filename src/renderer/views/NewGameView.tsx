@@ -78,6 +78,9 @@ import { playthroughMods } from '@shared/mods'
 import { modIsOn, useModsStore } from '../stores/modsStore'
 import { CHARACTER_DYNAMICS_MOD, dynamicsKnowsReader, readCharacterDynamics, readCharacterDynamicsEnabled, type CharacterDynamics } from '@shared/characterDynamics'
 import { CharacterDynamicsModal } from './CharacterDynamicsModal'
+import { EchoPanel } from './EchoPanel'
+import { type EchoState } from '@shared/echo'
+import { echoSetupLocks, finalizeEchoSetup, prepareEchoSetup } from '@shared/echoSetup'
 import { useSaveStore } from '../stores/saveStore'
 import { useUiStore } from '../stores/uiStore'
 import { CharacterHeightModal } from './CharacterHeightModal'
@@ -263,6 +266,10 @@ export function NewGameView(): JSX.Element {
     ? [...new Set([...continued.record.chars, ...Object.keys(readCharacterDynamics(continued.save)?.characters ?? {})])]
     : Object.keys(resumed?.enrollment.carry?.charInfo ?? {})
   const [choosingDynamics, setChoosingDynamics] = useState(false)
+  const [echoDraft,setEchoDraft]=useState<EchoState|null>(null)
+  const [echoSchedule,setEchoSchedule]=useState<Record<number,string>|null>(null)
+  const [echoSetupId]=useState(()=>crypto.randomUUID())
+  const carriedEcho=carry?.exEcho??continued?.save.exEcho
   const [picking, setPicking] = useState(false)
   const [inspecting, setInspecting] = useState<string | null>(null)
   const [warnings, setWarnings] = useState<string[] | null>(null)
@@ -691,8 +698,17 @@ export function NewGameView(): JSX.Element {
     setNamed(true)
   }
 
-  /** The save write, once the player has picked their timetable. */
-  async function onFinalize(playerSchedule: Record<number, string>): Promise<void> {
+  /** The last setup screen; profile defaults exist before any optional customization. */
+  function requestFinalize(playerSchedule:Record<number,string>):void {
+    if(!schedules)return
+    if(modIsOn('echo')){
+      setEchoDraft(prepareEchoSetup(echoDraft??carriedEcho,playthroughId??echoSetupId,roster,`${playerName.first} ${playerName.last}`,playerBio))
+      setEchoSchedule(playerSchedule)
+    }else void onFinalize(playerSchedule)
+  }
+
+  /** The save write, once the player has picked their timetable and optional Echoes. */
+  async function onFinalize(playerSchedule: Record<number, string>, echoes?:EchoState): Promise<void> {
     if (!schedules) return
 
     // The registrar is covered before the semester is written, and the curtain announces the
@@ -818,7 +834,8 @@ export function NewGameView(): JSX.Element {
           ...carry,
           // Setup keeps returnees intact and adds newcomers. Do not overwrite those additions
           // with the older modCarry snapshot when the first save is assembled.
-          ...(exCharacterDynamics ? { exCharacterDynamics } : {})
+          ...(exCharacterDynamics ? { exCharacterDynamics } : {}),
+          ...(echoes ? { exEcho: echoes } : {})
         })
       : save
     const startingMods = playthroughMods(useModsStore.getState().switches).filter(id => id !== CHARACTER_DYNAMICS_MOD)
@@ -844,6 +861,7 @@ export function NewGameView(): JSX.Element {
         money: STARTING_MONEY,
         ...(playerBio ? { bio: playerBio } : {}),
         ...(exCharacterDynamics ? { exCharacterDynamics } : {}),
+        ...(echoes ? { exEcho: echoes } : {}),
         tallies: { ...emptyTallies(), tokensGenerated: enrolledTokens },
         date: FIRST_SLOT.date,
         time: FIRST_SLOT.time,
@@ -969,10 +987,21 @@ export function NewGameView(): JSX.Element {
         schedules={schedules}
         playerName={playerName}
         saved={playthroughId !== null}
-        onFinalize={(playerSchedule) => void onFinalize(playerSchedule)}
+        onFinalize={requestFinalize}
         onCancel={() => setView('mainMenu')}
       />
     ) : null
+
+  const echoModal=echoSchedule&&echoDraft?<EchoPanel hidden={false} onClose={()=>setEchoSchedule(null)} setup={{
+    id:echoSetupId,value:echoDraft,roster,first:playerName.first,last:playerName.last,bio:playerBio,locked:echoSetupLocks(carriedEcho),
+    onChange:setEchoDraft,
+    onContinue:async value=>{
+      const settled=finalizeEchoSetup(value,roster,carriedEcho)
+      setEchoDraft(settled)
+      setEchoSchedule(null)
+      await onFinalize(echoSchedule,settled)
+    }
+  }}/>:null
 
   // The canned start asks its one question with no roster screen behind it, and the wait before
   // it is the crossing's — the menu covers the stage and the bundle is read under it.
@@ -980,6 +1009,7 @@ export function NewGameView(): JSX.Element {
     return (
       <>
         {classSelect}
+        {echoModal}
         <AnimatePresence>{dynamicsModal}</AnimatePresence>
         {/* Its answer ends the crossing rather than changing the view outright, so unlike the
             roster's modals this one does leave on its own — over the first frames of the wipe,
@@ -999,7 +1029,7 @@ export function NewGameView(): JSX.Element {
     )
   }
 
-  if (classSelect) return classSelect
+  if (classSelect) return <>{classSelect}{echoModal}</>
 
   return (
     // The crossing takes the pointer from its first frame but not the keyboard, and a screen

@@ -53,6 +53,17 @@ function inGame(over: Partial<NonNullable<SoundFacts['game']>> = {}): SoundFacts
 }
 
 describe('the title theme', () => {
+  it('uses the Reckoning track only for the active game encounter and restores the normal mix on exit', () => {
+    const scene = inGame({ landing: false, inScene: true })
+    const normal = soundscapeOf(scene)
+    const during = soundscapeOf({ ...scene, reckoning: true })
+    expect(during.music).toMatchObject({ key: 'reckoning' })
+    expect(during.ambience).toMatchObject({key:null})
+    expect(soundscapeOf({...scene,reckoning:true,reckoningVictory:true}).music).toMatchObject({key:'reckoning_victory'})
+    expect(soundscapeOf({...scene,reckoning:false,reckoningVictory:true})).toEqual(normal)
+    expect(soundscapeOf({ ...scene, reckoning: false })).toEqual(normal)
+    expect(soundscapeOf({ ...facts(), reckoning: true }).music).not.toEqual(during.music)
+  })
   it('requests an enabled replacement again on menu visits, then returns to the native rule when off', () => {
     const done = facts({ titleStarted: true, titleDone: true })
     expect(soundscapeOf({ ...done, customTitle: true }).music).toEqual({ key: 'title', fade: .5 })
