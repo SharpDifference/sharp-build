@@ -21,7 +21,8 @@ it takes over Photo Feature's post comments and photo posts get the same threads
   since as one call, in the background. The answers are stamped for the next slot, so they are waiting when
   it opens.
 - The poster always answers your comments. Anybody you tagged answers too. Her friends and other
-  students may react, one or two at most.
+  students may join in, one or two at most a post: answering you, each other or her, or leaving a
+  comment of their own on the post.
 - She also answers up to three other people's comments under a post you are active on.
 - Posts arrive with replies from strangers and from a few roster girls in their own voices: the
   poster's friends, or two random girls when she has none.

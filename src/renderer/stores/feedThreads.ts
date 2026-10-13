@@ -47,6 +47,9 @@ const MAX_THREADS = 8
 
 const MEMORY_TYPES: readonly MemoryType[] = ['loved', 'liked', 'disliked', 'hated']
 
+/** The most comments anybody but the poster adds under one post in a call. */
+const MAX_CROWD_REACTIONS = 2
+
 /** The reader's own name on a comment he left. */
 const PLAYER_HANDLE = 'you'
 
@@ -155,6 +158,8 @@ export async function armFeedThreads(showAt: 'now' | 'next' = 'now'): Promise<vo
   // Short refs the reply names comments by, unique across the whole call.
   const byRef = new Map<string, { owed: Owed; comment: PostComment }>()
   const refOf = new Map<string, string>()
+  // And the posts themselves, for a new comment left on one rather than under a comment.
+  const postByRef = new Map<string, Owed>()
   const threads: FeedThread[] = []
   for (const entry of owed) {
     const { charId, post, work } = entry
@@ -162,6 +167,8 @@ export async function armFeedThreads(showAt: 'now' | 'next' = 'now'): Promise<vo
     const info = game.charInfo[charId]
     if (!character || !info) continue
     const shown = (post.comments ?? []).filter((one) => one.at <= now)
+    const postRef = `p${postByRef.size + 1}`
+    postByRef.set(postRef, entry)
     for (const comment of shown) {
       const ref = `c${byRef.size + 1}`
       byRef.set(ref, { owed: entry, comment })
@@ -176,6 +183,7 @@ export async function armFeedThreads(showAt: 'now' | 'next' = 'now'): Promise<vo
         : {})
     }))
     threads.push({
+      postRef,
       character,
       info,
       charKey: charKeyOf(character.firstName, character.lastName),
@@ -224,7 +232,7 @@ export async function armFeedThreads(showAt: 'now' | 'next' = 'now'): Promise<vo
   try {
     const reply = await send(request, run)
     if (runStale(run) || !reply) return
-    fileReplies(reply, owed, byRef, now, showAt === 'next' ? now + 1 : now)
+    fileReplies(reply, owed, byRef, postByRef, now, showAt === 'next' ? now + 1 : now)
   } catch (err) {
     console.warn('[feed] no thread replies:', messageOf(err))
   } finally {
@@ -240,12 +248,13 @@ export async function armFeedThreads(showAt: 'now' | 'next' = 'now'): Promise<vo
 
 /**
  * Files what the call wrote: the poster answers only what her post owed and no more of other
- * people's than her cap allows; anybody else only answers the reader.
+ * people's than her cap allows; anybody else adds a few, to anyone in the thread or to the post.
  */
 function fileReplies(
   reply: FeedThreadsResponse,
   owed: readonly Owed[],
   byRef: ReadonlyMap<string, { owed: Owed; comment: PostComment }>,
+  postByRef: ReadonlyMap<string, Owed>,
   now: number,
   shownAt: number
 ): void {
@@ -256,28 +265,38 @@ function fileReplies(
   // Whose post each girl's memory happened under: the first post she was owed or answered on.
   const posterOf = new Map<string, string>()
   const capLeft = new Map<string, number>(owed.map(({ post, work }) => [post.id, work.othersLeft]))
+  // Everybody but the poster: a few reactions a post, to anybody in the thread or to the post.
+  const crowdLeft = new Map<string, number>(owed.map(({ post }) => [post.id, MAX_CROWD_REACTIONS]))
   const owedIds = new Set(
     owed.flatMap(({ work }) => [...work.player, ...work.others].map((one) => one.id))
   )
 
   for (const one of reply.replies ?? []) {
-    const target = byRef.get(one.to?.trim() ?? '')
+    const to = one.to?.trim() ?? ''
+    const target = byRef.get(to)
+    const onPost = target ? undefined : postByRef.get(to)
     const text = one.text?.trim()
-    if (!target || !text) continue
-    const { owed: entry, comment } = target
+    if ((!target && !onPost) || !text) continue
+    const entry = target?.owed ?? (onPost as Owed)
+    const comment = target?.comment
     const posterId = entry.charId
     const fromId = one.from?.trim() ? game.charKeyToId[one.from.trim()] : undefined
     if (one.from?.trim() && !fromId) console.warn(`[feed] thread reply from unknown key "${one.from}"`)
 
     if (fromId === posterId) {
-      if (!owedIds.has(comment.id)) continue
+      // She answers what is owed under her own post; she does not comment on it.
+      if (!comment || !owedIds.has(comment.id)) continue
       if (!comment.player) {
         const left = capLeft.get(entry.post.id) ?? 0
         if (left <= 0) continue
         capLeft.set(entry.post.id, left - 1)
       }
-    } else if (!comment.player) {
-      continue
+    } else {
+      // Nobody answers themselves, and the crowd stops at its few.
+      if (comment && fromId && comment.charId === fromId) continue
+      const left = crowdLeft.get(entry.post.id) ?? 0
+      if (left <= 0) continue
+      crowdLeft.set(entry.post.id, left - 1)
     }
 
     const list = filed.get(entry.post.id) ?? []
@@ -289,7 +308,7 @@ function fileReplies(
             handle: game.charInfo[fromId]?.handle ?? strangerHandle(),
             emoji: '',
             text,
-            replyTo: comment.id,
+            ...(comment ? { replyTo: comment.id } : {}),
             at: shownAt
           }
         : {
@@ -297,13 +316,19 @@ function fileReplies(
             handle: strangerHandle(),
             emoji: useGrabBagStore.getState().drawMany(FEED_EMOJI_BAG, FEED_EMOJI, 1)[0] ?? FEED_EMOJI[0],
             text,
-            replyTo: comment.id,
+            ...(comment ? { replyTo: comment.id } : {}),
             at: shownAt
           }
     )
     filed.set(entry.post.id, list)
     const known = fromId ? game.charInfo[fromId] : undefined
-    if (fromId && fromId !== posterId && known && (known.nameKnown || known.memories.length > 0)) {
+    if (
+      comment?.player &&
+      fromId &&
+      fromId !== posterId &&
+      known &&
+      (known.nameKnown || known.memories.length > 0)
+    ) {
       answeredHim.add(fromId)
       if (!posterOf.has(fromId)) posterOf.set(fromId, posterId)
     }
