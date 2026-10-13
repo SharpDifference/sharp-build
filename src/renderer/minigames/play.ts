@@ -10,8 +10,11 @@ export type { RoundAsk } from './round'
  * inside the component is the pack's own business.
  */
 
-/** How a game came out. `played` is a game with nobody to beat. */
-export type PlayOutcome = 'won' | 'lost' | 'draw' | 'played' | 'abandoned'
+/**
+ * How a game came out. `played` is a game with nobody to beat. `broken` is never a game's own: it
+ * is the framework's, for a game whose screen failed and was taken down part way.
+ */
+export type PlayOutcome = 'won' | 'lost' | 'draw' | 'played' | 'abandoned' | 'broken'
 
 export interface PlayResult {
   outcome: PlayOutcome

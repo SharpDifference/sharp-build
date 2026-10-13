@@ -387,9 +387,19 @@ export function fileResult(result: PlayResult, played: PlayedWith, tries = 0): v
     const who = listed(played.names)
     // Walked away from: that he did is all the scene is told. What it means is theirs to settle.
     const left = result.outcome === 'abandoned'
+    // Broken off: the game's own screen failed. Nobody's doing, and a small thing in the scene.
+    const broke = result.outcome === 'broken'
     useTableStore.getState().setPlayed({
       text: result.summary,
-      brief: left
+      brief: broke
+        ? [
+            'MINI-GAME',
+            `The reader and ${who} were playing ${played.game.name} for real, at the table, between your last lines and now. It broke off before it was over: the game itself went wrong, the way a machine jams or a deck gets muddled, not through anything either of them did. Nobody won it.`,
+            ...(result.account ?? []),
+            ...(played.stake ? [`Riding on it, as they agreed: ${played.stake}`] : []),
+            `Let ${who} react in character, lightly: it is a small mishap. Anything riding on it is for them to settle in the scene.`
+          ]
+        : left
         ? [
             'MINI-GAME',
             `The reader and ${who} were playing ${played.game.name} for real, at the table, between your last lines and now. The reader walked away from it before it was over. Nobody won it.`,
