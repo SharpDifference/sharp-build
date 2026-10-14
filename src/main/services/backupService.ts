@@ -1,8 +1,7 @@
-import { mkdir, readFile, rename, utimes, writeFile } from 'fs/promises'
+import { mkdir, readFile, rename, rm, utimes, writeFile } from 'fs/promises'
 import { basename, dirname, join } from 'path'
 import {
   BACKUP_NAME,
-  preflightBackup,
   BACKUP_READ,
   BACKUP_SCHEMA_VERSION,
   BACKUP_ZIP_LIMITS,
@@ -60,7 +59,7 @@ import {
 import {
   checkExtractedContent,
   copyInto,
-  replaceZip,
+  createZip,
   discard,
   extractZip,
   relPathsUnder,
@@ -319,7 +318,13 @@ export async function exportBackup(targetPath: string): Promise<void> {
       message: 'Could not write the backup record.'
     })
 
-    await replaceZip(scratch, targetPath)
+    // 7-Zip's `a` updates an existing archive, so an old zip must go first.
+    await rm(targetPath, { force: true })
+    await createZip(scratch, targetPath)
+  } catch (err) {
+    // A half-written zip is worse than none: it opens, and it is not the player's game.
+    await rm(targetPath, { force: true }).catch(() => {})
+    throw err
   } finally {
     await discard(scratch)
   }
@@ -531,7 +536,6 @@ export async function importBackup(archivePath: string): Promise<void> {
     await extractZip(archivePath, scratch, BACKUP_ZIP_LIMITS)
     await checkExtractedContent(scratch, classifyBackupEntry, 'backup')
     const record = await readBackupRecord(scratch)
-    preflightBackup(record)
     const music = await prepareSoundtrackSnapshot(record.exMusic,
       file => readSoundtrackFile(join(scratch, SOUNDTRACK_BACKUP_DIR, file)), soundtrackHash)
 

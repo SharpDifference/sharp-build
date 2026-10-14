@@ -1,5 +1,9 @@
 # Third- and fourth-pass QA follow-up — October 14, 2026
 
+## Review split
+
+Base-game backup preflight, safe ZIP replacement and ordinary texting request ownership have been extracted into separate core and upstream branches. Their original mixed-mod regressions remain in the Echo integration. #57 now contains only the community-mod fixes; prior validation totals below describe the pre-split combined work. Regeneration context and mod reply hooks remain here. See qa-base-game-split-2026-10-14.md for the branch mapping and updated checks.
+
 The supplied fourth-pass archive was hash-checked before running its synthetic reproductions. Against the original combined #53/#57 source, its 20 tests produced five failures and fifteen passes. The hidden-recap test was a passing characterization of incorrect editor behavior, not evidence that the bug was absent. The encounter answer lifecycle controls passed; they prompted no production changes. Third-pass reproductions had already established five additional issue groups.
 
 ## Community fixes in #57
