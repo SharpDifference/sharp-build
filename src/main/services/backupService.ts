@@ -3,6 +3,7 @@ import { mkdir, readFile, rename, utimes, writeFile } from 'fs/promises'
 import { basename, dirname, join } from 'path'
 import {
   BACKUP_NAME,
+  preflightBackup,
   BACKUP_READ,
   BACKUP_SCHEMA_VERSION,
   BACKUP_ZIP_LIMITS,
@@ -534,6 +535,7 @@ export async function importBackup(archivePath: string): Promise<void> {
     await extractZip(archivePath, scratch, BACKUP_ZIP_LIMITS)
     await checkExtractedContent(scratch, classifyBackupEntry, 'backup')
     const record = await readBackupRecord(scratch)
+    preflightBackup(record)
     const restoreReflections = prepareReflectionRestore(record.exReflections)
     const restoreEchoArtwork = await prepareEchoArtworkRestore(scratch, record.exEchoArt)
     const music = await prepareSoundtrackSnapshot(record.exMusic,

@@ -1,5 +1,6 @@
 import {
   BACKUP_NAME,
+  preflightBackup,
   BACKUP_READ,
   BACKUP_SCHEMA_VERSION,
   BACKUP_ZIP_LIMITS,
@@ -229,6 +230,8 @@ export async function importBackup(): Promise<boolean> {
     BACKUP_READ
   )
 
+  preflightBackup(record)
+
   const music = await prepareSoundtrackSnapshot(record.exMusic,
     async file => entries[SOUNDTRACK_BACKUP_DIR + '/' + file], soundtrackHash)
 
@@ -291,108 +294,116 @@ export async function importBackup(): Promise<boolean> {
       ],
       'readwrite'
     )
-    // Every value is in hand, so each step below is a database request and the transaction
-    // stays open across all of them.
-    void tx.objectStore('settings').put(settings, 'settings')
-    for (const [id, bytes] of echoImages) {
-      const existing = await tx.objectStore('echoArt').get(id)
-      // The preflight already compared bytes; a concurrent new entry aborts the transaction.
-      if (existing && !existingEchoImages.has(id)) {
-        tx.abort()
-        throw Error('Echo artwork changed during restore. Please retry.')
+    // Observe transaction rejection immediately; a synchronous write failure must abort too.
+    void tx.done.catch(() => {})
+    try {
+      // Every value is in hand, so each step below is a database request and the transaction
+      // stays open across all of them.
+      await tx.objectStore('settings').put(settings, 'settings')
+      for (const [id, bytes] of echoImages) {
+        const existing = await tx.objectStore('echoArt').get(id)
+        // The preflight already compared bytes; a concurrent new entry aborts the transaction.
+        if (existing && !existingEchoImages.has(id)) {
+          tx.abort()
+          throw Error('Echo artwork changed during restore. Please retry.')
+        }
+        if (!existing) await tx.objectStore('echoArt').add(imageBlob(bytes), id)
       }
-      if (!existing) await tx.objectStore('echoArt').add(imageBlob(bytes), id)
-    }
-    void tx.objectStore('grabbags').put(record.grabbags, 'grabbags')
-    if (music) {
-      void tx.objectStore('soundtrackMeta').put(music.map, 'tracks')
-      for (const [file, bytes] of Object.entries(music.files)) {
-        void tx.objectStore('soundtrackFiles').put(new Blob([new Uint8Array(bytes)]), file)
+      await tx.objectStore('grabbags').put(record.grabbags, 'grabbags')
+      if (music) {
+        await tx.objectStore('soundtrackMeta').put(music.map, 'tracks')
+        for (const [file, bytes] of Object.entries(music.files)) {
+          await tx.objectStore('soundtrackFiles').put(new Blob([new Uint8Array(bytes)]), file)
+        }
       }
-    }
 
-    const playthroughs = tx.objectStore('playthroughs')
-    void playthroughs.clear()
-    for (const [playthroughId, row] of Object.entries(record.playthroughs)) {
-      if (SAFE_NUMERIC_ID.test(playthroughId)) void playthroughs.put(row, playthroughId)
-    }
-
-    const saves = tx.objectStore('saves')
-    void saves.clear()
-    for (const entry of record.saves) {
-      void saves.put(entry.save, [entry.playthroughId, entry.saveId])
-    }
-
-    const keptReplays = tx.objectStore('replays')
-    void keptReplays.clear()
-    for (const entry of replays) {
-      // A replay goes back only beside a playthrough the backup restores.
-      if (!Object.hasOwn(record.playthroughs, entry.playthroughId)) continue
-      void keptReplays.put(entry.replay, [entry.playthroughId, entry.replayId])
-    }
-
-    const art = tx.objectStore('endingArt')
-    void art.clear()
-    for (const playthroughId of record.endingArt) {
-      const bytes = entries[endingArtEntry(playthroughId)]
-      if (bytes && SAFE_NUMERIC_ID.test(playthroughId)) {
-        void art.put(imageBlob(bytes), playthroughId)
+      const playthroughs = tx.objectStore('playthroughs')
+      await playthroughs.clear()
+      for (const [playthroughId, row] of Object.entries(record.playthroughs)) {
+        if (SAFE_NUMERIC_ID.test(playthroughId)) await playthroughs.put(row, playthroughId)
       }
-    }
 
-    const pictures = tx.objectStore('profilePictures')
-    void pictures.clear()
-    for (const playthroughId of record.profilePictures ?? []) {
-      const bytes = entries[profilePictureEntry(playthroughId)]
-      if (bytes && SAFE_NUMERIC_ID.test(playthroughId)) {
-        void pictures.put(imageBlob(bytes), playthroughId)
+      const saves = tx.objectStore('saves')
+      await saves.clear()
+      for (const entry of record.saves) {
+        await saves.put(entry.save, [entry.playthroughId, entry.saveId])
       }
-    }
 
-    const photos = tx.objectStore('photos')
-    void photos.clear()
-    for (const entry of record.photos ?? []) {
-      if (!SAFE_NUMERIC_ID.test(entry.playthroughId)) continue
-      try {
-        assertSafePhotoId(entry.photoId)
-      } catch {
-        continue
+      const keptReplays = tx.objectStore('replays')
+      await keptReplays.clear()
+      for (const entry of replays) {
+        // A replay goes back only beside a playthrough the backup restores.
+        if (!Object.hasOwn(record.playthroughs, entry.playthroughId)) continue
+        await keptReplays.put(entry.replay, [entry.playthroughId, entry.replayId])
       }
-      const bytes = entries[photoEntry(entry.playthroughId, entry.photoId)]
-      if (!bytes) continue
-      void photos.put({ image: imageBlob(bytes), meta: entry.meta }, [
-        entry.playthroughId,
-        entry.photoId
-      ])
+
+      const art = tx.objectStore('endingArt')
+      await art.clear()
+      for (const playthroughId of record.endingArt) {
+        const bytes = entries[endingArtEntry(playthroughId)]
+        if (bytes && SAFE_NUMERIC_ID.test(playthroughId)) {
+          await art.put(imageBlob(bytes), playthroughId)
+        }
+      }
+
+      const pictures = tx.objectStore('profilePictures')
+      await pictures.clear()
+      for (const playthroughId of record.profilePictures ?? []) {
+        const bytes = entries[profilePictureEntry(playthroughId)]
+        if (bytes && SAFE_NUMERIC_ID.test(playthroughId)) {
+          await pictures.put(imageBlob(bytes), playthroughId)
+        }
+      }
+
+      const photos = tx.objectStore('photos')
+      await photos.clear()
+      for (const entry of record.photos ?? []) {
+        if (!SAFE_NUMERIC_ID.test(entry.playthroughId)) continue
+        try {
+          assertSafePhotoId(entry.photoId)
+        } catch {
+          continue
+        }
+        const bytes = entries[photoEntry(entry.playthroughId, entry.photoId)]
+        if (!bytes) continue
+        await photos.put({ image: imageBlob(bytes), meta: entry.meta }, [
+          entry.playthroughId,
+          entry.photoId
+        ])
+      }
+
+      // Merged rather than replaced: a character made since the backup is still the player's. A
+      // shipped character is never written, neither her record nor any of her images.
+      const characters = tx.objectStore('characters')
+      for (const character of record.characters) {
+        if (!SAFE_CHAR_ID.test(character.charId) || isShipped(character.charId)) continue
+        await characters.put(character, character.charId)
+      }
+
+      // Merged by name, as the characters are by id: one brought in since the backup is still kept.
+      const kept = tx.objectStore('backgrounds')
+      for (const row of backgrounds) await kept.put(row, row.record.name)
+
+      // Merged by id the same way: a scene saved since the backup is still kept.
+      const keptScenes = tx.objectStore('scenes')
+      for (const scene of scenes) await keptScenes.put(scene, scene.id)
+
+      const charFiles = tx.objectStore('charFiles')
+      for (const [name, bytes] of Object.entries(entries)) {
+        const at = charFileOf(name)
+        if (!at || bytes.length === 0 || isShipped(at.charId)) continue
+        const rel = namedRel(at.rel)
+        // An archive holding both twins of one picture keeps the one already under the stored name.
+        if (rel !== at.rel && entries[charFileEntry(at.charId, rel)]) continue
+        await charFiles.put({ blob: imageBlob(bytes), updatedAt }, [at.charId, rel])
+      }
+
+        await tx.done
+    } catch (err) {
+      try { tx.abort() } catch { /* Already aborted by a failed request. */ }
+      await tx.done.catch(() => {})
+      throw err
     }
-
-    // Merged rather than replaced: a character made since the backup is still the player's. A
-    // shipped character is never written, neither her record nor any of her images.
-    const characters = tx.objectStore('characters')
-    for (const character of record.characters) {
-      if (!SAFE_CHAR_ID.test(character.charId) || isShipped(character.charId)) continue
-      void characters.put(character, character.charId)
-    }
-
-    // Merged by name, as the characters are by id: one brought in since the backup is still kept.
-    const kept = tx.objectStore('backgrounds')
-    for (const row of backgrounds) void kept.put(row, row.record.name)
-
-    // Merged by id the same way: a scene saved since the backup is still kept.
-    const keptScenes = tx.objectStore('scenes')
-    for (const scene of scenes) void keptScenes.put(scene, scene.id)
-
-    const charFiles = tx.objectStore('charFiles')
-    for (const [name, bytes] of Object.entries(entries)) {
-      const at = charFileOf(name)
-      if (!at || bytes.length === 0 || isShipped(at.charId)) continue
-      const rel = namedRel(at.rel)
-      // An archive holding both twins of one picture keeps the one already under the stored name.
-      if (rel !== at.rel && entries[charFileEntry(at.charId, rel)]) continue
-      void charFiles.put({ blob: imageBlob(bytes), updatedAt }, [at.charId, rel])
-    }
-
-    await tx.done
   }))
 
   forgetSettings()
