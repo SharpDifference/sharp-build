@@ -368,7 +368,7 @@ function CommentRow({
   to?: string
   onReply?: () => void
 }): JSX.Element {
-  const reader = useReaderHandle()
+  const name = useCommenterName(comment)
   return (
     <div className="vu-bb-comment">
       {comment.charId ? (
@@ -386,7 +386,7 @@ function CommentRow({
       )}
       <span className="vu-bb-comment-said">
         <span className="vu-bb-comment-who vu-bb-comment-who--over">
-          {comment.player ? reader : `@${comment.handle}`}
+          {name}
         </span>
         {to && <span className="vu-bb-comment-mention">{to} </span>}
         {comment.text.split(/(@[\w.]+)/).map((part, i) =>
@@ -418,6 +418,15 @@ function useReaderHandle(): string {
   const first = useGameStore((s) => s.playerFirstName)
   const handle = first.toLowerCase().replace(/[^\w.]/g, '')
   return handle ? `@${handle}` : 'you'
+}
+
+/** Who wrote a comment, by name: a roster girl's and his own in full, a stranger's handle. */
+function useCommenterName(comment: PostComment): string {
+  const first = useGameStore((s) => s.playerFirstName)
+  const last = useGameStore((s) => s.playerLastName)
+  const character = useGameStore((s) => (comment.charId ? s.characters[comment.charId] : undefined))
+  if (comment.player) return [first, last].filter(Boolean).join(' ') || 'you'
+  return character ? fullNameOf(character) : comment.handle
 }
 
 /** The reader's own picture from his Profile tab, or the word "you" while he has none. */

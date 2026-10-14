@@ -26,8 +26,8 @@ it takes over Photo Feature's post comments and photo posts get the same threads
   students may join in, one or two at most each time: answering you, each other or her, or
   leaving a comment of their own on the post.
 - She also answers up to three other people's comments under a post you are active on.
-- Each comment shows its writer's handle on its own line, and a reply opens with whom it answers
-  ("@handle"). You have no handle, so you show as @ and your first name.
+- Each comment shows its writer's name on its own line (a stranger's handle, as strangers have no
+  name), and a reply opens with whom it answers as a tag: "@handle", or @ and your first name.
 - After about six of your comments under one post, the thread winds down: she keeps her answers
   short and starts wrapping it up, and only girls you tag still join in. You can keep replying.
 - Posts arrive with replies from strangers and from a few roster girls in their own voices: the
