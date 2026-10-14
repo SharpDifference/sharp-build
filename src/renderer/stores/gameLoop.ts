@@ -53,6 +53,7 @@ import {
   isTutorialSlot,
   newcomerPremise,
   ORIENTATION_PREMISE,
+  orientationAcquaintancePremise,
   orientationLeaderPremise,
   returnScrollLines,
   reunionPremise,
@@ -494,7 +495,9 @@ function orientationOpening(): { cast: string[]; action: string } {
   return {
     cast: picked ? [picked] : [],
     action:
-      picked && freshmen.length === 0
+      picked && game.charInfo[picked]?.flags.hasMet
+        ? orientationAcquaintancePremise(game.characters[picked]?.firstName ?? 'she', freshmen.length === 0)
+        : picked && freshmen.length === 0
         ? orientationLeaderPremise(game.characters[picked]?.firstName ?? 'she')
         : ORIENTATION_PREMISE
   }
@@ -2919,6 +2922,8 @@ export function enterTrip(
 ): void {
   resetLoop()
   loopState.trip = trip
+  // Rule ownership survives even though this visit must never write to its source save.
+  loopState.record = record
   // The goodbye's path is keyed on the epilogue's own slot, so the scene is stood on it whatever
   // slot the save was taken in.
   useGameStore

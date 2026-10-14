@@ -180,6 +180,12 @@ let lastFacts: SoundFacts | null = null
 /** Reads the stores, works out the mix, hands each channel its cue and fires what just happened. */
 function recompute(): void {
   const facts = factsOf()
+  // The custom title never fired the native run-out callback. If it is removed after we
+  // left the menu, there is no title left to keep: allow normal menu ambience on returning.
+  if (lastFacts?.customTitle && !facts.customTitle && facts.titleStarted && !facts.titleDone && facts.music !== 'title') {
+    useAudioStore.setState({ titleDone: true })
+    facts.titleDone = true
+  }
   const mix = soundscapeOf(facts)
 
   if (mix.music !== 'keep' && mix.music.key === 'title' && !facts.titleStarted) {

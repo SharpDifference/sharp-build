@@ -261,3 +261,7 @@ over several days; schema validation cannot certify believable prose or perfect 
 - `src/renderer/modEntries/venus-whisper.ts` loads the hooks automatically at boot. The JSX marker and registration remain in `src/renderer/mods/venusWhisper.tsx`.
 
 The stable IDs, defaults, dependencies, save fields and gameplay behavior are unchanged. Native character notes, scene-creator saves and calendar replays retain their 0.3.1 behavior. Merge framework updates from `core` into this mod branch; resolve conflicts with `main` on a separate `integrate/venus-whisper` branch.
+
+## October 14 confession follow-up
+
+Departed bystanders no longer prevent private confession bookkeeping. Graduation goodbyes preserve a previously discovered identity, but do not permit a first confession: their generation route has no ledger step to validate and persist that discovery. Normal eligible private scenes remain the route for first discovery. Quoted speaker, trust, privacy and stale-result checks still apply.
