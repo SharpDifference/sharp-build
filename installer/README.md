@@ -34,6 +34,12 @@ The build compares two `out` folders, the official release's and this build's:
 - a file of the official game's that differs or is gone and is **not** code stops the build.
   None of Venus Dev's art, music or characters can end up in the download.
 
+## Community audio
+
+Put redistributable mod audio under `assets/sound/community/<mod-id>/`. The installer includes this folder recursively, so new tracks need no per-file change in `build.mjs`. Runtime audio paths are relative to `assets/sound/`, for example `community/my-mod/opening.mp3`.
+
+Keep permission/attribution in the mod guide and asset license notice. Do not put Venus Dev's original music in this folder. The installer still refuses to replace a differing official file, preserves pre-existing destination files for uninstall, and skips README.md and .gitkeep. Official `sound/music/` remains excluded.
+
 ## The no-exe download
 
 `Venus-Extracurriculars-<version>-no-exe.zip` is the same `patch.mjs` and payload with two small
