@@ -34,6 +34,13 @@ interface ModsStoreState {
 /** The tail of the write lane: each write is of the switches as they stand at its turn. */
 let tail: Promise<unknown> = Promise.resolve()
 
+/** The registrar uses the same choices that produced its saved jobs, haunts and setup. */
+let enrollmentRecord: Pick<PlaythroughRecord, 'mods'> | null = null
+export function setEnrollmentMods(mods: readonly string[] | null): void {
+  enrollmentRecord = mods === null ? null : { mods: [...mods] }
+  syncCityLife()
+}
+
 /** Owns `mods:*` IPC: which community mods are on, and their options. */
 export const useModsStore = create<ModsStoreState>((set, get) => {
   /** Applies a change at once, then writes it behind every write already in flight. */
@@ -92,13 +99,13 @@ useModsStore.subscribe((state) => tellSharedRules(state.switches))
 // game, a mod scoped to the playthrough is on as the game's record says, not as the switch now
 // stands; on the menus, with no game entered, the switches decide.
 setHookRules({
-  isOn: (modId) => modOn(useModsStore.getState().switches, modId, loopState.record),
+  isOn: (modId) => modOn(useModsStore.getState().switches, modId, enrollmentRecord ?? loopState.record),
   order: (modId) => MODS.findIndex((mod) => mod.id === modId)
 })
 
 /** Whether a mod is on, for code outside a component; see `modOn` for what a record changes. */
 export function modIsOn(id: string, record?: Pick<PlaythroughRecord, 'mods'> | null): boolean {
-  return modOn(useModsStore.getState().switches, id, record)
+  return modOn(useModsStore.getState().switches, id, record === undefined ? enrollmentRecord : record)
 }
 
 /** Whether a mod is on, for a component: it renders again when the switch moves. */
@@ -114,7 +121,7 @@ export function useModOption(modId: string, optionId: string): boolean {
 /** Bind shared catalogs to the current record, or to the switches while creating a game. */
 function syncCityLife(): void {
   const game = useGameStore.getState()
-  const record = game.playthroughId ? { mods: [...game.playthroughMods] } : null
+  const record = enrollmentRecord ?? (game.playthroughId ? { mods: [...game.playthroughMods] } : null)
   setCityLifeEnabled(modIsOn(CITY_LIFE_LOCATIONS_MOD, record), modIsOn(CITY_LIFE_JOBS_MOD, record))
 }
 useModsStore.subscribe(syncCityLife)

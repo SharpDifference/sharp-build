@@ -74,9 +74,9 @@ import {
 } from '../stores/crossingStore'
 import { slotStampOf } from '../stores/slotCrossing'
 import { lockedIdsOf, spriteUrl, useCharacterStore, visibleOrderOf } from '../stores/characterStore'
-import { playthroughMods } from '@shared/mods'
-import { modIsOn, useModsStore } from '../stores/modsStore'
-import { CHARACTER_DYNAMICS_MOD, dynamicsKnowsReader, readCharacterDynamics, readCharacterDynamicsEnabled, type CharacterDynamics } from '@shared/characterDynamics'
+import { enrollmentMods } from '@shared/enrollmentMods'
+import { modIsOn, setEnrollmentMods, useModsStore } from '../stores/modsStore'
+import { CHARACTER_DYNAMICS_MOD, dynamicsKnowsReader, readCharacterDynamics, type CharacterDynamics } from '@shared/characterDynamics'
 import { CharacterDynamicsModal } from './CharacterDynamicsModal'
 import { useSaveStore } from '../stores/saveStore'
 import { useUiStore } from '../stores/uiStore'
@@ -255,9 +255,12 @@ export function NewGameView(): JSX.Element {
   )
   const [exCharacterDynamics, setCharacterDynamics] = useState<CharacterDynamics | undefined>(() =>
     readCharacterDynamics(resumed?.enrollment) ?? readCharacterDynamics(resumed?.enrollment.carry) ?? readCharacterDynamics(continued?.save))
-  const [dynamicsEnabled] = useState(() => resumed
-    ? readCharacterDynamicsEnabled(resumed.enrollment)
-    : modIsOn(CHARACTER_DYNAMICS_MOD))
+  const [startingMods] = useState(() => enrollmentMods(resumed?.enrollment, useModsStore.getState().switches))
+  const dynamicsEnabled = modIsOn(CHARACTER_DYNAMICS_MOD, { mods: startingMods })
+  useEffect(() => {
+    setEnrollmentMods(startingMods)
+    return () => setEnrollmentMods(null)
+  }, [startingMods])
   // Previous classmates cannot be given a new past, even when no tags were assigned to them.
   const returningDynamicsIds = continued
     ? [...new Set([...continued.record.chars, ...Object.keys(readCharacterDynamics(continued.save)?.characters ?? {})])]
@@ -557,6 +560,7 @@ export function NewGameView(): JSX.Element {
       ...(bio ? { bio } : {}),
       ...(dynamics ? { exCharacterDynamics: dynamics } : {}),
       exCharacterDynamicsEnabled: dynamicsEnabled,
+      mods: startingMods,
       ...(tokensGenerated > 0 ? { tokensGenerated } : {})
     })
     if (!written.ok) {
@@ -821,8 +825,6 @@ export function NewGameView(): JSX.Element {
           ...(exCharacterDynamics ? { exCharacterDynamics } : {})
         })
       : save
-    const startingMods = playthroughMods(useModsStore.getState().switches).filter(id => id !== CHARACTER_DYNAMICS_MOD)
-    if (dynamicsEnabled) startingMods.push(CHARACTER_DYNAMICS_MOD)
     const written = await useSaveStore.getState().createPlaythrough(
       {
         ...(term ? { term } : {}),

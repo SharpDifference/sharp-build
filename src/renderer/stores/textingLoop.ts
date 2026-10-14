@@ -477,47 +477,12 @@ async function sendText(charId: string, text: string, incoming: boolean): Promis
 
   try {
     // Everyone else on the roster, for the lorebook's character entries.
-    const others = game.chars
-      .filter((id) => id !== charId)
-      .map((id) => game.characters[id])
-      .filter((other): other is Character => Boolean(other))
-
     const request = buildTextingPrompt(
       character,
       game.charInfo[charId],
       conversation,
       incoming ? '' : trimmed,
-      {
-        date: game.date,
-        time: game.time,
-        storyMemory: currentStorySnapshot(),
-        stats: game.stats,
-        breakthrough: modIsOn(BREAKTHROUGH_MOD) ? game.exBreakthrough : undefined,
-        roster: others,
-        charInfo: game.charInfo,
-        exCharacterDynamics: game.exCharacterDynamics,
-        npcRelationships: game.npcRelationships,
-        classes: game.classes,
-        playerSchedule: game.playerSchedule,
-        playerJob: game.job,
-        occasions: game.occasions,
-        weather: game.weather,
-        // Where she is texting from; never a class or shift, as the composer is shut then.
-        charLocation: charHiddenLocationNow(charId),
-        // Who is with her: the same group the location came from.
-        charCompanions: companionsOf(charId),
-        // What she is there for, on a slot she is standing at her own haunt.
-        charHaunt: charStandingHauntNow(charId),
-        // The one absence a thread survives, so her block has to say it.
-        springBreakAway: game.springBreakAway,
-        // From this slot on: texting comes before the slot's scene, so its own plan is still ahead.
-        upcomingPlans: upcomingPlanLines(
-          game.events,
-          game.characters,
-          globalSlotOf(game.date, game.time)
-        ),
-        memoryBudget: memoryBudgetsOf(useSettingsStore.getState().settings ?? {}).one
-      },
+      textingState(game, charId),
       // The same reader block a scene gets, grades and all.
       readerBlockOf(game),
       incoming ? trimmed : undefined
@@ -652,13 +617,50 @@ export function textRegenerationTarget(charId: string): ReturnType<typeof latest
   return latestTextReply(game.bunnyboard.conversations[charId], game.date, game.time)
 }
 
+/** Both delivery paths provide the same current continuity to every DM hook. */
+function textingState(game: ReturnType<typeof useGameStore.getState>, charId: string): Parameters<typeof buildTextingPrompt>[4] {
+  const others = game.chars.filter(id => id !== charId).map(id => game.characters[id])
+    .filter((other): other is Character => Boolean(other))
+  return {
+    date: game.date,
+    time: game.time,
+    storyMemory: currentStorySnapshot(),
+    stats: game.stats,
+    breakthrough: modIsOn(BREAKTHROUGH_MOD) ? game.exBreakthrough : undefined,
+    roster: others,
+    charInfo: game.charInfo,
+    exCharacterDynamics: game.exCharacterDynamics,
+    npcRelationships: game.npcRelationships,
+    classes: game.classes,
+    playerSchedule: game.playerSchedule,
+    playerJob: game.job,
+    occasions: game.occasions,
+    weather: game.weather,
+    // Where she is texting from; never a class or shift, as the composer is shut then.
+    charLocation: charHiddenLocationNow(charId),
+    // Who is with her: the same group the location came from.
+    charCompanions: companionsOf(charId),
+    // What she is there for, on a slot she is standing at her own haunt.
+    charHaunt: charStandingHauntNow(charId),
+    // The one absence a thread survives, so her block has to say it.
+    springBreakAway: game.springBreakAway,
+    // From this slot on: texting comes before the slot's scene, so its own plan is still ahead.
+    upcomingPlans: upcomingPlanLines(
+      game.events,
+      game.characters,
+      globalSlotOf(game.date, game.time)
+    ),
+    memoryBudget: memoryBudgetsOf(useSettingsStore.getState().settings ?? {}).one
+  }
+}
+
 /** Generate privately, check for changed plans, then persist and replace the entire response. */
 export async function regenerateTextReply(charId: string, commit: (
   charId: string, conversation: Conversation, isCurrent: () => boolean
 ) => Promise<Result<null>>): Promise<{ replaced: number; created: number }> {
   const game = useGameStore.getState(), target = textRegenerationTarget(charId)
   if (!target) throw Error('Regenerate a completed reply in this time slot, before a scene or hangout starts.')
-  const fingerprint = textReplyFingerprint(target.conversation)
+  let fingerprint = textReplyFingerprint(target.conversation)
   const entry = { abandoned: false, pacer: {
     push: (_text: string): void => {}, drain: async (): Promise<void> => {},
     cancel: (): void => { entry.abandoned = true }
@@ -677,13 +679,7 @@ export async function regenerateTextReply(charId: string, commit: (
   try {
     const prior = beforeTextReply(target), character = game.characters[charId]
     const request = buildTextingPrompt(character, game.charInfo[charId], prior, target.sent.text, {
-      date: game.date, time: game.time, stats: game.stats,
-      roster: game.chars.filter(id => id !== charId).map(id => game.characters[id]).filter(Boolean),
-      charInfo: game.charInfo, npcRelationships: game.npcRelationships, classes: game.classes,
-      playerSchedule: game.playerSchedule, playerJob: game.job, occasions: game.occasions,
-      weather: game.weather, charLocation: charHiddenLocationNow(charId), charCompanions: companionsOf(charId),
-      charHaunt: charStandingHauntNow(charId), springBreakAway: game.springBreakAway,
-      memoryBudget: memoryBudgetsOf(useSettingsStore.getState().settings ?? {}).one,
+      ...textingState(game, charId),
       historyLimit: prior.summary === null ? 160 : undefined
     }, readerBlockOf(game))
     const result = await window.api.llm.completeTexting(request, `texting:${charId}`)
@@ -701,6 +697,9 @@ export async function regenerateTextReply(charId: string, commit: (
     const next = replaceTextReply(target, replacement, () => crypto.randomUUID())
     const saved = await commit(charId, next, isCurrent)
     if (!saved.ok) throw Error(saved.error.message)
+    // Commit installs the replacement; check that exact accepted thread before side effects.
+    fingerprint = textReplyFingerprint(next)
+    if (isCurrent()) afterDmReply({ charId, character, reply: result.data })
     return { replaced: target.replies.length, created: replacement.messages.length }
   } finally {
     if (inFlight.get(charId) === entry) {

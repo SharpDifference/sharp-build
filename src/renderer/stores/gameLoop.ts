@@ -53,6 +53,7 @@ import {
   isTutorialSlot,
   newcomerPremise,
   ORIENTATION_PREMISE,
+  orientationAcquaintancePremise,
   orientationLeaderPremise,
   returnScrollLines,
   reunionPremise,
@@ -494,7 +495,9 @@ function orientationOpening(): { cast: string[]; action: string } {
   return {
     cast: picked ? [picked] : [],
     action:
-      picked && freshmen.length === 0
+      picked && game.charInfo[picked]?.flags.hasMet
+        ? orientationAcquaintancePremise(game.characters[picked]?.firstName ?? 'she', freshmen.length === 0)
+        : picked && freshmen.length === 0
         ? orientationLeaderPremise(game.characters[picked]?.firstName ?? 'she')
         : ORIENTATION_PREMISE
   }
