@@ -14,9 +14,9 @@ model weights and their license texts retain their own licenses.
 
 **Track owner: [themaestroai](https://suno.com/@themaestroai).**
 
-`assets/sound/music/reckoning_breakthrough.mp3` (Breakthrough: Victory & Hope version),
-`assets/sound/music/reckoning_bloom.mp3` (Bloom), and
-`assets/sound/music/reckoning_rise_from_the_dark.mp3` (Rise from the Dark) use this separate asset permission:
+`assets/sound/community/reckoning/reckoning_breakthrough.mp3` (Breakthrough: Victory & Hope version),
+`assets/sound/community/reckoning/reckoning_bloom.mp3` (Bloom), and
+`assets/sound/community/reckoning/reckoning_rise_from_the_dark.mp3` (Rise from the Dark) use this separate asset permission:
 
 > Made by Maestro with Suno on a paid plan; may be redistributed with Venus Extracurriculars
 

@@ -1,4 +1,4 @@
-import { assertEchoPng, ECHO_ART_MAX_BYTES } from '@shared/echoArtwork'
+import { assertEchoPng, ECHO_ART_MAX_BYTES, ECHO_CUTOUT_PREPARE_ERROR } from '@shared/echoArtwork'
 import { refineWhiteEchoEdges } from '@shared/echoCutoutEdges'
 
 let worker: Worker | null = null
@@ -47,7 +47,7 @@ export async function preparePortableCutout(signal: AbortSignal): Promise<void> 
   try { await job(undefined, signal); prepared = true }
   catch (error) {
     signal.throwIfAborted()
-    throw new Error('Could not prepare Echo background removal. The first use downloads about 100 MB. No image API request was made.', { cause: error })
+    throw new Error(ECHO_CUTOUT_PREPARE_ERROR, { cause: error })
   }
 }
 

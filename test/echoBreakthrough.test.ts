@@ -21,7 +21,7 @@ function playerAspect(aspect:string):void {
 }
 beforeEach(()=>{
   game().reset();resetLoopState()
-  useModsStore.setState({switches:{on:{},options:{}}})
+  useModsStore.setState({switches:{on:{echo:true},options:{}}})
   useGameStore.setState({playthroughId:'echo-run',date:15,time:0,chars:['a','b'],cast:['a','b'],
     characters:charactersById(a,b),charInfo:{a:charInfo({nameKnown:true}),b:charInfo({nameKnown:true})},
     awaitingInput:true,currentSceneTranscript:sceneLines('An ordinary conversation in the courtyard.'),

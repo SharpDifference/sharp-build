@@ -19,7 +19,7 @@ const matching = () => normalizeEcho({player:{aspect:'daylark',name:'First Light
 const art='d058c3ab-01f7-4994-aed8-ec004e9b243a'
 beforeEach(()=>{
   game().reset();resetLoopState()
-  useModsStore.setState({switches:{on:{},options:{}}})
+  useModsStore.setState({switches:{on:{echo:true},options:{}}})
   useGameStore.setState({playthroughId:'echo-test',date:7,chars:['a','b'],characters:charactersById(character({charId:'a'}),character({charId:'b'})),charInfo:{a:charInfo(),b:charInfo()},exEcho:matching()})
   stubApi({saves:{autosave:async(id,draft)=>({ok:true,data:{...draft,playthroughId:id,saveId:'autosave',saveDate:0}})}})
 })
@@ -292,7 +292,7 @@ describe('Echo relationship affinity',()=>{
     useModsStore.setState({switches:{on:{echo:false},options:{}}})
     slotSettled({before,ledger:null,closingCast:[]})
     expect(game().charInfo.a.memories[0].echoAffinity).toBeUndefined()
-    useModsStore.setState({switches:{on:{},options:{}}})
+    useModsStore.setState({switches:{on:{echo:true},options:{}}})
     slotSettled({before,ledger:null,closingCast:[]})
     expect(game().charInfo.a.memories[0].echoAffinity).toBe('matching')
     expect(matchingEcho(game().exEcho,'a')).toBe(true)

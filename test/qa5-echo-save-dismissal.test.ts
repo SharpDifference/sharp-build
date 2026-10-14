@@ -12,7 +12,7 @@ let saved: SaveDraft[]
 const finish = (draft: SaveDraft): Result<GameSave> => ({ ok: true, data: { ...draft, playthroughId: 'echo-save', saveId: 'autosave', saveDate: 0 } })
 beforeEach(() => {
   game().reset(); resetLoopState(); saved = []
-  useModsStore.setState({ switches: { on: {}, options: {} } })
+  useModsStore.setState({ switches: { on: { echo: true }, options: {} } })
   useGameStore.setState({ playthroughId: 'echo-save', date: 7, awaitingInput: true,
     exEcho: normalizeEcho({ player: { aspect: 'daylark', name: 'First Light' }, girls: {} }) })
   stubApi({ saves: { autosave: async (_id, draft) => { saved.push(structuredClone(draft)); return finish(draft) } } })

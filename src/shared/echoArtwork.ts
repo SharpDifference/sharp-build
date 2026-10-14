@@ -41,3 +41,6 @@ export function assertSameEchoArt(existing: Uint8Array | undefined, incoming: Ui
     throw Error('This backup has an Echo artwork id that belongs to a different image here. Nothing was restored.')
   }
 }
+
+/** Displayed when local segmentation cannot initialize before a paid image request. */
+export const ECHO_CUTOUT_PREPARE_ERROR = "Could not load the Echo background-removal model or runtime. First use downloads about 100 MB from staticimgly.com. Check your connection and try Generate artwork again. Previous artwork is unchanged; no image API request was made."

@@ -15,7 +15,7 @@ let database: typeof import('../src/web/db/open').database
 const request = () => ({ requestId: crypto.randomUUID(), identity: normalizeEcho({ player: { name: 'Vaelum', aspect: 'veilkeeper', motif: 0 } }).player!, name: 'Fictional owner', bio: 'Thoughtful.' })
 beforeEach(async () => {
   globalThis.indexedDB = new IDBFactory(); vi.resetModules(); vi.resetAllMocks()
-  mocks.switches.mockResolvedValue(NO_SWITCHES); mocks.cloud.mockResolvedValue(png)
+  mocks.switches.mockResolvedValue({ on: { echo: true, reckoning: true }, options: {} }); mocks.cloud.mockResolvedValue(png)
   mocks.normalize.mockResolvedValue(png); mocks.cutout.mockResolvedValue(png)
   echo = await import('../src/web/echoArtwork'); ({ database } = await import('../src/web/db/open'))
 })
@@ -31,7 +31,7 @@ it('initializes segmentation before charging, then stores separate source and im
 it('does not charge if preparation fails or local-only generation is selected', async () => {
   mocks.prepare.mockRejectedValueOnce(Error('offline'))
   await expect(echo.generateEchoArt(request())).rejects.toThrow('offline')
-  mocks.switches.mockResolvedValue({ on: {}, options: { 'echo:megaten-art': true } })
+  mocks.switches.mockResolvedValue({ on: { echo: true }, options: { 'echo:megaten-art': true } })
   await expect(echo.generateEchoArt(request())).rejects.toThrow('desktop')
   expect(mocks.cloud).not.toHaveBeenCalled()
 })
@@ -64,7 +64,7 @@ it('cancels during settings lookup, rejects overlapping jobs, and permits the ne
   mocks.switches.mockReturnValueOnce(new Promise(resolve => { finish = resolve }))
   const first = request(), pending = echo.generateEchoArt(first)
   await expect(echo.generateEchoArt(request())).rejects.toThrow('already being generated')
-  echo.cancelEchoArt(first.requestId); finish(NO_SWITCHES)
+  echo.cancelEchoArt(first.requestId); finish({ on: { echo: true, reckoning: true }, options: {} })
   await expect(pending).rejects.toMatchObject({ name: 'AbortError' })
   expect(mocks.prepare).not.toHaveBeenCalled(); expect(mocks.cloud).not.toHaveBeenCalled()
   const db = await database()

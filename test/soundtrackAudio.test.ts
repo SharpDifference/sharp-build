@@ -72,7 +72,7 @@ it('loops a short custom title and never applies the stock thirty-second ending 
 
 it('loops the dungeon and question tracks, switches to Bloom once, and restores custom overrides', async () => {
   await cue('reckoning_dungeon')
-  expect(window.api.assets.readAudio).toHaveBeenCalledWith('music/reckoning_rise_from_the_dark.mp3')
+  expect(window.api.assets.readAudio).toHaveBeenCalledWith('community/reckoning/reckoning_rise_from_the_dark.mp3')
   expect(Source.made.at(-1)?.loop).toBe(true)
   store.useSoundtrackStore.setState({map:{reckoning_dungeon:{...track,loop:false}}})
   engine.refreshSoundtracks();await settle()
@@ -83,10 +83,10 @@ it('loops the dungeon and question tracks, switches to Bloom once, and restores 
   expect(Source.made.at(-1)?.buffer?.duration).toBe(120)
   expect(Source.made.at(-1)?.loop).toBe(true)
   await cue('reckoning')
-  expect(window.api.assets.readAudio).toHaveBeenCalledWith('music/reckoning_breakthrough.mp3')
+  expect(window.api.assets.readAudio).toHaveBeenCalledWith('community/reckoning/reckoning_breakthrough.mp3')
   expect(Source.made.at(-1)?.loop).toBe(true)
   await cue('reckoning_victory')
-  expect(window.api.assets.readAudio).toHaveBeenCalledWith('music/reckoning_bloom.mp3')
+  expect(window.api.assets.readAudio).toHaveBeenCalledWith('community/reckoning/reckoning_bloom.mp3')
   const victory=Source.made.at(-1)!
   expect(victory.loop).toBe(false)
   victory.finish();const count=Source.made.length

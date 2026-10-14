@@ -1,6 +1,6 @@
 import { beforeEach, expect, it, vi } from 'vitest'
 import { normalizeEcho } from '@shared/echo'
-import { NO_SWITCHES, type ModSwitches } from '@shared/mods'
+import { type ModSwitches } from '@shared/mods'
 
 // DOTS regression fixtures: no real files, Electron windows, models or image API calls.
 const mocks = vi.hoisted(() => ({
@@ -36,7 +36,7 @@ const request = () => ({ requestId: id, identity: normalizeEcho({ player: { name
 
 beforeEach(() => {
   vi.resetAllMocks()
-  mocks.switches.mockResolvedValue(NO_SWITCHES)
+  mocks.switches.mockResolvedValue({ on: { echo: true, reckoning: true }, options: {} })
   mocks.cloud.mockResolvedValue(png)
   mocks.cutout.mockResolvedValue(png)
   mocks.read.mockRejectedValue(Object.assign(Error('fixture has no saved reflection'), { code: 'ENOENT' }))
@@ -55,7 +55,7 @@ it.each(['Echo', 'Unheard Soul'] as const)('honors %s cancellation while the ini
 
   // The renderer already owns this request ID and exposes Stop/Cancel at this point.
   cancelEchoArt(id, 7)
-  finishSettings(NO_SWITCHES)
+  finishSettings({ on: { echo: true, reckoning: true }, options: {} })
   await expect(pending).rejects.toMatchObject({ name: 'AbortError' })
 
   // Expected behavior: cancellation before any image work must prevent a paid request.
@@ -70,7 +70,7 @@ it('reserves one job during settings lookup, retains ownership and releases it o
   const pending = generateEchoArt(request(), 7)
   await expect(generateReflectionPortrait('nina', crypto.randomUUID(), 8)).rejects.toThrow('already being generated')
   cancelEchoArt(id, 8)
-  finish(NO_SWITCHES)
+  finish({ on: { echo: true, reckoning: true }, options: {} })
   await expect(pending).resolves.toBeTypeOf('string')
   expect(mocks.cloud).toHaveBeenCalledTimes(1)
   mocks.prepare.mockImplementationOnce(() => { cancelEchoArt(id, 7) })

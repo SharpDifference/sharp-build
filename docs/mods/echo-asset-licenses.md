@@ -21,7 +21,7 @@ relicense it under the game's AGPL license.
 
 See the separate [music asset license](../../assets/echo-public/echo-music-license.txt).
 The files ship as `reckoning_breakthrough.mp3`, `reckoning_bloom.mp3`, and `reckoning_rise_from_the_dark.mp3` in
-`assets/sound/music`.
+`assets/sound/community/reckoning`.
 
 ## The Unspoken backgrounds
 

@@ -25,7 +25,7 @@ const request = () => ({ requestId: 'fdc99b1a-bd3b-41ca-897f-757b3bf983c3',
 
 beforeEach(() => {
   vi.resetAllMocks()
-  mocks.switches.mockResolvedValue(NO_SWITCHES)
+  mocks.switches.mockResolvedValue({ on: { echo: true, reckoning: true }, options: {} })
   mocks.cloud.mockResolvedValue(Buffer.from('original'))
   mocks.cutout.mockResolvedValue(Buffer.from('transparent'))
   mocks.local.mockResolvedValue(Buffer.from('local-transparent'))
@@ -153,7 +153,7 @@ describe('Echo artwork routing and safe background removal', () => {
     expect(mocks.cloud).toHaveBeenCalledTimes(1)
   })
   it('uses the local generator and portable cleanup without making a cloud request', async () => {
-    mocks.switches.mockResolvedValue({ on: {}, options: { 'echo:megaten-art': true } })
+    mocks.switches.mockResolvedValue({ on: { echo: true }, options: { 'echo:megaten-art': true } })
     await generateEchoArt(request(), 7)
     await uploadEchoArt('chosen.png')
     expect(mocks.local).toHaveBeenCalledTimes(1)

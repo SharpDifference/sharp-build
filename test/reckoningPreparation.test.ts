@@ -28,7 +28,7 @@ beforeEach(()=>{
   vi.useFakeTimers()
   game().reset();resetLoopState()
   useSettingsStore.setState({settings:null})
-  useModsStore.setState({switches:{on:{echo:false,reckoning:true,breakthrough:true},options:{}}})
+  useModsStore.setState({switches:{on:{echo:false,reckoning:true,breakthrough:true},options:{'reckoning:prepare-questions':true}}})
   useGameStore.setState({playthroughId:'preparation-test',date:15,time:0,chars:['a','b'],cast:['a'],playerFirstName:'Sam',playerLastName:'Lee',
     characters:charactersById(character({charId:'a',firstName:'Nina',personality:'Outspoken but afraid of failing.'}),character({charId:'b',firstName:'Bea',personality:'Quiet but determined.'})),
     charInfo:{a:charInfo({nameKnown:true,memories}),b:charInfo({nameKnown:true,memories})},awaitingInput:true,
@@ -41,6 +41,21 @@ beforeEach(()=>{
 afterEach(async()=>{stop?.();stop=undefined;await writesSettled();restoreApi();vi.useRealTimers()})
 
 describe('Reckoning background preparation',()=>{
+  it('makes no background request with the new default, then prepares after explicit opt-in', async () => {
+    useModsStore.setState({ switches: { on: { reckoning: true, breakthrough: true }, options: {} } })
+    stop = watchReckoningPreparation()
+    await tick()
+    expect(complete).not.toHaveBeenCalled()
+    expect(save).not.toHaveBeenCalled()
+    useModsStore.setState({ switches: {
+      on: { reckoning: true, breakthrough: true }, options: { 'reckoning:prepare-questions': true }
+    } })
+    await tick()
+    expect(complete).toHaveBeenCalledTimes(1)
+    expect(reckoningPreparationStatus(game(), 'a').status).toBe('ready')
+    expect(game().exBreakthrough.meters.a).toBe(100)
+    expect(save).not.toHaveBeenCalled()
+  })
   it.each([0,1] as const)('does not spend a background request at the semester cutoff (time %s)',async time=>{
     const date=time===1?GRADUATION_DATE-1:GRADUATION_DATE
     useGameStore.setState({date,time,charInfo:{a:charInfo({nameKnown:true,memories:memories.map(m=>({...m,date}))})}})
@@ -74,9 +89,9 @@ describe('Reckoning background preparation',()=>{
     if(kind==='replay')useGameStore.setState({replaying:{} as never})
     if(kind==='created')useGameStore.setState({createdScene:{} as never})
     if(kind==='rewarded')useGameStore.setState({exCharacterDynamics:{version:1,characters:{a:{traits:[],growth:{id:'earned',name:'A New Step',description:'She can ask for help.',reframes:['one','two','three']}}}}})
-    if(kind==='mod')useModsStore.setState({switches:{on:{reckoning:false},options:{}}})
-    if(kind==='breakthrough')useModsStore.setState({switches:{on:{breakthrough:false},options:{}}})
-    if(kind==='option')useModsStore.setState({switches:{on:{},options:{'reckoning:prepare-questions':false}}})
+    if(kind==='mod')useModsStore.setState({switches:{on:{reckoning:false},options:{'reckoning:prepare-questions':true}}})
+    if(kind==='breakthrough')useModsStore.setState({switches:{on:{reckoning:true,breakthrough:false},options:{'reckoning:prepare-questions':true}}})
+    if(kind==='option')useModsStore.setState({switches:{on:{reckoning:true,breakthrough:true},options:{'reckoning:prepare-questions':false}}})
     stop=watchReckoningPreparation();await tick()
     expect(complete).not.toHaveBeenCalled()
     expect(save).not.toHaveBeenCalled()
@@ -100,7 +115,7 @@ describe('Reckoning background preparation',()=>{
     useGameStore.setState({busy:true,reread:1})
     await tick()
     useGameStore.setState({busy:false,reread:0})
-    useModsStore.setState({switches:{on:{},options:{'reckoning:glitch-effects':false}}})
+    useModsStore.setState({switches:{on:{reckoning:true,breakthrough:true},options:{'reckoning:prepare-questions':true,'reckoning:glitch-effects':false}}})
     await tick()
     expect(complete).toHaveBeenCalledTimes(1)
     expect(reckoningPreparationStatus(game(),'a').status).toBe('ready')
@@ -119,7 +134,7 @@ describe('Reckoning background preparation',()=>{
     if(kind==='slot')useGameStore.setState({time:1})
     if(kind==='provider')useSettingsStore.setState({settings:{apiProvider:'openai',endpointModel:'new-writer'} as never})
     if(kind==='spirit')useGameStore.setState({exBreakthrough:normalizeBreakthrough({meters:{a:75}})})
-    if(kind==='switch')useModsStore.setState({switches:{on:{reckoning:false},options:{}}})
+    if(kind==='switch')useModsStore.setState({switches:{on:{reckoning:false},options:{'reckoning:prepare-questions':true}}})
     expect(cancel).toHaveBeenCalledWith(group)
     release({ok:true,data:thoughts});await vi.advanceTimersByTimeAsync(0)
     expect(reckoningPreparationStatus(game(),'a').status).not.toBe('ready')
@@ -165,7 +180,7 @@ describe('Reckoning background preparation',()=>{
   it('debounces mount rehearsal, stops on unmount and retains on-demand behavior when opted out',async()=>{
     const rehearsal=watchReckoningPreparation();rehearsal()
     await tick();expect(complete).not.toHaveBeenCalled()
-    useModsStore.setState({switches:{on:{},options:{'reckoning:prepare-questions':false}}})
+    useModsStore.setState({switches:{on:{reckoning:true,breakthrough:true},options:{'reckoning:prepare-questions':false}}})
     stop=watchReckoningPreparation();await tick()
     await enterTestDungeon();await startReckoning('a')
     expect(complete).toHaveBeenCalledTimes(1);expect(save).toHaveBeenCalledTimes(3)

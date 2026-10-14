@@ -14,7 +14,7 @@ const game=()=>useGameStore.getState()
 const placement={x:135,y:-80,scale:1.4}
 beforeEach(()=>{
   game().reset();resetLoopState()
-  useModsStore.setState({switches:{on:{},options:{}}})
+  useModsStore.setState({switches:{on:{echo:true},options:{}}})
   useGameStore.setState({playthroughId:'echo-stage-test',date:7,chars:['a','b'],characters:charactersById(character({charId:'a'}),character({charId:'b'})),charInfo:{a:charInfo(),b:charInfo()},exEcho:normalizeEcho({player:{aspect:'daylark',name:'First Light'},girls:{a:{aspect:'daylark',name:'Morning Song'},b:{aspect:'veilkeeper',name:'Hidden Star'}}})})
   stubApi({saves:{autosave:async(id,draft)=>({ok:true,data:{...draft,playthroughId:id,saveId:'autosave',saveDate:0}})}})
 })

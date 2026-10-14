@@ -24,7 +24,7 @@ beforeEach(() => {
  vi.useFakeTimers(); game().reset(); resetLoopState(); saved.length = 0
  complete.mockReset().mockResolvedValue({ ok: true, data: questions }); cancel.mockClear()
  useSettingsStore.setState({ settings: null })
- useModsStore.setState({ switches: { on: { echo: false, reckoning: true, breakthrough: true }, options: {} } })
+ useModsStore.setState({ switches: { on: { echo: false, reckoning: true, breakthrough: true }, options: { 'reckoning:prepare-questions': true } } })
  const lines = sceneLines('We talked about asking for help.')
  useGameStore.setState({ playthroughId: 'qa3-pending-opening', date: 15, time: 0, chars: ['a'], cast: ['a'], playerFirstName: 'Sam', playerLastName: 'Lee',
   characters: charactersById(character({ charId: 'a', firstName: 'Nina', personality: 'Outspoken but afraid of failing.' })),

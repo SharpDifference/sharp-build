@@ -12,8 +12,6 @@ import { characterArchive, isPublic } from '../scripts/syncPublic.mjs'
 const PRIVATE = [
   'assets/characters/x/cg/sex.png',
   'assets/sound/music/a.ogg',
-  'assets/sound/music/a.mp3',
-  'assets/sound/music/reckoning_unlisted.mp3',
   'assets/sound/ambient_music/edm_music.ogg',
   'assets/newfolder/thing.json',
   'build/itch-page/shots/lab.jpg',
@@ -23,9 +21,6 @@ const PRIVATE = [
 ]
 
 const PUBLIC = [
-  'assets/sound/music/reckoning_breakthrough.mp3',
-  'assets/sound/music/reckoning_bloom.mp3',
-  'assets/sound/music/reckoning_rise_from_the_dark.mp3',
   'assets/workflows/characterCg.json',
   'assets/quickstart.json',
   'assets/pose/pose.json',

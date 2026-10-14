@@ -58,7 +58,7 @@ function enterContinuedRun(recorded: boolean, menu: boolean, retain = true): voi
     charInfo: { a: charInfo({ nameKnown: true, memories: Array.from({ length: 12 }, (_, i) => ({
       date: 15, type: 'loved' as const, desc: `The reader supported her bakery plan on occasion ${i}.`
     })) }) }, exBreakthrough: normalizeBreakthrough({ meters: { a: 100 } }) }
-  useModsStore.setState({ switches: { on: { [CHARACTER_DYNAMICS_MOD]: menu, echo: false, reckoning: true, breakthrough: true }, options: {} } })
+  useModsStore.setState({ switches: { on: { [CHARACTER_DYNAMICS_MOD]: menu, echo: false, reckoning: true, breakthrough: true }, options: { 'reckoning:prepare-questions': true } } })
   game().loadSave(stampSave(draft, 'next-term', 'autosave', 1), record, charactersById(girl))
   loopState.record = record
   const lines = sceneLines('We talked about her bakery plans.')

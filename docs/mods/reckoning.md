@@ -2,6 +2,8 @@
 
 This mod connects Breakthrough to a private encounter with a girl's **Unheard Soul**: the guarded, negative expression of thoughts she struggles to voice. The inner world is **The Unspoken**, called the **Unspoken Void** in narration. The code/save/mod ID remains reckoning so existing records and settings stay readable. It requires Breakthrough; Echoes supplies optional artwork, an aspect and a hint, while ordinary Breakthrough still works independently.
 
+This mod ships off by default (version 0.7.12), and background question preparation also defaults off. Players can enable each explicitly; saved choices remain authoritative.
+
 ## Establish the link, then follow it
 
 During a safe scene reply, select a known, present girl with at least **38 weighted native affection points** and **100 spirit**, then summon the encounter. This is roughly 75% of the native 50-point Devoted threshold; affection itself has no fixed numerical maximum. Only one link can be active, and a girl with completed growth cannot earn it twice.
@@ -37,7 +39,7 @@ The real girl does not know about this encounter. A later ordinary scene can exp
 
 ## Preparation, whispers and presentation
 
-Prepare questions in the background is on by default. Eligible current-scene targets can prepare their opening set while the panel is closed. Requests are serialized/debounced and invalidated when relevant context, save/provider or eligibility changes. Prepared text alone spends no spirit and writes no save. Background failure requires an explicit retry. Turning this option off restores on-demand preparation. It can consume tokens for unused openings; answer judgments, Talk and the hint remain live requests.
+Prepare questions in the background is off by default. Players can opt in so eligible current-scene targets prepare their opening set while the panel is closed. Requests are serialized/debounced and invalidated when relevant context, save/provider or eligibility changes. Prepared text alone spends no spirit and writes no save. Background failure requires an explicit retry. Leaving this option off uses on-demand preparation. Background preparation can consume tokens for unused openings; answer judgments, Talk and the hint remain live requests.
 
 Whispers are always first person and use existing prepared/context text rather than a timed generation loop. They appear at random safe background positions, avoid detected portrait silhouettes and controls, and use approximately 48% opacity. Characters can have different image sizes. Full-screen interference accompanies the letter glitches. With the linked girl present, subsequent whispers occur about every 50–75 seconds; in other scenes, her voice can appear every two minutes even while absent. Inside the dungeon, whispers repeat every ten seconds until the questions start. Hidden, busy, error and unsuitable scene states suppress them.
 
@@ -57,7 +59,7 @@ On desktop, character ZIP export/import/duplicate carries a validated optional e
 | Questions | Breakthrough: Victory & Hope | Loop |
 | Victory | Bloom | Once |
 
-Settings → Custom soundtracks exposes independent replacement slots for all three. Music follows the normal Music volume; the separate dungeon-silence toggle was removed. Question music and the reader's Echo begin with the questions, not on entry. Leaving restores the normal soundscape. The [asset notice](echo-asset-licenses.md) credits themaestroai and records permission for all three tracks. The release installer allowlist includes all three files and restores the official installation on uninstall.
+Settings → Custom soundtracks exposes independent replacement slots for all three. Music follows the normal Music volume; the separate dungeon-silence toggle was removed. Question music and the reader's Echo begin with the questions, not on entry. Leaving restores the normal soundscape. The [asset notice](echo-asset-licenses.md) credits themaestroai and records permission for all three tracks. Tracks live in `assets/sound/community/reckoning/`; the installer includes the shared community audio folder without a per-track list and restores the official installation on uninstall.
 
 ## Persistence, rewind and isolation
 

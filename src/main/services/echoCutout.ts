@@ -1,6 +1,6 @@
 import { BrowserWindow } from 'electron'
 import { join } from 'path'
-import { assertEchoPng } from '@shared/echoArtwork'
+import { assertEchoPng, ECHO_CUTOUT_PREPARE_ERROR } from '@shared/echoArtwork'
 
 let host: BrowserWindow | null = null
 
@@ -44,7 +44,7 @@ export async function prepareEchoCutout(signal: AbortSignal): Promise<void> {
   } catch (error) {
     releaseEchoCutout()
     signal.throwIfAborted()
-    throw new Error('Could not prepare Echo background removal. First use downloads about 100 MB. Check your connection; no image API request was made.', { cause: error })
+    throw new Error(ECHO_CUTOUT_PREPARE_ERROR, { cause: error })
   }
 }
 

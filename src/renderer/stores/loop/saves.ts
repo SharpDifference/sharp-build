@@ -580,7 +580,7 @@ export async function writeEcho(next: EchoState, previous: EchoState, active: ()
   const current = (): boolean => active() && modIsOn('echo') && ownsGame()
   if (!current() || manualSaveOffer() !== 'open') throw Error('Wait for a safe save point.')
   const saved = normalizeEcho(next)
-  assertEchoEdit(previous,saved)
+  assertEchoEdit(previous, saved)
   let written = false
   manualWriting = true
   try {
@@ -589,7 +589,7 @@ export async function writeEcho(next: EchoState, previous: EchoState, active: ()
       const now = useGameStore.getState()
       const draft = manualSaveDraft() ?? (!sceneActiveOf(now) ? { ...now.toGameSave(), scene: null } : null)
       if (!draft || !now.playthroughId) throw Error('No safe save point is available.')
-      assertEchoEdit(now.exEcho,saved)
+      assertEchoEdit(now.exEcho, saved)
       const result = await window.api.saves.autosave(now.playthroughId, { ...draft, exEcho: saved })
       if (!result.ok) throw Error(result.error.message)
       // Closing the editor cannot undo an acknowledged write. A different loaded game still wins.
@@ -599,38 +599,85 @@ export async function writeEcho(next: EchoState, previous: EchoState, active: ()
       written = true
     })
     if (!written) throw Error('The game changed. Reopen the Echo.')
-  } finally { manualWriting = false }
+  } finally {
+    manualWriting = false
+  }
 }
 
 /** One atomic save holds the spirit charge, round progress and earned Character Dynamics tag. */
-export async function writeReckoningChange(next:ReckoningState,previous:ReckoningState,charge:0|100,charId:string,dynamics:CharacterDynamics|undefined,active:()=>boolean,sceneBeat?:SceneLine[]):Promise<void> {
-  const start=useGameStore.getState(),meterBefore=start.exBreakthrough
-  const current=():boolean=>{const now=useGameStore.getState();return active()&&now.exReckoning===previous&&now.exBreakthrough===meterBefore&&
-    now.exCharacterDynamics===start.exCharacterDynamics&&now.playthroughId===start.playthroughId&&now.loads===start.loads&&!now.sceneEnding}
-  if(!current()||manualSaveOffer()!=='open')throw Error('Wait for a safe save point.')
-  const saved=normalizeReckoning(next)
-  if(next.active&&!saved.active)throw Error('The encounter could not be saved.')
-  if(next.dungeon&&!saved.dungeon)throw Error('The dungeon could not be saved.')
-  const meter=meterBefore.meters[charId]??0
-  if(charge&&meter<charge)throw Error('This encounter needs 100 spirit.')
-  const breakthrough=charge?{...meterBefore,meters:{...meterBefore.meters,[charId]:meter-charge}}:meterBefore
-  const patch={exReckoning:saved,exBreakthrough:breakthrough,...(dynamics?{exCharacterDynamics:dynamics}:{})}
-  let written=false;manualWriting=true
+export async function writeReckoningChange(
+  next: ReckoningState,
+  previous: ReckoningState,
+  charge: 0 | 100,
+  charId: string,
+  dynamics: CharacterDynamics | undefined,
+  active: () => boolean,
+  sceneBeat?: SceneLine[]
+): Promise<void> {
+  const start = useGameStore.getState()
+  const meterBefore = start.exBreakthrough
+  const current = (): boolean => {
+    const now = useGameStore.getState()
+    return active() && now.exReckoning === previous && now.exBreakthrough === meterBefore &&
+      now.exCharacterDynamics === start.exCharacterDynamics && now.playthroughId === start.playthroughId &&
+      now.loads === start.loads && !now.sceneEnding
+  }
+  if (!current() || manualSaveOffer() !== 'open') throw Error('Wait for a safe save point.')
+  const saved = normalizeReckoning(next)
+  if (next.active && !saved.active) throw Error('The encounter could not be saved.')
+  if (next.dungeon && !saved.dungeon) throw Error('The dungeon could not be saved.')
+  const meter = meterBefore.meters[charId] ?? 0
+  if (charge && meter < charge) throw Error('This encounter needs 100 spirit.')
+  const breakthrough = charge
+    ? { ...meterBefore, meters: { ...meterBefore.meters, [charId]: meter - charge } }
+    : meterBefore
+  const patch = {
+    exReckoning: saved,
+    exBreakthrough: breakthrough,
+    ...(dynamics ? { exCharacterDynamics: dynamics } : {})
+  }
+  let written = false
+  manualWriting = true
   try {
-    await queueWrite(async()=>{
-      if(!current()||saveOffer(false)!=='open')return
-      const now=useGameStore.getState(),draft=manualSaveDraft()??(!sceneActiveOf(now)?{...now.toGameSave(),scene:null}:null)
-      if(!draft||!now.playthroughId)throw Error('No safe save point is available.')
-      const scene=sceneBeat?.length&&draft.scene?{...draft.scene,transcript:[...now.currentSceneTranscript,...sceneBeat],sceneLog:[...now.sceneLog,sceneBeat[0]],currentLine:sceneBeat[0],pendingLines:sceneBeat.slice(1),resumeOnLine:true as const}:draft.scene
-      const result=await window.api.saves.autosave(now.playthroughId,{...draft,...patch,scene})
-      if(!result.ok)throw Error(result.error.message)
-      if(!current())return
-      if(loopState.statusBase)loopState.statusBase={...loopState.statusBase,...patch}
+    await queueWrite(async () => {
+      if (!current() || saveOffer(false) !== 'open') return
+      const now = useGameStore.getState()
+      const draft = manualSaveDraft() ?? (!sceneActiveOf(now) ? { ...now.toGameSave(), scene: null } : null)
+      if (!draft || !now.playthroughId) throw Error('No safe save point is available.')
+      const scene = sceneBeat?.length && draft.scene
+        ? {
+            ...draft.scene,
+            transcript: [...now.currentSceneTranscript, ...sceneBeat],
+            sceneLog: [...now.sceneLog, sceneBeat[0]],
+            currentLine: sceneBeat[0],
+            pendingLines: sceneBeat.slice(1),
+            resumeOnLine: true as const
+          }
+        : draft.scene
+      const result = await window.api.saves.autosave(now.playthroughId, { ...draft, ...patch, scene })
+      if (!result.ok) throw Error(result.error.message)
+      if (!current()) return
+      if (loopState.statusBase) loopState.statusBase = { ...loopState.statusBase, ...patch }
       // Quit/switch-save writes this held checkpoint. Preserve the paid link's
       // unread lines there too, without marking them as already advanced.
-      if(sceneBeat?.length&&scene)loopState.decisionSave=scene
-      useGameStore.setState({...patch,...(sceneBeat?.length&&scene?{currentSceneTranscript:scene.transcript,sceneLog:scene.sceneLog,currentLine:scene.currentLine,pendingLines:scene.pendingLines,awaitingInput:false,reread:0}:{})});written=true
+      if (sceneBeat?.length && scene) loopState.decisionSave = scene
+      useGameStore.setState({
+        ...patch,
+        ...(sceneBeat?.length && scene
+          ? {
+              currentSceneTranscript: scene.transcript,
+              sceneLog: scene.sceneLog,
+              currentLine: scene.currentLine,
+              pendingLines: scene.pendingLines,
+              awaitingInput: false,
+              reread: 0
+            }
+          : {})
+      })
+      written = true
     })
-    if(!written)throw Error('The game changed; reopen the encounter.')
-  } finally {manualWriting=false}
+    if (!written) throw Error('The game changed; reopen the encounter.')
+  } finally {
+    manualWriting = false
+  }
 }

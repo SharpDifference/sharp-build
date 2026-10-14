@@ -2,6 +2,8 @@
 
 Echoes gives the reader and each student a named symbolic creature and one of 22 original aspects. Matching aspects increase new positive relationship progress by 25%; competing aspects reduce it by 25%. Existing memories and negative gains are unchanged. Aspect assignment is a local profile-cue classifier, not an AI personality assessment. Ability prices and narrative effects remain experimental.
 
+Echo ships off by default (version 0.14.1). Enable it explicitly in Mods; saved switch choices are not reset.
+
 ## Setup and customization
 
 The shared Echoes manager appears near the end of new-game setup, after course selection. It starts with aspects, names and creature suggestions drawn from each profile. Before the game begins, the reader and new students can freely change starting aspects, names, creature details, artwork and staging. Returning students retain the history and identity brought forward by Continuing Semesters. Setup does not automatically buy artwork; generation buttons use the configured provider.
@@ -16,7 +18,7 @@ The manager uses the game's typography, paper-shadow buttons and day/night palet
 
 Gemini or the configured image API is the default. Mods → Echo → Local Megaten artwork selects an optional Echo-only ComfyUI workflow. A LoRA cannot be attached to the Gemini API: it is used only by that local workflow. Other image features keep their own provider settings. Only the reader's missing artwork gets an automatic first-menu attempt; student generation is explicit. Upload accepts existing artwork and Download exports the finished PNG.
 
-Desktop and browser API generation use local ISNet subject segmentation through IMG.LY background-removal 1.7.0 and ONNX Runtime Web 1.21.0. Gemini does not require ComfyUI or Python. First use downloads roughly 100 MB of model/runtime resources from the pinned resource host; later requests can reuse the cache. Images are not uploaded to that host. Initialization completes before a paid image request. Generated originals are retained before segmentation so a failed cutout does not discard the paid source. White-edge refinement is restricted to suitable light backgrounds instead of deleting dark body pixels.
+Desktop and browser API generation use local ISNet subject segmentation through IMG.LY background-removal 1.7.0 and ONNX Runtime Web 1.21.0. Gemini does not require ComfyUI or Python. First use downloads roughly 100 MB of model/runtime resources from the pinned resource host; later requests can reuse the cache. Images are not uploaded to that host. Initialization completes before a paid image request. If the model/runtime cannot load, the panel explains the first-use download, asks the player to check their connection and retry Generate artwork, and confirms that no paid request was made and existing artwork is unchanged. Generated originals are retained before segmentation so a failed cutout does not discard the paid source. White-edge refinement is restricted to suitable light backgrounds instead of deleting dark body pixels.
 
 The desktop runs segmentation in a hidden sandboxed renderer without a preload/filesystem bridge. Cancellation closes its worker/window. Browser custom endpoints must permit CORS. Provider, network and cache availability still affect generation; transparency quality is not guaranteed for every image.
 
