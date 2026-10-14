@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { MAX_POSTER_REPLIES, threadWork } from '../src/shared/bunnyfeeds'
+import { MAX_POSTER_REPLIES, threadWork, WRAP_UP_AFTER } from '../src/shared/bunnyfeeds'
 import type { PostComment } from '../src/shared/postComments'
 
 /** What the once-a-slot thread call still owes a post, read off the comments alone. */
@@ -34,5 +34,12 @@ describe('threadWork', () => {
     const owed = threadWork([...others, ...replies, comment('late', 3), mine], 'her', 2, 3)
     expect(owed?.others).toEqual([])
     expect(owed?.player).toEqual([mine])
+  })
+
+  it('winds the thread down once the reader has written enough under it', () => {
+    const mine = (count: number) =>
+      Array.from({ length: count }, (_, i) => comment(`p${i}`, i, { player: true }))
+    expect(threadWork(mine(WRAP_UP_AFTER - 1), 'her', undefined, 99)?.windingDown).toBe(false)
+    expect(threadWork(mine(WRAP_UP_AFTER), 'her', undefined, 99)?.windingDown).toBe(true)
   })
 })

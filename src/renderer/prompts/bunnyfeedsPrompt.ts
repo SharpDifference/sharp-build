@@ -117,6 +117,8 @@ export interface FeedThread {
   repliers: readonly Replier[]
   /** Girls the reader tagged, each with the ref of the comment she answers. */
   tagged?: readonly { ref: string; name: string }[]
+  /** The thread has run long and she wraps it up. */
+  windingDown?: boolean
 }
 
 /** Everything the builder reads; assembled by the loop, which owns the store. */
@@ -269,13 +271,17 @@ function threadLines(thread: FeedThread): string[] {
     ...(thread.tagged ?? []).map(
       ({ ref, name: tagged }) => `The reader tagged ${tagged} in ${ref}, so she answers it too.`
     ),
-    ...(thread.mustAnswer.length > 0
+    ...(thread.windingDown
       ? [
-          repliers.length > 0
-            ? `Besides her, ${repliers.join(', ')} and strangers may react here: to the reader, to each other, to her, or to the post itself as ${thread.postRef}.`
-            : `Besides her, strangers may react here: to the reader, to each other, to her, or to the post itself as ${thread.postRef}.`
+          `This thread has run long. ${name} keeps her answers short and starts wrapping it up in her own way, the way people drift out of a thread that has gone on too long. Nobody else reacts here besides anyone the reader tagged.`
         ]
-      : [])
+      : thread.mustAnswer.length > 0
+        ? [
+            repliers.length > 0
+              ? `Besides her, ${repliers.join(', ')} and strangers may react here: to the reader, to each other, to her, or to the post itself as ${thread.postRef}.`
+              : `Besides her, strangers may react here: to the reader, to each other, to her, or to the post itself as ${thread.postRef}.`
+          ]
+        : [])
   ]
 }
 

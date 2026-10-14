@@ -198,8 +198,11 @@ export async function armFeedThreads(showAt: 'now' | 'next' = 'now'): Promise<vo
       mustAnswer: work.player.map((one) => refOf.get(one.id) ?? ''),
       mayAnswer: work.others.map((one) => refOf.get(one.id) ?? ''),
       mayAnswerCount: work.othersLeft,
+      ...(work.windingDown ? { windingDown: true } : {}),
       repliers: withTagged(
-        work.player.length > 0 ? repliersFor(charId, game.npcRelationships) : [],
+        work.player.length > 0 && !work.windingDown
+          ? repliersFor(charId, game.npcRelationships)
+          : [],
         work.player,
         charId
       ),
@@ -267,6 +270,10 @@ function fileReplies(
   const capLeft = new Map<string, number>(owed.map(({ post, work }) => [post.id, work.othersLeft]))
   // Everybody but the poster: a few reactions a post, to anybody in the thread or to the post.
   const crowdLeft = new Map<string, number>(owed.map(({ post }) => [post.id, MAX_CROWD_REACTIONS]))
+  // A thread winding down hears only from the girls he tagged.
+  const taggedOn = new Map<string, Set<string>>(
+    owed.map(({ post, work }) => [post.id, new Set(work.player.flatMap((one) => one.tags ?? []))])
+  )
   const owedIds = new Set(
     owed.flatMap(({ work }) => [...work.player, ...work.others].map((one) => one.id))
   )
@@ -294,6 +301,7 @@ function fileReplies(
     } else {
       // Nobody answers themselves, and the crowd stops at its few.
       if (comment && fromId && comment.charId === fromId) continue
+      if (entry.work.windingDown && !(fromId && taggedOn.get(entry.post.id)?.has(fromId))) continue
       const left = crowdLeft.get(entry.post.id) ?? 0
       if (left <= 0) continue
       crowdLeft.set(entry.post.id, left - 1)
