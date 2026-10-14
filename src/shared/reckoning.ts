@@ -3,6 +3,8 @@ import { dynamicFor, type CharacterDynamics, type GrowthTag } from './characterD
 import type { Character, CharInfo, SceneLine } from './types'
 import type { BreakthroughState } from './breakthrough'
 import { sha256Hex } from './sha256'
+import { normalizeDungeon, type ReckoningDungeon } from './reckoningDungeonState'
+import { firstPersonThought } from './reckoningVoice'
 
 export const RECKONING_MOD = 'reckoning'
 export const RECKONING_COST = 100
@@ -17,10 +19,10 @@ export interface ReckoningSession {
   answers: ReckoningAnswer[]; challenge: string; feedback: string; attempts: number
   echoName?: string
 }
-export interface ReckoningAftermath { id:string; charId:string; date:number; time:number }
+export interface ReckoningAftermath { id:string; charId:string; date:number; time:number; origin?:string }
 /** A private event between transcript lines. No dialogue or profile text is duplicated. */
 export interface ReckoningRewind { id:string; charId:string; date:number; time:number; at:number; prefix:string }
-export interface ReckoningState { version: 1; active: ReckoningSession | null; aftermath?:ReckoningAftermath; rewinds?:ReckoningRewind[] }
+export interface ReckoningState { version: 1; active: ReckoningSession | null; aftermath?:ReckoningAftermath; afterQueue?:ReckoningAftermath[]; rewinds?:ReckoningRewind[]; dungeon?:ReckoningDungeon }
 export interface ReckoningVerdict { resolved: boolean; reaction: string; feedback: string; reframe: string; tagName: string; growth: string }
 const object = (v: unknown): Record<string, unknown> => v !== null && typeof v === 'object' && !Array.isArray(v) ? v as Record<string, unknown> : {}
 function text(v: unknown, max: number, field = 'a required field'): string {
@@ -29,6 +31,21 @@ function text(v: unknown, max: number, field = 'a required field'): string {
   return v.trim()
 }
 const id = (v: unknown): string => { const s=text(v,160); if (['__proto__','constructor','prototype'].includes(s)) throw Error('Invalid identity.'); return s }
+/** Old saves keep the first pending closing beat; later successes can queue behind it. */
+export function reckoningAftermaths(state:ReckoningState):ReckoningAftermath[] { return [...(state.aftermath?[state.aftermath]:[]),...(state.afterQueue??[])] }
+export function withReckoningAftermaths(state:ReckoningState,entries:ReckoningAftermath[]):ReckoningState {
+ const {aftermath:_a,afterQueue:_q,...base}=state
+ return {...base,...(entries[0]?{aftermath:entries[0]}:{}),...(entries.length>1?{afterQueue:entries.slice(1)}:{})}
+}
+function afterRecords(value:unknown):Pick<ReckoningState,'aftermath'|'afterQueue'> {
+ const state=object(value),records:ReckoningAftermath[]=[],seen=new Set<string>()
+ for(const raw of [state.aftermath,...(Array.isArray(state.afterQueue)?state.afterQueue:[])].slice(0,128))try {
+  const a=object(raw),key=id(a.id)
+  if(seen.has(key)||!Number.isSafeInteger(a.date)||Number(a.date)<0||!Number.isSafeInteger(a.time)||Number(a.time)<0||Number(a.time)>23)continue
+  records.push({id:key,charId:id(a.charId),date:Number(a.date),time:Number(a.time),...(typeof a.origin==='string'&&/^[a-f0-9]{64}$/.test(a.origin)?{origin:a.origin}:{})});seen.add(key)
+ }catch{/* Ignore damaged optional closing metadata without discarding encounter progress. */}
+ return {...(records[0]?{aftermath:records[0]}:{}),...(records.length>1?{afterQueue:records.slice(1)}:{})}
+}
 function rewindRecords(value:unknown):ReckoningRewind[] {
   if(!Array.isArray(value))return []
   const seen=new Set<string>(),records:ReckoningRewind[]=[]
@@ -42,7 +59,7 @@ function rewindRecords(value:unknown):ReckoningRewind[] {
 export function reckoningPrefix(lines:readonly SceneLine[]):string {
   return sha256Hex(JSON.stringify(lines.map(line=>[line.speaker,line.text])))
 }
-export function anchorReckoning(session:ReckoningSession,date:number,time:number,lines:readonly SceneLine[]):ReckoningRewind {
+export function anchorReckoning(session:Pick<ReckoningSession,'id'|'charId'>,date:number,time:number,lines:readonly SceneLine[]):ReckoningRewind {
   return {id:session.id,charId:session.charId,date,time,at:lines.length,prefix:reckoningPrefix(lines)}
 }
 
@@ -67,10 +84,11 @@ export function rewindReckoning(state:RewindableReckoning,kept:number):Partial<P
       dynamics={...dynamics!,characters:{...dynamics!.characters,[entry.charId]:rest}}
     }
   }
-  const {aftermath,rewinds:records,...base}=state.exReckoning
+  const {aftermath:_after,afterQueue:_queue,rewinds:records,...base}=state.exReckoning
   const rewinds=records?.filter(entry=>!ids.has(entry.id))??[]
   return {exReckoning:{...base,active:base.active&&ids.has(base.active.id)?null:base.active,
-    ...(aftermath&&!ids.has(aftermath.id)?{aftermath}:{}),...(rewinds.length?{rewinds}:{})},
+    ...(base.dungeon&&ids.has(base.dungeon.id)?{dungeon:undefined}:{}),
+    ...afterRecords(withReckoningAftermaths(base,reckoningAftermaths(state.exReckoning).filter(a=>!ids.has(a.id)))),...(rewinds.length?{rewinds}:{})},
     exBreakthrough:{...state.exBreakthrough,meters},...(dynamics!==state.exCharacterDynamics?{exCharacterDynamics:dynamics}:{})}
 }
 /** Editing words in-place keeps the event at the same point; a later branch can still undo it. */
@@ -83,14 +101,16 @@ export function rebaseReckoning(state:RewindableReckoning,lines:readonly SceneLi
 export function hasReckoningAffection(info: CharInfo | undefined, today: number, character: Character | undefined): boolean {
   return !!info?.nameKnown && !!character && affectionFor(info,today,character) >= RECKONING_AFFECTION_MIN
 }
-export function parseReckoningThoughts(value: unknown, context: ReckoningContext): ReckoningThought[] {
+export function parseReckoningThoughts(value: unknown, context: ReckoningContext, requireFirstPerson=false): ReckoningThought[] {
   const raw=object(value).thoughts
-  if (!Array.isArray(raw) || raw.length!==3) throw Error('Reckoning needs exactly three thoughts. Try again; no spirit was spent.')
+  if (!Array.isArray(raw) || raw.length!==3) throw Error('The encounter needs exactly three thoughts. Try again; no spirit was spent.')
   const allowed=new Set(context.evidence.map(e=>e.id))
   const thoughts=raw.map(v=>{
     const t=object(v)
     if(!Array.isArray(t.evidence)||!t.evidence.length||t.evidence.length>4||t.evidence.some(e=>typeof e!=='string'||!allowed.has(e)))throw Error('A thought cited unavailable history. Try again; no spirit was spent.')
-    return {belief:text(t.belief,350,'the limiting belief'),challenge:text(t.challenge,550,'the thought\'s challenge'),evidence:t.evidence as string[]}
+    const rawBelief=text(t.belief,350,'the limiting belief'),belief=requireFirstPerson?firstPersonThought(rawBelief,context.name):rawBelief
+    if(!belief)throw Error('The thought must be in her own first-person voice. Try again; no progress was changed.')
+    return {belief,challenge:text(t.challenge,550,'the thought\'s challenge'),evidence:t.evidence as string[]}
   })
   if(new Set(thoughts.map(t=>t.belief.toLowerCase())).size!==3)throw Error('The thoughts repeated themselves. Try again.')
   const memories=context.evidence.filter(e=>e.kind!=='profile').map(e=>e.id)
@@ -106,14 +126,12 @@ export function parseReckoningVerdict(value: unknown, finalRound: boolean): Reck
     growth:v.resolved&&finalRound?text(v.growth,700,'the earned growth description'):''}
 }
 export function normalizeReckoning(value?: unknown): ReckoningState {
+  const d=normalizeDungeon(object(value).dungeon),dungeon=d?{dungeon:d}:{},afters=afterRecords(value)
   try {
-    const state=object(value),raw=object(state.active),after=object(state.aftermath)
+    const state=object(value),raw=object(state.active)
     const records=rewindRecords(state.rewinds),rewinds=records.length?{rewinds:records}:{}
-    if(!Object.keys(raw).length){
-      if(!Object.keys(after).length)return {version:1,active:null,...rewinds}
-      if(!Number.isSafeInteger(after.date)||Number(after.date)<0||!Number.isSafeInteger(after.time)||Number(after.time)<0||Number(after.time)>23)throw Error('Invalid aftermath time')
-      return {version:1,active:null,...rewinds,aftermath:{id:id(after.id),charId:id(after.charId),date:Number(after.date),time:Number(after.time)}}
-    }
+    if(!Object.keys(raw).length)return {version:1,active:null,...rewinds,...dungeon,...afters}
+    if(d&&(!['inside','unlocked'].includes(d.phase)||raw.charId!==d.charId||raw.id!==d.id))throw Error('Mismatched dungeon encounter')
     const c=object(raw.context)
     if(!Array.isArray(c.evidence)||c.evidence.length>22)throw Error('Invalid evidence')
     const context: ReckoningContext={name:text(c.name,150),reader:text(c.reader,150),evidence:c.evidence.map(v=>{
@@ -122,12 +140,12 @@ export function normalizeReckoning(value?: unknown): ReckoningState {
     })}
     const thoughts=parseReckoningThoughts({thoughts:raw.thoughts},context)
     if(!Array.isArray(raw.answers)||raw.answers.length>2)throw Error('Invalid rounds')
-    return {version:1,...rewinds,active:{id:id(raw.id),charId:id(raw.charId),context,thoughts,
+    return {version:1,...rewinds,...dungeon,...afters,active:{id:id(raw.id),charId:id(raw.charId),context,thoughts,
       ...(typeof raw.echoName==='string'&&raw.echoName.trim()?{echoName:text(raw.echoName,120)}:{}),
       answers:raw.answers.map(v=>{const a=object(v);return {reply:text(a.reply,1500),reframe:text(a.reframe,500)}}),
       challenge:text(raw.challenge,600),feedback:typeof raw.feedback==='string'?raw.feedback.slice(0,500):'',
       attempts:Number.isSafeInteger(raw.attempts)&&Number(raw.attempts)>=0?Math.min(10000,Number(raw.attempts)):0}}
-  } catch { return {version:1,active:null} }
+  } catch { return {version:1,active:null,...dungeon,...afters} }
 }
 /** The tag belongs to her saved dynamic, never to the shared character library or trait palette. */
 export function applyReckoningVerdict(session: ReckoningSession, reply: string, verdict: ReckoningVerdict, dynamics?: CharacterDynamics): {state:ReckoningState;dynamics?:CharacterDynamics;tag?:GrowthTag;failed?:boolean} {

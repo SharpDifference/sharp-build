@@ -1,4 +1,8 @@
+import { UnspokenVoice } from './UnspokenVoice'
+import { UnspokenLinkGlitch } from './UnspokenLinkGlitch'
 import { ReckoningModal, ReckoningContinuation, ReckoningPreparation } from './ReckoningModal'
+import { ReckoningDungeonView } from './ReckoningDungeon'
+import { dungeonVisible } from '../stores/reckoningDungeon'
 import { EchoAura, EchoPanel } from './EchoPanel'
 import { ensureEchoes } from '../modEntries/echo'
 import { StoryMemoryModal } from './StoryMemoryModal'
@@ -678,6 +682,7 @@ export function GameView(): JSX.Element {
 
   const [action, setAction] = useState('')
   const [panel, setPanel] = useState<OpenPanel | null>(null)
+  const dungeonOpen=useGameStore(dungeonVisible)
   const closePanel = (): void => setPanel(null)
   /**
    * The glyphs a gift threw off her, until the last of them has faded. Armed `waiting` when the
@@ -1256,7 +1261,7 @@ export function GameView(): JSX.Element {
 
   useEffect(() => {
     // The scene chrome holds the line until the box that will hold it has arrived.
-    if (!text || typeHeld) return
+    if (!text || typeHeld || dungeonOpen) return
     // A line a cut landed is said whole again here, after the commit: a tick of the interval
     // is computed against the count last rendered, which a reset made in render can trail, and
     // a cut to a longer line would otherwise type out its tail.
@@ -1274,7 +1279,7 @@ export function GameView(): JSX.Element {
       })
     }, REVEAL_MS)
     return () => clearInterval(timer)
-  }, [currentLine, text, typeHeld, cutLanded])
+  }, [currentLine, text, typeHeld, cutLanded, dungeonOpen])
 
   /**
    * The voice under the typewriter: a blip on every third letter or digit, at the pitch of
@@ -1284,7 +1289,7 @@ export function GameView(): JSX.Element {
   useEffect(() => {
     const before = revealedBefore.current
     revealedBefore.current = revealed
-    if (revealed !== before + 1 || !VOICED.test(text[revealed - 1] ?? '')) return
+    if (dungeonOpen || revealed !== before + 1 || !VOICED.test(text[revealed - 1] ?? '')) return
     let voiced = 0
     for (const character of text.slice(0, revealed)) if (VOICED.test(character)) voiced += 1
     if (voiced % 3 !== 0) return
@@ -1295,7 +1300,7 @@ export function GameView(): JSX.Element {
     }
     const semitones = pitchSemitonesOf(speaking.voicePitch ?? VOICE_PITCH_DEFAULT, VOICE_RANGE)
     useAudioStore.getState().play('voice', { semitones })
-  }, [revealed, text, speakingCharId, characters])
+  }, [revealed, text, speakingCharId, characters, dungeonOpen])
 
   // What the glyphs come off her with. The burst is raised during render and render plays
   // nothing, so the sound is the commit that raised it — once per gift, on the burst's own key.
@@ -1402,7 +1407,7 @@ export function GameView(): JSX.Element {
    * right-click below from advancing, submitting or stepping behind one.
    */
   const blockedBefore = Boolean(
-    statusModal ||
+    dungeonOpen || statusModal ||
       memoryEdit ||
       turnFailed ||
       classifierError ||
@@ -2692,8 +2697,11 @@ export function GameView(): JSX.Element {
           <PlotTwistModal key="plot-twist" theme={half} onClose={closePanel} />
         )}
 
-        <ReckoningPreparation/>
-        <ReckoningContinuation blocked={blocked||covered}/>
+        <ReckoningPreparation key="reckoning-preparation"/>
+        <UnspokenVoice key="unspoken-voice" hidden={blocked||covered||uiHidden||cinematic}/>
+        <UnspokenLinkGlitch key="unspoken-link-glitch" hidden={blocked||covered||uiHidden||cinematic}/>
+        <ReckoningDungeonView key="reckoning-dungeon-view"/>
+        <ReckoningContinuation key="reckoning-continuation" blocked={blocked||covered}/>
         {panel?.kind === 'reckoning' && <ReckoningModal key={`reckoning-${panel.charId}`} charId={panel.charId} onClose={closePanel} />}
         {panel?.kind === 'echo' && (
           <EchoPanel key="echo" hidden={covered || created || replaying} theme={half} onClose={closePanel} />

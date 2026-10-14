@@ -137,7 +137,8 @@ async function externals() {
   shipped.delete('sound')
   const communityMusic = new Set([
     'sound/music/reckoning_breakthrough.mp3',
-    'sound/music/reckoning_bloom.mp3'
+    'sound/music/reckoning_bloom.mp3',
+    'sound/music/reckoning_rise_from_the_dark.mp3'
   ])
   const assets = ASSETS
   const found = []

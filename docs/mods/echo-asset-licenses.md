@@ -15,13 +15,17 @@ relicense it under the game's AGPL license.
 
 ## Reckoning soundtrack
 
-**Track owner: [themaestroai](https://suno.com/@themaestroai).** **Breakthrough.mp3** and **Bloom.mp3** use this permission supplied by Maestro:
+**Track owner: [themaestroai](https://suno.com/@themaestroai).** **Breakthrough_ Victory & Hope.mp3** (the current Breakthrough version), **Bloom.mp3**, and **Rise from the Dark.mp3** use this permission supplied by Maestro:
 
 > Made by Maestro with Suno on a paid plan; may be redistributed with Venus Extracurriculars
 
 See the separate [music asset license](../../assets/echo-public/echo-music-license.txt).
-The files ship as `reckoning_breakthrough.mp3` and `reckoning_bloom.mp3` in
+The files ship as `reckoning_breakthrough.mp3`, `reckoning_bloom.mp3`, and `reckoning_rise_from_the_dark.mp3` in
 `assets/sound/music`.
+
+## The Unspoken backgrounds
+
+The 22 backgrounds under assets/echo-public/echo-dungeons were AI-generated for Venus Extracurriculars and supplied for this project. They are separate from Venus Dev's artwork. ARTWORK.json records their identities and available generation descriptions; LICENSE-ASSETS.md distinguishes their attribution. Player-generated art and private character images are not bundled.
 
 ## Background-removal software and model
 

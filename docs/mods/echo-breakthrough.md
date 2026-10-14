@@ -1,6 +1,6 @@
 # Echo Breakthrough abilities
 
-Optional aspect abilities build on Echo and the existing Breakthrough system. This catalog is an initial balance pass for playtesting.
+Source integration for Echoes and Breakthrough in the 0.4.0 community build. The complete draft is tracked in PR #53; see echo-validation.md for current validation and release limits.
 
 ## Player behavior
 
@@ -55,6 +55,10 @@ This is a narrative prompt effect, not a guaranteed outcome or a numerical power
 
 Successful activations archive only actual generated scene lines through the existing Breakthrough continuity path. The ability's instructions and desired outcome never become remembered facts on their own. This update does not rewrite character profiles, saves, artwork, aspect choices, locks or spirit values. Installing a new archive changes code only.
 
+## Integration boundaries
+
+Keep the discovered Echo entry, modCarry registration and native Breakthrough refund/turn ownership rules together. The player's carried identity supplies the ability; no separate ability carry record is needed. Inside The Unspoken, regular scene abilities and Normal Breakthrough are unavailable. The four-choice menu instead offers one aspect-specific hint per link; it does not spend another ability charge. See [Breaking Through the Silence](reckoning.md).
+
 ## Pricing rationale
 
 - **Horizonbound — 50:** Opens a new direction without directly changing feelings.
@@ -80,6 +84,6 @@ Successful activations archive only actual generated scene lines through the exi
 - **Dawnmender — 75:** Repairing hurt can change the direction of a difficult relationship conversation.
 - **Thornheart — 50:** A clear boundary can redirect the terms of an exchange.
 
-## Validation scope
+## Verification
 
-Automated tests cover all 22 prices and prompts, repeated affordable uses, remainder retention, exact refunds, retry/load recovery, feature switches and ordinary 100-spirit behavior. Simulated responses validate request/state plumbing, not live model narrative quality.
+The exhaustive typed catalog and tests cover all 22 costs, fixed-action enforcement, partial-bar readiness, repeated affordable activations, exact refunds, recovery, legacy full-bar records and Echo-off fallback. See [current validation](echo-validation.md) for the combined branch checks. Prices are provisional balance decisions; automated tests do not measure model effectiveness.

@@ -1,24 +1,20 @@
-# Echo portability and live validation — 2026-10-13
+# Echo validation — 2026-10-13
 
-## Automated and packaged checks
+## Current combined PR checkout
 
-- All three TypeScript checks passed; desktop and browser production builds compiled.
-- Full Vitest suite: **2,316 passed, one existing skip** across 179 files.
-- Installer suite: **8 passed**, including added music, exact restoration on uninstall,
-  rollback and refusal to overwrite a differing official asset.
-- The dependency lockfile passed an offline `npm ci --dry-run --ignore-scripts` check.
-- Real local segmentation initialized and processed an existing test image without
-  ComfyUI or a paid image request. Visual inspection retained solid dark details and
-  removed the previously visible white background fragments.
-- Built browser smoke check: upload, PNG reading, download offer and persistence after
-  reload passed. No provider requests were made. Database tests also cover upgrading
-  existing version-8 storage without losing records.
-- Desktop and browser backup tests round-trip finished Echo artwork and reject
-  conflicting immutable image IDs before settings/saves change. Older backups without
-  an Echo image list remain supported.
-- The combined local package launched with its native bridge and separate model,
-  music and software notices. The local update retained Story Memory Light; all 1,161
-  existing data files and both bundled tracks were hash-verified unchanged.
+The Echo integration branch was merged with main at 494fb91aa72d504e83d8e31a2d4851239fe5fc26 before the current changes were applied. This includes Incoming Texts and the merged Story Memory Light option. The local experiment checkout was not published wholesale.
+
+- All three TypeScript checks passed (node, web/renderer and tests).
+- Full Vitest suite: **2,408 passed, one existing skip, 184 files** with two workers.
+- Installer suite: **8 passed**, with all three community music files in the build/test allowlists.
+- Desktop and browser production builds passed. Both include all 22 dungeon backgrounds. The browser emits all three MP3s; desktop release packaging supplies them as external assets through the installer allowlist.
+- Source regression coverage includes link/entry gates, private Talk limits, aspect hints, first-person whisper filtering and safe placement, rewind/save guards, Unheard Soul character/backup transfers, and soundtrack preview restoration/title toggling.
+
+These checks used an isolated source checkout without the official character ZIPs. They are not a fresh end-to-end installation run or a new live judgment test. No paid model requests were made for this publication update. Earlier local visual/install checks remain historical evidence; the current changes still need broader playtesting and release-machine verification.
+
+## Earlier portability checks
+
+Before the dungeon update, local segmentation ran without ComfyUI; a browser smoke check covered Echo upload/read/download/reload; desktop/browser backup tests covered immutable image IDs and old backups. A packaged copy launched with its native bridge and separate asset notices. Those results do not claim browser parity for the newer desktop-only Unheard Soul editor/portable extension.
 
 ## Small live-model check
 
@@ -44,20 +40,13 @@ segmented locally, read through the native API and exported as a transparent PNG
 Visual inspection found a coherent creature with retained light/dark details and no
 caption text. This single result does not guarantee future image quality.
 
-## Remaining limits
 
-This sample is not a model-wide judgment, balance or narrative-quality certification.
-Broader character/model playtesting and a fresh release-installer pass on a clean
-machine remain release checks. Isolated source builds omitted official character ZIPs.
+## Remaining release checks and limits
 
-The first cutout requires about 100 MB of downloadable model/runtime data, with
-availability depending on the original host and browser cache. Optional local Megaten
-generation still needs ComfyUI, compatible hardware and separately downloaded models.
-The downloader's bounds, integrity checks, reuse and cancellation are tested; a new
-multi-gigabyte checkpoint download was not repeated during this validation.
+The bounded live sample above predates the newer dungeon Talk/one-time hint flow. It does not certify their tone, model consistency or ability balance. Broader profiles/providers and a fresh clean-machine installer pass remain release checks.
 
-Browser custom image endpoints need browser-compatible CORS. Finished artwork travels
-in whole-game backups; loose save JSON files do not embed artwork, and recovery sources
-are not included. There is no separate single-playthrough export in this source tree.
+First cutout needs roughly 100 MB of downloadable model/runtime data. Optional local Megaten generation needs ComfyUI, compatible hardware and separate original-host model downloads. Download bounds/hash checks/reuse/cancellation are covered; a new multi-gigabyte download was not repeated. Browser custom image endpoints need compatible CORS.
 
-See [Echo](echo.md), [Reckoning](reckoning.md) and [separate asset licenses](echo-asset-licenses.md).
+Ordinary Echo artwork works on desktop and browser and travels in whole-game backups. Loose save JSON does not embed images or recovery originals; there is no separate single-playthrough exporter. Custom Unheard Soul images/staging and their optional portable character extension currently use desktop IPC. The browser uses the inverted normal portrait, and does not promise round-tripping that new extension.
+
+See [Echoes](echo.md), [Breaking Through the Silence](reckoning.md) and [asset notices](echo-asset-licenses.md).

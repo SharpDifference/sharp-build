@@ -1,3 +1,6 @@
+import { talkInReckoningDungeon } from '../src/renderer/stores/reckoningDungeon'
+import { enterTestDungeon } from './dungeonFixture'
+import { unlockReckoningDungeon } from '../src/renderer/stores/reckoning'
 import { afterEach, beforeEach, describe, expect, it, vi, type Mock } from 'vitest'
 import { normalizeBreakthrough } from '@shared/breakthrough'
 import type { Result } from '@shared/types'
@@ -46,9 +49,9 @@ describe('Reckoning background preparation',()=>{
     expect(game().exReckoning.active).toBeNull()
     expect(game().exBreakthrough.meters.a).toBe(100)
     expect(save).not.toHaveBeenCalled()
-    await startReckoning('a')
+    await enterTestDungeon();await startReckoning('a')
     expect(complete).toHaveBeenCalledTimes(1)
-    expect(save).toHaveBeenCalledTimes(1)
+    expect(save).toHaveBeenCalledTimes(3)
     expect(game().exReckoning.active?.thoughts[0].belief).toBe(thoughts.thoughts[0].belief)
     expect(game().exBreakthrough.meters.a).toBe(0)
     await tick()
@@ -133,10 +136,10 @@ describe('Reckoning background preparation',()=>{
     expect(reckoningPreparationStatus(game(),'a').status).toBe('error')
     retryReckoningPreparation('a');await tick()
     save.mockResolvedValueOnce({ok:false,error:{code:'QA_DISK',message:'Disk unavailable'}})
-    await expect(startReckoning('a')).rejects.toThrow('Disk unavailable')
+    await expect(unlockReckoningDungeon('a')).rejects.toThrow('Disk unavailable')
     expect(game().exBreakthrough.meters.a).toBe(100)
     expect(reckoningPreparationStatus(game(),'a').status).toBe('ready')
-    await startReckoning('a')
+    await enterTestDungeon();await startReckoning('a')
     expect(complete).toHaveBeenCalledTimes(2)
     expect(game().exBreakthrough.meters.a).toBe(0)
   })
@@ -144,6 +147,7 @@ describe('Reckoning background preparation',()=>{
   it('joins an in-flight preparation if a direct start races its result',async()=>{
     let release!:(value:Result<unknown>)=>void
     complete.mockImplementationOnce(()=>new Promise(r=>{release=r}))
+    await enterTestDungeon();save.mockClear()
     stop=watchReckoningPreparation();await tick()
     const start=startReckoning('a')
     release({ok:true,data:thoughts});await start
@@ -155,7 +159,11 @@ describe('Reckoning background preparation',()=>{
     await tick();expect(complete).not.toHaveBeenCalled()
     useModsStore.setState({switches:{on:{},options:{'reckoning:prepare-questions':false}}})
     stop=watchReckoningPreparation();await tick()
-    await startReckoning('a')
-    expect(complete).toHaveBeenCalledTimes(1);expect(save).toHaveBeenCalledTimes(1)
+    await enterTestDungeon();await startReckoning('a')
+    expect(complete).toHaveBeenCalledTimes(1);expect(save).toHaveBeenCalledTimes(3)
   })
+})
+
+it('keeps prepared dungeon questions across private conversation saves',async()=>{
+ await enterTestDungeon();stop=watchReckoningPreparation();await tick();expect(complete).toHaveBeenCalledTimes(1);complete.mockResolvedValueOnce({ok:true,data:{reply:'I wonder why you keep coming back.'}});await talkInReckoningDungeon('Hello');await tick();expect(complete).toHaveBeenCalledTimes(2);expect(reckoningPreparationStatus(game(),'a').status).toBe('ready');await startReckoning('a');expect(complete).toHaveBeenCalledTimes(2)
 })

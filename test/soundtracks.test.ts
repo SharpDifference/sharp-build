@@ -25,6 +25,15 @@ function fixture() {
 afterEach(() => vi.useRealTimers())
 
 describe('custom soundtrack storage', () => {
+  it('assigns the dungeon without changing question or victory tracks',async()=>{
+    const {library,add}=fixture()
+    await add('reckoning');await add('reckoning_victory')
+    const map=await add('reckoning_dungeon',new Uint8Array([8,9]))
+    expect(map.reckoning_dungeon?.loop).toBe(true)
+    expect(await library.read('reckoning_dungeon')).toEqual(new Uint8Array([8,9]))
+    expect(await library.read('reckoning')).toEqual(bytes)
+    expect((await library.remove('reckoning_dungeon')).reckoning_victory?.loop).toBe(false)
+  })
   it('keeps victory separate and defaults its replacement to one play, with looping optional',async()=>{
     const {library,add}=fixture()
     await add('reckoning');const map=await add('reckoning_victory')

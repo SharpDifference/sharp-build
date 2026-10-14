@@ -25,6 +25,7 @@ const PRIVATE = [
 const PUBLIC = [
   'assets/sound/music/reckoning_breakthrough.mp3',
   'assets/sound/music/reckoning_bloom.mp3',
+  'assets/sound/music/reckoning_rise_from_the_dark.mp3',
   'assets/workflows/characterCg.json',
   'assets/quickstart.json',
   'assets/pose/pose.json',

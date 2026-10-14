@@ -23,7 +23,7 @@ export function BreakthroughPanel({ hidden, blocked, onReckoning }: { hidden: bo
   const [draft,setDraft] = useState(''), [error,setError] = useState('')
   const ids = breakthroughCast(game), id = ids.includes(selected) ? selected : ids[0]
   useEffect(() => { setExpanded(false); setDraft(''); setError(''); setSelected('') }, [game.playthroughId,game.loads,game.date,game.time])
-  if (!on || hidden || !id) return null
+  if (!on || hidden || !id || game.exReckoning.dungeon&&game.exReckoning.dungeon.phase!=='unlocked') return null
   const amount = game.exBreakthrough.meters[id] ?? 0, cost=ability?.cost??100
   const ready=amount>=cost, full=amount>=100
   const canUse = !blocked && canBreakthrough(game,id,ability?.aspect)

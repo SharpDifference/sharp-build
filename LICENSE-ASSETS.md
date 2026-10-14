@@ -1,6 +1,6 @@
 # Asset licence
 
-Except for the community tracks listed below, image, audio and video files anywhere in this repository — including but not limited to `.png`,
+Except for the community assets listed below, image, audio and video files anywhere in this repository — including but not limited to `.png`,
 `.jpg`, `.webp`, `.ico`, `.gif`, `.ogg`, `.wav`, `.mp3` and `.mp4` files — are © Venus Dev. All
 rights reserved. They are not covered by the licence in `LICENSE`. They are included only so
 that the app builds from this source; no right is granted to reuse them in any other work or to
@@ -14,14 +14,22 @@ model weights and their license texts retain their own licenses.
 
 **Track owner: [themaestroai](https://suno.com/@themaestroai).**
 
-`assets/sound/music/reckoning_breakthrough.mp3` (Breakthrough) and
-`assets/sound/music/reckoning_bloom.mp3` (Bloom) use this separate asset permission:
+`assets/sound/music/reckoning_breakthrough.mp3` (Breakthrough: Victory & Hope version),
+`assets/sound/music/reckoning_bloom.mp3` (Bloom), and
+`assets/sound/music/reckoning_rise_from_the_dark.mp3` (Rise from the Dark) use this separate asset permission:
 
 > Made by Maestro with Suno on a paid plan; may be redistributed with Venus Extracurriculars
 
 They are not Venus Dev assets and are excluded from the blanket attribution above.
 The code licence does not apply to them. The [music licence](assets/echo-public/echo-music-license.txt)
 is included in both desktop and browser builds.
+
+## Community Unspoken backgrounds
+
+The 22 WebP backgrounds in assets/echo-public/echo-dungeons were AI-generated for
+Venus Extracurriculars and supplied for inclusion with this project. They are not
+Venus Dev assets and are excluded from the blanket attribution above. Their asset
+catalog is ARTWORK.json in that folder. No rights to other game assets are implied.
 
 ## Optional Echo model and artwork dependencies
 

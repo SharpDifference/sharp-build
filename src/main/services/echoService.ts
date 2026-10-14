@@ -1,3 +1,4 @@
+import { readPortableReflection, writePortableReflection } from './reflectionStorage'
 import { nativeImage } from 'electron'
 import { randomUUID } from 'crypto'
 import { mkdir, readFile, stat, writeFile } from 'fs/promises'
@@ -11,10 +12,67 @@ import { clearEchoMatte } from './echoMatte'
 import { generateLocalEcho } from './echoLocalImage'
 import { installEchoModels } from './echoModelSetup'
 import { cutoutEchoImage, prepareEchoCutout, releaseEchoCutout } from './echoCutout'
+import { assertSafeCharId } from '@shared/characterRules'
+import { expressionRel } from '@shared/characterFiles'
+import { getCharacter, readCharacterImage } from './characterService'
+import { reflectionPortraitPrompt, reflectionStageOf, assertReflectionStage, type ReflectionStage } from '@shared/reflectionPortrait'
 
 const jobs = new Map<string, { owner: number; controller: AbortController }>()
 const folder = (): string => join(getDataPath(),'echoes','art')
 const MAX_BYTES = 20 * 1024 * 1024
+export async function readReflectionStage(charId:string):Promise<ReflectionStage> {
+ return (await readPortableReflection(charId))?.stage ?? reflectionStageOf(null)
+}
+export async function saveReflectionStage(charId:string,value:unknown):Promise<ReflectionStage> {
+ assertSafeCharId(charId);assertReflectionStage(value)
+ if(!modOn(await getModSwitches(),'reckoning'))throw Error('Enable Reckoning in Mods first.')
+ const stage=reflectionStageOf(value),existing=await readPortableReflection(charId)
+ await writePortableReflection(charId,{version:1,image:existing?.image??null,stage})
+ return stage
+}
+export async function readReflectionPortrait(charId:string):Promise<string|null> {
+ return (await readPortableReflection(charId))?.image ?? null
+}
+/** An explicit null masks legacy artwork too, without removing the saved placement. */
+export async function resetReflectionPortrait(charId:string):Promise<void> {
+ assertSafeCharId(charId);await getCharacter(charId)
+ if(!modOn(await getModSwitches(),'reckoning'))throw Error('Enable Reckoning in Mods first.')
+ if(jobs.size)throw Error('Wait for image generation to finish or cancel it first.')
+ const existing=await readPortableReflection(charId)
+ await writePortableReflection(charId,{version:1,image:null,stage:existing?.stage??reflectionStageOf(null)})
+}
+async function storeReflection(charId:string,bytes:Uint8Array):Promise<string> {
+ const image=`data:image/png;base64,${decodeArt(bytes).toPNG().toString('base64')}`
+ const existing=await readPortableReflection(charId)
+ await writePortableReflection(charId,{version:1,image,stage:existing?.stage??reflectionStageOf(null)})
+ return image
+}
+export async function uploadReflectionPortrait(charId:string,path:string):Promise<string> {
+ assertSafeCharId(charId);await getCharacter(charId)
+ if(!modOn(await getModSwitches(),'reckoning'))throw Error('Enable Reckoning in Mods first.')
+ if((await stat(path)).size>MAX_BYTES)throw Error('Choose an image smaller than 20 MB.')
+ return storeReflection(charId,await readFile(path))
+}
+export async function generateReflectionPortrait(charId:string,requestId:string,owner:number):Promise<string> {
+ assertSafeCharId(charId)
+ if(!ECHO_ART_ID.test(requestId))throw Error('Invalid artwork request.')
+ if(!modOn(await getModSwitches(),'reckoning'))throw Error('Enable Reckoning in Mods first.')
+ if(jobs.size)throw Error('Another image is already being generated. Wait or cancel it first.')
+ const controller=new AbortController();jobs.set(requestId,{owner,controller})
+ try {
+  const signal=AbortSignal.any([controller.signal,AbortSignal.timeout(600000)])
+  const character=await getCharacter(charId),original=await readCharacterImage(charId,expressionRel('neutral'))
+  if(!original)throw Error('Generate or import her normal neutral portrait first.')
+  const reference=decodeArt(original).toPNG()
+  await prepareEchoCutout(signal)
+  const bytes=await generateImage(reflectionPortraitPrompt(character),{aspectRatio:'3:4',sources:[{bytes:reference,mimeType:'image/png'}],signal})
+  signal.throwIfAborted()
+  const png=decodeArt(bytes).toPNG(),sourceId=randomUUID(),sourceFolder=join(getDataPath(),'echoes','sources')
+  await mkdir(sourceFolder,{recursive:true});await writeFile(join(sourceFolder,`${sourceId}.png`),png,{flag:'wx'})
+  const cutout=await cutoutEchoImage(png,signal);signal.throwIfAborted()
+  return await storeReflection(charId,cutout)
+ } finally {releaseEchoCutout();jobs.delete(requestId)}
+}
 function artPath(id: string): string {
   if (typeof id !== 'string' || !ECHO_ART_ID.test(id)) throw Error('Invalid Echo artwork id.')
   return join(folder(),`${id}.png`)

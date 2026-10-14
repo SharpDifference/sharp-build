@@ -3,6 +3,7 @@ import { ECHO_ASPECTS, LEGACY_ECHO_ASPECTS, type EchoAspect } from './echoAspect
 import { echoProfileCues, explainEchoAspect, type EchoProfilePart, type EchoReasonExample } from './echoReasons'
 import { echoNameArtDirection, echoNameVisualCues, mythicalEchoName } from './echoNaming'
 import { normalizeEchoStage, type EchoStagePlacement } from './echoStage'
+import type { ReflectionStage } from './reflectionPortrait'
 export { ECHO_ASPECTS, type EchoAspect } from './echoAspects'
 export const ECHO_MOD = 'echo'
 export const ECHO_BONUS = 0.25
@@ -37,6 +38,14 @@ export interface EchoState {
 export type EchoProfile = Pick<Character,'firstName'|'lastName'|'personality'|'backstory'>
 export interface EchoArtRequest { requestId: string; identity: EchoIdentity; name: string; bio: string; backstory?: string }
 export interface EchoApi {
+  /** Separate dungeon portrait; never overwrites a default or custom girl's normal sprites. */
+  reflectionReset?: (charId:string) => Promise<Result<void>>
+  reflectionExport?: (charId:string) => Promise<Result<string|null>>
+  reflectionUpload?: (charId:string) => Promise<Result<string|null>>
+  reflectionRead?: (charId:string) => Promise<Result<string|null>>
+  reflectionGenerate?: (charId:string,requestId:string) => Promise<Result<string>>
+  reflectionStageRead?: (charId:string) => Promise<Result<ReflectionStage>>
+  reflectionStageSave?: (charId:string,stage:ReflectionStage) => Promise<Result<ReflectionStage>>
   /** Desktop only: explicit, hash-verified downloads into an existing ComfyUI install. */
   installLocalModels?: (requestId: string) => Promise<Result<null>>
   generate: (request: EchoArtRequest) => Promise<Result<string>>

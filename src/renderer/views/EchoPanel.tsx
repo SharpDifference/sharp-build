@@ -90,7 +90,7 @@ function EchoStagePreview({identity,charId,height,placement,opacity}: {identity:
   return <div className={`echo-stage-preview${charId==='player'?' echo-reflection-stage':''}`} data-player={charId==='player'} role="img" aria-label="Echo position preview" style={{'--preview-height':Math.max(.9,Math.min(1,height||1))} as CSSProperties}>
     <div className="echo-stage-guide" aria-hidden="true"/>
     <StagedEcho identity={identity} placement={placement} opacity={opacity} player={charId==='player'} preview/>
-    {charId==='player'?<><span className="echo-reflection-preview-label">Reckoning panel</span><span className="echo-reflection-preview-clock">Date &amp; time</span></>:missing?<div className="echo-stage-placeholder">Character portrait unavailable</div>:<img className="echo-stage-person" src={src} alt="" onError={()=>setMissing(true)}/>}
+    {charId==='player'?<><span className="echo-reflection-preview-label">Question panel</span><span className="echo-reflection-preview-clock">Date &amp; time</span></>:missing?<div className="echo-stage-placeholder">Character portrait unavailable</div>:<img className="echo-stage-person" src={src} alt="" onError={()=>setMissing(true)}/>}
   </div>
 }
 export interface EchoSetupContext {
@@ -339,7 +339,7 @@ export function EchoPanel({hidden,gallery=false,owner,onClose,setup,theme}: {hid
             </div>}
             {section==='stage'&&<div id="echo-section-stage" role="tabpanel" aria-labelledby="echo-tab-stage" tabIndex={0}>
             <section className="echo-placement" aria-label="Echo placement and motion">
-              <h3>{selected==='player'?'Your Echo during Reckoning':'Her Echo on stage'}</h3><p>Move and resize only {label(selected)}’s Echo. The preview follows your adjustments.</p>
+              <h3>{selected==='player'?'Your Echo during the questions':'Her Echo on stage'}</h3><p>Move and resize only {label(selected)}’s Echo. The preview follows your adjustments.</p>
               {([
                 {key:'x',label:'Horizontal (X)',min:-ECHO_STAGE_LIMITS.offset,max:ECHO_STAGE_LIMITS.offset,step:1,value:placement.x,unit:'px'},
                 {key:'y',label:'Vertical (Y)',min:-ECHO_STAGE_LIMITS.offset,max:ECHO_STAGE_LIMITS.offset,step:1,value:placement.y,unit:'px'},
@@ -353,14 +353,14 @@ export function EchoPanel({hidden,gallery=false,owner,onClose,setup,theme}: {hid
               <button type="button" className="vu-btn vu-btn--quiet echo-action" disabled={busy||placement.opacity===undefined} onClick={()=>{const {opacity:_opacity,...rest}=placement;setStageDraft({owner:selected,placement:rest})}}>{selected==='player'?'Use faint default · 18%':'Use shared visibility'}</button>
               <div className="echo-actions"><button type="button" className="vu-btn vu-btn--primary vu-paper echo-action" disabled={busy||!safe||!stagePending} onClick={()=>void apply(editEchoStage(state,selected,placement))}>Save placement</button><button type="button" className="vu-btn vu-btn--quiet echo-action" disabled={busy||(placement.x===defaultStage.x&&placement.y===defaultStage.y&&placement.scale===defaultStage.scale)} onClick={()=>setStageDraft({owner:selected,placement:{...placement,...defaultStage}})}>Reset position &amp; size</button></div>
               <p className="echo-help">Save to apply. Closing this window or choosing another character discards unsaved positioning. Artwork and gallery images stay unchanged.</p>
-              {selected==='player'&&<div className="echo-reckoning-effects"><label><input type="checkbox" aria-label="Reckoning glitch effects" checked={glitchEffects} disabled={busy} onChange={e=>void useModsStore.getState().setOption('reckoning','glitch-effects',e.target.checked)}/> Reckoning glitch effects</label><p className="echo-help">Brief text distortions and screen artifacts while answering a reflection. Saves automatically. Reduced-motion settings disable the effects.</p></div>}
+              {selected==='player'&&<div className="echo-reckoning-effects"><label><input type="checkbox" aria-label="Inner-world glitch effects" checked={glitchEffects} disabled={busy} onChange={e=>void useModsStore.getState().setOption('reckoning','glitch-effects',e.target.checked)}/> Inner-world glitch effects</label><p className="echo-help">Brief full-screen interference and text distortions during private whispers and reflection questions. Off keeps whispers as calm translucent text. Saves automatically. Reduced-motion settings disable the effects.</p></div>}
             </section>
             <h3>Shared visibility for girls’ Echoes</h3>
             <p>Girls without their own visibility setting use this value. Your Echo uses its own faint default.</p>
             <label>Echo visibility on stage · {Math.round(opacity*100)}%<input aria-label="Echo visibility on stage" type="range" min="5" max="80" value={Math.round(opacity*100)} disabled={busy} onChange={e=>setOpacity(Number(e.target.value)/100)}/></label>
             <p className="echo-help">Lower values make Echoes fainter; higher values make them more solid. Individual visibility overrides are kept. Gallery images keep their full visibility.</p>
             <div className="echo-actions"><button type="button" className="vu-btn vu-btn--primary vu-paper echo-action" disabled={busy||!safe||opacity===state.opacity} onClick={()=>void apply({...state,opacity})}>Apply visibility</button><button type="button" className="vu-btn vu-btn--quiet echo-action" disabled={busy||!safe} aria-pressed={state.visible} onClick={()=>void apply({...state,visible:!state.visible})}>{state.visible?'Hide on stage':'Show on stage'}</button></div>
-            <p className="echo-help">Your Echo appears during Reckoning. Girls’ Echoes appear behind standing portraits, outside replays and created scenes. Hide on stage hides both.</p>
+            <p className="echo-help">Your Echo appears while breaking through the silence. Girls’ Echoes appear behind standing portraits, outside replays and created scenes. Hide on stage hides both.</p>
             </div>}
             {!safe && <p className="echo-help">Wait for narration and messages to finish before saving or generating artwork.</p>}
           </section>

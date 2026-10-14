@@ -24,6 +24,7 @@ vi.mock('electron', () => ({
 }))
 
 const { exportBackup, importBackup } = await import('../src/main/services/backupService')
+const { readPortableReflection, writePortableReflection, removePortableReflection } = await import('../src/main/services/reflectionStorage')
 const { createCharacter, getCharacter, writeCharacter } = await import(
   '../src/main/services/characterService'
 )
@@ -192,6 +193,17 @@ async function entriesOf(archive: string): Promise<Record<string, Uint8Array>> {
 }
 
 describe('exportBackup', () => {
+  it('restores custom and shipped-character reflections and positions without enabling mods', async () => {
+    const { archive, character } = await seedAndExport()
+    await writeFile(join(getDataPath(),'mods.json'),JSON.stringify({schemaVersion:1,on:{reckoning:false,echo:false,breakthrough:false},options:{}}))
+    const reflection = {version:1,image:`data:image/png;base64,${Buffer.from(PNG_BYTES).toString('base64')}`,stage:{x:-12,y:6,scale:1.2}}
+    for (const id of [character.charId,'pregen-nina']) await writePortableReflection(id,reflection)
+    await exportBackup(archive)
+    for (const id of [character.charId,'pregen-nina']) await removePortableReflection(id)
+    await importBackup(archive)
+    for (const id of [character.charId,'pregen-nina']) expect(await readPortableReflection(id)).toEqual(reflection)
+    expect((await getCharacter(character.charId)).personality).toBe(character.personality)
+  })
   it('carries every save, character image and setting the data folder holds', async () => {
     const { archive, playthroughId, saveIds, character } = await seedAndExport()
     const entries = await entriesOf(archive)

@@ -1,4 +1,4 @@
-import { generateEchoArt, cancelEchoArt, uploadEchoArt, readEchoArt, installLocalEchoModels } from './services/echoService'
+import { resetReflectionPortrait, uploadReflectionPortrait, generateReflectionPortrait, readReflectionPortrait, readReflectionStage, saveReflectionStage, generateEchoArt, cancelEchoArt, uploadEchoArt, readEchoArt, installLocalEchoModels } from './services/echoService'
 import { writeFile } from 'fs/promises'
 import type { EchoArtRequest } from '@shared/echo'
 import { prepareStoryRequest, inspectStoryMemory } from './services/storyMemoryService'
@@ -264,6 +264,25 @@ export function registerIpcHandlers(): void {
 
   // The photo feature's three channels, which keep their own module and their own queue.
   registerPhotoIpc(handle)
+  handle('echo:reflectionExport',async(event,charId:string)=>{
+    const data=await readReflectionPortrait(charId)
+    if(!data)throw Error('Generate or upload an Unheard Soul portrait first.')
+    const character=await getCharacter(charId)
+    const stem=`${character.firstName}-${character.lastName}`.replace(/[^A-Za-z0-9._ -]/g,'_').slice(0,80)
+    const {canceled,filePath}=await showSaveDialogFor(event,{title:'Download Unheard Soul image',defaultPath:`Unheard-Soul-${stem}.png`,filters:[{name:'PNG image',extensions:['png']}]})
+    if(canceled||!filePath)return null
+    await writeFile(filePath,Buffer.from(data.slice(data.indexOf(',')+1),'base64'))
+    return filePath
+  })
+  handle('echo:reflectionUpload',async(event,charId:string)=>{
+    const picked=await showOpenDialogFor(event,{title:'Choose Unheard Soul artwork',properties:['openFile'],filters:[{name:'Images',extensions:['png','jpg','jpeg','webp']}]})
+    return picked.canceled||!picked.filePaths[0]?null:uploadReflectionPortrait(charId,picked.filePaths[0])
+  })
+  handle('echo:reflectionReset',(_event,charId:string)=>resetReflectionPortrait(charId))
+  handle('echo:reflectionRead',(_event,charId:string)=>readReflectionPortrait(charId))
+  handle('echo:reflectionStageRead',(_event,charId:string)=>readReflectionStage(charId))
+  handle('echo:reflectionStageSave',(_event,charId:string,stage:unknown)=>saveReflectionStage(charId,stage))
+  handle('echo:reflectionGenerate',(event,charId:string,id:string)=>generateReflectionPortrait(charId,id,event.sender.id))
   handle('echo:generate',(event,request: EchoArtRequest) => generateEchoArt(request,event.sender.id))
   handle('echo:installLocalModels', (event, id: string) => installLocalEchoModels(id, event.sender.id))
   handle('echo:cancel',(event,id: string) => cancelEchoArt(id,event.sender.id))

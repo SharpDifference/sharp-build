@@ -54,7 +54,7 @@ function CharacterDynamicsDetails({ entry, character, theme, onClose }: Props & 
           <p>Her starting tendencies and the growth she has earned in this playthrough.</p>
         </header>
         <div className="vu-dynamics-details-scroll">
-          {entry.growth && <section className="vu-dynamics-earned" aria-label="Earned growth"><h3>Earned through Reckoning</h3><strong>{entry.growth.name}</strong><p>{entry.growth.description}</p><ul>{entry.growth.reframes.map((line,i)=><li key={i}>{line}</li>)}</ul><p>A change she can build on, while keeping her voice and personality.</p></section>}
+          {entry.growth && <section className="vu-dynamics-earned" aria-label="Earned growth"><h3>Earned by breaking through the silence</h3><strong>{entry.growth.name}</strong><p>{entry.growth.description}</p><ul>{entry.growth.reframes.map((line,i)=><li key={i}>{line}</li>)}</ul><p>A change she can build on, while keeping her voice and personality.</p></section>}
           {relationship && <section className="vu-dynamics-starting-background">
             <h3>Starting background</h3>
             <strong>{relationship.name}</strong>

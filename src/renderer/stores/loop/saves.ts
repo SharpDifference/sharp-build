@@ -601,13 +601,14 @@ export async function writeEcho(next: EchoState, previous: EchoState, active: ()
 }
 
 /** One atomic save holds the spirit charge, round progress and earned Character Dynamics tag. */
-export async function writeReckoningChange(next:ReckoningState,previous:ReckoningState,charge:0|100,charId:string,dynamics:CharacterDynamics|undefined,active:()=>boolean):Promise<void> {
+export async function writeReckoningChange(next:ReckoningState,previous:ReckoningState,charge:0|100,charId:string,dynamics:CharacterDynamics|undefined,active:()=>boolean,sceneBeat?:SceneLine[]):Promise<void> {
   const start=useGameStore.getState(),meterBefore=start.exBreakthrough
   const current=():boolean=>{const now=useGameStore.getState();return active()&&now.exReckoning===previous&&now.exBreakthrough===meterBefore&&
     now.exCharacterDynamics===start.exCharacterDynamics&&now.playthroughId===start.playthroughId&&now.loads===start.loads&&!now.sceneEnding}
   if(!current()||manualSaveOffer()!=='open')throw Error('Wait for a safe save point.')
   const saved=normalizeReckoning(next)
   if(next.active&&!saved.active)throw Error('The encounter could not be saved.')
+  if(next.dungeon&&!saved.dungeon)throw Error('The dungeon could not be saved.')
   const meter=meterBefore.meters[charId]??0
   if(charge&&meter<charge)throw Error('This encounter needs 100 spirit.')
   const breakthrough=charge?{...meterBefore,meters:{...meterBefore.meters,[charId]:meter-charge}}:meterBefore
@@ -616,14 +617,15 @@ export async function writeReckoningChange(next:ReckoningState,previous:Reckonin
   try {
     await queueWrite(async()=>{
       if(!current()||saveOffer(false)!=='open')return
-      const now=useGameStore.getState(),draft=manualSaveDraft()
+      const now=useGameStore.getState(),draft=manualSaveDraft()??(!sceneActiveOf(now)?{...now.toGameSave(),scene:null}:null)
       if(!draft||!now.playthroughId)throw Error('No safe save point is available.')
-      const result=await window.api.saves.autosave(now.playthroughId,{...draft,...patch})
+      const scene=sceneBeat?.length&&draft.scene?{...draft.scene,transcript:[...now.currentSceneTranscript,...sceneBeat],sceneLog:[...now.sceneLog,sceneBeat[0]],currentLine:sceneBeat[0],pendingLines:sceneBeat.slice(1),resumeOnLine:true as const}:draft.scene
+      const result=await window.api.saves.autosave(now.playthroughId,{...draft,...patch,scene})
       if(!result.ok)throw Error(result.error.message)
       if(!current())return
       if(loopState.statusBase)loopState.statusBase={...loopState.statusBase,...patch}
-      useGameStore.setState(patch);written=true
+      useGameStore.setState({...patch,...(sceneBeat?.length&&scene?{currentSceneTranscript:scene.transcript,sceneLog:scene.sceneLog,currentLine:scene.currentLine,pendingLines:scene.pendingLines,awaitingInput:false,reread:0}:{})});written=true
     })
-    if(!written)throw Error('The game changed; reopen Reckoning.')
+    if(!written)throw Error('The game changed; reopen the encounter.')
   } finally {manualWriting=false}
 }

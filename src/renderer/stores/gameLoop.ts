@@ -1,5 +1,5 @@
 import { slotSettled } from '../mods/hooks'
-import { canContinueReckoning } from './reckoning'
+import { canContinueReckoning, pendingReckoningAftermath } from './reckoning'
 import { withReckoningAftermath } from '../prompts/reckoningPrompt'
 import { dynamicFor } from '@shared/characterDynamics'
 import { fullNameOf } from '@shared/types'
@@ -1383,7 +1383,7 @@ export async function submitAction(
 export async function submitReckoningAftermath():Promise<void> {
   const game=useGameStore.getState()
   if(!canContinueReckoning(game))return
-  const after=game.exReckoning.aftermath!,target=game.characters[after.charId]
+  const after=pendingReckoningAftermath(game)!,target=game.characters[after.charId]
   const growth=dynamicFor(game.exCharacterDynamics,after.charId).growth!
   const snapshot:TurnSnapshot={scene:game.captureScene(),action:'',reckoning:after.id}
   loopState.lastTurn=snapshot

@@ -1,45 +1,79 @@
-# Reckoning
+# Breaking Through the Silence
 
-Reckoning is an optional three-round encounter in which the reader challenges a student's limiting beliefs. Three successful answers earn a unique Character Dynamics growth tag. The feature is fictional character development, not a clinical assessment; the text model judges the exchange and its consistency needs playtesting.
+This mod connects Breakthrough to a private encounter with a girl's **Unheard Soul**: the guarded, negative expression of thoughts she struggles to voice. The inner world is **The Unspoken**, called the **Unspoken Void** in narration. The code/save/mod ID remains reckoning so existing records and settings stay readable. It requires Breakthrough; Echoes supplies optional artwork, an aspect and a hint, while ordinary Breakthrough still works independently.
 
-## Eligibility and flow
+## Establish the link, then follow it
 
-Enable Reckoning and Breakthrough. During an open scene reply, a known, present student needs **38 native affection points and 100 spirit**, with no existing Reckoning growth tag. This is approximately 75% of the native 50-point Devoted threshold, rounded up; affection itself has no numerical maximum. Lover status is neither required nor a bypass. Replays and created scenes cannot start encounters.
+During a safe scene reply, select a known, present girl with at least **38 weighted native affection points** and **100 spirit**, then summon the encounter. This is roughly 75% of the native 50-point Devoted threshold; affection itself has no fixed numerical maximum. Only one link can be active, and a girl with completed growth cannot earn it twice.
 
-With **Prepare questions in the background** enabled (the default), eligible girls in the current scene have their three opening thoughts prepared before the player opens the Breakthrough panel. Requests are briefly debounced and run one at a time. The button shows Preparing reflection until ready; **Face the reflection** then saves the encounter and opens directly on question one, with no opening generation call or introductory screen. Spirit is charged only on activation, never during preparation.
+The link and charge are saved together. A strong, wordless glitch marks activation. Activation inserts a short ordinary scene beat giving both the reader and girl a sharp head pain; she brushes it off as a passing headache. Later scene prompts preserve that physical event while keeping the mental connection private. This replaces the earlier earthquake/hidden-basement-door concept.
 
-The prompt uses her personality, backstory, relevant shared history and current scene to request three distinct beliefs. Prepared text is held only in memory and invalidated by changed scene text, relevant history/profile, playthrough/load, time slot, writer settings or eligibility. Rereading and temporarily closed reply controls retain it. Failed preparation offers an explicit retry and never loops automatically for the same context. Closing the game discards unused preparation; it is not part of the save or semester carry. A successful cached opening survives a disk-write failure so retrying the save does not regenerate it.
+Invocation does not teleport the reader. Finish the current scene, then use **Follow her voice** in the nighttime map row beneath the map. The reader closes their eyes and follows her voice inward. The real girl stays on her normal schedule. The private encounter uses a snapshot of her context rather than moving or replacing the real character.
 
-Background preparation uses the configured text provider even if the player never starts Reckoning. A changed conversation can require a fresh opening. Turn the option off in **Mods → Reckoning** to generate on opening instead. Preparation, provider or validation failures spend no spirit. Only a valid activated encounter is saved together with its 100-spirit charge. Answer judgments remain live because they need the player's actual reply.
+Each of the 22 original aspects has its own named dark inner world and bundled background. The destination follows the **girl's aspect**, not the reader's. The catalog in shared/reckoningDungeons.ts defines all 22; untyped legacy/no-Echo cases use the validated fallback. There is one map entrance, not 22 physical travel locations.
 
-Each reply is judged against the current thought. The first two successes show a separate resolved-thought screen with reaction and feedback; Continue advances without another model request or spirit charge. The third success grants growth. A failed answer ends the attempt without partial rewards; spent spirit is not restored for a valid failed attempt. Provider or disk errors offer retry rather than counting as a bad answer. Pause preserves progress, and Resume does not charge again.
+## Four choices before the questions
 
-A completed encounter normally uses one opening request, three answer judgments and one scene continuation. The latter runs after closing victory and privately asks for a natural lighter/happier reaction. The student does not learn about the reflection, Echo activation, judgment or reward. The pending continuation survives save/reload and provider errors, then clears after a successful scene response.
+The floating four-button menu uses native Venus styling. Hover glitches have no decorative scan lines. Choosing the questions removes this menu and keeps the established three-round question interface.
 
-If the provider blocks that follow-up, **Manually edit prompt** opens the failed request in the standard scene editor. Cancel keeps the failed request waiting; Send retries with the edited text. The earned growth and already-paid spirit cost remain unchanged, and the private direction is never placed in the reader's dialogue.
+| Choice | Behavior |
+| --- | --- |
+| Talk | She opens, then the reader can make three replies. Her responses are personal, dark, moody and unapologetic, with indirect clues rather than quotations from the question set. The fourth reply ends the attempt locally without another paid request. A warning appears after the third. |
+| Break through the silence | The button warns that there is no going back to Talk or the hint during this attempt. It opens directly on the first question; no introduction screen. Pausing preserves the questions, not access to the preparation choices. |
+| Your named aspect ability | The reader's actual Echo ability supplies one perspective/hint per connection. It needs Echoes and a player aspect, costs no additional spirit, and can be reread without another request. Reentering does not restore the spent hint. |
+| Open your eyes | A hard return to the real world, without a goodbye conversation or a flash of the normal portrait. An unfinished link remains available. Failed or expelled attempts need another 100 spirit to enter again. |
 
-## Growth and other mods
+Talk is separate from ordinary scenes: its private transcript does not become Story Memory or native relationship memories. A fresh response appears in the Talk panel first, then leads the next glitched whisper and joins the rotation. Starting the questions ends Talk and hint access. Normal Breakthrough and its other aspect actions cannot be used in this location.
 
-The earned tag records this student's particular limiting belief and a more constructive response. It appears in Character Dynamics and nudges future scene, text and slot-opening prompts. It softens that pattern while preserving personality, memories, boundaries and agency; it does not replace the character library or erase every negative trait. One completed tag per student is supported.
+## Questions, judgment and reward
 
-Reckoning requires Breakthrough but can operate with Echo or Character Dynamics switched off. With Echo enabled, the reader silently calls their Echo and its artwork appears as a translucent background behind the encounter. Normal Breakthrough still works independently at 100 spirit, and Echo's lower ability prices do not reduce Reckoning's cost. Disabling Reckoning preserves encounters and earned tags; active Character Dynamics may continue applying previously earned growth.
+Opening questions use bounded personality/backstory, chosen dynamics, native memories and shared history. Generated evidence references are validated, but that cannot prove the model interpreted an event correctly. There are three distinct beliefs. Each reply is judged against its current belief; meaningful imperfect answers can pass. A rejected answer ends the entire attempt, with no partial growth. Provider, parsing and save failures leave progress unchanged for retry; they are not an automatic defeat.
 
-## Presentation and sound
+The first two successes display a resolved-thought screen before Continue advances to the next question. Continuing makes no extra model call. The question layout fits long text down to a readable minimum and retains scrolling for exceptional content/window sizes. Three successes grant a unique saved Character Dynamics growth tag that softens the specific limiting beliefs without replacing her personality or promising a cure. The victory screen restores her normal portrait; 128 small irregular shards break and fall, while the Unheard Soul dissolves from the private world.
 
-The student portrait inverts while gold/white text presents each belief. Successful rounds fracture the overlay and reveal more light; victory expands the glass effect and reveals the earned tag. Long text uses bounded smaller sizing and more room, with scrolling as a fallback for unusually long output.
+The real girl does not know about this encounter. A later ordinary scene can express relief or a lighter mood naturally. That follow-up belongs outside the dungeon. The temporary link, private dialogue and whisper state end on completion; the earned growth is the persistent result. Disabling Character Dynamics does not duplicate or lose growth prompts: the Reckoning hook supplies them only when that mod is off for the running playthrough.
 
-Reader artwork uses the position, size, visibility and float controls in **Echoes → Your Echo → Stage**. Its default is a large left-side figure at 18% visibility. Girls have their own stage and floating controls. Reduced motion disables float, glass/victory motion and glitches.
+## Preparation, whispers and presentation
 
-Optional glitch effects produce brief text color offsets and decorative screen fragments while answering. They never alter the actual question, typed answer or saved data. Effects stop during loading, feedback, errors and results. The default seven-second cycle has alternating short bursts roughly 3–4 seconds apart. The saved toggle is in the reader's Stage settings and **Mods → Reckoning**; there is no encounter-header control.
+Prepare questions in the background is on by default. Eligible current-scene targets can prepare their opening set while the panel is closed. Requests are serialized/debounced and invalidated when relevant context, save/provider or eligibility changes. Prepared text alone spends no spirit and writes no save. Background failure requires an explicit retry. Turning this option off restores on-demand preparation. It can consume tokens for unused openings; answer judgments, Talk and the hint remain live requests.
 
-Bundled **Breakthrough** music loops during questions and **Bloom** plays once on victory. Custom Soundtracks has separate question and victory slots which override these defaults. Returning to ordinary play restores its soundscape. The engine retains a completed one-shot cue until leaving it so unrelated updates do not restart Bloom. Only the two exact community MP3 filenames are allowed through installer/public-export packaging; official music remains excluded. See [asset licensing](../../LICENSE-ASSETS.md).
+Whispers are always first person and use existing prepared/context text rather than a timed generation loop. They appear at random safe background positions, avoid detected portrait silhouettes and controls, and use approximately 48% opacity. Characters can have different image sizes. Full-screen interference accompanies the letter glitches. With the linked girl present, subsequent whispers occur about every 50–75 seconds; in other scenes, her voice can appear every two minutes even while absent. Inside the dungeon, whispers repeat every ten seconds until the questions start. Hidden, busy, error and unsuitable scene states suppress them.
 
-## Saves, rewinds and source boundaries
+The girl and her Echo are visible in the private location. The reader's Echo appears when questions begin, large and faint on the left; the girl's Echo is on the right. Question-screen portrait placement is fixed independently of the adjustable dungeon portrait. Escape does not dismiss the location to reveal a normal sprite. Entry uses no speech blips. Glitches, floating and shattering honor reduced motion; the saved glitch switch is shared by Mods and Echoes → Your Echo → Stage. Disabling glitches leaves calm translucent whispers.
 
-Optional `exReckoning` data stores the encounter, validated answers, pending aftermath and bounded conversation anchors. Charging, progress and growth writes are transactional; duplicate requests, stale playthrough results and cancelled dispatches cannot apply a second charge or reward. `modCarry` keeps active encounters, while Character Dynamics carries earned growth. Scene-specific aftermath and rewind anchors do not cross semesters.
+## Unheard Soul character artwork
 
-Rereading earlier dialogue changes nothing. Submitting a different reply at or before an anchored encounter discards its unfinished progress, earned growth and pending aftermath and refunds 100 spirit once, capped at 100. The next prompt uses the rolled-back state. Branching after the encounter retains it. Other character traits remain untouched. Older prototype encounters without anchors are preserved rather than guessed at; new encounters record the required boundary and transcript digest.
+Character management offers a separate Unheard Soul screen for default and custom girls. Its shared top viewport supports full-art and scene preview, with adjustable dungeon X/Y and scale. Download image, Upload image and Restore default share one action row. Generation uses the character as a reference; it never overwrites her ordinary sprites. Restore default returns to the inverted normal portrait.
 
-`src/shared/reckoning.ts` owns eligibility, validation, state transitions and rewind rules. Renderer store/prompt modules connect those rules to text jobs, saves and scene continuation. `ReckoningModal` owns transient feedback/results, audio and effects. The shared and renderer mod entries register it; native and browser text bridges support its structured completion request. Tests cover successful/failed rounds, malformed output, retry/refund, saving, carry, branch rollback, ordinary Breakthrough and soundscape behavior.
+On desktop, character ZIP export/import/duplicate carries a validated optional exReflection manifest extension containing the image and staging. Whole-game backups carry exReflections. These paths work with the mods off, and older packages without the extension remain accepted. A stock importer can ignore the optional JSON extension and import the ordinary character; that does not preserve the extra artwork through a stock re-export. Browser Echo artwork support exists, but the new Unheard Soul editor/portable extension currently remains desktop-only; the browser uses the inverted default portrait.
 
-The bounded live check on 2026-10-13 used 11 text requests with Gemini 3.6 Flash and three fictional adult profiles. All three openings parsed and used supplied history; each supportive answer passed and each hostile/instruction-injection answer failed. One complete three-round encounter earned a valid, character-specific growth tag. This is evidence for that configuration, not a balance guarantee or a substitute for broader model/character playtesting. No personal save text was used. See [asset licensing](echo-asset-licenses.md) for the separately licensed music and optional LoRA.
+## Music
+
+| Phase | Bundled default | Playback |
+| --- | --- | --- |
+| The Unspoken, before questions | Rise from the Dark | Loop |
+| Questions | Breakthrough: Victory & Hope | Loop |
+| Victory | Bloom | Once |
+
+Settings → Custom soundtracks exposes independent replacement slots for all three. Music follows the normal Music volume; the separate dungeon-silence toggle was removed. Question music and the reader's Echo begin with the questions, not on entry. Leaving restores the normal soundscape. The [asset notice](echo-asset-licenses.md) credits themaestroai and records permission for all three tracks. The release installer allowlist includes all three files and restores the official installation on uninstall.
+
+## Persistence, rewind and isolation
+
+exReckoning stores the active link, bounded private visit and question progress. Spirit/progress/growth writes use the native save queue and check request ownership before applying a late result. Provider/save errors cannot silently double-charge or award a partial tag. Load/retry/resume preserves the relevant attempt. Legacy records remain normalized instead of being guessed at or discarded.
+
+Reading old dialogue is harmless. Submitting a new reply at or before a recorded encounter anchor rolls back that branch's encounter/growth and refunds the recorded charge once, up to the spirit cap. Branching after it retains the encounter. Older records without an anchor are preserved. Blocked follow-up scene prompts support the normal edit-and-retry flow.
+
+The dungeon does not call native scene settlement or Story Memory extraction. Its ordinary Talk, questions, hints and whispers do not become public conversation history. The ordinary link-establishment sensation and later relief can be part of real-world story continuity; the private mechanics must not leak into characters' knowledge. Continuing Semesters resets transient encounters and carries earned dynamics through the existing registry.
+
+## Source map and validation
+
+| Area | Main files |
+| --- | --- |
+| State, catalogs and validation | shared/reckoning, reckoningDungeonState, reckoningDungeons, dungeonConversation, reckoningVoice, unspokenVoice |
+| Lifecycle and persistence | renderer/stores/reckoning, reckoningDungeon, loop/saves, loop/turn, gameLoop |
+| Bounded model context | renderer/prompts/reckoningPrompt, shared/dungeonConversation, renderer/prompts/characterDynamics |
+| Visuals and placement | ReckoningDungeon, ReckoningModal, UnspokenVoice, UnspokenLinkGlitch, ReflectionPortrait, FallingGlass, whisperLayout, whisperSilhouette |
+| Character images and portability | main/services/echoService, reflectionStorage, characterTransferService, backupService |
+| Audio | shared/audio, shared/soundtracks, renderer/stores/audioEngine, audioStore, soundscape |
+
+See [current validation](echo-validation.md), [Echoes](echo.md), [abilities](echo-breakthrough.md) and [Custom soundtracks](custom-soundtracks.md). This remains a draft feature for source review and broader live-model/balance/release testing; simulated responses do not establish narrative quality.

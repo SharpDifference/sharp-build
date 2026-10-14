@@ -1,3 +1,4 @@
+import { backupReflections, prepareReflectionRestore } from './reflectionStorage'
 import { mkdir, readFile, rename, rm, utimes, writeFile } from 'fs/promises'
 import { basename, dirname, join } from 'path'
 import {
@@ -300,6 +301,7 @@ export async function exportBackup(targetPath: string): Promise<void> {
     }
 
     const record: BackupFile = {
+      exReflections: await backupReflections(),
       exEchoArt: await backupEchoArtwork(scratch),
       ...(music ? { exMusic: music.map } : {}),
       schemaVersion: BACKUP_SCHEMA_VERSION,
@@ -538,6 +540,7 @@ export async function importBackup(archivePath: string): Promise<void> {
     await extractZip(archivePath, scratch, BACKUP_ZIP_LIMITS)
     await checkExtractedContent(scratch, classifyBackupEntry, 'backup')
     const record = await readBackupRecord(scratch)
+    const restoreReflections = prepareReflectionRestore(record.exReflections)
     const restoreEchoArtwork = await prepareEchoArtworkRestore(scratch, record.exEchoArt)
     const music = await prepareSoundtrackSnapshot(record.exMusic,
       file => readSoundtrackFile(join(scratch, SOUNDTRACK_BACKUP_DIR, file)), soundtrackHash)
@@ -550,6 +553,7 @@ export async function importBackup(archivePath: string): Promise<void> {
     const replays = replaysFromBackup(record)
 
     await restoreEchoArtwork()
+    await restoreReflections()
     await replaceSettings(settings)
     await setGrabBags(record.grabbags)
     await restoreSaves(scratch, record, replays)

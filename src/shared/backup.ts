@@ -71,6 +71,8 @@ export interface BackupPlaythrough {
 
 /** Everything a backup carries beside the images. */
 export interface BackupFile {
+  /** Optional desktop reflection images and positions, including shipped characters. */
+  exReflections?: Record<string, unknown>
   /** Immutable Echo PNG IDs, with bytes under echoes/art; absent in older backups. */
   exEchoArt?: string[]
   schemaVersion: number

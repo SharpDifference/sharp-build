@@ -23,7 +23,7 @@ export function canSpendBreakthrough(game:Game,id:string,cost:number):boolean {
   const offer = interjectOfferOf(game)
   const canReply = offer === 'open' || offer === 'none' && (replyRowOfferOf(game) === 'open' ||
     game.awaitingInput && !game.busy && game.pendingLines.length === 0)
-  return modIsOn(BREAKTHROUGH_MOD) && !!game.playthroughId && !game.replaying && !game.createdScene && canReply && !game.sceneQuiz &&
+  return (!game.exReckoning.dungeon||game.exReckoning.dungeon.phase==='unlocked') && modIsOn(BREAKTHROUGH_MOD) && !!game.playthroughId && !game.replaying && !game.createdScene && canReply && !game.sceneQuiz &&
     !game.turnError && !game.statusShown && !game.statusModal && !game.activeGameOver &&
     !game.exBreakthrough.pending && breakthroughCast(game).includes(id) &&
     (game.currentSceneTranscript.length > 0 || game.sceneSummary !== null) && (game.exBreakthrough.meters[id] ?? 0) >= cost

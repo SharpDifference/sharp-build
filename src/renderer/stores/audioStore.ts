@@ -37,6 +37,8 @@ import { useUiStore, type ViewName } from './uiStore'
  */
 
 interface AudioStoreState {
+  dungeonActive: boolean
+  setDungeonActive: (active: boolean) => void
   reckoningActive: boolean
   reckoningVictory: boolean
   setReckoningActive: (active: boolean, victory?: boolean) => void
@@ -61,6 +63,8 @@ interface AudioStoreState {
 }
 
 export const useAudioStore = create<AudioStoreState>(() => ({
+  dungeonActive: false,
+  setDungeonActive: active => { useAudioStore.setState({ dungeonActive: active }); if(started)recompute() },
   reckoningActive: false,
   reckoningVictory: false,
   setReckoningActive: (active,victory=false) => { useAudioStore.setState({ reckoningActive: active, reckoningVictory: active&&victory }); if(started)recompute() },
@@ -220,6 +224,7 @@ function factsOf(): SoundFacts {
     customTitle: soundtrackActive('title'),
     reckoning: audio.reckoningActive,
     reckoningVictory: audio.reckoningVictory,
+    dungeon: audio.dungeonActive,
     music: engine.current('music'),
     crossing: {
       phase: crossing.phase,

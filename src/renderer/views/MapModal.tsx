@@ -44,6 +44,7 @@ import {
   veilIn
 } from './motion'
 import '../vu_styles/BunnyMap.css'
+import { ReckoningDungeonMapPin } from './ReckoningDungeon'
 
 export interface MapModalProps {
   /** Drawn by the screen that opened this — a portal inherits no palette. */
@@ -459,6 +460,8 @@ export function MapModal({ theme, onClose, onGo }: MapModalProps): JSX.Element |
             })}
           </motion.div>
         </div>
+
+        <ReckoningDungeonMapPin canTravel={!!onGo} onEnter={onClose}/>
 
         <div className="vu-foot">
           {/* Nobody silently vanishes: the two lines that are not places, anchored left so

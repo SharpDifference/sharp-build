@@ -48,7 +48,8 @@ const MAX_ZIP_BYTES = 100 * 1024 * 1024
 /** Community tracks supplied for the Reckoning mod; no stock music is included. */
 const COMMUNITY_MUSIC = new Set([
   'assets/sound/music/reckoning_breakthrough.mp3',
-  'assets/sound/music/reckoning_bloom.mp3'
+  'assets/sound/music/reckoning_bloom.mp3',
+  'assets/sound/music/reckoning_rise_from_the_dark.mp3'
 ])
 
 /**
@@ -56,7 +57,7 @@ const COMMUNITY_MUSIC = new Set([
  * repo. `assets/` holds gigabytes of art including explicit images, so it is
  * allowlisted: a folder added there is private until this names it. Under
  * `sound/`, the `music/` and `ambient_music/` folders stay private because
- * their licence does not allow redistribution, except the two explicitly listed
+ * their licence does not allow redistribution, except the three explicitly listed
  * community Reckoning tracks. `private/` holds records that
  * stay in this repo.
  */

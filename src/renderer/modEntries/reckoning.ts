@@ -1,3 +1,4 @@
+import { unspokenSceneBoundary } from '@shared/unspokenVoice'
 import { CHARACTER_DYNAMICS_MOD } from '@shared/characterDynamics'
 import { registerHooks } from '../mods/hooks'
 import { earnedGrowthLines } from '../prompts/characterDynamics'
@@ -9,7 +10,7 @@ const dynamicsOn = (): boolean => modIsOn(CHARACTER_DYNAMICS_MOD, loopState.reco
 // Character Dynamics supplies this history when enabled. Do not duplicate its prompt.
 registerHooks('reckoning', {
   prompts: {
-    scene: { lines: ({ cast, state }) => dynamicsOn() ? [] : earnedGrowthLines(cast, state.exCharacterDynamics) },
+    scene: { lines: ({ cast, state }) => [...(dynamicsOn() ? [] : earnedGrowthLines(cast, state.exCharacterDynamics)),...unspokenSceneBoundary(state.exReckoning)] },
     dm: { lines: ({ character, state }) => dynamicsOn() ? [] : earnedGrowthLines([character], state.exCharacterDynamics) }
   },
   requests: {

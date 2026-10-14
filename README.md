@@ -41,8 +41,9 @@ These steps are Venus Dev's, from his repository; they hold here too.
   zipped, so their NSFW images can't be previewed on GitHub: every zip unpacks to
   `assets/characters/<id>/`, so from `assets/characters`,
   `for z in *.zip; do unzip -q "$z"; done` (or extract each one in place with your archiver).
-  The music tracks (`assets/sound/music`, `assets/sound/ambient_music`) are not included either:
-  `assets/sound/README.md` says how to get them.
+  The official game's music tracks (`assets/sound/music`, `assets/sound/ambient_music`) are not included either:
+  `assets/sound/README.md` says how to get them. Separately licensed community tracks are
+  included where listed in `LICENSE-ASSETS.md`.
 - `npm run dev` then starts with the backgrounds, the sound effects and the pre-generated
   characters. Character generation should work: the pose manifest and openpose skeletons under
   `assets/pose` are included.

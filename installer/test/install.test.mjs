@@ -14,7 +14,7 @@ const HERE = dirname(fileURLToPath(import.meta.url))
 const INSTALLER = join(HERE, '..')
 const GAME_VERSION = '9.9.9'
 const WORKFLOW = 'resources/assets/workflows/characterPhoto.json'
-const COMMUNITY_MUSIC = ['reckoning_breakthrough.mp3', 'reckoning_bloom.mp3']
+const COMMUNITY_MUSIC = ['reckoning_breakthrough.mp3', 'reckoning_bloom.mp3', 'reckoning_rise_from_the_dark.mp3']
 const sha = async (path) => createHash('sha256').update(await readFile(path)).digest('hex')
 
 async function put(path, text) {

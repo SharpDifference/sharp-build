@@ -53,6 +53,15 @@ function inGame(over: Partial<NonNullable<SoundFacts['game']>> = {}): SoundFacts
 }
 
 describe('the title theme', () => {
+  it('plays the dungeon cue on entry and after questions, with question/victory music taking priority',()=>{
+    const scene=inGame({landing:false,inScene:true})
+    const dungeon={...scene,dungeon:true}
+    expect(soundscapeOf(dungeon)).toMatchObject({music:{key:'reckoning_dungeon'},ambience:{key:null}})
+    expect(soundscapeOf({...dungeon,reckoning:true}).music).toMatchObject({key:'reckoning'})
+    expect(soundscapeOf({...dungeon,reckoning:true,reckoningVictory:true}).music).toMatchObject({key:'reckoning_victory'})
+    expect(soundscapeOf({...dungeon,reckoning:false,reckoningVictory:false}).music).toMatchObject({key:'reckoning_dungeon'})
+    expect(soundscapeOf({...dungeon,dungeon:false})).toEqual(soundscapeOf(scene))
+  })
   it('uses the Reckoning track only for the active game encounter and restores the normal mix on exit', () => {
     const scene = inGame({ landing: false, inScene: true })
     const normal = soundscapeOf(scene)

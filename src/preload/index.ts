@@ -9,6 +9,13 @@ import { photoApi } from './photoApi'
 const api: VenusUniversityApi = {
   platform: 'desktop',
   echo: {
+    reflectionReset: charId=>ipcRenderer.invoke('echo:reflectionReset',charId),
+    reflectionExport: charId=>ipcRenderer.invoke('echo:reflectionExport',charId),
+    reflectionUpload: charId=>ipcRenderer.invoke('echo:reflectionUpload',charId),
+    reflectionRead: charId=>ipcRenderer.invoke('echo:reflectionRead',charId),
+    reflectionStageRead: charId=>ipcRenderer.invoke('echo:reflectionStageRead',charId),
+    reflectionStageSave: (charId,stage)=>ipcRenderer.invoke('echo:reflectionStageSave',charId,stage),
+    reflectionGenerate: (charId,id)=>ipcRenderer.invoke('echo:reflectionGenerate',charId,id),
     installLocalModels: id => ipcRenderer.invoke('echo:installLocalModels', id),
     generate: request => ipcRenderer.invoke('echo:generate',request),
     cancel: id => ipcRenderer.invoke('echo:cancel',id),
