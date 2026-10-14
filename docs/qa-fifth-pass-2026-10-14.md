@@ -1,5 +1,9 @@
 # Fifth-pass QA verification — October 14, 2026
 
+## Review split
+
+Base-game backup preflight, safe ZIP replacement and ordinary texting request ownership have been extracted into separate core and upstream branches. Their original mixed-mod regressions remain in the Echo integration. #57 now contains only the community-mod fixes; prior validation totals below describe the pre-split combined work. Regeneration context and mod reply hooks remain here. See qa-base-game-split-2026-10-14.md for the branch mapping and updated checks.
+
 The supplied evidence targeted an older Echo head. All seven supplied test files were rerun unchanged against the current combined branch before editing: 18 checks passed and five failed, covering three issues. Typechecking passed. Fixtures use temporary folders, synthetic profiles, fake IndexedDB and mocked model requests.
 
 ## Backup restore preflight (#57)

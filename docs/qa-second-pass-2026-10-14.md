@@ -1,5 +1,9 @@
 # Community mod QA follow-up — October 14, 2026
 
+## Review split
+
+Base-game backup preflight, safe ZIP replacement and ordinary texting request ownership have been extracted into separate core and upstream branches. Their original mixed-mod regressions remain in the Echo integration. #57 now contains only the community-mod fixes; prior validation totals below describe the pre-split combined work. Regeneration context and mod reply hooks remain here. See qa-base-game-split-2026-10-14.md for the branch mapping and updated checks.
+
 This follow-up addresses all six issue groups in the supplied DOTS second-pass evidence. It is based on community main at `494fb91`, which already includes Story Memory Light (#52). It does not include the Echo/Reckoning implementation from #53.
 
 ## Fixes
