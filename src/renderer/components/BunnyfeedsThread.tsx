@@ -289,6 +289,12 @@ function Thread({
   const [unfolded, setUnfolded] = useState<ReadonlySet<string>>(new Set())
   if (said.length === 0) return null
   const { roots, repliesTo } = grouped(said)
+  const byId = new Map(said.map((one) => [one.id, one]))
+  // Whom a reply answers, named by the game off its target: his own carry the @ he typed.
+  const toOf = (one: PostComment): string | undefined => {
+    const target = one.player || !one.replyTo ? undefined : byId.get(one.replyTo)
+    return target ? (target.player ? 'you' : `@${target.handle}`) : undefined
+  }
 
   return (
     <ul className="vu-bb-comments">
@@ -318,6 +324,7 @@ function Thread({
                   <li key={one.id}>
                     <CommentRow
                       comment={one}
+                      to={toOf(one)}
                       onReply={
                         canComment && !one.player
                           ? () => setReplying({ root, to: one })
@@ -352,9 +359,12 @@ function Thread({
 /** One comment: a face, the handle running into what was said, and Reply where he may answer. */
 function CommentRow({
   comment,
+  to,
   onReply
 }: {
   comment: PostComment
+  /** Whom it answers, shown over the line. */
+  to?: string
   onReply?: () => void
 }): JSX.Element {
   return (
@@ -373,6 +383,7 @@ function CommentRow({
         </span>
       )}
       <span className="vu-bb-comment-said">
+        {to && <span className="vu-bb-comment-to">↪ {to}</span>}
         <span className="vu-bb-comment-who">
           {comment.player ? 'you' : `@${comment.handle}`}
         </span>
