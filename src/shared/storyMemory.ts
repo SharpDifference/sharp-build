@@ -44,6 +44,12 @@ export interface PastEncounter {
   subjects: string[]
   origin: TermOrigin
 }
+/** Editing an encounter changes its text, never its independent recall visibility. */
+export function editStoryEncounter(memory: StoryMemory, id: string, text: string): StoryMemory {
+  return { ...memory, encounterEdits: { ...memory.encounterEdits,
+    [id]: { ...memory.encounterEdits[id], text: text.trim() } } }
+}
+
 export interface StoryMemory {
   version: 1
   facts: StoryFact[]

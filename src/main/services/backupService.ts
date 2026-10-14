@@ -1,4 +1,4 @@
-import { mkdir, readFile, rename, rm, utimes, writeFile } from 'fs/promises'
+import { mkdir, readFile, rename, utimes, writeFile } from 'fs/promises'
 import { basename, dirname, join } from 'path'
 import {
   BACKUP_NAME,
@@ -59,7 +59,7 @@ import {
 import {
   checkExtractedContent,
   copyInto,
-  createZip,
+  replaceZip,
   discard,
   extractZip,
   relPathsUnder,
@@ -318,13 +318,7 @@ export async function exportBackup(targetPath: string): Promise<void> {
       message: 'Could not write the backup record.'
     })
 
-    // 7-Zip's `a` updates an existing archive, so an old zip must go first.
-    await rm(targetPath, { force: true })
-    await createZip(scratch, targetPath)
-  } catch (err) {
-    // A half-written zip is worse than none: it opens, and it is not the player's game.
-    await rm(targetPath, { force: true }).catch(() => {})
-    throw err
+    await replaceZip(scratch, targetPath)
   } finally {
     await discard(scratch)
   }

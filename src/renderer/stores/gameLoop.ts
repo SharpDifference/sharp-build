@@ -2922,6 +2922,8 @@ export function enterTrip(
 ): void {
   resetLoop()
   loopState.trip = trip
+  // Rule ownership survives even though this visit must never write to its source save.
+  loopState.record = record
   // The goodbye's path is keyed on the epilogue's own slot, so the scene is stood on it whatever
   // slot the save was taken in.
   useGameStore

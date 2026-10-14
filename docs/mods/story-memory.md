@@ -275,3 +275,7 @@ it, and a combined runtime still needs the merge steps above and a full integrat
 - `src/renderer/modEntries/story-memory.ts` loads the hooks automatically at boot.
 
 The stable IDs, defaults, dependencies, save fields and gameplay behavior are unchanged. Native character notes, scene-creator saves and calendar replays retain their 0.3.1 behavior. Merge framework updates from `core` into this mod branch; resolve conflicts with `main` on a separate `integrate/story-memory` branch.
+
+## October 14 editor follow-up
+
+Editing a hidden encounter recap retains its hidden flag and existing metadata through the normal save lane. Editing alone never restores it to recall. Standard and Light mode budgets are unchanged. See [QA follow-up](../qa-third-fourth-pass-2026-10-14.md) for current combined checks.

@@ -23,3 +23,7 @@ All tests use synthetic data and mocked providers; no paid API requests or perso
 Vitest was run on Windows with two workers and a 30-second per-test timeout. This does not establish a fresh Linux pass or live narrative quality. The reported Linux path assertion was already present in community main; Venus Dev's upstream was not independently verified. The isolated checkout has no official character ZIPs and was not installed into a player's game.
 
 After this PR merges, merge main into the Echo integration branch before its next review/build. The compatibility check does not itself modify or publish #53. The installed Echo Test copy and user saves are unchanged by this follow-up.
+
+## Subsequent verification
+
+The checks and branch status above describe the second pass. See [third/fourth-pass follow-up](qa-third-fourth-pass-2026-10-14.md) for the later fixes, combined validation and #53 dependency.

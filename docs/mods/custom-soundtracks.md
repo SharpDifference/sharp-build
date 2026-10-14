@@ -203,3 +203,7 @@ in this source port. It adds no remote downloads, new telemetry, or AI calls.
 - This mod has no renderer hook registration; its existing switch-gated integration stays in place.
 
 The stable IDs, defaults, dependencies, save fields and gameplay behavior are unchanged. Native character notes, scene-creator saves and calendar replays retain their 0.3.1 behavior. Merge framework updates from `core` into this mod branch; resolve conflicts with `main` on a separate `integrate/custom-soundtracks` branch.
+
+## October 14 load follow-up
+
+Canceling a picker or completing a cleanup with no assignment change no longer discards a pending initial soundtrack load. A successful assignment change still invalidates stale results. This is separate from the earlier title-theme transition and preview playback fixes; those are preserved in the combined Echo build.

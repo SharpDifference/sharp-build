@@ -1,6 +1,7 @@
 import { CITY_LIFE_LOCATIONS_MOD, CITY_LIFE_JOBS_MOD, setCityLifeEnabled } from '@shared/cityLife'
 import { useGameStore } from './gameStore'
 import { create } from 'zustand'
+import { toAppError } from '@shared/errors'
 import { CONTINUING_SEMESTERS } from '@shared/continuingSemestersMod'
 import {
   MODS,
@@ -43,17 +44,24 @@ export function setEnrollmentMods(mods: readonly string[] | null): void {
 
 /** Owns `mods:*` IPC: which community mods are on, and their options. */
 export const useModsStore = create<ModsStoreState>((set, get) => {
+  let persisted = NO_SWITCHES
   /** Applies a change at once, then writes it behind every write already in flight. */
   function change(apply: (switches: ModSwitches) => ModSwitches): Promise<void> {
     const before = get().switches
     const after = apply(before)
     set({ switches: after })
     const write = tail.then(async () => {
-      const result = await window.api.mods.set(get().switches)
-      if (result.ok) return
-      useUiStore.getState().showError(result.error)
-      // Only where nothing has changed since: a later change has its own write coming.
-      if (get().switches === after) set({ switches: before })
+      const snapshot = get().switches
+      try {
+        const result = await window.api.mods.set(snapshot)
+        if (!result.ok) throw result.error
+        persisted = snapshot
+      } catch (error) {
+        useUiStore.getState().showError(toAppError(error))
+        // A later queued edit owns its own attempt. When the lane is caught up,
+        // restore what storage actually acknowledged, not an unpersisted click.
+        if (get().switches === after) set({ switches: persisted })
+      }
     })
     tail = write
     return write
@@ -68,6 +76,7 @@ export const useModsStore = create<ModsStoreState>((set, get) => {
         console.error('[mods] the switches could not be read; every mod is at its default', result.error)
         return
       }
+      persisted = result.data
       set({ switches: result.data })
     },
 
@@ -121,7 +130,7 @@ export function useModOption(modId: string, optionId: string): boolean {
 /** Bind shared catalogs to the current record, or to the switches while creating a game. */
 function syncCityLife(): void {
   const game = useGameStore.getState()
-  const record = enrollmentRecord ?? (game.playthroughId ? { mods: [...game.playthroughMods] } : null)
+  const record = enrollmentRecord ?? (game.playthroughId ? { mods: [...game.playthroughMods] } : loopState.trip ? loopState.record : null)
   setCityLifeEnabled(modIsOn(CITY_LIFE_LOCATIONS_MOD, record), modIsOn(CITY_LIFE_JOBS_MOD, record))
 }
 useModsStore.subscribe(syncCityLife)

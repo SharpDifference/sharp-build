@@ -12,6 +12,7 @@ export interface WhisperIdentityContext {
   classCode?: string | null
   jobId?: string | null
   visitJobId?: string | null
+  firstDiscoveryAvailable?: boolean
 }
 
 /** Classified by the existing scene ledger, then checked against actual dialogue locally. */
@@ -35,7 +36,7 @@ export function whisperIdentityKnown(ctx: WhisperIdentityContext): boolean {
 /** The native trusted/devoted tier, in a one-to-one scene outside a class or work shift. */
 export function whisperCanConfess(ctx: WhisperIdentityContext): boolean {
   const author = ctx.cast.find(c => c.charId === ctx.whisper.author?.id)
-  return !!author && ctx.cast.length === 1 && !ctx.classCode && !ctx.jobId && !ctx.visitJobId &&
+  return ctx.firstDiscoveryAvailable !== false && !!author && ctx.cast.length === 1 && !ctx.classCode && !ctx.jobId && !ctx.visitJobId &&
     isTrusted(affectionFor(ctx.charInfo[author.charId], ctx.date, author))
 }
 

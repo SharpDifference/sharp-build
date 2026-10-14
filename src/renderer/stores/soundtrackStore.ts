@@ -25,7 +25,6 @@ let loading: Promise<void> | null = null
 export const useSoundtrackStore = create<SoundtrackState>((set, get) => {
   async function change(work: () => Promise<string>): Promise<void> {
     if (get().busy || !modIsOn(SOUNDTRACK_MOD)) return
-    revision++
     set({ busy: true, message: '' })
     try { set({ message: await work() }) }
     catch (error) { set({ message: toAppError(error).message }) }
