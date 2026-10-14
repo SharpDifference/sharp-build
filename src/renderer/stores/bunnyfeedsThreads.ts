@@ -5,7 +5,7 @@ import {
   type FeedThreadsResponse,
   type HeldFeedMemory,
   type ThreadWork
-} from '@shared/feedComments'
+} from '@shared/bunnyfeeds'
 import { globalSlotOf } from '@shared/jobs'
 import { areNpcFriends } from '@shared/npcRelationships'
 import type { PostComment } from '@shared/postComments'
@@ -19,7 +19,7 @@ import {
   buildFeedThreadsPrompt,
   type FeedThread,
   type ThreadLine
-} from '../prompts/feedCommentsPrompt'
+} from '../prompts/bunnyfeedsPrompt'
 import {
   FEED_EMOJI,
   FEED_EMOJI_BAG,
@@ -28,9 +28,9 @@ import {
 } from '../prompts/feedRandoms'
 import { SETTING } from '../prompts/setting'
 import { hasTexted } from '../prompts/textingPrompt'
-import { markCommented } from './feedVisit'
-import { repliersFor, type Replier } from './feedComments'
-import { fileDueFeedMemories, holdFeedMemories } from './feedMemory'
+import { markCommented } from './bunnyfeedsVisit'
+import { repliersFor, type Replier } from './bunnyfeedsReplies'
+import { fileDueFeedMemories, holdFeedMemories } from './bunnyfeedsMemory'
 import { useGameStore } from './gameStore'
 import { useGrabBagStore } from './grabBagStore'
 import { lessNsfwTextNow, reader } from './loop/promptState'

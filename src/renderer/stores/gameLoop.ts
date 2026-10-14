@@ -1,5 +1,5 @@
 import { slotSettled } from '../mods/hooks'
-import { feedStatusLines } from './feedMemory'
+import { feedStatusLines } from './bunnyfeedsMemory'
 import { currentStorySnapshot } from './storyMemory'
 import { finishBreakthrough, rearmBreakthrough, withBreakthrough } from './breakthrough'
 import { GAME_OVER_SCENES, gameOverReasonOf, gameOverSceneOf } from '@shared/gameOver'

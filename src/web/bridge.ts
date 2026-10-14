@@ -2,7 +2,7 @@ import { prepareStoryRequest, inspectStoryMemory } from './storyMemory'
 import type { WhisperDraft, WhisperReply } from '@shared/venusWhisper'
 import type { MeanwhileResponse } from '@shared/meanwhile'
 import type { ClassifierPromptRequest, ClassifierVerdict } from '@shared/classifier'
-import type { FeedThreadsResponse } from '@shared/feedComments'
+import type { FeedThreadsResponse } from '@shared/bunnyfeeds'
 import { base64ToBytes } from '@shared/base64'
 import { appError, toAppError } from '@shared/errors'
 import {

@@ -1,7 +1,7 @@
-import { BUNNYFEEDS, type HeldFeedMemory } from '@shared/feedComments'
+import { BUNNYFEEDS, type HeldFeedMemory } from '@shared/bunnyfeeds'
 import { memoryStatusLine } from '@shared/relationship'
 import type { CharMemory, SceneLine } from '@shared/types'
-import { TEXT_LEDGER_FEED_LINES } from '../prompts/feedCommentsPrompt'
+import { TEXT_LEDGER_FEED_LINES } from '../prompts/bunnyfeedsPrompt'
 import { UNKNOWN_NAME, useGameStore } from './gameStore'
 import { modIsOn } from './modsStore'
 

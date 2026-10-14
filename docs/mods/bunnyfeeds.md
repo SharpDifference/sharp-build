@@ -72,14 +72,22 @@ Bunnyfeeds makes **one extra AI call** of its own, to your usual model, on top o
 | File | What it is |
 | --- | --- |
 | `src/shared/modEntries/bunnyfeeds.ts` | The entry: anytime, off by default, no requirements. |
-| `src/shared/feedComments.ts` | The optional fields it adds to comments, posts and her record, and `threadWork`, what a thread still owes. |
+| `src/shared/bunnyfeeds.ts` | The optional fields it adds to comments and posts, the thread call's reply shape, and `threadWork`, what a thread still owes. |
 | `src/renderer/modEntries/bunnyfeeds.ts` | Registers the comment hand-off and the hooks. |
-| `src/renderer/prompts/feedCommentsPrompt.ts` | The slot opening's reply lines, the replier block and the thread call's prompt. |
-| `src/renderer/stores/feedComments.ts` | Who may reply under a post, and how the slot opening's replies are filed. |
-| `src/renderer/stores/feedThreads.ts` | The thread call: what is owed, sending on phone close, filing the answers. |
-| `src/renderer/components/FeedThread.tsx`, `vu_styles/FeedComments.css` | The feed preview, the comment pill, the post view with its thread, the comment box and the @ list. |
-| `src/main/ipc.ts`, `src/preload/*`, `src/web/bridge.ts` | The `llm:completeFeedThreads` channel. |
-| `test/feedComments.test.ts` | `threadWork`. |
+| `src/renderer/prompts/bunnyfeedsPrompt.ts` | The slot opening's reply lines, the replier block, the thread call's prompt and the texting bookkeeping's note. |
+| `src/renderer/stores/bunnyfeedsReplies.ts` | Who may reply under a post, and how the slot opening's replies are filed. |
+| `src/renderer/stores/bunnyfeedsThreads.ts` | The thread call: what is owed, sending on phone close, filing the answers. |
+| `src/renderer/stores/bunnyfeedsMemory.ts` | Feed memories: held until the answers show, filed, announced in the closing; and the texting bookkeeping's note. |
+| `src/renderer/stores/bunnyfeedsVisit.ts` | Whether he commented during this phone visit. |
+| `src/renderer/components/BunnyfeedsThread.tsx`, `vu_styles/Bunnyfeeds.css` | The feed preview, the comment pill, the post view with its thread, the comment box and the @ list. |
+| `src/main/ipc.ts`, `src/preload/*`, `src/web/bridge.ts` | The `llm:completeFeedThreads` channel (direct edit). |
+| `src/renderer/prompts/textLedgerPrompt.ts` | One line adding `textLedgerFeedLines` (direct edit). |
+| `src/renderer/stores/gameLoop.ts` | One line adding `feedStatusLines` to the closing's memories (direct edit). |
+| `test/bunnyfeeds.test.ts` | `threadWork`. |
+
+From Photo Feature 1.3.0 it uses the comment hand-off (`stores/commentHandoff.ts`), `PostComments`
+and `CommentAction`, and the post's `comments` field, so Photo Feature's code must be in the build,
+whether or not it is switched on.
 
 ### How it plugs in
 

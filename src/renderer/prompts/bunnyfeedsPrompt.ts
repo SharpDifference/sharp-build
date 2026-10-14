@@ -12,7 +12,7 @@ import { formatShortGameDate } from './gameDate'
 import { relationshipLines } from './relationship'
 import { objectSchema } from './schema'
 import { memoryLines, profileLines, spaced } from './scenePrompt'
-import type { Replier } from '../stores/feedComments'
+import type { Replier } from '../stores/bunnyfeedsReplies'
 
 /** Bunnyfeeds' prompts: the replies a post arrives with, and the call that answers the reader. */
 

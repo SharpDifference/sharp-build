@@ -132,7 +132,7 @@ import {
 import { classifyCloud } from '@shared/llm/cloudClassifier'
 import { generatePhoto } from '@shared/llm/cloudImage'
 import { completeStructured as completeCloudStructured, type StructuredRequest } from '@shared/llm/cloudLlm'
-import type { FeedThreadsResponse } from '@shared/feedComments'
+import type { FeedThreadsResponse } from '@shared/bunnyfeeds'
 import {
   listImageModels,
   listModels,
