@@ -52,3 +52,21 @@ it('round trips global Echo images and rejects conflicting IDs before any restor
   expect(await db.get('settings', 'settings')).toEqual(before)
   db.close()
 })
+
+it('round trips 4097 accumulated images within the whole-archive limits', async () => {
+  const { database } = await import('../src/web/db/open')
+  const { exportBackup, importBackup } = await import('../src/web/backup')
+  const db = await database(), ids = Array.from({ length: 4097 }, (_, i) => `00000000-0000-4000-8000-${i.toString(16).padStart(12, '0')}`)
+  const transaction = db.transaction('echoArt', 'readwrite')
+  for (const key of ids) await transaction.store.add(new Blob([png], { type: 'image/png' }), key)
+  await transaction.done
+  await exportBackup()
+  const archive = mocks.download.mock.calls[0][1] as Uint8Array, entries = unzipSync(archive)
+  expect(JSON.parse(new TextDecoder().decode(entries[BACKUP_NAME])).exEchoArt).toEqual(ids)
+  await db.clear('echoArt')
+  mocks.pick.mockResolvedValue(new File([new Uint8Array(archive)], 'backup.zip'))
+  expect(await importBackup()).toBe(true)
+  expect(await db.getAllKeys('echoArt')).toEqual(ids)
+  expect(new Uint8Array(await (await db.get('echoArt', ids.at(-1)!))!.arrayBuffer())).toEqual(new Uint8Array(png))
+  db.close()
+}, 20000)

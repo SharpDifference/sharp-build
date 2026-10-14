@@ -41,9 +41,10 @@ export async function resetReflectionPortrait(charId:string):Promise<void> {
  const existing=await readPortableReflection(charId)
  await writePortableReflection(charId,{version:1,image:null,stage:existing?.stage??reflectionStageOf(null)})
 }
-async function storeReflection(charId:string,bytes:Uint8Array):Promise<string> {
+async function storeReflection(charId:string,bytes:Uint8Array,signal?:AbortSignal):Promise<string> {
  const image=`data:image/png;base64,${decodeArt(bytes).toPNG().toString('base64')}`
  const existing=await readPortableReflection(charId)
+ signal?.throwIfAborted()
  await writePortableReflection(charId,{version:1,image,stage:existing?.stage??reflectionStageOf(null)})
  return image
 }
@@ -56,21 +57,25 @@ export async function uploadReflectionPortrait(charId:string,path:string):Promis
 export async function generateReflectionPortrait(charId:string,requestId:string,owner:number):Promise<string> {
  assertSafeCharId(charId)
  if(!ECHO_ART_ID.test(requestId))throw Error('Invalid artwork request.')
- if(!modOn(await getModSwitches(),'reckoning'))throw Error('Enable Reckoning in Mods first.')
  if(jobs.size)throw Error('Another image is already being generated. Wait or cancel it first.')
+ // Admit the job before any await, so Stop also covers the settings read.
  const controller=new AbortController();jobs.set(requestId,{owner,controller})
  try {
   const signal=AbortSignal.any([controller.signal,AbortSignal.timeout(600000)])
+  const switches=await getModSwitches();signal.throwIfAborted()
+  if(!modOn(switches,'reckoning'))throw Error('Enable Reckoning in Mods first.')
   const character=await getCharacter(charId),original=await readCharacterImage(charId,expressionRel('neutral'))
+  signal.throwIfAborted()
   if(!original)throw Error('Generate or import her normal neutral portrait first.')
   const reference=decodeArt(original).toPNG()
   await prepareEchoCutout(signal)
+  signal.throwIfAborted()
   const bytes=await generateImage(reflectionPortraitPrompt(character),{aspectRatio:'3:4',sources:[{bytes:reference,mimeType:'image/png'}],signal})
   signal.throwIfAborted()
   const png=decodeArt(bytes).toPNG(),sourceId=randomUUID(),sourceFolder=join(getDataPath(),'echoes','sources')
   await mkdir(sourceFolder,{recursive:true});await writeFile(join(sourceFolder,`${sourceId}.png`),png,{flag:'wx'})
   const cutout=await cutoutEchoImage(png,signal);signal.throwIfAborted()
-  return await storeReflection(charId,cutout)
+  return await storeReflection(charId,cutout,signal)
  } finally {releaseEchoCutout();jobs.delete(requestId)}
 }
 function artPath(id: string): string {
@@ -87,26 +92,30 @@ function decodeArt(bytes: Uint8Array): Electron.NativeImage {
   return image
 }
 /** An immutable file id lets old saves keep their original artwork after a replacement. */
-async function storeArt(bytes: Uint8Array): Promise<string> {
+async function storeArt(bytes: Uint8Array, signal?: AbortSignal): Promise<string> {
   const image = decodeArt(bytes)
   const id = randomUUID()
   await mkdir(folder(),{recursive:true})
+  signal?.throwIfAborted()
   await writeFile(artPath(id),image.toPNG(),{flag:'wx'})
   return id
 }
 export async function generateEchoArt(value: EchoArtRequest, owner: number): Promise<string> {
   const identity = normalizeEchoIdentity(value?.identity)
   if (!identity?.name || !ECHO_ART_ID.test(value?.requestId ?? '') || typeof value.name !== 'string' || typeof value.bio !== 'string' || (value.backstory !== undefined && typeof value.backstory !== 'string')) throw Error('Invalid Echo request.')
-  const switches = await getModSwitches()
-  if (!modOn(switches,'echo')) throw Error('Enable Echo in Mods first.')
   if (jobs.size) throw Error('An Echo image is already being generated. Wait or cancel it first.')
+  // The renderer can cancel as soon as it sends this request ID.
   const controller = new AbortController()
   jobs.set(value.requestId,{owner,controller})
   try {
+    const switches = await getModSwitches()
+    controller.signal.throwIfAborted()
+    if (!modOn(switches,'echo')) throw Error('Enable Echo in Mods first.')
     const local = optionOn(switches,'echo','megaten-art')
     const signal = AbortSignal.any([controller.signal,AbortSignal.timeout(local ? 900000 : 600000)])
     const prompt = (local ? echoLocalImagePrompt : echoImagePrompt)({...value,identity})
     await prepareEchoCutout(signal)
+    signal.throwIfAborted()
     const bytes = local ? await generateLocalEcho(prompt,signal) : await generateImage(prompt,{aspectRatio:'3:4',signal})
     signal.throwIfAborted()
     const png = decodeArt(bytes).toPNG()
@@ -117,7 +126,7 @@ export async function generateEchoArt(value: EchoArtRequest, owner: number): Pro
     try {
       const cutout = await cutoutEchoImage(png,signal)
       signal.throwIfAborted()
-      return await storeArt(cutout)
+      return await storeArt(cutout,signal)
     } catch (error) {
       signal.throwIfAborted()
       throw new Error(`Echo background removal failed. Your previous artwork is unchanged. The original image is kept in data/echoes/sources/${sourceId}.png; no automatic paid retry was made.`,{cause:error})

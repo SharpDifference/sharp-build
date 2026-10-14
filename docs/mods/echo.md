@@ -20,6 +20,10 @@ Desktop and browser API generation use local ISNet subject segmentation through 
 
 The desktop runs segmentation in a hidden sandboxed renderer without a preload/filesystem bridge. Cancellation closes its worker/window. Browser custom endpoints must permit CORS. Provider, network and cache availability still affect generation; transparency quality is not guaranteed for every image.
 
+Generation reserves its cancellable job before reading settings, on desktop and browser. Stop/Close during that read or preparation prevents a provider request; a second job is refused until the first settles. Desktop cancellation also checks the requesting window's ownership. A request already sent to the provider may still be chargeable. The bundled software notices and model license open as read-only in-game dialogs, including offline, without permitting arbitrary file links.
+
+Whole-game backups include all retained finished Echo artwork, including images used by historical saves. There is no separate 4,096-image manifest cutoff; combined collections can be exported and restored subject to the existing whole-archive import limits (16,384 entries, 8 GiB) and per-image validation. This change does not delete old images or recovery originals. Recovery originals remain local and outside backups.
+
 The optional local workflow uses ComfyUI with novaAnimeXL_ilV190.safetensors and Megaten_Style.safetensors. Set up local artwork → Install local art models explicitly downloads missing originals (about 6.9 GB and 218 MB), checks pinned sizes and hashes, reuses matching files and refuses to overwrite a different version. Downloads can be cancelled; manual installation remains available. LoRA strength is 0.7 with the workflow's SDXL encoder configuration. Weights are not bundled in Git. See the [separate asset notices](echo-asset-licenses.md).
 
 ## Staging and abilities

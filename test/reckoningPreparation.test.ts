@@ -10,6 +10,7 @@ import { useSettingsStore } from '../src/renderer/stores/settingsStore'
 import { reckoningPreparationStatus, retryReckoningPreparation, startReckoning, watchReckoningPreparation } from '../src/renderer/stores/reckoning'
 import { resetLoopState } from '../src/renderer/stores/loop/state'
 import { writesSettled } from '../src/renderer/stores/loop/saves'
+import { GRADUATION_DATE } from '../src/renderer/prompts/occasions'
 import { character, charactersById, charInfo, restoreApi, sceneLines, stubApi } from './fixtures'
 
 const game=()=>useGameStore.getState()
@@ -40,6 +41,13 @@ beforeEach(()=>{
 afterEach(async()=>{stop?.();stop=undefined;await writesSettled();restoreApi();vi.useRealTimers()})
 
 describe('Reckoning background preparation',()=>{
+  it.each([0,1] as const)('does not spend a background request at the semester cutoff (time %s)',async time=>{
+    const date=time===1?GRADUATION_DATE-1:GRADUATION_DATE
+    useGameStore.setState({date,time,charInfo:{a:charInfo({nameKnown:true,memories:memories.map(m=>({...m,date}))})}})
+    stop=watchReckoningPreparation();await tick()
+    expect(complete).not.toHaveBeenCalled();expect(save).not.toHaveBeenCalled()
+    expect(game().exBreakthrough.meters.a).toBe(100)
+  })
   it('prepares before the panel opens without spending or saving, then reuses the questions',async()=>{
     stop=watchReckoningPreparation()
     expect(complete).not.toHaveBeenCalled()

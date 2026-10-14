@@ -58,3 +58,23 @@ it('uploads, cancels the picker, validates ids and never asks the provider', asy
   await expect(echo.readEchoArt('../settings')).rejects.toThrow('Invalid')
   expect(mocks.cloud).not.toHaveBeenCalled(); expect(mocks.prepare).not.toHaveBeenCalled()
 })
+
+it('cancels during settings lookup, rejects overlapping jobs, and permits the next request', async () => {
+  let finish!: (switches: typeof NO_SWITCHES) => void
+  mocks.switches.mockReturnValueOnce(new Promise(resolve => { finish = resolve }))
+  const first = request(), pending = echo.generateEchoArt(first)
+  await expect(echo.generateEchoArt(request())).rejects.toThrow('already being generated')
+  echo.cancelEchoArt(first.requestId); finish(NO_SWITCHES)
+  await expect(pending).rejects.toMatchObject({ name: 'AbortError' })
+  expect(mocks.prepare).not.toHaveBeenCalled(); expect(mocks.cloud).not.toHaveBeenCalled()
+  const db = await database()
+  expect(await db.count('echoArt')).toBe(0); expect(await db.count('echoSources')).toBe(0)
+  await expect(echo.generateEchoArt(request())).resolves.toBeTypeOf('string')
+})
+
+it('checks cancellation again after preparation before calling the paid provider', async () => {
+  const first = request()
+  mocks.prepare.mockImplementationOnce(() => { echo.cancelEchoArt(first.requestId) })
+  await expect(echo.generateEchoArt(first)).rejects.toMatchObject({ name: 'AbortError' })
+  expect(mocks.cloud).not.toHaveBeenCalled()
+})

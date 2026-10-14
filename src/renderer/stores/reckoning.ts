@@ -15,6 +15,7 @@ import { writeReckoningChange } from './loop/saves'
 import { loopState } from './loop/state'
 import { dungeonFarewell, dungeonVisitAllowed, useDungeonRequest } from './reckoningDungeon'
 import { LINK_GLITCH_MS, useReckoningLinkEffect } from './reckoningLinkEffect'
+import { unspokenNightAvailable } from './reckoningCalendar'
 type Game=ReturnType<typeof useGameStore.getState>
 let flight:{group:string;cancelled:boolean;committing:boolean}|null=null
 export function canStartReckoning(game:Game,id:string):boolean {
@@ -27,6 +28,7 @@ export function canUnlockReckoning(game:Game,id:string):boolean {
 /** Keep a prepared opening through rereading and temporarily closed reply controls. */
 function canKeepOpening(game:Game,id:string):boolean {
   const d=game.exReckoning.dungeon
+  if(!unspokenNightAvailable(game,!d))return false
   if(d)return d.charId===id&&d.phase!=='farewell'&&!game.exReckoning.active&&modIsOn(RECKONING_MOD)&&modIsOn('breakthrough')&&!!game.playthroughId&&!game.createdScene&&!game.replaying
   return modIsOn(RECKONING_MOD)&&modIsOn('breakthrough')&&!!game.playthroughId&&!game.createdScene&&!game.replaying&&
     !game.exBreakthrough.pending&&(game.exBreakthrough.meters[id]??0)>=100&&breakthroughCast(game).includes(id)&&

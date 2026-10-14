@@ -624,6 +624,9 @@ export async function writeReckoningChange(next:ReckoningState,previous:Reckonin
       if(!result.ok)throw Error(result.error.message)
       if(!current())return
       if(loopState.statusBase)loopState.statusBase={...loopState.statusBase,...patch}
+      // Quit/switch-save writes this held checkpoint. Preserve the paid link's
+      // unread lines there too, without marking them as already advanced.
+      if(sceneBeat?.length&&scene)loopState.decisionSave=scene
       useGameStore.setState({...patch,...(sceneBeat?.length&&scene?{currentSceneTranscript:scene.transcript,sceneLog:scene.sceneLog,currentLine:scene.currentLine,pendingLines:scene.pendingLines,awaitingInput:false,reread:0}:{})});written=true
     })
     if(!written)throw Error('The game changed; reopen the encounter.')

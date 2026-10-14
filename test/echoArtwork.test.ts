@@ -13,7 +13,7 @@ describe('portable Echo artwork records', () => {
     }
     expect(classifyBackupEntry('echoes/sources/private.png')).toBe('reject')
   })
-  it('reads old backups but rejects duplicate, unbounded and malformed manifests', () => {
+  it('reads old backups but rejects duplicate and malformed manifests', () => {
     expect(echoArtIds(undefined)).toEqual([])
     expect(echoArtIds([id])).toEqual([id])
     for (const value of [null, {}, ['../../settings'], [id, id.toUpperCase()], Array(4097).fill(id)]) expect(() => echoArtIds(value)).toThrow()

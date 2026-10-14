@@ -1,16 +1,28 @@
-# Echo validation — 2026-10-13
+# Echo validation — 2026-10-14
 
 ## Current combined PR checkout
 
 The Echo integration branch was merged with main at 494fb91aa72d504e83d8e31a2d4851239fe5fc26 before the current changes were applied. This includes Incoming Texts and the merged Story Memory Light option. The local experiment checkout was not published wholesale.
 
 - All three TypeScript checks passed (node, web/renderer and tests).
-- Full Vitest suite: **2,408 passed, one existing skip, 184 files** with two workers.
+- Full Windows Vitest suite: **2,426 passed, one existing skip, 187 files** with two workers.
 - Installer suite: **8 passed**, with all three community music files in the build/test allowlists.
 - Desktop and browser production builds passed. Both include all 22 dungeon backgrounds. The browser emits all three MP3s; desktop release packaging supplies them as external assets through the installer allowlist.
 - Source regression coverage includes link/entry gates, private Talk limits, aspect hints, first-person whisper filtering and safe placement, rewind/save guards, Unheard Soul character/backup transfers, and soundtrack preview restoration/title toggling.
 
 These checks used an isolated source checkout without the official character ZIPs. They are not a fresh end-to-end installation run or a new live judgment test. No paid model requests were made for this publication update. Earlier local visual/install checks remain historical evidence; the current changes still need broader playtesting and release-machine verification.
+
+## DOTS QA follow-up
+
+All five reported findings have source fixes and targeted verification:
+
+- Early cancellation: register desktop Echo/Unheard Soul and browser Echo jobs before awaiting settings; check cancellation again before the provider and before publishing artwork. Regressions cover pending settings, ownership, overlapping jobs, preparation cancellation and retry after failure.
+- Semester cutoff: refuse a new link and unused background preparation when no playable night remains after the scene. The last daytime scene and already-linked final-night entry remain valid.
+- Exit checkpoint: retain the paid link's head-pain dialogue and unread-line position when quitting/switching saves; a failed save keeps the old checkpoint and full spirit.
+- Bundled notices: static in-game text dialogs replace blocked file links. An isolated offline Chromium/Edge fixture verified exact bundled contents, day/night themes, no popup, focus restoration, and Escape closing only the notice. This is a component UI check, not an installed-game launch; desktop navigation restrictions are unchanged.
+- Accumulated artwork: desktop and browser tests export/restore 4,097 finished images. The separate 4,096-image rejection is removed; IDs, duplicate/collision protection, PNG limits and whole-archive import bounds remain. No artwork is automatically deleted.
+
+The supplied Linux run had one existing failure at `test/mainServices.test.ts:177`: its Windows absolute-path spelling is interpreted differently by native `node:path.resolve` on Linux. The test and implementation are unchanged between community `main` at `494fb91` and the reviewed PR head `9a9f3ab`. This establishes a **Venus Extracurriculars main-branch baseline**, not a verified defect on Venus Dev's current upstream branch. This follow-up was tested on Windows and does not claim a new green Linux run.
 
 ## Earlier portability checks
 

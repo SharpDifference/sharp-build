@@ -10,6 +10,8 @@ The link and charge are saved together. A strong, wordless glitch marks activati
 
 Invocation does not teleport the reader. Finish the current scene, then use **Follow her voice** in the nighttime map row beneath the map. The reader closes their eyes and follows her voice inward. The real girl stays on her normal schedule. The private encounter uses a snapshot of her context rather than moving or replacing the real character.
 
+A new link and its background question preparation require a playable night after the current scene. The final daytime scene still qualifies; the final ordinary night and graduation epilogue do not. A previously linked encounter can still be entered on the final playable night. The same relative calendar applies to continuing semesters. A successful link save also updates the held exit checkpoint, so quitting or switching saves during its head-pain beat retains both unread lines and the single spirit charge; failed saves keep the previous checkpoint and spirit.
+
 Each of the 22 original aspects has its own named dark inner world and bundled background. The destination follows the **girl's aspect**, not the reader's. The catalog in shared/reckoningDungeons.ts defines all 22; untyped legacy/no-Echo cases use the validated fallback. There is one map entrance, not 22 physical travel locations.
 
 ## Four choices before the questions

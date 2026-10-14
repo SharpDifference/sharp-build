@@ -13,6 +13,7 @@ import { useAudioStore } from '../stores/audioStore'
 import { spriteUrl, useSpriteVersion } from '../stores/characterStore'
 import { answerReckoning, cancelReckoningRequest, canResumeReckoning, canStartReckoning, canUnlockReckoning, unlockReckoningDungeon, startReckoning, canContinueReckoning, watchReckoningPreparation } from '../stores/reckoning'
 import { submitReckoningAftermath } from '../stores/gameLoop'
+import { unspokenNightAvailable } from '../stores/reckoningCalendar'
 import { resolveEchoStage } from '@shared/echoStage'
 import { StagedEcho } from './EchoPanel'
 import '../vu_styles/Reckoning.css'
@@ -45,6 +46,7 @@ export function ReckoningEntry({charId,blocked,onOpen}:{charId:string;blocked:bo
     {game.exReckoning.active&&!dungeon?<button type="button" className="vu-btn vu-btn--outline vu-paper" disabled={blocked||launching||game.time!==1} onClick={()=>void invoke()}>Continue in The Unspoken · night</button>:
       !earned&&!dungeon&&<button type="button" className="vu-btn vu-btn--outline vu-paper" disabled={blocked||launching||!canUnlockReckoning(game,charId)} onClick={()=>void invoke()}>{launching?'Listening…':'Listen beneath her words · 100 spirit'}</button>}
     {launchError&&<p role="alert">{launchError}</p>}
+    {!earned&&!dungeon&&!game.exReckoning.active&&!unspokenNightAvailable(game,true)&&<p>There is no playable night left after this scene. Start a connection earlier in the semester.</p>}
   </section>
 }
 

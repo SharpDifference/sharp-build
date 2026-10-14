@@ -3,7 +3,6 @@ import { imageTypeOf } from './imageBytes'
 
 export const ECHO_ART_DIR = 'echoes/art'
 export const ECHO_ART_MAX_BYTES = 20 * 1024 * 1024
-export const ECHO_ART_MAX_COUNT = 4096
 
 export function echoArtEntry(id: string): string {
   if (!ECHO_ART_ID.test(id)) throw Error('Invalid Echo artwork id.')
@@ -19,7 +18,9 @@ export function echoArtIdOf(entry: string): string | null {
 /** Validate before restore writes anything. Older backups legitimately have no artwork list. */
 export function echoArtIds(value: unknown): string[] {
   if (value === undefined) return []
-  if (!Array.isArray(value) || value.length > ECHO_ART_MAX_COUNT || value.some(id => typeof id !== 'string' || !ECHO_ART_ID.test(id))) {
+  // Whole-archive entry/byte limits apply to imports. A separate artwork count
+  // would make two individually valid imported collections impossible to back up.
+  if (!Array.isArray(value) || value.some(id => typeof id !== 'string' || !ECHO_ART_ID.test(id))) {
     throw Error('Invalid Echo artwork list in backup.')
   }
   if (new Set(value.map(id => id.toLowerCase())).size !== value.length) throw Error('Duplicate Echo artwork id in backup.')

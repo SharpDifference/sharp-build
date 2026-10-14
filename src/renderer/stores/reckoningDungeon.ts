@@ -7,6 +7,7 @@ import { preparedReckoningThoughts } from './reckoning'
 import { useGameStore } from './gameStore'
 import { modIsOn } from './modsStore'
 import { manualSaveOffer, writeReckoningChange } from './loop/saves'
+import { unspokenNightAvailable } from './reckoningCalendar'
 
 type Game=ReturnType<typeof useGameStore.getState>
 const canLeave=(game:Game):boolean=>!!game.playthroughId&&!game.createdScene&&!game.replaying&&!game.busy&&!game.turnError&&manualSaveOffer()==='open'
@@ -18,7 +19,7 @@ export function dungeonVisitAllowed(game:Game):boolean {
 /** Entry is travel: finish the summoning scene before using the nighttime map.
  * Kept separate from visit readiness so old, already-inside saves remain playable. */
 export function dungeonEntryAllowed(game:Game):boolean {
- return dungeonVisitAllowed(game)&&game.exReckoning.dungeon?.phase==='unlocked'
+ return dungeonVisitAllowed(game)&&unspokenNightAvailable(game)&&game.exReckoning.dungeon?.phase==='unlocked'
   &&(!game.exReckoning.dungeon?.needsSpirit||(game.exBreakthrough.meters[game.exReckoning.dungeon.charId]??0)>=100)
   &&!sceneActiveOf(game)&&game.awaitingInput&&!game.pendingLines.length&&!game.sceneEnding&&!epilogueOf(game)
 }
