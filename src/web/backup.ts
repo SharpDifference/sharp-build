@@ -398,7 +398,7 @@ export async function importBackup(): Promise<boolean> {
         await charFiles.put({ blob: imageBlob(bytes), updatedAt }, [at.charId, rel])
       }
 
-        await tx.done
+      await tx.done
     } catch (err) {
       try { tx.abort() } catch { /* Already aborted by a failed request. */ }
       await tx.done.catch(() => {})
