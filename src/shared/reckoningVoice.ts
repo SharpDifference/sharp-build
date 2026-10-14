@@ -12,7 +12,10 @@ export function firstPersonThought(raw:string,name:string):string|null {
  words=words.replace(new RegExp(`^${subject}\\s+(${Object.keys(verbs).join('|')})\\b`,'i'),(_match,verb:string)=>`I ${verbs[verb.toLowerCase()]}`)
  if(owner)words=words.replace(new RegExp(`^${owner}['’]s\\s+`,'i'),'My ')
  const narratorLead=new RegExp(`^(?:${subject}\\b|her\\b)`,'i')
- if(narratorLead.test(words)||owner&&new RegExp(`\\b${owner}\\b`,'i').test(words))return null
+ if(narratorLead.test(words))return null
+ // Names can also be ordinary words (May, Hope, Grace). Within a first-person
+ // sentence, reject clear owner narration rather than every matching word.
+ if(owner&&new RegExp(`\\b${owner}(?:['’]s\\b|\\s+(?:${Object.keys(verbs).join('|')})\\b)`).test(words))return null
  if(!/\b(?:I|me|my|mine|myself)\b/i.test(words))return null
  // A repaired opening with ambiguous remaining third-person references is safer
  // to skip than to reinterpret. A direct first-person challenge can be used instead.

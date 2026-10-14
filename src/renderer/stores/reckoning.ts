@@ -37,7 +37,7 @@ function canKeepOpening(game:Game,id:string):boolean {
 }
 
 export const RECKONING_PREPARE_OPTION='prepare-questions'
-type Opening={key:string;charId:string;context:ReckoningContext;status:'queued'|'preparing'|'ready'|'error';
+type Opening={key:string;handoffKey?:string;charId:string;context:ReckoningContext;status:'queued'|'preparing'|'ready'|'error';
   thoughts?:ReckoningSession['thoughts'];error?:string;group:string;cancelled:boolean;promise?:Promise<void>}
 const openings=new Map<string,Opening>()
 let preparing:Opening|null=null,prepareTimer:ReturnType<typeof setTimeout>|undefined,watchers=0
@@ -61,11 +61,11 @@ function canPrepareOpening(game:Game,id:string):boolean {
 function validOpening(opening:Opening):boolean {
   const game=useGameStore.getState()
   return !opening.cancelled&&preparationOn()&&canKeepOpening(game,opening.charId)&&
-    opening.key===openingKey(game,opening.charId,openingContext(game,opening.charId))
+    [opening.key,opening.handoffKey].includes(openingKey(game,opening.charId,openingContext(game,opening.charId)))
 }
 export function reckoningPreparationStatus(game:Game,id:string):{status:Opening['status']|'idle';error?:string} {
   const opening=openings.get(id)
-  if(!opening||!canKeepOpening(game,id)||!preparationOn()||opening.key!==openingKey(game,id,openingContext(game,id)))return {status:'idle'}
+  if(!opening||!canKeepOpening(game,id)||!preparationOn()||![opening.key,opening.handoffKey].includes(openingKey(game,id,openingContext(game,id))))return {status:'idle'}
   return {status:opening.status,error:opening.error}
 }
 /** Read an already prepared opening for private whispers; never starts a request. */
@@ -251,8 +251,20 @@ export async function unlockReckoningDungeon(charId:string):Promise<void> {
   const dungeon={id,charId,aspect,unlockedByReckoning:true as const,phase:'unlocked' as const,context,replies:0,farewellReplies:0,lines:[],
    ...(cached?.status==='ready'&&validOpening(cached)&&cached.thoughts?{thoughts:cached.thoughts}:{})}
   const linked={...dungeon,voice:beginUnspokenVoice(dungeon,game.date,game.time)}
+  // Both identities are valid during the durable handoff, with the same load, provider
+  // and evidence fences. A failed write leaves the original preparation usable.
+  const handoff=cached&&validOpening(cached)?cached:undefined
+  if(handoff)handoff.handoffKey=openingKey({...game,exReckoning:{...game.exReckoning,dungeon:linked}},charId,context)
   commit()
+  try {
   await writeReckoningChange(withReckoningAftermaths({version:1,active:null,dungeon:linked,rewinds:[...prior,anchor]},reckoningAftermaths(game.exReckoning)),game.exReckoning,100,charId,undefined,current,unspokenLinkBeat(charKeyOf(girl.firstName,girl.lastName),context.name))
+  } finally {
+    if(handoff){
+      if(useGameStore.getState().exReckoning.dungeon?.id===id&&validOpening(handoff))handoff.key=handoff.handoffKey!
+      delete handoff.handoffKey
+      syncPreparation()
+    }
+  }
   const now=useGameStore.getState()
   if(now.playthroughId===game.playthroughId&&now.loads===game.loads&&now.exReckoning.dungeon?.id===id)
    useReckoningLinkEffect.setState({pulse:{id,playthroughId:game.playthroughId!,loads:game.loads,until:Date.now()+LINK_GLITCH_MS}})

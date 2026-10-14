@@ -79,3 +79,7 @@ The dungeon does not call native scene settlement or Story Memory extraction. It
 | Audio | shared/audio, shared/soundtracks, renderer/stores/audioEngine, audioStore, soundscape |
 
 See [current validation](echo-validation.md), [Echoes](echo.md), [abilities](echo-breakthrough.md) and [Custom soundtracks](custom-soundtracks.md). This remains a draft feature for source review and broader live-model/balance/release testing; simulated responses do not establish narrative quality.
+
+## October 14 preparation and voice follow-up
+
+Prepared questions, including an outstanding request, survive committing the link that opens The Unspoken. A failed link save retains preparation and does not spend spirit; loading a different save or changing provider/context still invalidates it. First-person whisper validation no longer rejects ordinary words just because they match the owner's name (for example, May or Hope); explicit third-person narration remains excluded. Six additional lifecycle controls verify answer cancellation, load/reset, final-growth delays, failed saving and commit ownership. See the combined third/fourth-pass QA report after integration with #57.
