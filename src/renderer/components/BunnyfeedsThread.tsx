@@ -290,10 +290,11 @@ function Thread({
   if (said.length === 0) return null
   const { roots, repliesTo } = grouped(said)
   const byId = new Map(said.map((one) => [one.id, one]))
+  const reader = useReaderHandle()
   // Whom a reply answers, named by the game off its target: his own carry the @ he typed.
   const toOf = (one: PostComment): string | undefined => {
     const target = one.player || !one.replyTo ? undefined : byId.get(one.replyTo)
-    return target ? (target.player ? 'you' : `@${target.handle}`) : undefined
+    return target ? (target.player ? reader : `@${target.handle}`) : undefined
   }
 
   return (
@@ -363,10 +364,11 @@ function CommentRow({
   onReply
 }: {
   comment: PostComment
-  /** Whom it answers, shown over the line. */
+  /** Whom it answers, leading the line. */
   to?: string
   onReply?: () => void
 }): JSX.Element {
+  const reader = useReaderHandle()
   return (
     <div className="vu-bb-comment">
       {comment.charId ? (
@@ -383,11 +385,10 @@ function CommentRow({
         </span>
       )}
       <span className="vu-bb-comment-said">
-        {to && <span className="vu-bb-comment-to">↪ {to}</span>}
-        <span className="vu-bb-comment-who">
-          {comment.player ? 'you' : `@${comment.handle}`}
+        <span className="vu-bb-comment-who vu-bb-comment-who--over">
+          {comment.player ? reader : `@${comment.handle}`}
         </span>
-        {' '}
+        {to && <span className="vu-bb-comment-mention">{to} </span>}
         {comment.text.split(/(@[\w.]+)/).map((part, i) =>
           i % 2 === 1 ? (
             <span key={i} className="vu-bb-comment-mention">
@@ -410,6 +411,13 @@ function CommentRow({
       </span>
     </div>
   )
+}
+
+/** The reader on the feed, who has no handle: his first name in one. */
+function useReaderHandle(): string {
+  const first = useGameStore((s) => s.playerFirstName)
+  const handle = first.toLowerCase().replace(/[^\w.]/g, '')
+  return handle ? `@${handle}` : 'you'
 }
 
 /** The reader's own picture from his Profile tab, or the word "you" while he has none. */

@@ -36,12 +36,11 @@
   gap: 10px;
 }
 
-/* Whom a reply answers, a quiet line over it, so a busy chain reads who is talking to whom. */
-.vu-bb-comment-to {
+/* The name sits on its own line over the words, as the big feeds do, so a long thread reads by
+   who is talking; a reply's words open on whom it answers. */
+.vu-bb-comment-who--over {
   display: block;
-  margin-bottom: 2px;
-  color: var(--vu-text-muted);
-  font: 700 11px var(--font-mono);
+  margin: 0 0 2px;
 }
 
 /* The reader has no picture on the feed, so his disc carries the word instead, in the accent. */
