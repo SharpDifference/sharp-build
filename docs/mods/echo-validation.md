@@ -1,6 +1,10 @@
 # Echo validation — 2026-10-14
 
-## Current combined PR checkout
+## Current source review follow-up
+
+After refreshing #53 from main fc72480: **2,591 passing tests, one existing skip across 221 files**, all three typechecks, eight installer tests, and desktop/browser production builds pass. Echo and Breaking Through the Silence default off; background preparation requires separate opt-in. The actual panel/worker blocked-download check confirms a visible retryable error, unchanged previous artwork and zero paid image requests. Three unchanged music files now use the generic community folder from #61. See [review QA](../qa-echo-review-2026-10-14.md) for scope and evidence.
+
+## Earlier first-pass combined checkout (historical)
 
 The Echo integration branch was merged with main at 494fb91aa72d504e83d8e31a2d4851239fe5fc26 before the current changes were applied. This includes Incoming Texts and the merged Story Memory Light option. The local experiment checkout was not published wholesale.
 

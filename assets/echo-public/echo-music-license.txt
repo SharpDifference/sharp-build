@@ -4,13 +4,13 @@ Track owner: themaestroai
 Suno profile: https://suno.com/@themaestroai
 
 Breakthrough_ Victory & Hope.mp3 (replacement version of Breakthrough)
-Packaged as assets/sound/music/reckoning_breakthrough.mp3
+Packaged as assets/sound/community/reckoning/reckoning_breakthrough.mp3
 
 Bloom.mp3
-Packaged as assets/sound/music/reckoning_bloom.mp3
+Packaged as assets/sound/community/reckoning/reckoning_bloom.mp3
 
 Rise from the Dark.mp3
-Packaged as assets/sound/music/reckoning_rise_from_the_dark.mp3
+Packaged as assets/sound/community/reckoning/reckoning_rise_from_the_dark.mp3
 
 Made by Maestro with Suno on a paid plan; may be redistributed with Venus Extracurriculars
 
