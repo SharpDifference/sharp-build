@@ -56,6 +56,9 @@ export interface FeedThreadsResponse {
 /** How many comments by other people the poster herself answers under one post. */
 export const MAX_POSTER_REPLIES = 3
 
+/** How many comments the reader leaves under one post before she starts wrapping the thread up. */
+export const WRAP_UP_AFTER = 6
+
 /** What one post's thread still owes: the comments that need an answer this round. */
 export interface ThreadWork {
   /** The reader's comments she has not answered yet; each one gets an answer from the poster. */
@@ -64,6 +67,8 @@ export interface ThreadWork {
   others: PostComment[]
   /** How many of `others` she may answer. */
   othersLeft: number
+  /** The thread has run long: she starts winding it down and only girls he tagged join in. */
+  windingDown: boolean
 }
 
 /**
@@ -99,5 +104,7 @@ export function threadWork(
           (one) => one.at > since && one.at <= now && !one.player && one.charId !== posterId
         )
       : []
-  return { player, others, othersLeft }
+  const windingDown =
+    comments.filter((one) => one.player && one.at <= now).length >= WRAP_UP_AFTER
+  return { player, others, othersLeft, windingDown }
 }
