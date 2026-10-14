@@ -1,8 +1,8 @@
 import { optionOn } from '@shared/mods'
 import { useEffect, useRef, useState, type CSSProperties, type JSX } from 'react'
-import { ECHO_ASPECTS, aspectOf, changePlayerEcho, echoAffinity, echoCreatureOf, editEchoCreature, editEchoStage, matchingEcho, normalizeEcho, renameEcho, withEchoArtwork, type EchoAspect, type EchoIdentity, type EchoState } from '@shared/echo'
+import { ECHO_ASPECTS, aspectOf, changePlayerEcho, echoAffinity, echoCreatureOf, editEchoCreature, editEchoSettings, editEchoStage, matchingEcho, normalizeEcho, renameEcho, withEchoArtwork, type EchoAspect, type EchoIdentity, type EchoState } from '@shared/echo'
 import { chooseSetupEchoAspect } from '@shared/echoSetup'
-import { ECHO_STAGE_DEFAULT, PLAYER_ECHO_STAGE_DEFAULT, ECHO_STAGE_LIMITS, echoStageOpacity, echoStageStyle, normalizeEchoStage, resolveEchoStage, type EchoStagePlacement } from '@shared/echoStage'
+import { ECHO_FLOAT_SECONDS_DEFAULT, ECHO_STAGE_DEFAULT, PLAYER_ECHO_STAGE_DEFAULT, ECHO_STAGE_LIMITS, echoStageOpacity, echoStageStyle, normalizeEchoStage, resolveEchoStage, type EchoStagePlacement } from '@shared/echoStage'
 import { spriteUrl, useSpriteVersion } from '../stores/characterStore'
 import { pictureKeySet } from '@shared/settingsRules'
 import { suggestEchoName, suggestEchoCreature } from '@shared/echoNaming'
@@ -15,6 +15,7 @@ import { manualSaveOffer, writeEcho } from '../stores/loop/saves'
 import { ensureEchoes } from '../modEntries/echo'
 import { useDismissLayer } from '../components/useModalShell'
 import { EchoNotice } from '../components/EchoNotice'
+import { EchoSwitchDialog } from '../components/EchoSwitchDialog'
 import type { ScreenTheme } from './clockTheme'
 import '../vu_styles/Echo.css'
 
@@ -70,9 +71,10 @@ export function EchoAura({charId}: {charId:string}): JSX.Element | null {
   return <StagedEcho identity={identity} opacity={state.opacity} owner={charId}/>
 }
 /** Shared preview/stage rendering keeps position, opacity and optional motion identical. */
-export function StagedEcho({identity,placement=identity.stage,opacity,player=false,preview=false,owner}: {identity:EchoIdentity;placement?:EchoStagePlacement;opacity:number;player?:boolean;preview?:boolean;owner?:string}):JSX.Element {
+export function StagedEcho({identity,placement=identity.stage,visible=identity.stage?.visible!==false,opacity,player=false,preview=false,owner}: {identity:EchoIdentity;placement?:EchoStagePlacement;visible?:boolean;opacity:number;player?:boolean;preview?:boolean;owner?:string}):JSX.Element | null {
   const stage=resolveEchoStage(placement,player)
-  return <div className="echo-aura" data-echo-owner={owner} data-floating={stage.floating??player} aria-hidden="true" style={{...echoStageStyle(stage,preview),opacity:echoStageOpacity(stage,opacity,player),'--echo-float-seconds':`${stage.floatSeconds??10}s`,'--echo-tint':aspectOf(identity.aspect).color} as CSSProperties}>
+  if (!visible) return null
+  return <div className="echo-aura" data-echo-owner={owner} data-floating={stage.floating??player} aria-hidden="true" style={{...echoStageStyle(stage,preview),opacity:echoStageOpacity(stage,opacity,player),'--echo-float-seconds':`${stage.floatSeconds??ECHO_FLOAT_SECONDS_DEFAULT}s`,'--echo-tint':aspectOf(identity.aspect).color} as CSSProperties}>
     <div className="echo-float"><EchoArt identity={identity}/></div>
   </div>
 }
@@ -90,7 +92,7 @@ function EchoStagePreview({identity,charId,height,placement,opacity}: {identity:
   useEffect(()=>setMissing(false),[src])
   return <div className={`echo-stage-preview${charId==='player'?' echo-reflection-stage':''}`} data-player={charId==='player'} role="img" aria-label="Echo position preview" style={{'--preview-height':Math.max(.9,Math.min(1,height||1))} as CSSProperties}>
     <div className="echo-stage-guide" aria-hidden="true"/>
-    <StagedEcho identity={identity} placement={placement} opacity={opacity} player={charId==='player'} preview/>
+    <StagedEcho identity={identity} placement={placement} visible={placement.visible!==false} opacity={opacity} player={charId==='player'} preview/>
     {charId==='player'?<><span className="echo-reflection-preview-label">Question panel</span><span className="echo-reflection-preview-clock">Date &amp; time</span></>:missing?<div className="echo-stage-placeholder">Character portrait unavailable</div>:<img className="echo-stage-person" src={src} alt="" onError={()=>setMissing(true)}/>}
   </div>
 }
@@ -115,6 +117,7 @@ export function EchoPanel({hidden,gallery=false,owner,onClose,setup,theme}: {hid
   const game=setup?readGame():storedGame
   const state=game.exEcho
   const [open,setOpen] = useState(!gallery), [selected,setSelected] = useState('player')
+  const [pendingSwitch,setPendingSwitch] = useState<string | null>(null)
   const [section,setSection] = useState<'appearance'|'resonance'|'stage'>('appearance')
   const session = useRef({id:game.playthroughId,loads:game.loads})
   const [busy,setBusy] = useState(false), [message,setMessage] = useState(''), [error,setError] = useState('')
@@ -132,7 +135,7 @@ export function EchoPanel({hidden,gallery=false,owner,onClose,setup,theme}: {hid
   const dialog = useRef<HTMLDialogElement>(null), live = useRef(false), request = useRef<string | null>(null)
   const batch = useRef(false)
   const cancel = (): void => { batch.current = false; if (request.current) void window.api.echo?.cancel(request.current); request.current = null }
-  const close = (): void => { live.current = false; cancel(); setOpen(false); onClose?.() }
+  const close = (): void => { live.current = false; cancel(); setPendingSwitch(null); setOpen(false); onClose?.() }
   useDismissLayer(close, open)
   useEffect(() => { if (!setup && enabled && game.playthroughId) ensureEchoes() },[!!setup,enabled,game.playthroughId,game.loads])
   useEffect(() => {
@@ -186,10 +189,10 @@ export function EchoPanel({hidden,gallery=false,owner,onClose,setup,theme}: {hid
     const previous = useGameStore.getState().exEcho
     await writeEcho(next,previous,() => live.current)
   }
-  async function apply(next:EchoState):Promise<void> {
+  async function apply(next:EchoState):Promise<boolean> {
     setBusy(true);setError('');setMessage('')
-    try { await commit(next); if(live.current)setMessage(setup?'Kept for this new game.':'Saved to this playthrough.') }
-    catch(e) { if(live.current)setError(e instanceof Error ? e.message : 'Could not save Echo.') }
+    try { await commit(next); if(live.current)setMessage(setup?'Kept for this new game.':'Saved to this playthrough.'); return live.current }
+    catch(e) { if(live.current)setError(e instanceof Error ? e.message : 'Could not save Echo.'); return false }
     finally { if(live.current)setBusy(false) }
   }
   async function generateOne(id:string):Promise<void> {
@@ -277,6 +280,43 @@ export function EchoPanel({hidden,gallery=false,owner,onClose,setup,theme}: {hid
     try{await apply(chooseSetupEchoAspect(readGame().exEcho,selected,chosenAspect,setup.roster,setup.bio,setup.locked))}
     catch(e){setError(e instanceof Error?e.message:'Could not choose this aspect.')}
   }
+  async function saveAllSettings():Promise<boolean> {
+    if (busy || !safe) return false
+    try {
+      let next = editEchoSettings(readGame().exEcho, selected, {
+        ...(namePending ? { name: editedName } : {}),
+        ...(creaturePending ? { creature: { type: editedCreatureType, description: editedDescription } } : {}),
+        ...(stagePending ? { stage: placement } : {}),
+        ...(opacity !== state.opacity ? { opacity } : {})
+      })
+      if (aspectPending && setup) {
+        next = chooseSetupEchoAspect(next, selected, chosenAspect, setup.roster, setup.bio, setup.locked)
+      }
+      return await apply(next)
+    } catch (e) {
+      setMessage('')
+      setError(e instanceof Error ? e.message : 'Could not save these Echo settings.')
+      return false
+    }
+  }
+  function switchOwner(id: string): void {
+    setPendingSwitch(null)
+    setOpacity(readGame().exEcho.opacity)
+    setSelected(id)
+    setError('')
+    setMessage('')
+  }
+  function requestOwner(id: string): void {
+    if (busy || id === selected) return
+    if (pendingEdits) {
+      setError('')
+      setPendingSwitch(id)
+    } else switchOwner(id)
+  }
+  async function saveAndSwitch(): Promise<void> {
+    const destination = pendingSwitch
+    if (destination !== null && await saveAllSettings()) switchOwner(destination)
+  }
   async function finishSetup():Promise<void>{
     if(!setup||busy)return
     setBusy(true);setError('')
@@ -284,7 +324,7 @@ export function EchoPanel({hidden,gallery=false,owner,onClose,setup,theme}: {hid
     catch(e){if(live.current)setError(e instanceof Error?e.message:'Could not start the semester.')}
     finally{if(live.current)setBusy(false)}
   }
-  const pendingSetupEdits=namePending||creaturePending||stagePending||aspectPending||opacity!==state.opacity
+  const pendingEdits=namePending||creaturePending||stagePending||aspectPending||opacity!==state.opacity
   if(hidden || !enabled || !game.playthroughId || !state.player || (!setup&&(game.replaying || game.createdScene)))return null
   const aspect=aspectOf(identity?.aspect ?? state.player.aspect)
   const ability=selected==='player'?echoBreakthroughAbility(identity?.aspect):null
@@ -295,9 +335,9 @@ export function EchoPanel({hidden,gallery=false,owner,onClose,setup,theme}: {hid
       <header><div><h1 id="echo-title">Echoes</h1><p>{setup?'Before the semester begins · Keep the suggested Echoes, or make them your own.':'A shape for the part of you that resonates.'}</p></div><button type="button" className="echo-close" onClick={close} aria-label={setup?'Back to class selection':'Close Echoes'}>×</button></header>
       <div className="echo-layout">
         <nav aria-label="Echo owners">
-          <button type="button" aria-pressed={selected==='player'} onClick={()=>setSelected('player')}><b>Your Echo</b><span>{aspectOf(state.player.aspect).name}</span></button>
+          <button type="button" aria-pressed={selected==='player'} disabled={busy} onClick={()=>requestOwner('player')}><b>Your Echo</b><span>{aspectOf(state.player.aspect).name}</span></button>
           <small>{setup?'THIS SEMESTER’S CAST':'MET THIS SEMESTER'} · {ids.length}</small>
-          {ids.map(id=><button type="button" key={id} aria-pressed={selected===id} onClick={()=>setSelected(id)}><b>{label(id)} {matchingEcho(state,id)&&<em title="Matching aspect · +25%">✦</em>}{echoAffinity(state,id)==='competing'&&<em className="echo-competing" title="Competing aspect · −25%">◇</em>}</b><span>{aspectOf(state.girls[id]?.aspect??'horizonbound').name}</span></button>)}
+          {ids.map(id=><button type="button" key={id} aria-pressed={selected===id} disabled={busy} onClick={()=>requestOwner(id)}><b>{label(id)} {matchingEcho(state,id)&&<em title="Matching aspect · +25%">✦</em>}{echoAffinity(state,id)==='competing'&&<em className="echo-competing" title="Competing aspect · −25%">◇</em>}</b><span>{aspectOf(state.girls[id]?.aspect??'horizonbound').name}</span></button>)}
         </nav>
         <div className="echo-workspace">
           <div className="echo-preview">
@@ -312,7 +352,7 @@ export function EchoPanel({hidden,gallery=false,owner,onClose,setup,theme}: {hid
           </div>
           <section className="echo-details">
             <small className="echo-kicker">{setup?(setupAspectEditable?'CHOOSE YOUR STARTING ECHO':'RETURNING ECHO · ASPECT CARRIED'):selected==='player'?'YOUR PERSONAL ECHO':identity.assignment==='chosen'?'PLAYER CHOSEN · ASPECT FIXED':'PROFILE ASSIGNED · ASPECT FIXED'}</small>
-            <h2>{selected==='player'?'Your resonance':label(selected)}</h2><p className="echo-owner-aspect"><strong>{aspect.name}</strong> — {aspect.meaning}</p>
+            <h2>{selected==='player'?'Your Echo':label(selected)}</h2><p className="echo-owner-aspect"><strong>{aspect.name}</strong> — {aspect.meaning}</p>
             <div className="echo-tabs" role="tablist" aria-label="Echo settings">
               {(['appearance','resonance','stage'] as const).map((tab,index,tabs)=><button type="button" key={tab} id={`echo-tab-${tab}`} role="tab" aria-selected={section===tab} aria-controls={`echo-section-${tab}`} tabIndex={section===tab?0:-1} onClick={()=>setSection(tab)} onKeyDown={e=>{
                 const next=e.key==='ArrowRight'?(index+1)%tabs.length:e.key==='ArrowLeft'?(index+tabs.length-1)%tabs.length:e.key==='Home'?0:e.key==='End'?tabs.length-1:null
@@ -341,6 +381,7 @@ export function EchoPanel({hidden,gallery=false,owner,onClose,setup,theme}: {hid
             {section==='stage'&&<div id="echo-section-stage" role="tabpanel" aria-labelledby="echo-tab-stage" tabIndex={0}>
             <section className="echo-placement" aria-label="Echo placement and motion">
               <h3>{selected==='player'?'Your Echo during the questions':'Her Echo on stage'}</h3><p>Move and resize only {label(selected)}’s Echo. The preview follows your adjustments.</p>
+              {selected!=='player'&&<><label><input type="checkbox" aria-label="Show her Echo on stage" checked={placement.visible!==false} disabled={busy} onChange={e=>changePlacement('visible',e.target.checked)}/> Show her Echo on stage</label><p className="echo-help">Hides only her Echo in scenes and the Unspoken Void, including the questions. Her artwork, aspect and abilities stay available.</p></>}
               {([
                 {key:'x',label:'Horizontal (X)',min:-ECHO_STAGE_LIMITS.offset,max:ECHO_STAGE_LIMITS.offset,step:1,value:placement.x,unit:'px'},
                 {key:'y',label:'Vertical (Y)',min:-ECHO_STAGE_LIMITS.offset,max:ECHO_STAGE_LIMITS.offset,step:1,value:placement.y,unit:'px'},
@@ -348,12 +389,12 @@ export function EchoPanel({hidden,gallery=false,owner,onClose,setup,theme}: {hid
               ] as const).map(control=><EchoPlacementControl key={`${selected}-${control.key}`} id={`echo-stage-${control.key}`} label={control.label} min={control.min} max={control.max} value={control.value} unit={control.unit} disabled={busy} onChange={value=>changePlacement(control.key,value/(control.key==='scale'?100:1))}/>)}
               <p className="echo-help">X: left − / right +. Y: up − / down +. Offsets use the game’s stage coordinates. Size grows from the bottom center. {selected==='player'?'Your Echo fills the left background at 18% visibility. Adjust it freely, including over the date and time.':'Her Echo follows her position when the cast moves.'}</p>
               <label><input type="checkbox" aria-label="Floating wobble" checked={placement.floating??selected==='player'} disabled={busy} onChange={e=>changePlacement('floating',e.target.checked)}/> Floating wobble</label>
-              <EchoPlacementControl id="echo-float-speed" label="Float cycle" min={3} max={20} value={placement.floatSeconds??10} unit="s" disabled={busy||!(placement.floating??selected==='player')} onChange={value=>changePlacement('floatSeconds',value)}/>
-              <p className="echo-help">Shorter cycles move faster; longer cycles drift slowly. Reduced-motion settings disable the animation.</p>
+              <EchoPlacementControl id="echo-float-speed" label="Float cycle" min={3} max={20} value={placement.floatSeconds??ECHO_FLOAT_SECONDS_DEFAULT} unit="s" disabled={busy||!(placement.floating??selected==='player')} onChange={value=>changePlacement('floatSeconds',value)}/>
+              <p className="echo-help">The default is a gentle 14-second drift. Shorter cycles move faster; longer cycles drift slowly. Reduced-motion settings disable the animation.</p>
               <EchoPlacementControl id="echo-owner-opacity" label="This Echo visibility" min={5} max={80} value={Math.round(echoStageOpacity(placement,opacity,selected==='player')*100)} unit="%" disabled={busy} onChange={value=>changePlacement('opacity',value/100)}/>
               <button type="button" className="vu-btn vu-btn--quiet echo-action" disabled={busy||placement.opacity===undefined} onClick={()=>{const {opacity:_opacity,...rest}=placement;setStageDraft({owner:selected,placement:rest})}}>{selected==='player'?'Use faint default · 18%':'Use shared visibility'}</button>
               <div className="echo-actions"><button type="button" className="vu-btn vu-btn--primary vu-paper echo-action" disabled={busy||!safe||!stagePending} onClick={()=>void apply(editEchoStage(state,selected,placement))}>Save placement</button><button type="button" className="vu-btn vu-btn--quiet echo-action" disabled={busy||(placement.x===defaultStage.x&&placement.y===defaultStage.y&&placement.scale===defaultStage.scale)} onClick={()=>setStageDraft({owner:selected,placement:{...placement,...defaultStage}})}>Reset position &amp; size</button></div>
-              <p className="echo-help">Save to apply. Closing this window or choosing another character discards unsaved positioning. Artwork and gallery images stay unchanged.</p>
+              <p className="echo-help">Save to apply. Save all settings also keeps your name, creature details and placement together. Switching Echoes asks what to do with unsaved edits; closing this window discards them. Artwork and gallery images stay unchanged.</p>
               {selected==='player'&&<div className="echo-reckoning-effects"><label><input type="checkbox" aria-label="Inner-world glitch effects" checked={glitchEffects} disabled={busy} onChange={e=>void useModsStore.getState().setOption('reckoning','glitch-effects',e.target.checked)}/> Inner-world glitch effects</label><p className="echo-help">Brief full-screen interference and text distortions during private whispers and reflection questions. Off keeps whispers as calm translucent text. Saves automatically. Reduced-motion settings disable the effects.</p></div>}
             </section>
             <h3>Shared visibility for girls’ Echoes</h3>
@@ -361,13 +402,19 @@ export function EchoPanel({hidden,gallery=false,owner,onClose,setup,theme}: {hid
             <label>Echo visibility on stage · {Math.round(opacity*100)}%<input aria-label="Echo visibility on stage" type="range" min="5" max="80" value={Math.round(opacity*100)} disabled={busy} onChange={e=>setOpacity(Number(e.target.value)/100)}/></label>
             <p className="echo-help">Lower values make Echoes fainter; higher values make them more solid. Individual visibility overrides are kept. Gallery images keep their full visibility.</p>
             <div className="echo-actions"><button type="button" className="vu-btn vu-btn--primary vu-paper echo-action" disabled={busy||!safe||opacity===state.opacity} onClick={()=>void apply({...state,opacity})}>Apply visibility</button><button type="button" className="vu-btn vu-btn--quiet echo-action" disabled={busy||!safe} aria-pressed={state.visible} onClick={()=>void apply({...state,visible:!state.visible})}>{state.visible?'Hide on stage':'Show on stage'}</button></div>
-            <p className="echo-help">Your Echo appears while breaking through the silence. Girls’ Echoes appear behind standing portraits, outside replays and created scenes. Hide on stage hides both.</p>
+            <p className="echo-help">Your Echo appears while breaking through the silence. Girls’ Echoes appear behind standing portraits, outside replays and created scenes. Hide on stage hides both; each girl also has her own stage switch above.</p>
             </div>}
             {!safe && <p className="echo-help">Wait for narration and messages to finish before saving or generating artwork.</p>}
           </section>
         </div>
       </div>
-      <footer><div aria-live="polite">{error?<span role="alert" className="echo-error">{error}</span>:setup&&pendingSetupEdits?'Save the edits for this Echo before continuing.':message|| (setup?'Artwork is optional. Changes are saved when you begin the semester.':'')}</div><button type="button" className="vu-btn vu-btn--primary vu-paper echo-action" disabled={busy||!safe||namePending||creaturePending||aspectPending||!missing.length} onClick={()=>void generate(true)}>Generate all missing · {missing.length} {missing.length===1?'image':'images'}</button>{busy&&<button type="button" className="vu-btn vu-btn--quiet echo-action" onClick={cancel}>Stop generation</button>}{setup&&<><button type="button" className="vu-btn vu-btn--quiet echo-action" disabled={busy} onClick={close}>Back</button><button type="button" className="vu-btn vu-btn--primary vu-paper echo-action echo-begin" disabled={busy||pendingSetupEdits} onClick={()=>void finishSetup()}>Begin semester</button></>}</footer>
+      <footer><div aria-live="polite">{error?<span role="alert" className="echo-error">{error}</span>:pendingEdits?'Unsaved changes for this Echo. Choose Save all settings to keep them together.':message|| (setup?'Artwork is optional. Changes are saved when you begin the semester.':'')}</div><button type="button" className="vu-btn vu-btn--primary vu-paper echo-action" disabled={busy||!safe||namePending||creaturePending||aspectPending||!missing.length} onClick={()=>void generate(true)}>Generate all missing · {missing.length} {missing.length===1?'image':'images'}</button><button type="button" className="vu-btn vu-btn--primary vu-paper echo-action" disabled={busy||!safe||!pendingEdits||!editedName.trim()||!editedCreatureType.trim()} onClick={()=>void saveAllSettings()}>Save all settings</button>{busy&&<button type="button" className="vu-btn vu-btn--quiet echo-action" onClick={cancel}>Stop generation</button>}{setup&&<><button type="button" className="vu-btn vu-btn--quiet echo-action" disabled={busy} onClick={close}>Back</button><button type="button" className="vu-btn vu-btn--primary vu-paper echo-action echo-begin" disabled={busy||pendingEdits} onClick={()=>void finishSetup()}>Begin semester</button></>}</footer>
     </dialog>}
+    {open && pendingSwitch !== null && <EchoSwitchDialog
+      firstName={selected === 'player' ? undefined : game.characters[selected]?.firstName}
+      ownerName={selected === 'player' ? undefined : label(selected)} theme={setup ? 'day' : theme}
+      busy={busy} canSave={safe && !!editedName.trim() && !!editedCreatureType.trim()} error={error}
+      onStay={() => setPendingSwitch(null)} onDiscard={() => switchOwner(pendingSwitch)}
+      onSave={() => void saveAndSwitch()}/>}
   </>
 }

@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-import { assignEchoes, editEchoCreature, editEchoStage, normalizeEcho, renameEcho, withEchoArtwork } from '@shared/echo'
+import { assignEchoes, editEchoCreature, editEchoSettings, editEchoStage, normalizeEcho, renameEcho, withEchoArtwork } from '@shared/echo'
 import { echoStageOpacity, echoStageStyle, normalizeEchoStage, resolveEchoStage } from '@shared/echoStage'
 import { carryModFields } from '@shared/modCarry'
 import { useGameStore } from '../src/renderer/stores/gameStore'
@@ -21,6 +21,43 @@ beforeEach(()=>{
 afterEach(async()=>{await writesSettled();restoreApi()})
 
 describe('Per-character Echo staging',()=>{
+  it('keeps a per-girl visibility choice through saves and semester carry without disabling other Echoes', async()=>{
+    const before=game().exEcho
+    const next=editEchoStage(before,'a',{...placement,visible:false})
+    await writeEcho(next,before,()=>true)
+    const saved=normalizeEcho(JSON.parse(JSON.stringify(game().toGameSave().exEcho)))
+    expect(saved.girls.a.stage).toEqual({...placement,visible:false})
+    expect(saved.girls.b).toEqual(before.girls.b)
+    expect(saved.player).toEqual(before.player)
+    expect(saved.visible).toBe(true)
+    expect(saved.girls.a.aspect).toBe(before.girls.a.aspect)
+    expect(assignEchoes(saved,'next',game().characters,'Reader','').girls.a.stage?.visible).toBe(false)
+    expect(editEchoStage(saved,'a',{...placement,visible:true}).girls.a.stage?.visible).toBe(true)
+    expect(normalizeEchoStage({visible:'false'}).visible).toBeUndefined()
+  })
+  it('saves name, creature, staging and opacity together in one write, preserving other owners and artwork',async()=>{
+    const before=withEchoArtwork(game().exEcho,'a','d058c3ab-01f7-4994-aed8-ec004e9b243a','uploaded')
+    useGameStore.setState({exEcho:before})
+    let writes=0
+    stubApi({saves:{autosave:async(id,draft)=>{writes++;return {ok:true,data:{...draft,playthroughId:id,saveId:'autosave',saveDate:0}}}}})
+    const next=editEchoSettings(before,'a',{name:'Zephyra',creature:{type:'moonlit fox',description:'silver markings'},stage:{...placement,visible:false,floating:true,floatSeconds:17},opacity:.4})
+    await writeEcho(next,before,()=>true)
+    expect(writes).toBe(1)
+    expect(game().exEcho.girls.a).toMatchObject({name:'Zephyra',creature:{type:'moonlit fox',description:'silver markings'},stage:{...placement,visible:false,floating:true,floatSeconds:17},art:before.girls.a.art,aspect:before.girls.a.aspect})
+    expect(game().exEcho.girls.b).toEqual(before.girls.b)
+    expect(game().exEcho.player).toEqual(before.player)
+    expect(game().exEcho.opacity).toBe(.4)
+    expect(before.girls.a.name).toBe('Morning Song')
+  })
+  it('keeps every pending field unchanged on validation or disk failure',async()=>{
+    const before=game().exEcho,original=structuredClone(before)
+    expect(()=>editEchoSettings(before,'a',{name:'Zephyra',creature:{type:'',description:''},stage:{...placement,visible:false}})).toThrow('monster type')
+    expect(before).toEqual(original)
+    const next=editEchoSettings(before,'a',{name:'Zephyra',stage:{...placement,visible:false}})
+    stubApi({saves:{autosave:async()=>({ok:false,error:{code:'DISK',message:'Disk full'}})}})
+    await expect(writeEcho(next,before,()=>true)).rejects.toThrow('Disk full')
+    expect(game().exEcho).toBe(before)
+  })
   it('uses the large reader default only when unset, preserving saved placements and girls',()=>{
     expect(resolveEchoStage(undefined,true)).toEqual({x:25,y:600,scale:2.39})
     expect(resolveEchoStage(undefined)).toEqual({x:0,y:0,scale:1})
