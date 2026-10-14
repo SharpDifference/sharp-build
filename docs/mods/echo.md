@@ -50,3 +50,8 @@ Unheard Soul artwork is a separate character image, not an Echo replacement. Its
 | shared/echoBreakthrough and renderer/prompts/echoBreakthroughPrompt | Exhaustive abilities and bounded one-turn instructions |
 
 Current validation and remaining release checks are in [echo-validation.md](echo-validation.md). The internal IDs remain echo and reckoning for compatibility with existing saves and settings.
+
+
+## Fifth-pass persistence and context checks
+
+Closing the Echo manager before Save starts discards the draft. Once storage acknowledges a dispatched Save, the live Echo and next autosave retain that edit even if the manager has closed. A load/reset or different playthrough still blocks stale completion, and failed writes leave live state unchanged.

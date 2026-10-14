@@ -572,11 +572,12 @@ export async function persistMeanwhileScene(scene: MeanwhileScene, isCurrent: ()
 /** Echo edits share the native save queue and reject stale playthroughs. */
 export async function writeEcho(next: EchoState, previous: EchoState, active: () => boolean): Promise<void> {
   const start = useGameStore.getState()
-  const current = (): boolean => {
+  const ownsGame = (): boolean => {
     const now = useGameStore.getState()
-    return active() && modIsOn('echo') && now.playthroughId === start.playthroughId && now.loads === start.loads &&
+    return now.playthroughId === start.playthroughId && now.loads === start.loads &&
       now.exEcho === previous && now.date === start.date && now.time === start.time && !now.sceneEnding
   }
+  const current = (): boolean => active() && modIsOn('echo') && ownsGame()
   if (!current() || manualSaveOffer() !== 'open') throw Error('Wait for a safe save point.')
   const saved = normalizeEcho(next)
   assertEchoEdit(previous,saved)
@@ -591,7 +592,8 @@ export async function writeEcho(next: EchoState, previous: EchoState, active: ()
       assertEchoEdit(now.exEcho,saved)
       const result = await window.api.saves.autosave(now.playthroughId, { ...draft, exEcho: saved })
       if (!result.ok) throw Error(result.error.message)
-      if (!current()) return
+      // Closing the editor cannot undo an acknowledged write. A different loaded game still wins.
+      if (!ownsGame()) return
       if (loopState.statusBase) loopState.statusBase = { ...loopState.statusBase, exEcho: saved }
       useGameStore.setState({ exEcho: saved })
       written = true

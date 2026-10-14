@@ -1,4 +1,4 @@
-import { dynamicFor, type GrowthTag } from '@shared/characterDynamics'
+import { CHARACTER_DYNAMICS_MOD, dynamicFor, type GrowthTag } from '@shared/characterDynamics'
 import { anchorReckoning, applyReckoningVerdict, hasReckoningAffection, parseReckoningThoughts, parseReckoningVerdict, RECKONING_AFFECTION_MIN, RECKONING_MOD, type ReckoningContext, type ReckoningSession } from '@shared/reckoning'
 import { optionOn } from '@shared/mods'
 import { create } from 'zustand'
@@ -47,7 +47,8 @@ const changed=():void=>{useReckoningPreparation.setState(s=>({revision:s.revisio
 const preparationOn=():boolean=>optionOn(useModsStore.getState().switches,RECKONING_MOD,RECKONING_PREPARE_OPTION)
 function openingContext(game:Game,id:string):ReckoningContext {
   if(game.exReckoning.dungeon?.charId===id)return game.exReckoning.dungeon.context
-  return reckoningContext(game.characters[id],game.charInfo[id],`${game.playerFirstName} ${game.playerLastName}`.trim(),game.exCharacterDynamics,game.currentSceneTranscript)
+  const dynamics=modIsOn(CHARACTER_DYNAMICS_MOD,{mods:[...game.playthroughMods]})?game.exCharacterDynamics:undefined
+  return reckoningContext(game.characters[id],game.charInfo[id],`${game.playerFirstName} ${game.playerLastName}`.trim(),dynamics,game.currentSceneTranscript)
 }
 function openingKey(game:Game,id:string,context:ReckoningContext):string {
   const s=useSettingsStore.getState().settings

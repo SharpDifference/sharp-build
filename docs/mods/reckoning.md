@@ -83,3 +83,8 @@ See [current validation](echo-validation.md), [Echoes](echo.md), [abilities](ech
 ## October 14 preparation and voice follow-up
 
 Prepared questions, including an outstanding request, survive committing the link that opens The Unspoken. A failed link save retains preparation and does not spend spirit; loading a different save or changing provider/context still invalidates it. First-person whisper validation no longer rejects ordinary words just because they match the owner's name (for example, May or Hope); explicit third-person narration remains excluded. Six additional lifecycle controls verify answer cancellation, load/reset, final-growth delays, failed saving and commit ownership. See the combined third/fourth-pass QA report after integration with #57.
+
+
+## Fifth-pass persistence and context checks
+
+Prepared questions and new Unspoken snapshots use Character Dynamics starting choices only when enabled in the running playthrough record. Changing the menu switch for future games does not change that decision. Carried choices remain saved while inactive; earned growth and its completion guard remain independent. Existing paid encounter snapshots remain stable.
