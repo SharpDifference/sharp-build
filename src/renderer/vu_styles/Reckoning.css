@@ -1,5 +1,8 @@
 .vu-reckoning-entry{border-top:1px solid currentColor;margin-top:14px;padding-top:12px}.vu-reckoning-entry>strong{color:var(--vu-accent)}
 .vu-reckoning-veil{position:fixed;inset:0;z-index:1200;isolation:isolate;overflow:hidden;background:#100e18e8;display:grid;place-items:center;padding:22px;color:#fff7e6}
+/* Keep the live question and draft mounted beneath the ordinary game menus (z-index 100). */
+.vu-reckoning-veil[data-covered]{z-index:61}
+.vu-reckoning-header-actions{display:flex;align-items:center;gap:12px;flex-shrink:0}
 .vu-reckoning{position:relative;z-index:1;isolation:isolate;display:flex;flex-direction:column;width:min(1180px,96vw);height:min(980px,calc(100dvh - 44px));min-height:0;overflow:hidden;background:#201a2b;border:1px solid #a58b55;box-shadow:0 24px 100px #0009;font-family:var(--font-body,sans-serif)}
 .vu-reckoning>header{display:flex;justify-content:space-between;align-items:start;padding:25px 36px 12px;z-index:2}.vu-reckoning h1{font-family:var(--font-display,Georgia,serif);font-size:30px;line-height:1.05;margin:5px 0}.vu-reckoning small{color:#e6c677;letter-spacing:.16em;text-transform:uppercase;font-size:11px;font-weight:700}.vu-reckoning-close{color:#eed8a0;background:transparent;border:1px solid #c7af7b80;border-radius:50%;width:36px;height:36px;cursor:pointer;font-size:25px}
 .vu-reckoning-portrait{position:absolute;inset:7% 0 0 40%;z-index:-3;opacity:.24;transition:opacity .9s}.vu-reckoning-portrait img{width:100%;height:100%;object-fit:contain;object-position:bottom;filter:invert(1) hue-rotate(170deg);transition:filter 1.3s}
