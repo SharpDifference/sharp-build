@@ -36,6 +36,14 @@
   gap: 10px;
 }
 
+/* Whom a reply answers, a quiet line over it, so a busy chain reads who is talking to whom. */
+.vu-bb-comment-to {
+  display: block;
+  margin-bottom: 2px;
+  color: var(--vu-text-muted);
+  font: 700 11px var(--font-mono);
+}
+
 /* The reader has no picture on the feed, so his disc carries the word instead, in the accent. */
 .vu-bb-comment-face--player {
   background: color-mix(in oklab, var(--vu-accent) 30%, transparent);
