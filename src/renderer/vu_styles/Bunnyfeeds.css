@@ -83,10 +83,10 @@
   font-size: 13.5px;
 }
 
-/* A tag in a comment reads in the accent, the way a feed marks a name it links. */
+/* A tag in a comment is drawn exactly like the handle over it, so a handle reads the same anywhere. */
 .vu-bb-comment-mention {
-  color: color-mix(in oklab, var(--vu-text) 55%, var(--vu-accent));
-  font-weight: 700;
+  color: color-mix(in oklab, var(--vu-text) 72%, var(--vu-accent));
+  font: 700 12px var(--font-mono);
 }
 
 /* The contacts @ lists: the shared floating list, standing in the column under the well rather
