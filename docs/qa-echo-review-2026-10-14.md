@@ -10,7 +10,7 @@
 
 ## Integration
 
-Main fc7248047a8af03728ef41a928a2bbf6f256f7cf includes merged #58 → #60 and #57. #53 merges that main, retaining Echo artwork/Unheard Soul preflight alongside the soundtrack restore path. Merge #61 before completing #53, using regular merges. No PR was merged by this update.
+Main fc7248047a8af03728ef41a928a2bbf6f256f7cf includes merged #58 → #60 and #57. #53 merges that main, retaining Echo artwork/Unheard Soul preflight alongside the soundtrack restore path. A maintainer then merged #61 into main at 05733525fc03a39cadfe3eb3b5a9642e90e1b849. Merging that result into #53 changed ancestry only: the complete tree was identical. All prerequisites are now in main; #53 remains a draft. No PR was merged by this agent.
 
 ## Validation
 
