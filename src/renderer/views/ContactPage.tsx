@@ -92,7 +92,7 @@ export function ContactPage({
   if (!character) return <p className="vu-contact-gone">This account no longer exists.</p>
 
   const dynamic = dynamicFor(dynamics, charId)
-  const hasDynamics = Boolean(dynamic.relationship || dynamic.traits.length)
+  const hasDynamics = Boolean(dynamic.relationship || dynamic.traits.length || dynamic.growth)
   const dynamicsLink = <CharacterDynamicsBackstory key={charId} entry={dynamic} character={character} theme={theme} />
 
   // The list the tag is computed from, texting memory and all; the history reads it folded.
@@ -109,7 +109,7 @@ export function ContactPage({
   const flags = info?.flags ?? emptyFlags()
   const isContact = Boolean(flags.gaveContactInfo)
   // Her gallery, and the tab strip it brings with it.
-  const gallery = useContactGallery({ charId, isContact })
+  const gallery = useContactGallery({ charId, isContact, theme })
   const handle = info?.handle
   const feed = (info?.feed ?? []).filter(postVisible).sort(newestFirst)
   // The days she made a friend, among what she posted. The other girl has to be one the

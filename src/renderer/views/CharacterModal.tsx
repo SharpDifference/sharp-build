@@ -1,3 +1,4 @@
+import { ReflectionPortraitControl } from '../components/ReflectionPortrait'
 import { useState, type JSX, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { AnimatePresence, motion } from 'motion/react'
@@ -176,6 +177,7 @@ export function CharacterModal({
           <TitleTab>Character</TitleTab>
 
           <div className="vu-edit-images">
+            <ReflectionPortraitControl charId={charId} name={name} theme={theme} height={character.height}/>
             <div className="vu-edit-wardrobes">
               {WARDROBES.map(({ target, set, title }) => (
                 <WardrobeColumn

@@ -1,3 +1,4 @@
+import { setEchoBonusEnabled } from '@shared/echo'
 import { CITY_LIFE_LOCATIONS_MOD, CITY_LIFE_JOBS_MOD, setCityLifeEnabled } from '@shared/cityLife'
 import { useGameStore } from './gameStore'
 import { create } from 'zustand'
@@ -94,6 +95,7 @@ export const useModsStore = create<ModsStoreState>((set, get) => {
  * there is no next semester for them to stay for, and the ending is the game's own.
  */
 function tellSharedRules(switches: ModSwitches): void {
+  setEchoBonusEnabled(modOn(switches, 'echo'))
   const staying =
     modOn(switches, CONTINUING_SEMESTERS) &&
     !optionOn(switches, CONTINUING_SEMESTERS, 'seniors-graduate')

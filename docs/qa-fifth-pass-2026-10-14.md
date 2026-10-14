@@ -21,3 +21,7 @@ This is preflight validation and browser transaction rollback, not a new cross-f
 The Echo integration additionally fixes inactive carried Character Dynamics starting choices leaking into Unspoken context, and an acknowledged Echo edit being discarded from live state when its editor closes during saving. Its tests retain mixed Echo/reflection/music import coverage alongside the common checks.
 
 The supplied ability dispatch, social carry and soundtrack controls already passed. No additional soundtrack regression was found in this pass. Automated tests do not establish live model judgment or narrative quality; no paid requests or personal saves were used.
+
+## Final source checks
+
+Community branch: 2,227 passing tests, one existing skip, all three typechecks and desktop/web builds. Combined Echo branch: 2578 passing tests, one existing skip across 217 files, all three typechecks and desktop/web builds. The combined suite includes invalid mixed Echo/reflection/music restore and successful mixed restore checks.

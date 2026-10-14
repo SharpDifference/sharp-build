@@ -23,6 +23,7 @@ import {
   BunnyIcon,
   CalendarIcon,
   ChevronIcon,
+  EchoIcon,
   HalfMarkIcon,
   halfMarkKindOf,
   LogIcon,
@@ -167,6 +168,7 @@ export interface LandingChromeProps {
   bunnyshopUnlocked: boolean
   onCalendar: () => void
   onBunnyboard: () => void
+  onEchoes?: () => void
   onShop: () => void
   onMap: () => void
   onChatLog: () => void
@@ -508,6 +510,19 @@ export function LandingChrome(props: LandingChromeProps): JSX.Element {
           >
             <LogIcon />
             LOG
+          </motion.button>
+        )}
+        {props.onEchoes && shown.has('settings') && (
+          <motion.button
+            type="button"
+            className="vu-landing-tool"
+            variants={landingApp}
+            aria-label="Echoes"
+            title="Echoes"
+            {...gestures(false, quietLift, quietPress)}
+            onClick={props.onEchoes}
+          >
+            <EchoIcon />
           </motion.button>
         )}
         {/* Never gated: the way out must be reachable from wherever the reader is stuck. */}

@@ -8,6 +8,9 @@ import { openShot } from '../components/PhotoBubble'
 import { newestFirst } from '../stores/feedRolls'
 import { useExplicitBlocked, usePhotosVisible } from '../stores/photoSwitchHooks'
 import { useGameStore } from '../stores/gameStore'
+import { useModOn } from '../stores/modsStore'
+import { EchoPanel } from './EchoPanel'
+import type { ScreenTheme } from './clockTheme'
 import { Card, Locked } from './ContactPage'
 import { gestures, quietLift, quietPress } from './motion'
 import { EyeIcon, EyeOffIcon } from './screenIcons'
@@ -146,14 +149,17 @@ function Shot({
  */
 export function useContactGallery({
   charId,
-  isContact
+  isContact,
+  theme
 }: {
   charId: string
   isContact: boolean
+  theme: ScreenTheme
 }): ContactGallery {
   const [tab, setTab] = useState<ContactTab>('profile')
   const [filter, setFilter] = useState<ShotFilter>('all')
   const visible = usePhotosVisible()
+  const echoOn = useModOn('echo')
   const playthroughId = useGameStore((s) => s.playthroughId)
   const conversation = useGameStore((s) => s.bunnyboard.conversations[charId])
   const feed = useGameStore((s) => s.charInfo[charId]?.feed)
@@ -228,7 +234,7 @@ export function useContactGallery({
     >
       {!isContact ? (
         <Locked>??? — Unlocked after adding</Locked>
-      ) : photos.length === 0 ? (
+      ) : !visible ? null : photos.length === 0 ? (
         <p className="vu-contact-empty">No photos yet.</p>
       ) : (
         <>
@@ -269,11 +275,12 @@ export function useContactGallery({
           )}
         </>
       )}
+      {isContact && echoOn && <EchoPanel hidden={false} gallery owner={charId} theme={theme} />}
     </Card>
   )
 
   // Hidden while the mod is off, unless the player keeps them: her page is the game's own again.
-  if (!visible) return { tabs: null, showing: false, panel }
+  if (!visible && !echoOn) return { tabs: null, showing: false, panel }
   return { tabs, showing: tab === 'gallery', panel }
 }
 

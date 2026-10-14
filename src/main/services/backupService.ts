@@ -1,3 +1,4 @@
+import { backupReflections, prepareReflectionRestore } from './reflectionStorage'
 import { mkdir, readFile, rename, utimes, writeFile } from 'fs/promises'
 import { basename, dirname, join } from 'path'
 import {
@@ -91,6 +92,7 @@ import {
 import { getRendererSettings, getSettings, replaceSettings } from './settingsService'
 import { prepareSoundtrackSnapshot, SOUNDTRACK_BACKUP_DIR } from '@shared/soundtracks'
 import { soundtrackLibrary, soundtrackHash, readSoundtrackFile } from './soundtrackService'
+import { backupEchoArtwork, prepareEchoArtworkRestore } from './echoArtworkBackup'
 
 /** The data folder as one backup zip, and one backup zip back over the data folder. */
 
@@ -300,6 +302,8 @@ export async function exportBackup(targetPath: string): Promise<void> {
     }
 
     const record: BackupFile = {
+      exReflections: await backupReflections(),
+      exEchoArt: await backupEchoArtwork(scratch),
       ...(music ? { exMusic: music.map } : {}),
       schemaVersion: BACKUP_SCHEMA_VERSION,
       settings,
@@ -532,6 +536,8 @@ export async function importBackup(archivePath: string): Promise<void> {
     await checkExtractedContent(scratch, classifyBackupEntry, 'backup')
     const record = await readBackupRecord(scratch)
     preflightBackup(record)
+    const restoreReflections = prepareReflectionRestore(record.exReflections)
+    const restoreEchoArtwork = await prepareEchoArtworkRestore(scratch, record.exEchoArt)
     const music = await prepareSoundtrackSnapshot(record.exMusic,
       file => readSoundtrackFile(join(scratch, SOUNDTRACK_BACKUP_DIR, file)), soundtrackHash)
 
@@ -542,6 +548,8 @@ export async function importBackup(archivePath: string): Promise<void> {
     const scenes = scenesFromBackup(record)
     const replays = replaysFromBackup(record)
 
+    await restoreEchoArtwork()
+    await restoreReflections()
     await replaceSettings(settings)
     await setGrabBags(record.grabbags)
     await restoreSaves(scratch, record, replays)

@@ -6,7 +6,7 @@ import { useModsStore } from '../src/renderer/stores/modsStore'
 import { regenerateTextReply, resetTextingLoop, sendMessage } from '../src/renderer/stores/textingLoop'
 import { persistRegeneratedConversation, writesSettled } from '../src/renderer/stores/loop/saves'
 import '../src/renderer/modEntries/character-dynamics'
-
+import '../src/renderer/modEntries/reckoning'
 import '../src/renderer/modEntries/breakthrough'
 import '../src/renderer/modEntries/story-memory'
 import { calendarEvent, character, charactersById, charInfo, restoreApi, stubApi } from './fixtures'
@@ -23,7 +23,8 @@ beforeEach(() => {
     events: [calendarEvent({ date: 9, description: 'Our reserved planetarium visit', charIds: ['a'] })],
     exCharacterDynamics: { version: 1, characters: { a: {
       relationship: { kind: 'ex-girlfriend', reason: 'They separated after moving to different cities.' },
-      traits: ['guarded']
+      traits: ['guarded'], growth: { id: 'qa-growth', name: 'New confidence',
+        description: 'She learned to voice her needs.', reframes: ['Asking is allowed.', 'A no is survivable.', 'Her feelings matter.'] }
     } } },
     bunnyboard: { ...game().bunnyboard, conversations: { a: { charId: 'a', unread: 0, summary: null, messages: [] } } } })
 })
@@ -51,6 +52,12 @@ describe('QA2 ordinary and regenerated DM continuity parity', () => {
     expect(normal).toContain('Gentle tendencies: Guarded:')
     expect(replacement).toContain('They separated after moving to different cities.')
     expect(replacement).toContain('Gentle tendencies: Guarded:')
+  })
+  it.each([true, false])('keeps earned growth with Character Dynamics %s', async enabled => {
+    useModsStore.setState({ switches: { on: { 'character-dynamics': enabled, reckoning: true }, options: {} } })
+    const { normal, replacement } = await requests()
+    expect(normal).toContain('She learned to voice her needs.')
+    expect(replacement).toContain('She learned to voice her needs.')
   })
   it('keeps the actual saved upcoming plans when rebuilding a reply', async () => {
     const { normal, replacement } = await requests()

@@ -23,6 +23,7 @@ import {
   type BackupSave
 } from '@shared/backup'
 import { namedRel } from '@shared/characterFiles'
+import { assertEchoPng, assertSameEchoArt, echoArtEntry, echoArtIds } from '@shared/echoArtwork'
 import { SAFE_CHAR_ID } from '@shared/characterRules'
 import {
   BG_VARIANTS,
@@ -177,6 +178,7 @@ export async function exportBackup(): Promise<string> {
     }
 
     const backup: BackupFile = {
+      exEchoArt: echoArtIds(await db.getAllKeys('echoArt')),
       schemaVersion: BACKUP_SCHEMA_VERSION,
       settings: await rendererSettings(),
       grabbags: (await db.get('grabbags', 'grabbags')) ?? {},
@@ -191,6 +193,12 @@ export async function exportBackup(): Promise<string> {
       characters: (await db.getAll('characters')).filter(
         (character) => !isShipped(character.charId)
       )
+    }
+    for (const id of backup.exEchoArt!) {
+      const blob = await db.get('echoArt', id)
+      if (!blob) throw Error('Echo artwork changed during backup. Please retry.')
+      const bytes = await bytesOf(blob); assertEchoPng(bytes)
+      files[echoArtEntry(id)] = bytes
     }
     return backup
   })
@@ -226,6 +234,19 @@ export async function importBackup(): Promise<boolean> {
 
   const music = await prepareSoundtrackSnapshot(record.exMusic,
     async file => entries[SOUNDTRACK_BACKUP_DIR + '/' + file], soundtrackHash)
+
+  const echoImages = new Map<string, Uint8Array>()
+  const existingEchoImages = new Set<string>()
+  const echoDb = await database()
+  for (const id of echoArtIds(record.exEchoArt)) {
+    const bytes = entries[echoArtEntry(id)]
+    if (!bytes) throw Error('This backup is missing Echo artwork it names.')
+    assertEchoPng(bytes)
+    const existing = await echoDb.get('echoArt', id)
+    if (existing) existingEchoImages.add(id)
+    assertSameEchoArt(existing ? await bytesOf(existing) : undefined, bytes)
+    echoImages.set(id, bytes)
+  }
 
   // Everything the record says is checked before anything here is written. Remembered keys
   // stay, as do the switches this build fixes and whether it remembers keys at all.
@@ -268,7 +289,8 @@ export async function importBackup(): Promise<boolean> {
         'scenes',
         'replays',
         'soundtrackMeta',
-        'soundtrackFiles'
+        'soundtrackFiles',
+        'echoArt'
       ],
       'readwrite'
     )
@@ -278,6 +300,15 @@ export async function importBackup(): Promise<boolean> {
       // Every value is in hand, so each step below is a database request and the transaction
       // stays open across all of them.
       await tx.objectStore('settings').put(settings, 'settings')
+      for (const [id, bytes] of echoImages) {
+        const existing = await tx.objectStore('echoArt').get(id)
+        // The preflight already compared bytes; a concurrent new entry aborts the transaction.
+        if (existing && !existingEchoImages.has(id)) {
+          tx.abort()
+          throw Error('Echo artwork changed during restore. Please retry.')
+        }
+        if (!existing) await tx.objectStore('echoArt').add(imageBlob(bytes), id)
+      }
       await tx.objectStore('grabbags').put(record.grabbags, 'grabbags')
       if (music) {
         await tx.objectStore('soundtrackMeta').put(music.map, 'tracks')
