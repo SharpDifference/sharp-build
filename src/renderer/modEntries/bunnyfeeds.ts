@@ -1,4 +1,4 @@
-import { BUNNYFEEDS } from '@shared/feedComments'
+import { BUNNYFEEDS } from '@shared/bunnyfeeds'
 import { globalSlotOf } from '@shared/jobs'
 import { PHOTO_FEATURE } from '@shared/mods'
 import { shownComments } from '@shared/postComments'
@@ -10,19 +10,19 @@ import {
   replierBlock,
   slotCommentLines,
   slotCommentsField
-} from '../prompts/feedCommentsPrompt'
+} from '../prompts/bunnyfeedsPrompt'
 import { handOffComments } from '../stores/commentHandoff'
-import { repliersFor, rollFeedComments, writtenComments } from '../stores/feedComments'
+import { repliersFor, rollFeedComments, writtenComments } from '../stores/bunnyfeedsReplies'
 import { useBunnyboardStore } from '../stores/bunnyboardStore'
-import { fileDueFeedMemories } from '../stores/feedMemory'
-import { takeCommented } from '../stores/feedVisit'
+import { fileDueFeedMemories } from '../stores/bunnyfeedsMemory'
+import { takeCommented } from '../stores/bunnyfeedsVisit'
 import { useGameStore } from '../stores/gameStore'
 import { modIsOn } from '../stores/modsStore'
 import type { CommentViewProps } from '../stores/commentHandoff'
 
 // Loaded on first draw, so registering the mod pulls in no screen code.
-const screens = (): Promise<typeof import('../components/FeedThread')> =>
-  import('../components/FeedThread')
+const screens = (): Promise<typeof import('../components/BunnyfeedsThread')> =>
+  import('../components/BunnyfeedsThread')
 const LazyPreview = lazy(() => screens().then((module) => ({ default: module.FeedPreview })))
 const LazyPill = lazy(() => screens().then((module) => ({ default: module.CommentPill })))
 
@@ -83,8 +83,8 @@ function recentPostLines(characters: readonly Character[]): string[] {
 }
 
 /** The thread call, loaded the first time it is needed. */
-function threads(): Promise<typeof import('../stores/feedThreads')> {
-  return import('../stores/feedThreads')
+function threads(): Promise<typeof import('../stores/bunnyfeedsThreads')> {
+  return import('../stores/bunnyfeedsThreads')
 }
 
 // Closing the phone ends a visit: everything he commented during it goes out as one call.

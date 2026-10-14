@@ -1,5 +1,5 @@
 import type { ModDef } from '../mods'
-import { BUNNYFEEDS } from '../feedComments'
+import { BUNNYFEEDS } from '../bunnyfeeds'
 
 const mod: ModDef = {
   id: BUNNYFEEDS,

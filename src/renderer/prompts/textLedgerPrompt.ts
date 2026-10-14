@@ -5,7 +5,7 @@ import {
   type LedgerResponse,
   type StructuredRequest
 } from '@shared/types'
-import { textLedgerFeedLines } from '../stores/feedMemory'
+import { textLedgerFeedLines } from '../stores/bunnyfeedsMemory'
 import { objectSchema } from './schema'
 import { LEDGER_PERSONA, milestoneCastLines } from './scenePrompt'
 import {

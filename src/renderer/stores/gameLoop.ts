@@ -1,5 +1,5 @@
 import { slotSettled } from '../mods/hooks'
-import { feedStatusLines } from './feedMemory'
+import { feedStatusLines } from './bunnyfeedsMemory'
 import { GAME_OVER_SCENES, gameOverReasonOf } from '@shared/gameOver'
 import { earnLine, spendLine, spentOf } from '@shared/money'
 import {

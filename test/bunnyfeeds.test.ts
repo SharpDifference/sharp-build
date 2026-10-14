@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { MAX_POSTER_REPLIES, threadWork } from '../src/shared/feedComments'
+import { MAX_POSTER_REPLIES, threadWork } from '../src/shared/bunnyfeeds'
 import type { PostComment } from '../src/shared/postComments'
 
 /** What the once-a-slot thread call still owes a post, read off the comments alone. */
