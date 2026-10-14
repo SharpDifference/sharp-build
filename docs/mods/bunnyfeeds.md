@@ -46,11 +46,20 @@ it takes over Photo Feature's post comments and photo posts get the same threads
 
 ## What it costs
 
+Bunnyfeeds makes **one extra AI call** of its own, to your usual model, on top of the game's calls.
+
 - Opening and closing the phone without commenting makes no call.
 - One call per phone visit you commented in. It describes only the posts you commented under:
   the poster in full, and the girls who may react (her friends or two random girls, and anybody
   you tagged).
-- The slot opening describes up to three possible repliers per post it writes, a few lines each.
+- Each call is roughly **2,000 to 4,000 tokens in and 200 to 500 out**, more when you comment
+  under several posts in one visit. These are estimates from what the prompt holds; your
+  provider's usage page shows the real numbers. Several comments in one visit still make one
+  call, not one per comment.
+- The slot opening describes up to three possible repliers per post it writes, a few lines each:
+  no extra call, a few hundred tokens more on a call the game makes anyway.
+- The closing's feed memory lines and the note to the texting bookkeeping are a line or two on
+  calls the game already makes.
 - If a call fails, or you reload before it was saved, the slot's settling asks again for whatever
   is still unanswered.
 - Off, no call is made, and posts go back to Photo Feature's plain stranger comments, or none if
