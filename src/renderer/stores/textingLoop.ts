@@ -116,7 +116,8 @@ function companionsOf(charId: string): NpcCompanions {
 }
 
 /** One in-flight texting turn per conversation, keyed by charId. */
-const inFlight = new Map<string, { abandoned: boolean; pacer: TypingPacer }>()
+type TextFlight = { abandoned: boolean; pacer: TypingPacer }
+const inFlight = new Map<string, TextFlight>()
 
 /**
  * One failed reply turn per conversation, parked on the thread's Retry: the identical
@@ -449,6 +450,7 @@ export async function sendMessage(charId: string, text: string): Promise<void> {
   // The composer stays locked from here until the hangout verdict is in.
   useBunnyboardStore.getState().setTextBusy(charId, true)
 
+  let owned: TextFlight | undefined
   try {
     // Everyone else on the roster, for the lorebook's character entries.
     const others = game.chars
@@ -493,10 +495,14 @@ export async function sendMessage(charId: string, text: string): Promise<void> {
       readerBlockOf(game)
     )
 
-    await runReply(charId, character, conversation, sent, request, 0, invited)
+    const reply = runReply(charId, character, conversation, sent, request, 0, invited)
+    owned = inFlight.get(charId)
+    await reply
   } finally {
-    inFlight.delete(charId)
-    useBunnyboardStore.getState().setTextBusy(charId, false)
+    if (owned ? inFlight.get(charId) === owned : useGameStore.getState().loads === game.loads && !inFlight.has(charId)) {
+      inFlight.delete(charId)
+      useBunnyboardStore.getState().setTextBusy(charId, false)
+    }
   }
 }
 
@@ -627,8 +633,9 @@ export async function retryFailedMessage(charId: string): Promise<void> {
   failedTurns.delete(charId)
   useBunnyboardStore.getState().setTextFailed(charId, false)
   useBunnyboardStore.getState().setTextBusy(charId, true)
+  let owned: TextFlight | undefined
   try {
-    await runReply(
+    const reply = runReply(
       charId,
       character,
       failed.conversation,
@@ -637,9 +644,13 @@ export async function retryFailedMessage(charId: string): Promise<void> {
       failed.released,
       failed.invited
     )
+    owned = inFlight.get(charId)
+    await reply
   } finally {
-    inFlight.delete(charId)
-    useBunnyboardStore.getState().setTextBusy(charId, false)
+    if (owned && inFlight.get(charId) === owned) {
+      inFlight.delete(charId)
+      useBunnyboardStore.getState().setTextBusy(charId, false)
+    }
   }
 }
 
