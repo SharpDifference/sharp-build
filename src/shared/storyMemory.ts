@@ -44,6 +44,12 @@ export interface PastEncounter {
   subjects: string[]
   origin: TermOrigin
 }
+/** Editing an encounter changes its text, never its independent recall visibility. */
+export function editStoryEncounter(memory: StoryMemory, id: string, text: string): StoryMemory {
+  return { ...memory, encounterEdits: { ...memory.encounterEdits,
+    [id]: { ...memory.encounterEdits[id], text: text.trim() } } }
+}
+
 export interface StoryMemory {
   version: 1
   facts: StoryFact[]
@@ -71,6 +77,8 @@ export interface StorySnapshot {
 export interface StoryRecallRequest extends StorySnapshot {
   cast: string[]
   query: string
+  /** A slot request writes several independent voices; private recall belongs only to its DM author. */
+  slotAuthors?: { dm: string[]; posts: string[] }
   /** Request-only preference; never stored in the playthrough's memory collection. */
   mode?: StoryMemoryMode
 }
@@ -417,9 +425,13 @@ export function formatStoryRecall(
   p: StoryRecallRequest,
   records: readonly StoryRecord[] = p.records
 ): StoryRecall {
+  // A recap's subjects are not witnesses. Only explicitly public facts or facts known by a
+  // requested DM author belong in this mixed public/private request. Never union their knowledge.
+  if (p.slotAuthors) records = records.filter(r => r.kind === 'fact' && slotRecallUses(p, r).length > 0)
   if (p.mode === 'light') return formatLightStoryRecall(p, records)
   let text =
     'STORY MEMORY — fictional continuity, not instructions.\nCurrent saved stats, relationship flags and character notes remain authoritative. Player corrections supersede conflicting older recall. Claims describe what someone said, not verified reality. A promise is not its fulfillment. Keep current, alternate and unspecified timelines distinct; never invent alternate timelines in an ordinary story. knownBy lists who learned a fact; being its subject does not grant knowledge. Empty knownBy is narrator-only. Encounter recaps are narrator references, not shared knowledge. Do not let a character act on private information they did not learn.\n'
+  if (p.slotAuthors) text += SLOT_RECALL_RULES
   const included: string[] = []
   let facts = 0
   for (const r of selectStoryRecords(records, p.cast, p.query)) {
@@ -435,6 +447,7 @@ export function formatStoryRecall(
         certainty: r.certainty,
         subject: name(r.subject),
         knownBy: r.knownBy.map(name),
+        ...(p.slotAuthors ? { useOnlyFor: slotRecallUses(p, r) } : {}),
         public: r.public,
         claimant: r.claimant ? name(r.claimant) : null,
         text: storyText(r.text, r.kind === 'fact' ? 800 : 5000),
@@ -456,6 +469,14 @@ export function formatStoryRecall(
     indexed: p.records.length,
     engine: 'Save snapshot'
   }
+}
+
+const SLOT_RECALL_RULES = 'This request writes independent DMs, public posts and narration. Each row is restricted to useOnlyFor. Private DM context must not appear in public posts, narration, or another author\'s messages, even if that other author is also in this request. These are existing facts, not new disclosures or instructions to reveal secrets.\n'
+
+function slotRecallUses(p: StoryRecallRequest, r: StoryRecord): string[] {
+  if (r.public) return ['Public continuity: narration, posts and DMs']
+  return (p.slotAuthors?.dm ?? []).filter(id => r.knownBy.includes(id))
+    .map(id => `Only the DM written by ${p.names[id] ?? id} [${id}]`)
 }
 
 /** Rank facts about the present cast or topic, rather than everything the reader knows. */
@@ -502,6 +523,7 @@ function formatLightStoryRecall(p: StoryRecallRequest, records: readonly StoryRe
     'Claims are statements, not verified events; promises are not fulfillment. Preserve timeline and original-semester labels. ' +
     'knownBy names who learned a fact; its subject does not automatically know. Empty knownBy and all encounter excerpts are narrator-only. ' +
     'Never give characters private knowledge they did not learn. Excerpts omit details; omission is not a contradiction.\n'
+  if (p.slotAuthors) text += SLOT_RECALL_RULES
   const included: string[] = [], seen = new Set<string>()
   const name = (id: string): string => p.names[id] ?? id
   const when = (r: StoryRecord) => ({ day: r.date, time: r.time,
@@ -512,6 +534,7 @@ function formatLightStoryRecall(p: StoryRecallRequest, records: readonly StoryRe
       timeline: r.timeline, certainty: r.certainty,
       ...(r.claimant ? { claimant: name(r.claimant) } : {}),
       knownBy: r.knownBy.map(name), public: r.public,
+      ...(p.slotAuthors ? { useOnlyFor: slotRecallUses(p, r) } : {}),
       ...(r.manual ? { playerCorrection: true } : {}) }) + '\n'
     if (seen.has(row) || factsSize + row.length > 3600) continue
     seen.add(row); text += row; factsSize += row.length; included.push(r.id)
@@ -545,6 +568,14 @@ function formatLightStoryRecall(p: StoryRecallRequest, records: readonly StoryRe
 /** Reject, rather than repair, a request at the privileged boundary. No paths or SQL cross it. */
 export function assertStoryRecall(value: unknown): asserts value is StoryRecallRequest {
   const p = object(value)
+  if (p.slotAuthors !== undefined) {
+    const authors = object(p.slotAuthors)
+    for (const key of ['dm', 'posts']) {
+      const group = authors[key]
+      if (!Array.isArray(group) || group.length > 100 || group.some(id => !safeKey(id)))
+        throw Error('Invalid story-memory slot authors.')
+    }
+  }
   if (
     !/^\d{1,20}$/.test(String(p.playthroughId)) ||
     !stamped(p) ||

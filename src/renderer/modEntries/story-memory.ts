@@ -17,7 +17,13 @@ registerHooks('story-memory', {
         return id ? [id] : []
       })
     }),
-    'slot-intro': (request, { input }) => ({ ...request, ...recallPayload(input.storyMemory, [], input.recent.join(' ')) })
+    'slot-intro': (request, { input }) => {
+      const dm = [...new Set([...input.askers, ...input.breakups].map(person => person.character.charId))]
+      const posts = [...new Set(input.posters.map(person => person.character.charId))]
+      const payload = recallPayload(input.storyMemory, [...dm, ...posts], input.recent.join(' '))
+      if (payload.storyMemory) payload.storyMemory.slotAuthors = { dm, posts }
+      return { ...request, ...payload }
+    }
   },
   slotSettled: ({ before, ledger, closingCast }) => {
     if (!before.playthroughId || before.createdScene || before.replaying) return

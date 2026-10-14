@@ -1688,6 +1688,8 @@ export interface QuickstartBundle {
 
 /** A whole semester with the reader beside it, as the screen that generated it hands it over. */
 export type EnrollmentDraft = QuickstartBundle & {
+  /** Per-playthrough choices used for this semester's generation, including an explicit empty list. */
+  mods?: string[]
   /** The same setup survives leaving the registrar before Finalize. */
   exCharacterDynamics?: import('./characterDynamics').CharacterDynamics
   /** The setup switch is fixed once this enrollment starts, even when choices are empty. */

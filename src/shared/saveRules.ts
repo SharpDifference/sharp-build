@@ -125,7 +125,7 @@ const RECORD_REQUIRED: Record<keyof Omit<PlaythroughRecord, 'name' | 'term' | 'm
  * the fields an enrollment written before them lacks are optional on the type and omitted here.
  */
 const ENROLLMENT_REQUIRED: Record<
-  keyof Omit<Enrollment, 'bio' | 'tokensGenerated' | 'term' | 'carry' | 'exCharacterDynamics' | 'exCharacterDynamicsEnabled'>,
+  keyof Omit<Enrollment, 'bio' | 'tokensGenerated' | 'term' | 'carry' | 'exCharacterDynamics' | 'exCharacterDynamicsEnabled' | 'mods'>,
   true
 > = {
   schemaVersion: true,
