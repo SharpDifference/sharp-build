@@ -20,6 +20,14 @@ import type { ScreenTheme } from './clockTheme'
 import '../vu_styles/Echo.css'
 
 const artCache = new Map<string,Promise<string | null>>()
+/** Reset before committing a render, so another owner's draft never looks like an edit. */
+function useEchoDraft<T>(saved: T, scope: string): [T, (value: T) => void] {
+  const key = JSON.stringify([scope, saved])
+  const [draft, setDraft] = useState({key, value: saved})
+  if (draft.key !== key) setDraft({key, value: saved})
+  return [draft.key === key ? draft.value : saved, value => setDraft({key, value})]
+}
+
 function EchoDice({label,disabled,onClick}: {label:string;disabled:boolean;onClick:()=>void}): JSX.Element {
   return <button type="button" className="echo-dice" aria-label={label} title={label} disabled={disabled} onClick={onClick}>
     <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="4" stroke="currentColor" strokeWidth="1.5"/>{[[8,8],[16,8],[12,12],[8,16],[16,16]].map(([cx,cy])=><circle key={`${cx}-${cy}`} cx={cx} cy={cy} r="1.4" fill="currentColor"/>)}</svg>
@@ -122,11 +130,15 @@ export function EchoPanel({hidden,gallery=false,owner,onClose,setup,theme}: {hid
   const session = useRef({id:game.playthroughId,loads:game.loads})
   const [busy,setBusy] = useState(false), [message,setMessage] = useState(''), [error,setError] = useState('')
   const [downloading,setDownloading] = useState(false)
-  const [opacity,setOpacity] = useState(game.exEcho.opacity)
-  const [stageDraft,setStageDraft]=useState<{owner:string;placement:EchoStagePlacement}|null>(null)
-  const [chosenAspect,setChosenAspect] = useState<EchoAspect>(game.exEcho.player?.aspect ?? 'horizonbound')
-  const [editedName,setEditedName] = useState(''),[generatingId,setGeneratingId]=useState<string|null>(null)
-  const [editedCreatureType,setEditedCreatureType]=useState(''),[editedDescription,setEditedDescription]=useState('')
+  const identity = selected === 'player' ? state.player : state.girls[selected]
+  const creature = identity ? echoCreatureOf(identity) : {type: '', description: ''}
+  const draftScope = JSON.stringify([game.playthroughId, game.loads, selected, open])
+  const [opacity,setOpacity] = useEchoDraft(state.opacity, draftScope)
+  const [chosenAspect,setChosenAspect] = useEchoDraft<EchoAspect>(identity?.aspect ?? 'horizonbound', draftScope)
+  const [editedName,setEditedName] = useEchoDraft(identity?.name ?? '', draftScope)
+  const [editedCreatureType,setEditedCreatureType] = useEchoDraft(creature.type, draftScope)
+  const [editedDescription,setEditedDescription] = useEchoDraft(creature.description, draftScope)
+  const [generatingId,setGeneratingId]=useState<string|null>(null)
   const localArt=useModsStore(s=>optionOn(s.switches,'echo','megaten-art'))
   const glitchEffects=useModsStore(s=>optionOn(s.switches,'reckoning','glitch-effects'))
   const abilityOption=useModsStore(s=>optionOn(s.switches,'echo',ECHO_BREAKTHROUGH_OPTION)),breakthroughOn=useModOn('breakthrough')
@@ -148,20 +160,13 @@ export function EchoPanel({hidden,gallery=false,owner,onClose,setup,theme}: {hid
     if(!enabled||hidden||(!setup&&(changed||game.replaying||game.createdScene))){close();setSelected('player');setError('');setBusy(false)}
   },[game.playthroughId,game.loads,enabled,hidden,game.replaying,game.createdScene])
   useEffect(()=>{if(open)setSection('appearance')},[open])
-  useEffect(() => { setOpacity(game.exEcho.opacity) },[game.exEcho.opacity])
-  const identity = selected === 'player' ? state.player : state.girls[selected]
-  useEffect(()=>setChosenAspect(identity?.aspect??'horizonbound'),[selected,identity?.aspect,open])
   const setupAspectEditable=!!setup&&!setup.locked.includes(selected)
   const aspectPending=setupAspectEditable&&chosenAspect!==identity?.aspect
   const defaultStage=selected==='player'?PLAYER_ECHO_STAGE_DEFAULT:ECHO_STAGE_DEFAULT
   const savedStage=resolveEchoStage(identity?.stage,selected==='player')
-  const placement=stageDraft?.owner===selected?stageDraft.placement:savedStage
+  const [placement,setPlacement] = useEchoDraft(savedStage, draftScope)
   const stagePending=JSON.stringify(placement)!==JSON.stringify(savedStage)
-  useEffect(()=>setStageDraft(null),[selected,JSON.stringify(savedStage),game.loads,open])
-  const changePlacement=(key:keyof EchoStagePlacement,value:number|boolean):void=>setStageDraft({owner:selected,placement:normalizeEchoStage({...placement,[key]:value})})
-  const creature=identity?echoCreatureOf(identity):{type:'',description:''}
-  useEffect(()=>{setEditedName(identity?.name??'')},[selected,identity?.name,game.loads,open])
-  useEffect(()=>{setEditedCreatureType(creature.type);setEditedDescription(creature.description)},[selected,creature.type,creature.description,game.loads,open])
+  const changePlacement=(key:keyof EchoStagePlacement,value:number|boolean):void=>setPlacement(normalizeEchoStage({...placement,[key]:value}))
   const preview = useEchoImage(identity?.art,identity?.source!=='uploaded')
   const ids = Object.keys(game.characters).filter(id=>setup||game.charInfo[id]?.nameKnown)
   const galleryIds = owner ? (owner==='player'||ids.includes(owner)?[owner]:[]) : ['player',...ids]
@@ -301,7 +306,6 @@ export function EchoPanel({hidden,gallery=false,owner,onClose,setup,theme}: {hid
   }
   function switchOwner(id: string): void {
     setPendingSwitch(null)
-    setOpacity(readGame().exEcho.opacity)
     setSelected(id)
     setError('')
     setMessage('')
@@ -392,8 +396,8 @@ export function EchoPanel({hidden,gallery=false,owner,onClose,setup,theme}: {hid
               <EchoPlacementControl id="echo-float-speed" label="Float cycle" min={3} max={20} value={placement.floatSeconds??ECHO_FLOAT_SECONDS_DEFAULT} unit="s" disabled={busy||!(placement.floating??selected==='player')} onChange={value=>changePlacement('floatSeconds',value)}/>
               <p className="echo-help">The default is a gentle 14-second drift. Shorter cycles move faster; longer cycles drift slowly. Reduced-motion settings disable the animation.</p>
               <EchoPlacementControl id="echo-owner-opacity" label="This Echo visibility" min={5} max={80} value={Math.round(echoStageOpacity(placement,opacity,selected==='player')*100)} unit="%" disabled={busy} onChange={value=>changePlacement('opacity',value/100)}/>
-              <button type="button" className="vu-btn vu-btn--quiet echo-action" disabled={busy||placement.opacity===undefined} onClick={()=>{const {opacity:_opacity,...rest}=placement;setStageDraft({owner:selected,placement:rest})}}>{selected==='player'?'Use faint default · 18%':'Use shared visibility'}</button>
-              <div className="echo-actions"><button type="button" className="vu-btn vu-btn--primary vu-paper echo-action" disabled={busy||!safe||!stagePending} onClick={()=>void apply(editEchoStage(state,selected,placement))}>Save placement</button><button type="button" className="vu-btn vu-btn--quiet echo-action" disabled={busy||(placement.x===defaultStage.x&&placement.y===defaultStage.y&&placement.scale===defaultStage.scale)} onClick={()=>setStageDraft({owner:selected,placement:{...placement,...defaultStage}})}>Reset position &amp; size</button></div>
+              <button type="button" className="vu-btn vu-btn--quiet echo-action" disabled={busy||placement.opacity===undefined} onClick={()=>{const {opacity:_opacity,...rest}=placement;setPlacement(rest)}}>{selected==='player'?'Use faint default · 18%':'Use shared visibility'}</button>
+              <div className="echo-actions"><button type="button" className="vu-btn vu-btn--primary vu-paper echo-action" disabled={busy||!safe||!stagePending} onClick={()=>void apply(editEchoStage(state,selected,placement))}>Save placement</button><button type="button" className="vu-btn vu-btn--quiet echo-action" disabled={busy||(placement.x===defaultStage.x&&placement.y===defaultStage.y&&placement.scale===defaultStage.scale)} onClick={()=>setPlacement({...placement,...defaultStage})}>Reset position &amp; size</button></div>
               <p className="echo-help">Save to apply. Save all settings also keeps your name, creature details and placement together. Switching Echoes asks what to do with unsaved edits; closing this window discards them. Artwork and gallery images stay unchanged.</p>
               {selected==='player'&&<div className="echo-reckoning-effects"><label><input type="checkbox" aria-label="Inner-world glitch effects" checked={glitchEffects} disabled={busy} onChange={e=>void useModsStore.getState().setOption('reckoning','glitch-effects',e.target.checked)}/> Inner-world glitch effects</label><p className="echo-help">Brief full-screen interference and text distortions during private whispers and reflection questions. Off keeps whispers as calm translucent text. Saves automatically. Reduced-motion settings disable the effects.</p></div>}
             </section>
