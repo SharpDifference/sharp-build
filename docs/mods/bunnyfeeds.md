@@ -9,33 +9,37 @@ it takes over Photo Feature's post comments and photo posts get the same threads
   at any time: threads carry on whichever is on.
 - In the feed a post shows one comment (yours if you left one, otherwise the newest), its reply
   count, **View all N comments**, and a speech-bubble pill with the count beside the heart.
-- The pill or **View all** opens the post in a popup over the whole screen, like a photo: the post, its photo,
-  every comment with replies folded behind **View N replies** (yours open), and a box at the foot
-  for commenting on the post. You comment on a post once; after that you carry on through Reply,
-  as often as you like. **Reply** shows when you hover a comment, any comment in the thread;
-  it opens a box under that thread addressed to its author (`@handle`, tagged if she is a contact),
-  so a conversation can carry on there. ✕, Escape or a click outside closes it.
+- The pill or **View all** opens the post in a popup over the whole screen, like a photo: the
+  post, its photo, every comment with replies folded behind **View N replies** (yours open), and a
+  box at the foot for commenting on the post. You comment on a post once; after that you carry on
+  through Reply, as often as you like. **Reply** shows when you hover a comment, any comment in
+  the thread; it opens a box under that thread addressed to its author (`@handle`, tagged if she
+  is a contact), so a conversation can carry on there. ✕, Escape or a click outside closes it.
 - Type `@` to tag one of your contacts. A list of them opens under the box and narrows as you type;
   arrows and Enter or Tab pick one. A tag counts only while its `@handle` is still in what you send.
 - What you write shows at once. Closing the post view, or the phone, sends everything you wrote
-  since as one call, in the background. The answers are stamped for the next slot, so they are waiting when
-  it opens.
+  since as one call, in the background. The answers are stamped for the next slot, so they are
+  waiting when it opens.
+- A post only grows while you are in its thread. Once she has answered you and you stop
+  replying, nothing new is written under it and it costs nothing.
 - The poster always answers your comments. Anybody you tagged answers too. Her friends and other
-  students may join in, one or two at most a post: answering you, each other or her, or leaving a
-  comment of their own on the post.
+  students may join in, one or two at most each time: answering you, each other or her, or
+  leaving a comment of their own on the post.
 - She also answers up to three other people's comments under a post you are active on.
 - Posts arrive with replies from strangers and from a few roster girls in their own voices: the
   poster's friends, or two random girls when she has none.
 - Commenting is closed during a scene, exactly when texting is: the post view's box says so, and
   Reply is hidden. Reading stays open.
 - Strangers' posts, and the slot's random student post, take no comments.
-- She keeps one memory of your comments among her own, arriving with her answers, the newest replacing the last, as her
-  texting memory does. It shows in her Memories ("…, on her post"), can be edited there, counts
-  in her affection like any memory, and every scene, text and slot opening can bring it up. The
-  closing before her answers show announces it, as it does any memory.
+- She keeps one memory of your comments among her own, arriving with her answers, the newest
+  replacing the last, as her texting memory does. It shows in her Memories ("…, on her post"), can
+  be edited there, counts in her affection like any memory, and every scene, text and slot opening
+  can bring it up. The closing before her answers show announces it, as it does any memory.
 - A roster girl who has met you and answers you under somebody else's post keeps the same kind of
   memory ending "…, under <name>'s post", so she can bring it up in her own texts and scenes.
   It comes out of the same call and replaces her last feed memory, whether she posted or commented.
+- Talking about her post or your comment in her DMs is not filed as something said over text:
+  the texting bookkeeping is told that comments belong to the feed.
 - In her texts and in scenes with her, she sees her two newest posts, with what you commented
   under them and what she answered, so she knows what she posted and what you said there.
 - When she answers you she knows her profile, how she stands with you, her latest memories of
@@ -96,26 +100,27 @@ whether or not it is switched on.
   the hand-off instead, so replies are never asked for twice.
 
 - **Photo Feature's comment hand-off** (`stores/commentHandoff.ts`, Photo Feature 1.3.0): while
-  Bunnyfeeds is on, the slot opening asks for replies in its words and its schema (each reply
-  names who wrote it), a filed post's replies are dressed by it with the picture's tier already
-  known, `PostComments` draws its preview, and `CommentAction` puts its comment pill beside the like.
+  Bunnyfeeds is on, the slot opening asks for replies in its words and its schema (each reply names
+  who wrote it), a filed post's replies are dressed by it with the picture's tier already known,
+  `PostComments` draws its preview, and `CommentAction` puts its comment pill beside the like.
 - Two direct edits, where no hook exists: `textLedgerPrompt.ts` adds `textLedgerFeedLines`, telling
   the end-of-slot texting bookkeeping that comments under her posts are the feed's, so talk about a
   post in her DMs is not filed as something said over text; `gameLoop.ts` adds `feedStatusLines` to
   the closing's memories. Both do nothing while the mod is off.
 - `requests['slot-intro']` adds the replier block. `prompts.dm` and `prompts.scene` add her two
-  newest posts with his comments and her answers. `slotSettled` sends whatever is still owed. `gameEntered` drops a visit not yet sent.
+  newest posts with his comments and her answers. `slotSettled` sends whatever is still owed.
+  `gameEntered` drops a visit not yet sent.
 - The thread call is not blocked by a save: a save taken while it is out simply leaves those
   comments owed, and the next settling asks again.
 
 ### Save fields
 
-All optional, so a save without the mod loads as before, and switching it off keeps them:
-`charId`, `player`, `replyTo` and `tags` on a comment; `threadedThrough` and `heldMemories` on a post.
-A memory the thread call writes waits in `heldMemories` until the slot its answers show, and is
-filed into her memories as the slot before it settles, so it arrives with the answers. What she made
-of his comments is one of her ordinary memories, ending ", on her post" or ", under <name>'s post", which is how the next
-one finds and replaces it.
+All optional, so a save without the mod loads as before, and switching it off keeps them: `charId`,
+`player`, `replyTo` and `tags` on a comment; `threadedThrough` and `heldMemories` on a post. A
+memory the thread call writes waits in `heldMemories` until the slot its answers show, and is filed
+into her memories as the slot before it settles, so it arrives with the answers. What she made of
+his comments is one of her ordinary memories, ending ", on her post" or ", under <name>'s post",
+which is how the next one finds and replaces it.
 
 Comments keep Photo Feature's `comments` field. A comment written by Photo Feature alone reads as
 a stranger's. While Bunnyfeeds is off, Photo Feature's own view leaves out the comments only
