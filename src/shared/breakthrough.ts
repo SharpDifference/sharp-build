@@ -26,6 +26,8 @@ export interface BreakthroughMoment {
   outcome: string
   transcriptStart?: number
   transcriptCount?: number
+  /** Actual successful charge. Older outcomes omit this; their price cannot be inferred. */
+  spent?: EchoSpiritCost | 100
   origin?: TermOrigin
 }
 
@@ -85,7 +87,8 @@ export function normalizeBreakthrough(value?: unknown, recover = false): Breakth
         Number.isSafeInteger(e.transcriptCount) && (e.transcriptCount as number) > 0
       return [{ id:e.id, date:e.date as number, time:e.time as TimeSlot, outcome:e.outcome.slice(0,12000),
         ...(origin ? { origin } : {}),
-        ...(range ? { transcriptStart:e.transcriptStart as number, transcriptCount:e.transcriptCount as number } : {}) }]
+        ...(range ? { transcriptStart:e.transcriptStart as number, transcriptCount:e.transcriptCount as number,
+          ...(isSpiritPrice(e.spent) ? { spent:e.spent } : {}) } : {}) }]
     })
   }
   const p = record(raw.pending)
@@ -125,14 +128,29 @@ export function outcomeOf(lines: readonly SceneLine[]): string {
     .map(line => `${line.speaker || 'Narrator'}: ${line.text}`).join('\n').slice(0,12000)
 }
 
-/** Edits and discarded tails must not survive in the separate continuity archive. */
+/**
+ * Align continuity with the retained transcript. Supplying its previous contents also
+ * refunds complete activations removed by a real prefix cut, never by rereading or edits.
+ * This is pure so decision-point saves can project the same refund without changing play.
+ */
 export function reconcileBreakthrough(
-  value: BreakthroughState, transcript: readonly SceneLine[], date: number, time: TimeSlot
+  value: BreakthroughState, transcript: readonly SceneLine[], date: number, time: TimeSlot,
+  previous?: readonly SceneLine[]
 ): BreakthroughState {
   const state = normalizeBreakthrough(value)
+  const cut = previous && transcript.length < previous.length && transcript.every((line, i) =>
+    line.speaker === previous[i].speaker && line.text === previous[i].text)
+  const refunded = new Set<string>()
   for (const [id, entries] of Object.entries(state.moments)) {
     state.moments[id] = entries.flatMap(entry => {
       if (entry.date !== date || entry.time !== time || entry.transcriptStart === undefined) return [entry]
+      if (cut && !entry.origin && transcript.length <= entry.transcriptStart &&
+          entry.transcriptStart + entry.transcriptCount! <= previous.length &&
+          isSpiritPrice(entry.spent) && !refunded.has(entry.id) &&
+          outcomeOf(previous.slice(entry.transcriptStart, entry.transcriptStart + entry.transcriptCount!)) === entry.outcome) {
+        state.meters[id] = meter((state.meters[id] ?? 0) + entry.spent)
+        refunded.add(entry.id)
+      }
       const lines = transcript.slice(entry.transcriptStart,entry.transcriptStart + entry.transcriptCount!)
       const outcome = outcomeOf(lines)
       return outcome ? [{ ...entry, outcome, transcriptCount:lines.length }] : []

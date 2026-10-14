@@ -117,8 +117,9 @@ export function writeAutosave(scene: SceneState | null): Promise<void> {
     const playthroughId = game.playthroughId
     if (!playthroughId) return
     const draft: SaveDraft = { ...game.toGameSave(), scene,
-      // A leave write may rewind to an earlier decision point. Do not carry its discarded outcome.
-      exBreakthrough: reconcileBreakthrough(game.exBreakthrough, scene?.transcript ?? [], game.date, game.time)
+      // Project discarded outcomes and their recorded charges onto the same decision point.
+      exBreakthrough: reconcileBreakthrough(game.exBreakthrough, scene?.transcript ?? [], game.date, game.time,
+        scene && !game.replaying && !game.createdScene ? game.currentSceneTranscript : undefined)
     }
 
     const thumbnail = scene ? await composeStageThumbnail(scene) : null

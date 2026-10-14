@@ -71,7 +71,7 @@ export function finishBreakthrough(token: string | undefined, refund: boolean, l
   if (refund || !outcome) state.meters[pending.charId] = refundSpirit(state.meters[pending.charId]??0,pending)
   else state.moments[pending.charId] = [...(state.moments[pending.charId] ?? []),{
     id:pending.id, date:pending.date, time:pending.time, outcome,
-    transcriptStart:at, transcriptCount:lines.length
+    transcriptStart:at, transcriptCount:lines.length, spent:breakthroughSpent(pending)
   }].slice(-6)
   state.pending = null
   useGameStore.setState({ exBreakthrough:state, ...(refund ? {breakthroughFlash:null} : {}) })

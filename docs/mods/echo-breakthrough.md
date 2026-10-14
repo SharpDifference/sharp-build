@@ -55,6 +55,8 @@ This is a narrative prompt effect, not a guaranteed outcome or a numerical power
 
 Successful activations archive only actual generated scene lines through the existing Breakthrough continuity path. The ability's instructions and desired outcome never become remembered facts on their own. This update does not rewrite character profiles, saves, artwork, aspect choices, locks or spirit values. Installing a new archive changes code only.
 
+New completed uses retain their exact charged price in the outcome record. If the player rewinds before a use and submits a different reply, removing the whole paid response, that character receives the recorded 25/50/75 spirit back once (100 for Normal Breakthrough), capped at 100. Merely rereading, editing a line or keeping part of the paid response does not refund it. Save/load and earlier decision-point saves preserve this accounting. Older completed outcomes did not store the price and are not retroactively refunded; their price is never guessed from the player's current aspect. See [Breakthrough](breakthrough.md) for the rewind rules.
+
 ## Integration boundaries
 
 Keep the discovered Echo entry, modCarry registration and native Breakthrough refund/turn ownership rules together. The player's carried identity supplies the ability; no separate ability carry record is needed. Inside The Unspoken, regular scene abilities and Normal Breakthrough are unavailable. The four-choice menu instead offers one aspect-specific hint per link; it does not spend another ability charge. See [Breaking Through the Silence](reckoning.md).
