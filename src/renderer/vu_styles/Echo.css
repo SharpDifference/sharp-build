@@ -106,8 +106,8 @@
 .echo-dialog{color-scheme:light;scrollbar-color:var(--vu-border) var(--vu-ground)}
 .echo-dialog[data-theme=night]{color-scheme:dark}
 @media(prefers-reduced-motion:reduce){.echo-dialog .echo-action{transition:none;translate:none}}
-.echo-aura[data-floating=true]>.echo-float{animation:echo-float var(--echo-float-seconds,10s) ease-in-out infinite}
-@keyframes echo-float{0%,100%{transform:translateY(0) rotate(-1deg)}50%{transform:translateY(-2%) rotate(1deg)}}
+.echo-aura[data-floating=true]>.echo-float{animation:echo-float var(--echo-float-seconds,14s) ease-in-out infinite}
+@keyframes echo-float{0%,100%{transform:translateY(0) rotate(-.5deg)}50%{transform:translateY(-1%) rotate(.5deg)}}
 .echo-reflection-stage .echo-aura{left:calc(9.4% + var(--echo-x,0%));bottom:calc(34% - var(--echo-y,0%));height:62%;width:18%;filter:drop-shadow(0 0 8px var(--echo-tint));mask-image:linear-gradient(transparent,black 8%,black 88%,transparent)}
 .echo-reflection-preview-clock{position:absolute;left:2%;bottom:5%;width:15%;height:23%;display:grid;place-items:center;border:1px dashed var(--vu-border);font:9px var(--font-body);color:var(--vu-text-body);text-align:center}
 .echo-reflection-preview-label{position:absolute;inset:5% 19.3%;display:grid;place-items:center;font:10px var(--font-body);color:var(--vu-text-body);background:var(--vu-surface,var(--vu-ground));border:1px solid var(--vu-border);pointer-events:none}

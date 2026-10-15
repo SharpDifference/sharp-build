@@ -1,5 +1,6 @@
 /** Offsets in the game's 1920 × 1080 stage coordinates, relative to its existing Echo position. */
-export interface EchoStagePlacement { x:number; y:number; scale:number; opacity?:number; floating?:boolean; floatSeconds?:number }
+export interface EchoStagePlacement { x:number; y:number; scale:number; visible?:boolean; opacity?:number; floating?:boolean; floatSeconds?:number }
+export const ECHO_FLOAT_SECONDS_DEFAULT = 14
 export const ECHO_STAGE_DEFAULT:Readonly<EchoStagePlacement>={x:0,y:0,scale:1}
 /** Full-height reader Echo on the left of Reckoning, behind the dialog. */
 export const PLAYER_ECHO_STAGE_DEFAULT:Readonly<EchoStagePlacement>={x:25,y:600,scale:2.39}
@@ -21,9 +22,10 @@ export function normalizeEchoStage(value?:unknown):EchoStagePlacement {
     return typeof n==='number'&&Number.isFinite(n)?Math.round(Math.max(min,Math.min(max,n))*100)/100:fallback
   }
   return {x:bounded('x',-600,600,0),y:bounded('y',-600,600,0),scale:bounded('scale',0.25,2.5,1),
+    ...(typeof v.visible==='boolean'?{visible:v.visible}:{}),
     ...(typeof v.opacity==='number'&&Number.isFinite(v.opacity)?{opacity:bounded('opacity',.05,.8,.3)}:{}),
     ...(typeof v.floating==='boolean'?{floating:v.floating}:{}),
-    ...(typeof v.floatSeconds==='number'&&Number.isFinite(v.floatSeconds)?{floatSeconds:bounded('floatSeconds',3,20,10)}:{})}
+    ...(typeof v.floatSeconds==='number'&&Number.isFinite(v.floatSeconds)?{floatSeconds:bounded('floatSeconds',3,20,ECHO_FLOAT_SECONDS_DEFAULT)}:{})}
 }
 
 /** Preview and real stage share transform order and bottom-centre scaling. */

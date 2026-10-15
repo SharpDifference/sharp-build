@@ -192,6 +192,23 @@ export function editEchoStage(value:EchoState,owner:string,placement:EchoStagePl
   if(owner==='player')state.player=updated;else state.girls[owner]=updated
   return state
 }
+/** Validate the selected owner's pending fields before making a single save. */
+export function editEchoSettings(value: EchoState, owner: string, edits: {
+  name?: string
+  creature?: { type: string; description: string }
+  stage?: EchoStagePlacement
+  opacity?: number
+}): EchoState {
+  let next = normalizeEcho(value)
+  if (!(owner === 'player' ? next.player : Object.hasOwn(next.girls, owner))) {
+    throw Error('Choose an Echo to edit.')
+  }
+  if (edits.name !== undefined) next = renameEcho(next, owner, edits.name)
+  if (edits.creature) next = editEchoCreature(next, owner, edits.creature.type, edits.creature.description)
+  if (edits.stage) next = editEchoStage(next, owner, edits.stage)
+  if (edits.opacity !== undefined) next = normalizeEcho({ ...next, opacity: edits.opacity })
+  return next
+}
 /** Image regeneration must retain the existing identity, player lock and custom name. */
 export function withEchoArtwork(value:EchoState,owner:string,art:string,source:'generated'|'uploaded'):EchoState{
   if(!ECHO_ART_ID.test(art))throw Error('Invalid Echo artwork id.')

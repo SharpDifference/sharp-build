@@ -12,7 +12,11 @@ During play, open Echoes from its scene sidebar icon between Calendar and Settin
 
 After starting, students' aspects are locked and the reader has one aspect change. Names and visual creature descriptions remain editable for everyone. The name and creature dice generate local suggestions for free. Save changes before generating artwork: the chosen name, species and description shape its appearance. Regenerating artwork preserves the saved name and aspect. Why this type? is marked as a spoiler and explains the relevant backstory/personality cues, including weak-evidence cases.
 
+Save all settings, beside Generate all missing in the footer, commits the selected owner’s pending name, creature details, placement, visibility, motion and shared opacity in one save. During enrollment it also saves an editable starting aspect. The reader’s once-only mid-play aspect change remains its own explicit action. Individual Save buttons are still available. Switching Echoes with pending edits asks whether to Save and switch, Discard and switch, or Stay here. A failed save keeps the current Echo and its draft open; Escape dismisses only this warning. Discard also resets any unsaved shared-opacity change. Draft fields follow the selected owner and save session before the menu renders, so switching untouched Echoes does not briefly flash an unsaved warning or enable Save. Saving one field refreshes only that field, preserving other pending edits.
+
 The manager uses the game's typography, paper-shadow buttons and day/night palette. New-game setup always uses a plain light background. The artwork gallery has a separate Echoes section.
+
+The reader's aspect selectors show the highlighted aspect's ability name, short explanation, spirit cost and affected characters directly underneath. Girls do not use abilities: their setup selectors instead show the matching aspect (+25%), competing aspect (−25%) and neutral matchups, based on the reader's Echo and affecting new positive relationship progress. Previews update before saving; the reader's ability preview also appears during the one later change and through the gallery. Browsing does not save a choice or use that change.
 
 ## Artwork providers and transparency
 
@@ -30,7 +34,7 @@ The optional local workflow uses ComfyUI with novaAnimeXL_ilV190.safetensors and
 
 ## Staging and abilities
 
-Each owner has X/Y, scale, optional visibility override, floating motion and speed controls. Save placement applies the preview; closing an unsaved draft leaves the scene unchanged. Visibility is opacity, not background removal: it fades the entire already-cut-out creature. Shared visibility defaults to 30%; per-owner values and Hide on stage take priority. Floating cycles range from 3–20 seconds and respect reduced motion.
+Each owner has X/Y, scale, optional visibility override, floating motion and speed controls. Save placement applies the preview; closing an unsaved draft leaves the scene unchanged. Visibility is opacity, not background removal: it fades the entire already-cut-out creature. Shared visibility defaults to 30%; per-owner values and Hide on stage take priority. Each girl also has a Show her Echo on stage switch: it hides only her staged Echo in ordinary scenes, the Unspoken Void and the question screen, while retaining artwork, identity and abilities. Old saves default to visible. Floating cycles range from 3–20 seconds, default to a gentle 14-second drift with half the former sway, and respect reduced motion. Saved cycle speeds are preserved.
 
 During Breaking Through the Silence, the reader's Echo defaults to a large, faint left backdrop (X 25, Y 600, scale 2.39, 18% visibility). Saved overrides win. The girl's Echo appears opposite it, mirrored from the reader's placement. Her dungeon portrait controls do not move the question-screen portrait. The reader's Stage panel also exposes the saved glitch-effects option; it remains accessible through Mods when Echoes is disabled.
 
