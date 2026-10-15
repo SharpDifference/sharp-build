@@ -30,6 +30,16 @@ function EchoAspectAbility({aspect}: {aspect: EchoAspect}): JSX.Element | null {
     <p>{ability.cost} spirit · {ability.scope} · One exchange</p>
   </section>
 }
+function EchoAspectMatchups({aspect}: {aspect: EchoAspect}): JSX.Element {
+  const selected = aspectOf(aspect)
+  return <section className="echo-bond" aria-label="Selected aspect matchups" aria-live="polite" aria-atomic="true">
+    <strong>Aspect matchups</strong>
+    <p>Matching: <b>{selected.name}</b> · +25%</p>
+    <p>Competing: <b>{aspectOf(selected.opposite).name}</b> · −25%</p>
+    <p>All other aspects: neutral · normal progress</p>
+    <p>Based on your Echo’s aspect. Applies to new positive relationship progress.</p>
+  </section>
+}
 /** Reset before committing a render, so another owner's draft never looks like an edit. */
 function useEchoDraft<T>(saved: T, scope: string): [T, (value: T) => void] {
   const key = JSON.stringify([scope, saved])
@@ -374,7 +384,7 @@ export function EchoPanel({hidden,gallery=false,owner,onClose,setup,theme}: {hid
               }}>{tab==='appearance'?'Appearance':tab==='resonance'?'Resonance':'Stage'}</button>)}
             </div>
             {section==='appearance'&&<div id="echo-section-appearance" role="tabpanel" aria-labelledby="echo-tab-appearance" tabIndex={0}>
-            {setup&&<div className="echo-setup-aspect"><label>Starting aspect<select aria-label="Starting Echo aspect" value={chosenAspect} disabled={busy||!setupAspectEditable} onChange={e=>setChosenAspect(e.target.value as EchoAspect)}>{ECHO_ASPECTS.map(a=><option key={a.id} value={a.id}>{a.name}</option>)}</select><small>{aspectOf(chosenAspect).meaning}. Competes with {aspectOf(aspectOf(chosenAspect).opposite).name}.</small></label><EchoAspectAbility aspect={chosenAspect}/>{setupAspectEditable?<><button type="button" className="vu-btn vu-btn--primary vu-paper echo-action" disabled={busy||!aspectPending} onClick={()=>void saveStartingAspect()}>Choose starting aspect</button><p className="echo-help">Suggestions come from {selected==='player'?'your bio':'her personality and backstory'}. Change the starting aspect as often as you like. Your names, creature details and existing images stay; regenerate artwork only if you want it to reflect the new aspect. Your reader’s one later change stays available.</p></>:<p className="echo-help">This aspect comes from the previous semester. Appearance and stage placement are still editable.</p>}</div>}
+            {setup&&<div className="echo-setup-aspect"><label>Starting aspect<select aria-label="Starting Echo aspect" value={chosenAspect} disabled={busy||!setupAspectEditable} onChange={e=>setChosenAspect(e.target.value as EchoAspect)}>{ECHO_ASPECTS.map(a=><option key={a.id} value={a.id}>{a.name}</option>)}</select><small>{aspectOf(chosenAspect).meaning}. Competes with {aspectOf(aspectOf(chosenAspect).opposite).name}.</small></label>{selected==='player'?<EchoAspectAbility aspect={chosenAspect}/>:<EchoAspectMatchups aspect={chosenAspect}/>}{setupAspectEditable?<><button type="button" className="vu-btn vu-btn--primary vu-paper echo-action" disabled={busy||!aspectPending} onClick={()=>void saveStartingAspect()}>Choose starting aspect</button><p className="echo-help">Suggestions come from {selected==='player'?'your bio':'her personality and backstory'}. Change the starting aspect as often as you like. Your names, creature details and existing images stay; regenerate artwork only if you want it to reflect the new aspect. Your reader’s one later change stays available.</p></>:<p className="echo-help">This aspect comes from the previous semester. Appearance and stage placement are still editable.</p>}</div>}
             <div className="echo-draft-field"><label htmlFor="echo-name-input">Echo name</label><div className="echo-input-roll"><input id="echo-name-input" type="text" maxLength={60} value={editedName} disabled={busy} onChange={e=>setEditedName(e.target.value)}/><EchoDice label="Roll a random Echo name" disabled={busy} onClick={generateName}/></div></div>
             <div className="echo-name-actions"><button type="button" className="vu-btn vu-btn--primary vu-paper echo-action" disabled={busy||!safe||!editedName.trim()||editedName.trim()===identity.name} onClick={()=>void saveName()}>Save name</button></div>
             <p className="echo-help">Roll the dice for a free suggestion, then save your favorite. The next artwork uses the name you save.</p>

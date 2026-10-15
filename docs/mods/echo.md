@@ -16,7 +16,7 @@ Save all settings, beside Generate all missing in the footer, commits the select
 
 The manager uses the game's typography, paper-shadow buttons and day/night palette. New-game setup always uses a plain light background. The artwork gallery has a separate Echoes section.
 
-Every aspect selector shows the highlighted aspect's ability name, short explanation, spirit cost and affected characters directly underneath. This preview updates before saving, both for the reader and girls during setup and for the reader's one later change, including the gallery entry point. Browsing these previews does not save a choice or use the reader's one change.
+The reader's aspect selectors show the highlighted aspect's ability name, short explanation, spirit cost and affected characters directly underneath. Girls do not use abilities: their setup selectors instead show the matching aspect (+25%), competing aspect (−25%) and neutral matchups, based on the reader's Echo and affecting new positive relationship progress. Previews update before saving; the reader's ability preview also appears during the one later change and through the gallery. Browsing does not save a choice or use that change.
 
 ## Artwork providers and transparency
 
