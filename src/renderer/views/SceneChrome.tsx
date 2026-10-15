@@ -16,6 +16,7 @@ import type { ScreenTheme } from './clockTheme'
 import {
   BunnyIcon,
   CalendarIcon,
+  EchoIcon,
   EyeIcon,
   HalfMarkIcon,
   halfMarkKindOf,
@@ -123,6 +124,8 @@ export interface SceneChromeProps {
   railDead: boolean
   onCalendar: () => void
   onBunnyboard: () => void
+  /** Absent when Echo is disabled or this screen has no ordinary playthrough. */
+  onEchoes?: () => void
   onSettings: () => void
   onHideUi: () => void
   onBackground: () => void
@@ -364,6 +367,15 @@ export function SceneChrome(props: SceneChromeProps): JSX.Element {
         >
           <CalendarIcon />
         </RailSeat>
+        {props.onEchoes && (
+          <RailSeat
+            label="Echoes"
+            state={seatState(!dark && shown.has('settings'), props.railDead)}
+            onClick={props.onEchoes}
+          >
+            <EchoIcon />
+          </RailSeat>
+        )}
         {/* Never gated: the way out must be reachable from wherever the reader is stuck. */}
         <RailSeat
           label="Settings"
@@ -548,6 +560,7 @@ function RailSeat({
     <motion.button
       className="vu-scene-seat vu-paper"
       aria-label={label}
+      title={label}
       disabled={dead}
       variants={seat}
       initial="hidden"

@@ -1,5 +1,6 @@
 import type { CharInfo, SceneLine, TimeSlot } from './types'
 import { normalizeTermOrigin, type TermOrigin } from './termOrigin'
+import { isEchoBreakthroughAspect, type EchoBreakthroughAspect, type EchoSpiritCost } from './echoBreakthrough'
 
 export const BREAKTHROUGH_MOD = 'breakthrough'
 export const SPIRIT_MAX = 100
@@ -11,6 +12,10 @@ export interface BreakthroughPending {
   date: number
   time: TimeSlot
   playthroughId: string
+  /** Optional local Echo integration; omitted for an ordinary Breakthrough. */
+  echoAspect?: EchoBreakthroughAspect
+  /** Price actually charged for an Echo activation; absent in older, full-bar saves. */
+  spent?: EchoSpiritCost | 100
 }
 
 export interface BreakthroughMoment {
@@ -21,6 +26,8 @@ export interface BreakthroughMoment {
   outcome: string
   transcriptStart?: number
   transcriptCount?: number
+  /** Actual successful charge. Older outcomes omit this; their price cannot be inferred. */
+  spent?: EchoSpiritCost | 100
   origin?: TermOrigin
 }
 
@@ -47,6 +54,19 @@ function slot(date: unknown, time: unknown): boolean {
 
 const meter = (n: number): number => Math.max(0, Math.min(SPIRIT_MAX, Number.isFinite(n) ? n : 0))
 
+function isSpiritPrice(value:unknown):value is EchoSpiritCost|100 {
+  return value===25||value===50||value===75||value===100
+}
+
+/** Ordinary and legacy activations always paid a full bar. Never infer an old price from today's catalog. */
+export function breakthroughSpent(pending:BreakthroughPending):EchoSpiritCost|100 {
+  return pending.echoAspect&&isSpiritPrice(pending.spent)?pending.spent:SPIRIT_MAX
+}
+
+export function refundSpirit(current:number,pending:BreakthroughPending):number {
+  return meter(current+breakthroughSpent(pending))
+}
+
 /** Imported optional data is bounded. Loading refunds an interrupted, uncommitted activation. */
 export function normalizeBreakthrough(value?: unknown, recover = false): BreakthroughState {
   const raw = record(value)
@@ -67,15 +87,17 @@ export function normalizeBreakthrough(value?: unknown, recover = false): Breakth
         Number.isSafeInteger(e.transcriptCount) && (e.transcriptCount as number) > 0
       return [{ id:e.id, date:e.date as number, time:e.time as TimeSlot, outcome:e.outcome.slice(0,12000),
         ...(origin ? { origin } : {}),
-        ...(range ? { transcriptStart:e.transcriptStart as number, transcriptCount:e.transcriptCount as number } : {}) }]
+        ...(range ? { transcriptStart:e.transcriptStart as number, transcriptCount:e.transcriptCount as number,
+          ...(isSpiritPrice(e.spent) ? { spent:e.spent } : {}) } : {}) }]
     })
   }
   const p = record(raw.pending)
   const pending: BreakthroughPending | null = safeId(p.id) && safeId(p.charId) && safeId(p.playthroughId) &&
     slot(p.date,p.time) && typeof p.direction === 'string' && !!p.direction.trim() && p.direction.length <= 1000
     ? { id:p.id, charId:p.charId, playthroughId:p.playthroughId, date:p.date as number,
-      time:p.time as TimeSlot, direction:p.direction.trim() } : null
-  if (recover && pending) meters[pending.charId] = SPIRIT_MAX
+      time:p.time as TimeSlot, direction:p.direction.trim(),
+      ...(isEchoBreakthroughAspect(p.echoAspect)?{echoAspect:p.echoAspect,...(isSpiritPrice(p.spent)?{spent:p.spent}:{})}:{}) } : null
+  if (recover && pending) meters[pending.charId] = refundSpirit(meters[pending.charId]??0,pending)
   return { meters, settled, moments, pending:recover ? null : pending }
 }
 
@@ -106,14 +128,29 @@ export function outcomeOf(lines: readonly SceneLine[]): string {
     .map(line => `${line.speaker || 'Narrator'}: ${line.text}`).join('\n').slice(0,12000)
 }
 
-/** Edits and discarded tails must not survive in the separate continuity archive. */
+/**
+ * Align continuity with the retained transcript. Supplying its previous contents also
+ * refunds complete activations removed by a real prefix cut, never by rereading or edits.
+ * This is pure so decision-point saves can project the same refund without changing play.
+ */
 export function reconcileBreakthrough(
-  value: BreakthroughState, transcript: readonly SceneLine[], date: number, time: TimeSlot
+  value: BreakthroughState, transcript: readonly SceneLine[], date: number, time: TimeSlot,
+  previous?: readonly SceneLine[]
 ): BreakthroughState {
   const state = normalizeBreakthrough(value)
+  const cut = previous && transcript.length < previous.length && transcript.every((line, i) =>
+    line.speaker === previous[i].speaker && line.text === previous[i].text)
+  const refunded = new Set<string>()
   for (const [id, entries] of Object.entries(state.moments)) {
     state.moments[id] = entries.flatMap(entry => {
       if (entry.date !== date || entry.time !== time || entry.transcriptStart === undefined) return [entry]
+      if (cut && !entry.origin && transcript.length <= entry.transcriptStart &&
+          entry.transcriptStart + entry.transcriptCount! <= previous.length &&
+          isSpiritPrice(entry.spent) && !refunded.has(entry.id) &&
+          outcomeOf(previous.slice(entry.transcriptStart, entry.transcriptStart + entry.transcriptCount!)) === entry.outcome) {
+        state.meters[id] = meter((state.meters[id] ?? 0) + entry.spent)
+        refunded.add(entry.id)
+      }
       const lines = transcript.slice(entry.transcriptStart,entry.transcriptStart + entry.transcriptCount!)
       const outcome = outcomeOf(lines)
       return outcome ? [{ ...entry, outcome, transcriptCount:lines.length }] : []

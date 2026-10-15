@@ -154,6 +154,7 @@ export function CharacterDynamicsModal({ theme, roster, initial, returning = [],
                       </div>}
                     </>
                   )}
+                  {entry.growth && <div className="vu-dynamics-history"><span className="vu-field-label">Earned growth</span><strong>{entry.growth.name}</strong><p>{entry.growth.description}</p></div>}
                   <div className="vu-dynamics-dropzone">
                     <span className="vu-field-label">Personality nudges</span>
                     {entry.traits.length === 0 && <p>{locked ? 'Original personality.' : 'Drop tags here. Her original personality stays.'}</p>}

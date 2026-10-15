@@ -1,4 +1,5 @@
 import { prepareStoryRequest, inspectStoryMemory } from './storyMemory'
+import * as echo from './echoArtwork'
 import type { WhisperDraft, WhisperReply } from '@shared/venusWhisper'
 import type { MeanwhileResponse } from '@shared/meanwhile'
 import type { ClassifierPromptRequest, ClassifierVerdict } from '@shared/classifier'
@@ -140,6 +141,13 @@ async function generateEndingArt(
 export function buildApi(): VenusUniversityApi {
   return {
     platform: 'web',
+    echo: {
+      generate: request => result('generate Echo artwork', () => echo.generateEchoArt(request)),
+      cancel: id => result('cancel Echo artwork', () => echo.cancelEchoArt(id)),
+      upload: () => result('upload Echo artwork', echo.uploadEchoArt),
+      read: id => result('read Echo artwork', () => echo.readEchoArt(id)),
+      export: (id, name) => result('download Echo artwork', () => echo.exportEchoArt(id, name))
+    },
     storyMemory: { inspect: (payload) => result('inspect story recall', () => inspectStoryMemory(payload)) },
     soundtracks: {
       list: () => result('list custom soundtracks', () => soundtrackLibrary.list()),
@@ -259,6 +267,7 @@ export function buildApi(): VenusUniversityApi {
         result('write the status updates', () =>
           runAbortable(group, (signal) => completeStructured<EndingPostsResponse>(request, signal))
         ),
+      completeReckoning: (request, group) => result('write Reckoning', () => runAbortable(group, signal => completeStructured<unknown>(request, signal))),
       completeMeanwhile: (request, group) =>
         result('write the Meanwhile conversation', () =>
           runAbortable(group, signal => completeStructured<MeanwhileResponse>(request, signal))

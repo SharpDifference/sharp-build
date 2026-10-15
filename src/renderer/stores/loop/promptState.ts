@@ -350,6 +350,7 @@ export function promptState(): PromptState {
     : null
 
   return {
+    exReckoning: modIsOn('reckoning')&&!game.replaying&&!game.createdScene?game.exReckoning:undefined,
     storyMemory: currentStorySnapshot(),
     playthroughId: game.playthroughId ?? 'unsaved',
     exPlotTwist: activePlotTwist(game.exPlotTwist, modIsOn(PLOT_TWIST_MOD)),

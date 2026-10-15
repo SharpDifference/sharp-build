@@ -1,3 +1,4 @@
+import { echoMultiplier } from './echo'
 import { likedPostBonus, likedPostWindowOf } from './feed'
 import {
   MAX_TIER,
@@ -263,7 +264,7 @@ export function affectionOf(memories: readonly CharMemory[], today: number): num
   for (const entry of memories) {
     const points = POINTS[entry.type]
     if (points === undefined) continue
-    total += points * weightFor(Math.max(0, today - entry.date))
+    total += points * weightFor(Math.max(0, today - entry.date)) * echoMultiplier(entry)
   }
   return total
 }

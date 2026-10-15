@@ -1,3 +1,6 @@
+import { resetReflectionPortrait, uploadReflectionPortrait, generateReflectionPortrait, readReflectionPortrait, readReflectionStage, saveReflectionStage, generateEchoArt, cancelEchoArt, uploadEchoArt, readEchoArt, installLocalEchoModels } from './services/echoService'
+import { writeFile } from 'fs/promises'
+import type { EchoArtRequest } from '@shared/echo'
 import { prepareStoryRequest, inspectStoryMemory } from './services/storyMemoryService'
 import type { StoryRecallRequest } from '@shared/storyMemory'
 import type { WhisperDraft, WhisperReply } from '@shared/venusWhisper'
@@ -253,12 +256,57 @@ async function enqueueComfyJob<T>(
 
 /** Registers every IPC channel; keep this, preload and the d.ts in sync. */
 export function registerIpcHandlers(): void {
+  handle('llm:completeReckoning', (_event, request: StructuredRequest, group: string) =>
+    runAbortable(group, signal => completeStructured<unknown>(request, signal))
+  )
   handle('llm:completeWhisper', (_event, request: StructuredRequest, group: string) =>
     runAbortable(group, signal => completeStructured<WhisperDraft | WhisperReply>(request, signal))
   )
 
   // The photo feature's three channels, which keep their own module and their own queue.
   registerPhotoIpc(handle)
+  handle('echo:reflectionExport',async(event,charId:string)=>{
+    const data=await readReflectionPortrait(charId)
+    if(!data)throw Error('Generate or upload an Unheard Soul portrait first.')
+    const character=await getCharacter(charId)
+    const stem=`${character.firstName}-${character.lastName}`.replace(/[^A-Za-z0-9._ -]/g,'_').slice(0,80)
+    const {canceled,filePath}=await showSaveDialogFor(event,{title:'Download Unheard Soul image',defaultPath:`Unheard-Soul-${stem}.png`,filters:[{name:'PNG image',extensions:['png']}]})
+    if(canceled||!filePath)return null
+    await writeFile(filePath,Buffer.from(data.slice(data.indexOf(',')+1),'base64'))
+    return filePath
+  })
+  handle('echo:reflectionUpload',async(event,charId:string)=>{
+    const picked=await showOpenDialogFor(event,{title:'Choose Unheard Soul artwork',properties:['openFile'],filters:[{name:'Images',extensions:['png','jpg','jpeg','webp']}]})
+    return picked.canceled||!picked.filePaths[0]?null:uploadReflectionPortrait(charId,picked.filePaths[0])
+  })
+  handle('echo:reflectionReset',(_event,charId:string)=>resetReflectionPortrait(charId))
+  handle('echo:reflectionRead',(_event,charId:string)=>readReflectionPortrait(charId))
+  handle('echo:reflectionStageRead',(_event,charId:string)=>readReflectionStage(charId))
+  handle('echo:reflectionStageSave',(_event,charId:string,stage:unknown)=>saveReflectionStage(charId,stage))
+  handle('echo:reflectionGenerate',(event,charId:string,id:string)=>generateReflectionPortrait(charId,id,event.sender.id))
+  handle('echo:generate',(event,request: EchoArtRequest) => generateEchoArt(request,event.sender.id))
+  handle('echo:installLocalModels', (event, id: string) => installLocalEchoModels(id, event.sender.id))
+  handle('echo:cancel',(event,id: string) => cancelEchoArt(id,event.sender.id))
+  handle('echo:read',(_event,id: string,generated?: boolean) => readEchoArt(id,generated))
+  handle('echo:export',async (event,id:string,name:string,generated:boolean) => {
+    if(typeof name!=='string')throw Error('Invalid Echo name.')
+    // Read through the same cleanup path as the preview; preserve its PNG alpha.
+    // The renderer supplies an artwork id, never a filesystem path or arbitrary bytes.
+    const data=await readEchoArt(id,generated)
+    if(!data)throw Error('This Echo artwork is missing. Generate or upload an image first.')
+    const stem=name.replace(/[<>:"/\\|?*\x00-\x1f]/g,'').trim().slice(0,60)||'artwork'
+    const {canceled,filePath}=await showSaveDialogFor(event,{
+      title:'Download Echo image',defaultPath:`Echo-${stem}.png`,
+      filters:[{name:'PNG image',extensions:['png']}]
+    })
+    if(canceled||!filePath)return null
+    await writeFile(filePath,Buffer.from(data.slice(data.indexOf(',')+1),'base64'))
+    return filePath
+  })
+  handle('echo:upload',async event => {
+    const picked = await showOpenDialogFor(event,{ title:'Choose Echo artwork', properties:['openFile'], filters:[{name:'Images',extensions:['png','jpg','jpeg','webp']}] })
+    return picked.canceled || !picked.filePaths[0] ? null : uploadEchoArt(picked.filePaths[0])
+  })
   // The key the cloud calls need never leaves main; the transport reads it through this port.
   useSettingsSource(getSettings)
   // Fixed channel: jobs can outlive their original `invoke`, so broadcast progress.

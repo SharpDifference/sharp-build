@@ -1,6 +1,8 @@
+import { setEchoBonusEnabled } from '@shared/echo'
 import { CITY_LIFE_LOCATIONS_MOD, CITY_LIFE_JOBS_MOD, setCityLifeEnabled } from '@shared/cityLife'
 import { useGameStore } from './gameStore'
 import { create } from 'zustand'
+import { toAppError } from '@shared/errors'
 import { CONTINUING_SEMESTERS } from '@shared/continuingSemestersMod'
 import {
   MODS,
@@ -34,19 +36,33 @@ interface ModsStoreState {
 /** The tail of the write lane: each write is of the switches as they stand at its turn. */
 let tail: Promise<unknown> = Promise.resolve()
 
+/** The registrar uses the same choices that produced its saved jobs, haunts and setup. */
+let enrollmentRecord: Pick<PlaythroughRecord, 'mods'> | null = null
+export function setEnrollmentMods(mods: readonly string[] | null): void {
+  enrollmentRecord = mods === null ? null : { mods: [...mods] }
+  syncCityLife()
+}
+
 /** Owns `mods:*` IPC: which community mods are on, and their options. */
 export const useModsStore = create<ModsStoreState>((set, get) => {
+  let persisted = NO_SWITCHES
   /** Applies a change at once, then writes it behind every write already in flight. */
   function change(apply: (switches: ModSwitches) => ModSwitches): Promise<void> {
     const before = get().switches
     const after = apply(before)
     set({ switches: after })
     const write = tail.then(async () => {
-      const result = await window.api.mods.set(get().switches)
-      if (result.ok) return
-      useUiStore.getState().showError(result.error)
-      // Only where nothing has changed since: a later change has its own write coming.
-      if (get().switches === after) set({ switches: before })
+      const snapshot = get().switches
+      try {
+        const result = await window.api.mods.set(snapshot)
+        if (!result.ok) throw result.error
+        persisted = snapshot
+      } catch (error) {
+        useUiStore.getState().showError(toAppError(error))
+        // A later queued edit owns its own attempt. When the lane is caught up,
+        // restore what storage actually acknowledged, not an unpersisted click.
+        if (get().switches === after) set({ switches: persisted })
+      }
     })
     tail = write
     return write
@@ -61,6 +77,7 @@ export const useModsStore = create<ModsStoreState>((set, get) => {
         console.error('[mods] the switches could not be read; every mod is at its default', result.error)
         return
       }
+      persisted = result.data
       set({ switches: result.data })
     },
 
@@ -78,6 +95,7 @@ export const useModsStore = create<ModsStoreState>((set, get) => {
  * there is no next semester for them to stay for, and the ending is the game's own.
  */
 function tellSharedRules(switches: ModSwitches): void {
+  setEchoBonusEnabled(modOn(switches, 'echo'))
   const staying =
     modOn(switches, CONTINUING_SEMESTERS) &&
     !optionOn(switches, CONTINUING_SEMESTERS, 'seniors-graduate')
@@ -92,13 +110,13 @@ useModsStore.subscribe((state) => tellSharedRules(state.switches))
 // game, a mod scoped to the playthrough is on as the game's record says, not as the switch now
 // stands; on the menus, with no game entered, the switches decide.
 setHookRules({
-  isOn: (modId) => modOn(useModsStore.getState().switches, modId, loopState.record),
+  isOn: (modId) => modOn(useModsStore.getState().switches, modId, enrollmentRecord ?? loopState.record),
   order: (modId) => MODS.findIndex((mod) => mod.id === modId)
 })
 
 /** Whether a mod is on, for code outside a component; see `modOn` for what a record changes. */
 export function modIsOn(id: string, record?: Pick<PlaythroughRecord, 'mods'> | null): boolean {
-  return modOn(useModsStore.getState().switches, id, record)
+  return modOn(useModsStore.getState().switches, id, record === undefined ? enrollmentRecord : record)
 }
 
 /** Whether a mod is on, for a component: it renders again when the switch moves. */
@@ -114,7 +132,7 @@ export function useModOption(modId: string, optionId: string): boolean {
 /** Bind shared catalogs to the current record, or to the switches while creating a game. */
 function syncCityLife(): void {
   const game = useGameStore.getState()
-  const record = game.playthroughId ? { mods: [...game.playthroughMods] } : null
+  const record = enrollmentRecord ?? (game.playthroughId ? { mods: [...game.playthroughMods] } : loopState.trip ? loopState.record : null)
   setCityLifeEnabled(modIsOn(CITY_LIFE_LOCATIONS_MOD, record), modIsOn(CITY_LIFE_JOBS_MOD, record))
 }
 useModsStore.subscribe(syncCityLife)

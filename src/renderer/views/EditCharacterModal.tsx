@@ -1,3 +1,4 @@
+import { ReflectionPortraitControl } from '../components/ReflectionPortrait'
 import { cleanBody, type CharacterBody } from '@shared/characterBody'
 import { BodyFieldsSection, bodyForm } from './bodyFields'
 import { useRef, useState, type CSSProperties, type JSX } from 'react'
@@ -945,6 +946,7 @@ export function EditCharacterModal({
           <TitleTab>Edit character</TitleTab>
 
           <div className="vu-edit-images">
+            <ReflectionPortraitControl charId={charId} name={name} theme={theme} height={character.height}/>
             <div className="vu-edit-wardrobes">
               {WARDROBES.map(({ target, set, title }) => (
                 <WardrobeColumn key={target} {...columnFor(target, set, title)} />

@@ -58,7 +58,7 @@ export function SoundtracksModal({ theme, onClose }: { theme: ScreenTheme; onClo
             <SelectField id="soundtrack-slot" label="Game track" value={key} options={options} onChange={value => { if (isSoundtrackKey(value)) setKey(value) }} />
             <div className="vu-soundtracks-file">
               <span className="vu-field-label">Selected audio</span>
-              <strong>{item?.name ?? 'Original game music'}</strong>
+              <strong>{item?.name ?? (key==='reckoning_dungeon'?'Rise from the Dark':'Original game music')}</strong>
             </div>
             <CheckField id="soundtrack-loop" label="Loop replacement" note="When off, the replacement plays once when this cue starts. It can play again after the game leaves this cue and returns." checked={item?.loop !== false} disabled={blocked || !item} onChange={value => void state.loop(key, value)} />
             <div className="vu-soundtracks-actions">

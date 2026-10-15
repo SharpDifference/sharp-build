@@ -1,3 +1,5 @@
+import { normalizeReckoning, rebaseReckoning, rewindReckoning, type ReckoningState } from '@shared/reckoning'
+import { normalizeEcho, type EchoState } from '@shared/echo'
 import { normalizeStoryMemory, type StoryMemory } from '@shared/storyMemory'
 import { normalizeWhisper, type VenusWhisper } from '@shared/venusWhisper'
 import { normalizeBreakthrough, reconcileBreakthrough, type BreakthroughState } from '@shared/breakthrough'
@@ -239,8 +241,10 @@ function sceneKindFields(scene: SceneKind | null | undefined) {
  * `gameLoop.ts` drives this store imperatively outside React.
  */
 interface GameStoreState {
+  exReckoning: ReckoningState
+  exEcho: EchoState
   exBreakthrough: BreakthroughState
-  breakthroughFlash: { id: string; playthroughId: string; name: string } | null
+  breakthroughFlash: { id: string; playthroughId: string; name: string; echoAspect?: import('@shared/echoBreakthrough').EchoBreakthroughAspect } | null
   /** The playthrough being played; every save this session writes goes into it. */
   playthroughId: string | null
   /** The Scene Creator's scene being played, with no playthrough; null in a game. */
@@ -1350,6 +1354,8 @@ function nextLineFields(
 }
 
 const initialState = {
+  exReckoning: normalizeReckoning(),
+  exEcho: normalizeEcho(),
   exBreakthrough: normalizeBreakthrough(),
   breakthroughFlash: null as GameStoreState['breakthroughFlash'],
   playthroughId: null,
@@ -1505,6 +1511,8 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
       classes: record.classes,
       playerSchedule: save.playerSchedule,
       exStoryMemory: normalizeStoryMemory(save.exStoryMemory),
+      exReckoning: normalizeReckoning(save.exReckoning),
+      exEcho: normalizeEcho(save.exEcho),
       exBreakthrough: normalizeBreakthrough(save.exBreakthrough, true),
       history: save.history,
       // Younger than the save format: a save from before it keeps none.
@@ -1721,7 +1729,8 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
 
   restoreScene: (scene) =>
     set((state) => ({
-      exBreakthrough: reconcileBreakthrough(state.exBreakthrough, scene?.transcript ?? [], state.date, state.time),
+      exBreakthrough: reconcileBreakthrough(state.exBreakthrough, scene?.transcript ?? [], state.date, state.time,
+        scene && !state.replaying && !state.createdScene ? state.currentSceneTranscript : undefined),
       pendingLines: scene ? [...scene.pendingLines] : [],
       cast: scene ? [...scene.cast] : [],
       ...sceneKindFields(scene),
@@ -1836,8 +1845,11 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
   truncateUnread: () =>
     set((state) => {
       const kept = cutLengthOf(state)
+      const breakthrough = reconcileBreakthrough(state.exBreakthrough, state.currentSceneTranscript.slice(0, kept), state.date, state.time,
+        !state.replaying && !state.createdScene ? state.currentSceneTranscript : undefined)
       return {
-        exBreakthrough: reconcileBreakthrough(state.exBreakthrough, state.currentSceneTranscript.slice(0, kept), state.date, state.time),
+        exBreakthrough: breakthrough,
+        ...rewindReckoning({...state,exBreakthrough:breakthrough},kept),
         currentSceneTranscript: state.currentSceneTranscript.slice(0, kept),
         pendingLines: [],
         reread: 0,
@@ -1914,6 +1926,7 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
       // files the whole recap.
       ...(mirrored
         ? {
+            exReckoning: rebaseReckoning(state, transcript.map((line, i) => (i === tAt ? edited : line))),
             exBreakthrough: reconcileBreakthrough(state.exBreakthrough, transcript.map((line, i) => (i === tAt ? edited : line)), state.date, state.time),
             currentSceneTranscript: transcript.map((line, i) => (i === tAt ? edited : line)),
             ...(state.sceneEnding
@@ -2837,6 +2850,8 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
       ),
       playerSchedule: state.playerSchedule,
       exStoryMemory: normalizeStoryMemory(state.exStoryMemory),
+      exReckoning: normalizeReckoning(state.exReckoning),
+      exEcho: normalizeEcho(state.exEcho),
       exBreakthrough: normalizeBreakthrough(state.exBreakthrough),
       history: state.history,
       // Omitted while it names none, as an absent optional is.

@@ -139,6 +139,11 @@ export function returnScrollLines(stats: PlayerStats, date: number): SceneLine[]
 export const ORIENTATION_PREMISE =
   'The reader is standing with his orientation group in the Venus Quad. One of the other freshmen stands out to him. Neither of them knows anybody here yet and neither knows whether this is the start of anything at all — write the scene with that feeling: first day, everything still ahead, nothing decided.'
 
+/** A shared past changes the encounter, even though this is the reader's first semester. */
+export function orientationAcquaintancePremise(firstName: string, leader: boolean): string {
+  return `The reader is standing with his orientation group in the Venus Quad. ${firstName}, ${leader ? 'the upperclassman leading the group' : 'another freshman'}, is someone he already knows. Let their established history and current feelings shape this first-day encounter. Do not introduce them as strangers, invent a reunion after a specific absence, or assume their past is friendly. Leave room for what happens next.`
+}
+
 /** The same scene when the roster has no freshmen: she is the upperclassman leading the group. */
 export function orientationLeaderPremise(firstName: string): string {
   return `The reader's orientation group is short of half its people. ${firstName}, the upperclassman leading the group, introduces herself to him, and the two of them talk while the stragglers turn up. She already knows her way around and is in no hurry; he knows nobody at all. Write the scene with that first-day feeling: an easy, unhurried conversation between two people who have just met, and the open question of whether it leads anywhere.`

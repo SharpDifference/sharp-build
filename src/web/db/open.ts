@@ -46,6 +46,8 @@ export interface StoredBackground {
  * playthrough and write time, so the newest of one playthrough is found without reading the rest.
  */
 export interface VenusUniversityDb extends DBSchema {
+  echoArt: { key: string; value: Blob }
+  echoSources: { key: string; value: Blob }
   soundtrackMeta: { key: 'tracks'; value: SoundtrackMap }
   soundtrackFiles: { key: string; value: Blob }
   settings: { key: 'settings'; value: StoredSettings }
@@ -69,6 +71,8 @@ export interface VenusUniversityDb extends DBSchema {
  * what is missing, so a database already here gains it and keeps everything it holds.
  */
 const STORES = [
+  'echoArt',
+  'echoSources',
   'soundtrackMeta',
   'soundtrackFiles',
   'settings',
@@ -86,7 +90,7 @@ const STORES = [
   'replays'
 ] as const
 
-const DB_VERSION = 8
+const DB_VERSION = 9
 
 let opened: Promise<IDBPDatabase<VenusUniversityDb>> | null = null
 

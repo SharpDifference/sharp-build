@@ -62,6 +62,10 @@ export async function sendPhoto(
     return
   }
   const file = named.data
+  // A replacement, load, or disabled Photo Feature can overtake the asynchronous reservation.
+  const live = useGameStore.getState()
+  const held = live.bunnyboard.conversations[charId]?.messages.find(message => message.id === last.id)
+  if (live.playthroughId !== playthroughId || live.loads !== game.loads || !held || held.photo || !canSendPhotos()) return
   setMessagePhoto(charId, last.id, { tier: verdict.tier, scene, file, pending: true })
   // Her first picture to him is the moment BunnyBot explains them.
   tellAboutDmPhotos(character.firstName)

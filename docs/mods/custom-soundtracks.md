@@ -2,8 +2,7 @@
 
 Custom soundtracks is a self-contained, default-on `anytime` mod, ID `custom-soundtracks`.
 It needs the shared Mods framework, but does not depend on renaming, Plot Twist, Story Memory,
-SQLite, City Life, or any particular character or save. This guide describes the source port
-of the local-audio feature from Maestro's Community Mods 1.8.2 to game 0.3.1.
+SQLite, City Life, or any particular character or save. This guide describes the current community source implementation, including Echo encounter cues.
 
 ## Player behavior
 
@@ -13,8 +12,9 @@ Settings form's Cancel button does not undo them. Files must be nonempty, at mos
 (labelled 50 MB in the UI), and decode to at most 20 minutes. Codec support depends on the
 browser/Electron build. A failed selection leaves the old assignment in place.
 
-The ten slots are title, weekday day/night, weekend day/night, ending, and the four venue
-styles (electronic, lo-fi, pop and rock). These are soundtrack cues already present in the
+The thirteen slots are title, weekday day/night, weekend day/night, ending, the four venue
+styles (electronic, lo-fi, pop and rock), and three Breaking Through the Silence cues
+(dungeon, questions and victory). These are soundtrack cues already present in the
 game, not additional location rules. Weather, other ambience and effects stay with their
 existing cues. Imported title/landing/ending tracks use the Music volume; venue songs use
 Ambience and the native venue treatment. Music still follows the game's scene transitions.
@@ -29,8 +29,11 @@ a play-once recording finishes, rather than claiming that sound is still playing
 
 Preview plays the first ten seconds (repeating a shorter recording) through the slot's native
 volume group. **Stop preview**, closing the panel, changing slots, changing assignments or
-toggling the mod stops it. Preview uses the native snippet path; venue previews are clear,
-without the venue's in-world filtering. A currently playing game cue can overlap the preview.
+toggling the mod stops it. Preview temporarily silences background music and ambience, including fading tracks, while
+keeping the preview on its normal volume group. Stop, timeout, cancellation and load failure
+restore the current background mix. The underlying game tracks continue their clocks silently,
+so stopping a preview does not restart a song or revive a finished play-once cue. Venue
+previews are clear, without the venue's in-world filtering.
 
 **Restore original** clears that slot's assignment. **Clean up unused imports**, after
 confirmation, deletes only unassigned imported copies. It never deletes the original file
@@ -42,7 +45,7 @@ No saved playthrough is rewritten and no AI prompt or token budget is involved.
 
 | File | Responsibility |
 | --- | --- |
-| `src/shared/soundtracks.ts` | Mod definition, ten slots, bridge types, limits, legacy map parsing, backup integrity |
+| `src/shared/soundtracks.ts` | Mod definition, thirteen slots, bridge types, limits, legacy map parsing, backup integrity |
 | `src/shared/soundtrackLibrary.ts` | Serialized mutations, temporary selection tokens, shared native/web rules |
 | `src/shared/modEntries/custom-soundtracks.ts` | Registers the independent switch, without `requires` |
 | `src/main/services/soundtrackService.ts` | Native file storage, bounded reads, SHA-256 and atomic writes |
@@ -72,7 +75,7 @@ data/ex-music/tracks.json
 data/ex-music/<sha256>.mp3   (or .ogg / .wav)
 ```
 
-`tracks.json` is a raw object keyed by one of the ten cue IDs. For example:
+`tracks.json` is a raw object keyed by one of the thirteen cue IDs. For example:
 
 ```ts
 {
@@ -129,7 +132,9 @@ buffers are marked separately so stock fallback uses stock loop/end rules.
 
 Changing a slot invalidates only that slot's custom cache and restarts only channels currently
 requesting that slot. Switching the feature clears the custom caches and refreshes relevant
-music/venue channels. Per-slot revisions reject decode completions from older assignments;
+music/venue channels without reporting the outgoing copy as a natural song ending. This
+prevents the stock menu title from being marked finished when the mod is toggled. Its
+normal once-per-session and end-of-track rules are unchanged. Per-slot revisions reject decode completions from older assignments;
 the engine's existing channel tokens reject sources belonging to older cues. A separate
 snippet token prevents a preview from appearing after the player has closed its panel.
 
@@ -203,3 +208,7 @@ in this source port. It adds no remote downloads, new telemetry, or AI calls.
 - This mod has no renderer hook registration; its existing switch-gated integration stays in place.
 
 The stable IDs, defaults, dependencies, save fields and gameplay behavior are unchanged. Native character notes, scene-creator saves and calendar replays retain their 0.3.1 behavior. Merge framework updates from `core` into this mod branch; resolve conflicts with `main` on a separate `integrate/custom-soundtracks` branch.
+
+## October 14 load follow-up
+
+Canceling a picker or completing a cleanup with no assignment change no longer discards a pending initial soundtrack load. A successful assignment change still invalidates stale results. This is separate from the earlier title-theme transition and preview playback fixes; those are preserved in the combined Echo build.
