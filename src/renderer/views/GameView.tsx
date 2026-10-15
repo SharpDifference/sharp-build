@@ -27,7 +27,7 @@ import {
   type TimeSlot
 } from '@shared/types'
 import { isWet } from '@shared/weather'
-import type { GiftReaction } from '@shared/shop'
+import type { GiftReaction, ItemPick } from '@shared/shop'
 import { Burst } from '../components/Burst'
 import { CheckField } from '../components/CheckField'
 import { ConfirmModal } from '../components/ConfirmModal'
@@ -114,7 +114,8 @@ import {
   startFarewellScene,
   submitAction,
   submitQuizAnswer,
-  submitGift
+  submitGift,
+  turnPromptEditable
 } from '../stores/gameLoop'
 import {
   abandonHangoutClassify,
@@ -127,7 +128,12 @@ import { useAssetStore } from '../stores/assetStore'
 import { useAudioStore } from '../stores/audioStore'
 import { useBunnyboardStore } from '../stores/bunnyboardStore'
 import { giftGivenOf, useGameStore } from '../stores/gameStore'
-import { forwardOpenOf, replyRowOfferOf, rewindOpenOf } from '../stores/loop/playback'
+import {
+  forwardOpenOf,
+  openingLockOf,
+  replyRowOfferOf,
+  rewindOpenOf
+} from '../stores/loop/playback'
 import { firstPhotoFailure, usePhotoStore } from '../stores/photoStore'
 import {
   displayedCgOf,
@@ -246,8 +252,8 @@ type OpenPanel =
   | { kind: 'chatLog' }
   | { kind: 'shop' }
   | { kind: 'gift' }
-  | { kind: 'giftTarget'; itemId: string }
-  | { kind: 'giftMessage'; itemId: string; charId: string }
+  | { kind: 'giftTarget'; pick: ItemPick }
+  | { kind: 'giftMessage'; pick: ItemPick; charId: string }
   | { kind: 'editPrompt'; source: 'turn' | 'closing' | 'ledger' | 'textLedger' | 'intro' }
   | { kind: 'settings' }
   | { kind: 'saveGame' }
@@ -268,7 +274,7 @@ type OpenPanel =
 /** What an interjection sends: the reader's words, or a present handed over with his line. */
 type Interjection =
   | { kind: 'words'; action: string }
-  | { kind: 'gift'; charId: string; itemId: string; message: string }
+  | { kind: 'gift'; charId: string; pick: ItemPick; message: string }
 
 /** Which of the two horizontal offsets a sprite layer sits at. */
 function sideClass(side: 1 | -1): string {
@@ -406,7 +412,7 @@ function PortraitSlot({
   const light = dim ? (cut ? spriteDimCut : spriteDim) : cut ? spriteLitCut : spriteLit
 
   return (
-    /** How tall she stands, as a share of the maximum, and where she stands. */
+    /** How tall she stands, as a share of full size, and where she stands. */
     <div
       className={leaving ? 'vu-stage-slot vu-stage-slot--leaving' : 'vu-stage-slot'}
       style={{ '--stage-char-scale': scale, '--stage-slot-x': x } as CSSProperties}
@@ -1453,6 +1459,8 @@ export function GameView(): JSX.Element {
    * is the turn's own, or down.
    */
   const interjectRow = offer !== 'none' && !inputShown && !sending ? offer : null
+  /** What holds the opening reply shut, which the locked row's word names. */
+  const openingLock = useGameStore(openingLockOf)
 
   /**
    * The scene's row is up: for the turn, through the wait for its reply, and over the reply for
@@ -1589,9 +1597,9 @@ export function GameView(): JSX.Element {
    * Hands a present over, on the turn or over the lines still to come. The wait is reported as a
    * turn's is, and a gift that could not go out spends nothing and reports nothing.
    */
-  function sendGift(charId: string, itemId: string, message: string): void {
+  function sendGift(charId: string, pick: ItemPick, message: string): void {
     setSending(true)
-    if (!submitGift(charId, itemId, message)) {
+    if (!submitGift(charId, pick, message)) {
       setSending(false)
       return
     }
@@ -2029,6 +2037,7 @@ export function GameView(): JSX.Element {
           skips={arrivalSkips}
           rowShown={rowShown}
           interject={interjectRow}
+          lockedBy={openingLock ?? 'class'}
           ending={sceneEnding}
           onAdvance={boxAdvances ? onAdvanceClick : undefined}
           onRewind={rewindOpen && !covered && !blocked ? onRewind : undefined}
@@ -2240,10 +2249,10 @@ export function GameView(): JSX.Element {
             mode="gift"
             theme={half}
             onClose={closePanel}
-            onGift={(itemId) => {
+            onGift={(pick) => {
               if (giftTargets.length === 1) {
-                setPanel({ kind: 'giftMessage', itemId, charId: giftTargets[0] })
-              } else setPanel({ kind: 'giftTarget', itemId })
+                setPanel({ kind: 'giftMessage', pick, charId: giftTargets[0] })
+              } else setPanel({ kind: 'giftTarget', pick })
             }}
           />
         )}
@@ -2255,8 +2264,8 @@ export function GameView(): JSX.Element {
             charIds={giftTargets}
             onClose={closePanel}
             onPick={(charId) => {
-              const { itemId } = panel
-              setPanel({ kind: 'giftMessage', itemId, charId })
+              const { pick } = panel
+              setPanel({ kind: 'giftMessage', pick, charId })
             }}
           />
         )}
@@ -2273,18 +2282,18 @@ export function GameView(): JSX.Element {
             }
             onClose={closePanel}
             onSend={(message) => {
-              const { itemId, charId } = panel
+              const { pick, charId } = panel
               closePanel()
               // Over an ending under way, a gift asks first as words do.
               const warns = useSettingsStore.getState().settings?.warnEndingInterrupt !== false
               if (useGameStore.getState().sceneEnding && warns && !created) {
                 setPanel({
                   kind: 'interruptEnding',
-                  turn: { kind: 'gift', charId, itemId, message }
+                  turn: { kind: 'gift', charId, pick, message }
                 })
                 return
               }
-              sendGift(charId, itemId, message)
+              sendGift(charId, pick, message)
             }}
           />
         )}
@@ -2395,9 +2404,10 @@ export function GameView(): JSX.Element {
               retryMessage="You can send that again."
               cancelText={turnDismissLabel(turnError)}
               // A refused request shows why, and the reader rewords from it. A connection
-              // failure offers Settings beside Retry. Nothing else is his to reword.
+              // failure offers Settings beside Retry. The editor stands on any other failure of
+              // the scene call, which may be a refusal under a code the app does not know.
               permanentDetail
-              extraText="Manually edit prompt"
+              extraText={turnPromptEditable() ? 'Edit prompt' : undefined}
               onExtra={() => setPanel({ kind: 'editPrompt', source: 'turn' })}
               onSettings={() => {
                 abandonTurn()
@@ -2427,6 +2437,14 @@ export function GameView(): JSX.Element {
               key="edit-prompt"
               id="edit-prompt"
               theme={modalTheme}
+              // The scene has already been cut back once, so the advice starts there.
+              hint={
+                <>
+                  If the model is refusing to write due to prohibited content, try rewording "The reader's action:" first. Avoid any explicit sexual words, replacing them with vague descriptions: "make love" instead of "fuck", "use her mouth" instead of "blowjob".
+                  <br/> If rewording the action doesn't work, start rewriting or removing words from THE SCENE SO FAR or the STORY SO FAR.
+                  <br/> Replacing specific sexual details with a vague "They shared an intimate encounter" usually unblocks the scene and allows you to continue.
+                </>
+              }
               initialPrompt={
                 (panel.source === 'ledger'
                   ? lastLedgerPromptText()
@@ -2478,15 +2496,14 @@ export function GameView(): JSX.Element {
             title="Couldn't end the scene"
             retryMessage={`You can try again or exit. ${ABANDON_HINT}`}
             permanentMessage={ABANDON_HINT}
-            extraText="Manually edit prompt"
+            extraText="Edit prompt"
             onExtra={() => setPanel({ kind: 'editPrompt', source: 'closing' })}
             onRetry={retryEndingCall}
             onAbandon={onAbandonScene}
           />
         )}
 
-        {/* The bookkeeping call failed: the wrap-up modal's shape, with the editor on
-            a content block alone. */}
+        {/* The bookkeeping call failed: the wrap-up modal's shape. */}
         {ledgerError && (
           <LlmFailureModal
             key="ledger-failed"
@@ -2496,7 +2513,7 @@ export function GameView(): JSX.Element {
             title="Couldn't record what happened"
             retryMessage={`You can try again or exit. ${ABANDON_HINT}`}
             permanentMessage={ABANDON_HINT}
-            extraText="Manually edit prompt"
+            extraText="Edit prompt"
             onExtra={() => setPanel({ kind: 'editPrompt', source: 'ledger' })}
             onRetry={retryEndingCall}
             onAbandon={onAbandonScene}
@@ -2514,7 +2531,7 @@ export function GameView(): JSX.Element {
             title="Couldn't record the texting"
             retryMessage={`You can try again, or exit. ${ABANDON_HINT}`}
             permanentMessage={ABANDON_HINT}
-            extraText="Manually edit prompt"
+            extraText="Edit prompt"
             onExtra={() => setPanel({ kind: 'editPrompt', source: 'textLedger' })}
             onRetry={retryEndingCall}
             onAbandon={onAbandonScene}
@@ -2531,7 +2548,7 @@ export function GameView(): JSX.Element {
             title="Couldn't open the next part of the day"
             retryMessage={`You can try again, or exit. ${ABANDON_HINT}`}
             permanentMessage={ABANDON_HINT}
-            extraText="Manually edit prompt"
+            extraText="Edit prompt"
             onExtra={() => setPanel({ kind: 'editPrompt', source: 'intro' })}
             onRetry={retryEndingCall}
             onAbandon={onAbandonScene}
@@ -2727,7 +2744,7 @@ export function GameView(): JSX.Element {
               const { turn } = panel
               closePanel()
               if (turn.kind === 'words') sendInterjection(turn.action)
-              else sendGift(turn.charId, turn.itemId, turn.message)
+              else sendGift(turn.charId, turn.pick, turn.message)
             }}
           />
         )}

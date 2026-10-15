@@ -6,6 +6,7 @@
  */
 
 import { globalSlotOf } from '@shared/jobs'
+import { ASK_CHANCE, INVITE_CHANCE, REACH_OUT_CHANCE, SLOT_CHANCE } from '@shared/odds'
 import type { Disposition } from '@shared/relationship'
 import {
   EVERYDAY_ASKS,
@@ -23,19 +24,6 @@ import {
   type ReachOutTopic
 } from '../prompts/slotIntroPrompt'
 
-/** Her base odds of asking him out in one slot, by what she is to him. */
-const ASK_CHANCE = {
-  lover: 0.4,
-  devoted: 0.3,
-  trusted: 0.25,
-  friendly: 0.16,
-  neutral: 0.04,
-  lonelyNeutral: 0.1
-} as const
-
-/** What the slot itself does to those odds: free hours invite, exam weeks do not. */
-const SLOT_CHANCE = { weekend: 1.5, weekdayDay: 0.8, examWeek: 0.5 } as const
-
 /** However many win their roll, only this many are asked in one slot. */
 const MAX_ASKERS = 2
 
@@ -50,14 +38,6 @@ const DECLINE_COOLDOWN_BASE = 4
 
 /** The longest that doubling reaches — two weeks of slots. */
 const DECLINE_COOLDOWN_CAP = 28
-
-/** Her odds of reaching out just to talk in one slot, by what she is to him; nobody less reaches out. */
-const REACH_OUT_CHANCE = {
-  lover: 0.3,
-  devoted: 0.22,
-  trusted: 0.15,
-  friendly: 0.08
-} as const
 
 /** However many win their roll, only this many reach out in one slot. */
 const MAX_REACH_OUTS = 1
@@ -255,19 +235,6 @@ export function drawOccasionAsker(
   const index = Math.min(pool.length - 1, Math.floor(rand() * pool.length))
   return pool[index].charId
 }
-
-/** The odds of each ask an invitation out of nowhere may be rolled into, in the order tried. */
-const INVITE_CHANCE = {
-  lustfulRoom: 0.5,
-  intimateRoom: 0.25,
-  study: 0.5,
-  hisRoom: 0.25,
-  outing: 0.25,
-  help: 0.2,
-  exercise: 0.1,
-  meal: 0.1,
-  shopping: 0.1
-} as const
 
 /** How many days ahead an exam she shares with him may be for her to ask him to study for it. */
 export const STUDY_LEAD_DAYS = 3

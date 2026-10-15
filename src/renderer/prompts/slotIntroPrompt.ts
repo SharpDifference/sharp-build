@@ -26,6 +26,7 @@ import { objectSchema } from './schema'
 import {
   graduateLines,
   memoryLines,
+  secretLines,
   notesLines,
   personaFor,
   profileLines,
@@ -133,6 +134,16 @@ export interface IntroLeaver {
   texted: boolean
 }
 
+/** A graduate back in town for Homecoming, texting the reader that she is here. */
+export interface IntroVisitor {
+  character: Character
+  info: CharInfo
+  /** How the reply names her back — resolved through `charKeyToId`. */
+  charKey: string
+  /** Whether a Bunnyboard thread with her already holds anything (`hasTexted`). */
+  texted: boolean
+}
+
 /** What a girl reaching out just to talk texts the reader about, rolled by the app. */
 export const REACH_OUT_TOPICS = ['wellbeing', 'goodNews', 'badNews', 'question'] as const
 
@@ -190,6 +201,8 @@ export interface SlotIntroInput {
   time: TimeSlot
   /** The player's `lessNsfwText` setting; picks which persona heads this call's prefix. */
   lessNsfwText: boolean
+  /** How many of her told secrets each girl's entry carries; absent is the default. */
+  secretBudget?: number
   /** The app-written first line the narration continues from. */
   opening: string
   /**
@@ -206,6 +219,8 @@ export interface SlotIntroInput {
   breakups: readonly IntroBreakup[]
   /** The girls the spring break pick just sent away, each texting him she is going. */
   leavers: readonly IntroLeaver[]
+  /** The graduate Homecoming morning brings back, texting him she is in town. */
+  visitors: readonly IntroVisitor[]
   /** The one contact, if any, texting him just to talk this slot. */
   reachOuts: readonly IntroReachOut[]
   /**
@@ -239,6 +254,8 @@ export interface SlotIntroInput {
   backgroundLore?: readonly string[]
   /** Who leaves campus for spring break, or null before the pick has run. */
   springBreakAway?: readonly string[] | null
+  /** The graduate back in town for Homecoming, as a charId; absent on every other slot. */
+  homecomingVisitor?: string
   /**
    * The place `SOMEWHERE TO GO` invents a rumor about. **Drawn by the loop rather than
    * here**, which is what lets the reply's own sentence about it be banked and carried into the
@@ -308,6 +325,18 @@ const SCHEMA = objectSchema('slot_intro', ['lines'], {
     }
   },
   reachOuts: {
+    type: 'array',
+    items: {
+      type: 'object',
+      additionalProperties: false,
+      required: ['char', 'texts'],
+      properties: {
+        char: { type: 'string' },
+        texts: { type: 'array', items: { type: 'string' } }
+      }
+    }
+  },
+  homecomingTexts: {
     type: 'array',
     items: {
       type: 'object',
@@ -458,6 +487,17 @@ function leaverBlock(input: SlotIntroInput): string[] {
   ]
 }
 
+/** The graduate back in town for Homecoming, telling him so by text as the slot opens. */
+function visitorBlock(input: SlotIntroInput): string[] {
+  if (input.visitors.length === 0) return []
+
+  return [
+    'BACK FOR HOMECOMING',
+    'Each of these characters graduated and moved away from Veridan, and is texting the reader right now to let him know she is back in town for the Homecoming game today and leaves again tomorrow morning. Write one entry in "homecomingTexts" for each, and nothing for anyone else. They are described under LOREBOOK.',
+    ...input.visitors.map(({ charKey }) => `- ${charKey}`)
+  ]
+}
+
 /** The contact texting the reader just to talk this slot, beside what she is texting about. */
 function reachOutBlock(input: SlotIntroInput): string[] {
   if (input.reachOuts.length === 0) return []
@@ -469,15 +509,22 @@ function reachOutBlock(input: SlotIntroInput): string[] {
   ]
 }
 
-/** Everybody the five blocks above name, described once each. */
+/** Everybody the six blocks above name, described once each. */
 function characterBlock(input: SlotIntroInput): string[] {
   const entries: string[][] = []
   const named = new Set<string>()
 
   // A girl reaching out comes ahead of the posters, so her entry is the one carrying her thread.
   const listed: ReadonlyArray<
-    IntroAsker | IntroBreakup | IntroLeaver | IntroReachOut | IntroPoster
-  > = [...input.askers, ...input.breakups, ...input.leavers, ...input.reachOuts, ...input.posters]
+    IntroAsker | IntroBreakup | IntroLeaver | IntroVisitor | IntroReachOut | IntroPoster
+  > = [
+    ...input.askers,
+    ...input.breakups,
+    ...input.leavers,
+    ...input.visitors,
+    ...input.reachOuts,
+    ...input.posters
+  ]
   for (const entry of listed) {
     const { charKey, character, info, texted } = entry
     // A girl the slot placed somewhere; the girl ending it is texting from nowhere in particular.
@@ -487,8 +534,12 @@ function characterBlock(input: SlotIntroInput): string[] {
     entries.push([
       `${fullNameOf(character)} — "char": "${charKey}"`,
       ...profileLines(character, info.flags ?? emptyFlags()),
-      // A graduate posting or ending it from out of town.
-      ...graduateLines(character.firstName, info),
+      // A graduate posting or ending it from out of town, or back for Homecoming.
+      ...graduateLines(
+        character.firstName,
+        info,
+        input.homecomingVisitor === character.charId
+      ),
       ...(whereabouts
         ? [
             whereaboutsLine(
@@ -521,6 +572,7 @@ function characterBlock(input: SlotIntroInput): string[] {
         { date: input.date, offset: info.moodCycleOffset ?? 0 }
       ),
       ...memoryLines(character, dedupedMemoriesFor(info).slice(-2), info.textMemory, input.season),
+      ...secretLines(info.toldSecrets, input.secretBudget),
       // What she and the reader last texted about, for the girl starting a conversation.
       ...('thread' in entry ? entry.thread : []),
       ...notesLines(character.firstName, info.notes)
@@ -564,6 +616,7 @@ export function buildSlotIntroPrompt(
     ...spaced(breakupBlock(input)),
     ...spaced(posterBlock(input)),
     ...spaced(leaverBlock(input)),
+    ...spaced(visitorBlock(input)),
     ...spaced(reachOutBlock(input)),
     ...spaced(rumor),
     'YOUR TURN',
@@ -634,6 +687,17 @@ export function buildSlotIntroPrompt(
           // Refused out loud for "hangouts"'s reason.
           '',
           'Return nothing at all for "springBreakTexts".'
+        ]),
+    ...(input.visitors.length > 0
+      ? [
+          '',
+          'Then fill "homecomingTexts", one entry per character under BACK FOR HOMECOMING. "char" is her key exactly as written there. "texts" is one to three short messages she sends one after another, in her own texting voice — lowercase, slang, typos and emoji are all fine if that is how she types — letting the reader know she is back in town for the Homecoming game today and leaves again tomorrow morning: what she has been up to since she left, and whether she would like to see him while she is here, in keeping with where the two of them stand. No narration, no stage directions, no reply from the reader.',
+          'The narration in "lines" must not mention these messages or these characters at all — the reader has not opened his phone yet.'
+        ]
+      : [
+          // Refused out loud for "hangouts"'s reason.
+          '',
+          'Return nothing at all for "homecomingTexts".'
         ]),
     ...(input.reachOuts.length > 0
       ? [

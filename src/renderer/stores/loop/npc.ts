@@ -207,6 +207,8 @@ export function npcWhereaboutsFor(
   const game = useGameStore.getState()
   // Ahead of the homebound branch: a girl abroad on a stay-in day is not in her room.
   if (charUnavailableNow(charId, date, time)) return null
+  // A graduate back for the day keeps no room or haunt in Veridan.
+  if (game.alumni.includes(charId)) return null
 
   const stamped = overlay && overlay.date === date && overlay.time === time ? overlay : null
   const group = stamped

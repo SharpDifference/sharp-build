@@ -10,6 +10,7 @@ import type {
   CharInfo,
   EventCancellation,
   EverydayAsk,
+  InviteKind,
   Occasion
 } from '@shared/types'
 import { kindOf } from '@shared/academics'
@@ -31,7 +32,7 @@ import {
 } from '@shared/npcRelationships'
 import { readerBlockOf } from '../prompts/setting'
 import { classRostersOf, examDateOf } from '../prompts/classProgress'
-import { memoryBudgetsOf } from '@shared/settingsRules'
+import { memoryBudgetsOf, secretBudgetOf } from '@shared/settingsRules'
 import { useSettingsStore } from './settingsStore'
 import {
   bossChatIdOf,
@@ -97,6 +98,7 @@ import {
   charStandingHauntAt,
   charStandingHauntNow,
   charUnavailableNow,
+  homecomingVisitorNow,
   playerClassNow,
   shiftNow
 } from './timetable'
@@ -150,7 +152,8 @@ const inFlight = new Map<string, { abandoned: boolean; pacer: TypingPacer }>()
 
 /**
  * One failed reply turn per conversation, parked on the thread's Retry: the identical
- * request to re-send, the pre-send snapshot the classifier reads, and the texts landed.
+ * request to re-send, the pre-send snapshot the classifier reads, the texts landed, the error
+ * bubble the failure posted, which every resend takes back down, and the failure's code.
  */
 const failedTurns = new Map<
   string,
@@ -160,6 +163,8 @@ const failedTurns = new Map<
     conversation: Conversation | undefined
     released: number
     invited: Conversation['pendingHangout'] | null
+    bubbleId: string
+    code: string
   }
 >()
 
@@ -491,6 +496,7 @@ export async function sendMessage(charId: string, text: string): Promise<void> {
       .filter((id) => id !== charId)
       .map((id) => game.characters[id])
       .filter((other): other is Character => Boolean(other))
+    const visitor = homecomingVisitorNow()
 
     const request = buildTextingPrompt(
       character,
@@ -524,6 +530,8 @@ export async function sendMessage(charId: string, text: string): Promise<void> {
         charHaunt: charStandingHauntNow(charId),
         // The one absence a thread survives, so her block has to say it.
         springBreakAway: game.springBreakAway,
+        // The one day a graduate's thread is from somebody in town.
+        ...(visitor ? { homecomingVisitor: visitor } : {}),
         // From this slot on: texting comes before the slot's scene, so its own plan is still ahead.
         upcomingPlans: upcomingPlanLines(
           game.events,
@@ -532,6 +540,7 @@ export async function sendMessage(charId: string, text: string): Promise<void> {
           game.calendar.season
         ),
         memoryBudget: memoryBudgetsOf(useSettingsStore.getState().settings ?? {}).one,
+        secretBudget: secretBudgetOf(useSettingsStore.getState().settings ?? {}),
         history: game.history
       },
       // The same reader block a scene gets, grades and all.
@@ -601,8 +610,19 @@ async function runReply(
     console.warn('[texting] the reply failed:', result.error)
     // Whatever the stream queued is dropped; anything already released stays.
     pacer.cancel()
+    // The failure is said in the thread at once, under whatever did land.
+    const bubble = chatMessage('system', `Failed to receive ${character.firstName}'s message.`, true)
+    deliver(charId, bubble)
     // The turn parks on the thread's Retry, which re-sends this identical request.
-    failedTurns.set(charId, { request, sent, conversation, released, invited })
+    failedTurns.set(charId, {
+      request,
+      sent,
+      conversation,
+      released,
+      invited,
+      bubbleId: bubble.id,
+      code: result.error.code
+    })
     useBunnyboardStore.getState().setTextFailed(charId, true)
     return
   }
@@ -658,16 +678,19 @@ function settleAnsweredInvitation(charId: string, occasionId?: string): void {
 }
 
 /**
- * The thread's Retry on a failed turn: re-sends the identical request, skipping whatever
- * the failed attempt already released.
+ * The thread's Retry on a failed turn: re-sends the identical request — or, from the prompt
+ * editor, one with a hand-edited `user` message, kept for every later retry — skipping
+ * whatever the failed attempt already released. The failure's bubble comes down first, so a
+ * thread retried many times holds only the latest one.
  */
-export async function retryFailedMessage(charId: string): Promise<void> {
+export async function retryFailedMessage(charId: string, prompt?: string): Promise<void> {
   const failed = failedTurns.get(charId)
   if (!failed || inFlight.has(charId)) return
   const character = useGameStore.getState().characters[charId]
   if (!character) return
 
   failedTurns.delete(charId)
+  useGameStore.getState().removeChatMessage(charId, failed.bubbleId)
   useBunnyboardStore.getState().setTextFailed(charId, false)
   useBunnyboardStore.getState().setTextBusy(charId, true)
   try {
@@ -676,7 +699,7 @@ export async function retryFailedMessage(charId: string): Promise<void> {
       character,
       failed.conversation,
       failed.sent,
-      failed.request,
+      prompt === undefined ? failed.request : { ...failed.request, user: prompt },
       failed.released,
       failed.invited
     )
@@ -686,18 +709,23 @@ export async function retryFailedMessage(charId: string): Promise<void> {
   }
 }
 
+/** The `user` message of the parked failed turn — what the prompt editor opens on. */
+export function failedTextingPrompt(charId: string): string | null {
+  return failedTurns.get(charId)?.request.user ?? null
+}
+
+/** The code the parked failed turn failed with — what decides whether the editor is offered. */
+export function failedTextingCode(charId: string): string | null {
+  return failedTurns.get(charId)?.code ?? null
+}
+
 /**
- * The failure bar's way out: drops the parked turn and posts a system line in its place.
- * The sent message stays.
+ * The failure bar's way out: drops the parked turn. The sent message and the failure's
+ * bubble both stay.
  */
 export function dismissFailedMessage(charId: string): void {
-  const failed = failedTurns.get(charId)
-  if (!failed) return
-  failedTurns.delete(charId)
+  if (!failedTurns.delete(charId)) return
   useBunnyboardStore.getState().setTextFailed(charId, false)
-
-  const name = useGameStore.getState().characters[charId]?.firstName ?? 'her'
-  deliver(charId, chatMessage('system', `Failed to receive ${name}'s message.`, true))
 }
 
 /** What the hangout classifier's failure modal is waiting on, while a turn sits inside it. */
@@ -1446,12 +1474,14 @@ export function plannedWith(
 /**
  * Files the invitations the slot opening wrote. `occasionId` is the occasion its askers were
  * asking him to, stamped onto every one of them that is not a reminder about a plan;
- * `everydayAsks` the everyday ask each charKey's invitation was rolled into, stamped onto hers.
+ * `everydayAsks` the everyday ask each charKey's invitation was rolled into, stamped onto hers,
+ * and `inviteKinds` what each was rolled into asking.
  */
 export function deliverSlotHangouts(
   hangouts: SlotIntroResponse['hangouts'],
   occasionId?: string,
-  everydayAsks: Readonly<Record<string, EverydayAsk>> = {}
+  everydayAsks: Readonly<Record<string, EverydayAsk>> = {},
+  inviteKinds: Readonly<Record<string, InviteKind>> = {}
 ): void {
   for (const hangout of hangouts ?? []) {
     const game = useGameStore.getState()
@@ -1474,6 +1504,8 @@ export function deliverSlotHangouts(
     // Marked only once it is delivered: what the round of everyday asks is read back off.
     const ask = everydayAsks[hangout.char]
     if (ask) message.everydayAsk = ask
+    const kind = inviteKinds[hangout.char]
+    if (kind) message.inviteKind = kind
     deliver(charId, message)
     // A reminder about a plan already on the calendar is not an invitation and starts no cooldown.
     const reminder = plannedWith(charId, game.date, game.time) !== null
@@ -1513,6 +1545,22 @@ export function deliverSpringBreakTexts(entries: SlotIntroResponse['springBreakT
     const info = game.charInfo[charId]
     const affection = affectionFor(info, game.date, game.characters[charId])
     if (!sendsSpringBreakNotice(info, affection)) continue
+
+    deliverContactTexts(charId, entry.texts, 3)
+  }
+}
+
+/** Files the texts the slot opening wrote for the graduate back in town for Homecoming. */
+export function deliverHomecomingTexts(entries: SlotIntroResponse['homecomingTexts']): void {
+  for (const entry of entries ?? []) {
+    const game = useGameStore.getState()
+    const charId = game.charKeyToId[entry.char]
+    if (!charId) continue
+
+    // Only the girl the boundary settled is back, and she can only text a number he has.
+    if (homecomingVisitorNow() !== charId) continue
+    const flags = game.charInfo[charId]?.flags
+    if (!flags?.gaveContactInfo || flags.blocked) continue
 
     deliverContactTexts(charId, entry.texts, 3)
   }

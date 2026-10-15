@@ -8,6 +8,7 @@ import {
   type Character,
   type CharacterBehavior,
   type CharacterBrief,
+  type DefaultsStatus,
   type Emotion
 } from './types'
 import { randomId } from './uuid'
@@ -219,12 +220,22 @@ export function blankSheet(character: Character, personality: string, pose: stri
   }
 }
 
-/** Every shipped charId, and which of them the player has removed; only a shipped id counts. */
+/**
+ * Every shipped charId, which of them the player has removed and which have an edited copy; only
+ * a shipped id counts in either list.
+ */
 export function defaultsStatusOf(
   ids: readonly string[],
-  removed: readonly string[]
-): { ids: string[]; removed: string[] } {
-  return { ids: [...ids], removed: removed.filter((charId) => ids.includes(charId)) }
+  removed: readonly string[],
+  edited: readonly string[],
+  inPlace: boolean
+): DefaultsStatus {
+  return {
+    ids: [...ids],
+    removed: removed.filter((charId) => ids.includes(charId)),
+    edited: edited.filter((charId) => ids.includes(charId)),
+    inPlace
+  }
 }
 
 /** The removed-defaults list with `charId` on it, unchanged where it already is. */

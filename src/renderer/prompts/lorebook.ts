@@ -12,6 +12,7 @@ import { affectionFor } from '@shared/relationship'
 import { andList, escapeRegExp, splitSentences } from '@shared/sentences'
 import { eyeColorOf, hairColorOf, skinToneOf } from '@shared/tags'
 import { fullNameOf, type CharInfo, type Character, type ClassEntry } from '@shared/types'
+import { HOMECOMING_VISIT_SENTENCE } from './homecoming'
 import { npcStandingLine } from './npcRelationship'
 import { readerStandingLine } from './relationship'
 
@@ -263,7 +264,8 @@ export function characterLore(
   charInfo: Record<string, CharInfo>,
   date: number,
   relations?: LoreRelations,
-  plans?: LorePlans
+  plans?: LorePlans,
+  visitor?: string
 ): string[] {
   return characterParagraphs(
     roster.filter((character) =>
@@ -272,7 +274,8 @@ export function characterLore(
     charInfo,
     date,
     relations,
-    plans
+    plans,
+    visitor
   )
 }
 
@@ -282,9 +285,10 @@ export function characterLoreForIds(
   charInfo: Record<string, CharInfo>,
   date: number,
   relations?: LoreRelations,
-  plans?: LorePlans
+  plans?: LorePlans,
+  visitor?: string
 ): string[] {
-  return characterParagraphs(mentions, charInfo, date, relations, plans)
+  return characterParagraphs(mentions, charInfo, date, relations, plans, visitor)
 }
 
 /**
@@ -348,13 +352,17 @@ function appearanceSentence(character: Character): string {
   return ` She has ${list}.`
 }
 
-/** The paragraph itself, shared by both entry points so they cannot drift. */
+/**
+ * The paragraph itself, shared by both entry points so they cannot drift. `visitor` is the
+ * graduate back in town for Homecoming, if any.
+ */
 function characterParagraphs(
   characters: readonly Character[],
   charInfo: Record<string, CharInfo>,
   date: number,
   relations?: LoreRelations,
-  plans?: LorePlans
+  plans?: LorePlans,
+  visitor?: string
 ): string[] {
   const lines: string[] = []
   for (const character of characters) {
@@ -365,9 +373,10 @@ function characterParagraphs(
     const affection = affectionFor(info, date, character)
     const reader = readerStandingLine(character.firstName, info.flags, affection)
     // A graduate's life since, where anybody else's year, major and dorm would be.
+    const away = character.charId === visitor ? HOMECOMING_VISIT_SENTENCE : 'She is out of town.'
     const who =
       info.pursuing !== undefined
-        ? `${fullNameOf(character)} graduated from Venus University, where she majored in ${info.major}, moved away from Veridan, and is now ${info.pursuing}. She is out of town.`
+        ? `${fullNameOf(character)} graduated from Venus University, where she majored in ${info.major}, moved away from Veridan, and is now ${info.pursuing}. ${away}`
         : `${fullNameOf(character)} is a ${yearLabel(info.year).toLowerCase()} majoring in ${info.major}.`
     lines.push(
       who +

@@ -3,6 +3,7 @@ import {
   affectionFor,
   affectionOf,
   applyEvent,
+  breakPenaltyAt,
   crushChance,
   crushHintUpdate,
   dispositionOf,
@@ -24,6 +25,7 @@ import {
   refreshedFlags,
   rollsCrush,
   romanceScenesAfter,
+  withBreakPenaltiesStepped,
   withMemoryReplaced,
   withRomanceScenes
 } from '@shared/relationship'
@@ -890,5 +892,53 @@ describe('the crush roll', () => {
       expect(rollsCrush(ordinary, stats({ brain: GODLY }), -1, () => 0)).toBe(false)
       expect(rollsCrush(ordinary, stats({ brain: GODLY }), 0, () => 0)).toBe(true)
     })
+  })
+})
+
+describe('the break penalty', () => {
+  it('is taken off her affection whole, then by its half rounded up', () => {
+    // Twenty old loves, each worth 2 at a weight of 1: an affection of 40.
+    const memories = Array.from({ length: 20 }, () => mem(0, 'loved'))
+    expect(affectionFor({ memories, breakPenalty: { points: 9 } }, 100, undefined)).toBe(31)
+    expect(
+      affectionFor({ memories, breakPenalty: { points: 9, halved: true } }, 100, undefined)
+    ).toBe(35)
+  })
+
+  it('lands devoted on the bottom of trusted, trusted on friendly’s and friendly on zero', () => {
+    for (const [affection, landing] of [
+      [80, 31],
+      [51, 31],
+      [40, 16],
+      [31, 16],
+      [22, 0],
+      [16, 0]
+    ]) {
+      const penalty = breakPenaltyAt(affection, undefined)
+      expect(penalty).toEqual({ points: affection - landing })
+    }
+    expect(breakPenaltyAt(15, undefined)).toBeNull()
+    expect(breakPenaltyAt(-20, { points: 5, halved: true })).toBeNull()
+  })
+
+  it('replaces a penalty she still holds, counted off her affection without it', () => {
+    // Raw 40, a halved 10 still held: she opens on 35, trusted, and lands on 16.
+    expect(breakPenaltyAt(35, { points: 10, halved: true })).toEqual({ points: 24 })
+  })
+
+  it('halves at her first cast scene, goes at her second, and waits out scenes she is not in', () => {
+    const whole = charInfo({ breakPenalty: { points: 30 } })
+    const before = { a: whole, b: charInfo({ breakPenalty: { points: 8 } }) }
+    const once = withBreakPenaltiesStepped(before, ['a'])
+    expect(once.a.breakPenalty).toEqual({ points: 30, halved: true })
+    expect(once.b).toBe(before.b)
+    const twice = withBreakPenaltiesStepped(once, ['a'])
+    expect(twice.a).not.toHaveProperty('breakPenalty')
+    expect(withBreakPenaltiesStepped(twice, ['a', 'c'])).toBe(twice)
+  })
+
+  it('leaves a graduate’s entry alone', () => {
+    const before = { g: charInfo({ breakPenalty: { points: 30 }, pursuing: 'law school' }) }
+    expect(withBreakPenaltiesStepped(before, ['g'])).toBe(before)
   })
 })

@@ -29,6 +29,7 @@ import { PROFILE_PICTURE_TYPES } from '@shared/profilePicture'
 import { formatTokens } from '@shared/tallies'
 import { affectionFor, emptyFlags, relationshipTagOf } from '@shared/relationship'
 import { ConfirmModal } from '../components/ConfirmModal'
+import { promptEditable } from '../components/LlmFailureModal'
 import { TextField } from '../components/TextField'
 import { useModalShell } from '../components/useModalShell'
 import { yearLabel } from '@shared/classes'
@@ -40,6 +41,7 @@ import {
   slotHalf
 } from '../prompts/gameDate'
 import { handedBackAcedCount } from '../prompts/classProgress'
+import { isHomecomingVisit } from '../prompts/homecoming'
 import { ADD_DROP_DATE } from '../prompts/occasions'
 import { profileDescriptionOf, readerYearLine } from '../prompts/setting'
 import { isVenusChat, VENUS_EMOJI, VENUS_NAME, VENUS_TITLE } from '../prompts/venus'
@@ -59,6 +61,8 @@ import {
   blockedThreadHidden,
   dismissFailedMessage,
   epilogueOf,
+  failedTextingCode,
+  failedTextingPrompt,
   plannedWith,
   replyFromBoss,
   retryFailedMessage,
@@ -76,6 +80,7 @@ import {
 } from '../stores/timetable'
 import { ContactPage } from './ContactPage'
 import { PhotosPage } from './PhotosPage'
+import { EditPromptModal } from './EditPromptModal'
 import { RescheduleModal } from './RescheduleModal'
 import {
   cancelLift,
@@ -888,6 +893,9 @@ function ConversationView({
   const character = useGameStore((s) => s.characters[charId])
   const info = useGameStore((s) => s.charInfo[charId])
   const date = useGameStore((s) => s.date)
+  const visiting = useGameStore(
+    (s) => isHomecomingVisit(s.calendar.season, s.date) && s.homecomingVisitor === charId
+  )
   const time = useGameStore((s) => s.time)
   const season = useGameStore((s) => s.calendar.season)
   // A subscribed read, so the footer redraws the moment a rescheduled plan leaves this slot.
@@ -913,6 +921,10 @@ function ConversationView({
   const typing = useBunnyboardStore((s) => s.typingCharIds.includes(charId))
   // Her last turn failed and is parked on Retry.
   const failed = useBunnyboardStore((s) => s.failedCharIds.includes(charId))
+  // Edit prompt stands beside Retry unless the failure is one the prompt cannot answer.
+  const editable = failed && promptEditable(failedTextingCode(charId) ?? '')
+  // The prompt editor over that failed turn.
+  const [editing, setEditing] = useState(false)
   // Her ask-out, only while it is still asking: a No dismisses it, invitation still standing.
   const pendingHangout = conversation?.pendingHangout
   const askingOut = Boolean(pendingHangout && !pendingHangout.dismissed)
@@ -924,6 +936,8 @@ function ConversationView({
   const [rescheduling, setRescheduling] = useState(false)
   // She has him blocked: readable to the end of the slot, nothing sendable.
   const blocked = useGameStore((s) => s.charInfo[charId]?.flags?.blocked === true)
+  // Retrying is sending; the composer's own reasons to be shut apply, the editor's included.
+  const retryDead = sceneActive || unavailable || blocked
 
   // Opening the thread, and any message landing while it is open, is reading it.
   useEffect(() => {
@@ -963,10 +977,10 @@ function ConversationView({
   // willing to say about her hour — never a relationship tag, which belongs on the page
   // that is about her.
   const handle = bot ? null : info?.handle
-  // A graduate is on no map: she is out of town.
+  // A graduate is on no map: she is out of town, but for the Homecoming she is back for.
   const placed = bot
     ? undefined
-    : info?.pursuing !== undefined
+    : info?.pursuing !== undefined && !visiting
       ? awayWhereabouts(charId)
       : knownWhereabouts(date, time).find((row) => row.charId === charId)
   // A blocked thread says nothing about where she is: the map has dropped her to what he
@@ -1074,10 +1088,21 @@ function ConversationView({
               <CancelButton id="bb-retry-dismiss" onClick={() => dismissFailedMessage(charId)}>
                 Dismiss
               </CancelButton>
+              {editable && (
+                <motion.button
+                  id="bb-retry-edit"
+                  className="vu-btn vu-btn--outline vu-btn--panel vu-paper"
+                  type="button"
+                  disabled={retryDead}
+                  {...gestures(retryDead, lift, press)}
+                  onClick={() => setEditing(true)}
+                >
+                  Edit prompt
+                </motion.button>
+              )}
               <PrimaryButton
                 id="bb-retry"
-                // Retrying is sending; the composer's own reasons to be shut apply.
-                dead={sceneActive || unavailable || blocked}
+                dead={retryDead}
                 onClick={() => void retryFailedMessage(charId)}
               >
                 Retry
@@ -1151,6 +1176,31 @@ function ConversationView({
             charId={charId}
             theme={theme}
             onClose={() => setRescheduling(false)}
+          />
+        )}
+        {/* Held to the failure still being parked and still retryable: a scene starting or a
+            leave clears the turn, and the editor goes with it. */}
+        {editing && editable && !epilogue && !retryDead && (
+          <EditPromptModal
+            key="edit-prompt"
+            id="bb-edit-prompt"
+            theme={theme}
+            hint={
+              <>
+                If the model is refusing to reply due to prohibited content, try rewording the
+                reader&apos;s newest text, the last line of RECENT MESSAGES, first. Avoid any
+                explicit sexual words, replacing them with vague descriptions.
+                <br /> If that doesn&apos;t work, start rewriting or removing words from TEXTING
+                SO FAR or the earlier RECENT MESSAGES.
+                <br /> Only what is sent changes: the thread keeps your text as you typed it.
+              </>
+            }
+            initialPrompt={failedTextingPrompt(charId) ?? ''}
+            onSubmit={(prompt) => {
+              setEditing(false)
+              void retryFailedMessage(charId, prompt)
+            }}
+            onCancel={() => setEditing(false)}
           />
         )}
       </AnimatePresence>
@@ -1252,17 +1302,20 @@ function FriendsList(): JSX.Element {
   const alumni = useGameStore((s) => s.alumni)
   const date = useGameStore((s) => s.date)
   const time = useGameStore((s) => s.time)
+  const visitor = useGameStore((s) =>
+    isHomecomingVisit(s.calendar.season, s.date) ? s.homecomingVisitor : null
+  )
   const epilogue = useGameStore(epilogueOf)
   const openPage = useBunnyboardStore((s) => s.openPage)
 
   // Every card's status off one reading of the map, rather than one walk of the roster apiece,
-  // and every graduate out of town. None on the goodbye menu, which pins nobody to an hour.
+  // and every graduate out of town but the one back for Homecoming, whom the map carries. None
+  // on the goodbye menu, which pins nobody to an hour.
+  const away = alumni.filter((charId) => charId !== visitor).map(awayWhereabouts)
   const placed = new Map(
     epilogue
       ? []
-      : [...knownWhereabouts(date, time), ...alumni.map(awayWhereabouts)].map(
-          (row) => [row.charId, row] as const
-        )
+      : [...knownWhereabouts(date, time), ...away].map((row) => [row.charId, row] as const)
   )
 
   // A blocked contact is off the list while the block stands, a graduate kept on it. Closest
@@ -1556,7 +1609,7 @@ function ProfilePage(): JSX.Element {
             multiline
             rows={3}
             placeholder="Optional. Can be left blank."
-            hint={`This is put in every prompt so try to keep it short and sweet. Use third-person past tense and continue this paragraph: ${readerYearLine('<Name>', semesterIndex)} The reader is <description based on current stats>. The reader is...`}
+            hint={`This is put in every prompt so try to keep it short and sweet. Use third-person past tense and continue this paragraph: ${readerYearLine(firstName + ' ' + lastName, semesterIndex)} The reader is <description based on current stats>. The reader is...`}
           />
         </div>
 

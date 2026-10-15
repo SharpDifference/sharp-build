@@ -1,9 +1,11 @@
 import { likedPostBonus, likedPostWindowOf } from './feed'
+import { RELATIONSHIP_SHARE, STAT_SHARE } from './odds'
 import {
   MAX_TIER,
   pointsForTier,
   STAT_KEYS,
   STAT_LABELS,
+  tierName,
   tierNameOf,
   tierOf,
   type PlayerStats,
@@ -11,6 +13,7 @@ import {
   type StatTier
 } from './playerStats'
 import { secondPerson } from './readerVoice'
+import { andList } from './sentences'
 import { markedLine } from './statusMark'
 import { hasTrait } from './traits'
 import type {
@@ -174,11 +177,15 @@ const AFFECTION_WINDOW = 20
 
 /**
  * A character's affection off her `CharInfo`, texting memory and the likes he left on her
- * recent posts included, off only the newest {@link AFFECTION_WINDOW} of her stored memories.
+ * recent posts included, off only the newest {@link AFFECTION_WINDOW} of her stored memories,
+ * less whatever break penalty she still holds.
  */
 export function affectionFor(
   info:
-    | Pick<CharInfo, 'memories' | 'textMemory' | 'feed' | 'jealousyMemories' | 'giftMemories'>
+    | Pick<
+        CharInfo,
+        'memories' | 'textMemory' | 'feed' | 'jealousyMemories' | 'giftMemories' | 'breakPenalty'
+      >
     | undefined,
   today: number,
   character: Pick<Character, 'traits'> | undefined
@@ -189,7 +196,11 @@ export function affectionFor(
     info?.jealousyMemories,
     info?.giftMemories
   )
-  return affectionOf(windowed, today) + likedPostBonus(info?.feed, likedPostWindowOf(character))
+  return (
+    affectionOf(windowed, today) +
+    likedPostBonus(info?.feed, likedPostWindowOf(character)) -
+    breakPenaltyNow(info?.breakPenalty)
+  )
 }
 
 /**
@@ -702,13 +713,6 @@ export function milestoneEmotionOf(before: CharFlags, after: CharFlags): Emotion
 /** The character half of the roll — what she is drawn to, and how hard she is to reach. */
 type CrushCharacter = Pick<Character, 'traits' | 'preferredStat'> | undefined
 
-/**
- * How the crush roll splits its two questions: most of it is how she already feels about
- * him, the rest is whether he is her type at all.
- */
-const RELATIONSHIP_SHARE = 0.6
-const STAT_SHARE = 0.4
-
 /** The tier what she goes for has to reach, and the tier `High Standards` asks of the other two. */
 const PREFERRED_TIER: StatTier = 3
 const OTHER_TIER: StatTier = 2
@@ -903,4 +907,81 @@ export function withRomanceScenes(
     next[charId] = stepped
   }
   return next ?? after
+}
+
+/** The break penalty she holds, as points off her affection: whole, then half rounded up. */
+export function breakPenaltyNow(penalty: CharInfo['breakPenalty']): number {
+  if (!penalty) return 0
+  return penalty.halved ? Math.ceil(penalty.points / 2) : penalty.points
+}
+
+/** Where the break leaves each tier it lowers: the bottom of the tier below, friendly at zero. */
+const BREAK_TARGETS: Partial<Record<Disposition, number>> = {
+  devoted: TRUSTED_FLOOR + 1,
+  trusted: FRIENDLY_FLOOR + 1,
+  friendly: 0
+}
+
+/**
+ * The penalty a later semester's start hands her off the affection she would open it on: a whole
+ * one taking her to the tier below, counted off her affection without what she already holds, or
+ * null below friendly, where she keeps that.
+ */
+export function breakPenaltyAt(
+  affection: number,
+  held: CharInfo['breakPenalty']
+): NonNullable<CharInfo['breakPenalty']> | null {
+  const target = BREAK_TARGETS[dispositionOf(affection)]
+  if (target === undefined) return null
+  return { points: affection + breakPenaltyNow(held) - target }
+}
+
+/**
+ * Every cast girl's break penalty stepped over one boundary: halved by her first scene, gone after
+ * her second. An entry it leaves alone keeps its identity, and so does the map when none moved.
+ */
+export function withBreakPenaltiesStepped(
+  after: Readonly<Record<string, CharInfo>>,
+  cast: readonly string[]
+): Readonly<Record<string, CharInfo>> {
+  let next: Record<string, CharInfo> | null = null
+  for (const charId of cast) {
+    const info = after[charId]
+    // A graduate is never cast again, and so never holds one.
+    if (!info?.breakPenalty || info.pursuing !== undefined) continue
+    const stepped = { ...info }
+    if (info.breakPenalty.halved) delete stepped.breakPenalty
+    else stepped.breakPenalty = { ...info.breakPenalty, halved: true }
+    next ??= { ...after }
+    next[charId] = stepped
+  }
+  return next ?? after
+}
+
+/**
+ * The first morning's word on what the break cost: each stat that fell a tier with the tier it
+ * fell to, and the girls it cooled by first name; null when it cost nothing.
+ */
+export function breakDecayLine(
+  decayed: readonly StatKey[],
+  stats: PlayerStats,
+  names: readonly string[]
+): string | null {
+  const parts: string[] = []
+  if (decayed.length > 0) {
+    parts.push(
+      andList(
+        decayed.map((key, i) =>
+          i === 0
+            ? `your ${STAT_LABELS[key]} slipped to ${tierName(stats[key])}`
+            : `your ${STAT_LABELS[key]} to ${tierName(stats[key])}`
+        )
+      )
+    )
+  }
+  if (names.length > 0) {
+    parts.push(`${andList(names)} ${names.length === 1 ? 'feels' : 'feel'} a little more distant`)
+  }
+  if (parts.length === 0) return null
+  return `Over the break, ${parts.join(', and ')}.`
 }

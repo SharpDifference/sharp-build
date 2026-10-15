@@ -143,13 +143,12 @@
     }
   },
   "9": {
-    "class_type": "SaveImage",
+    "class_type": "PreviewImage",
     "_meta": {
-      "title": "SaveImage"
+      "title": "PreviewImage"
     },
     "inputs": {
-      "images": ["31", 0],
-      "filename_prefix": "venus-university/cg"
+      "images": ["31", 0]
     }
   },
   "50": {

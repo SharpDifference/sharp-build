@@ -1,5 +1,12 @@
 import type { GameOverReason } from '@shared/gameOver'
-import { READER_SPEAKER, type QuizState, type SceneLine, type TimeSlot } from '@shared/types'
+import {
+  READER_SPEAKER,
+  type QuizState,
+  type ReceivedGift,
+  type SceneEvent,
+  type SceneLine,
+  type TimeSlot
+} from '@shared/types'
 import { isOrientationSlot } from '../../prompts/introScript'
 import { lastReaderIndexOf, rewindTargetOf } from '../stageStep'
 import { sceneOnScreenOf } from '../textingLoop'
@@ -18,6 +25,8 @@ export interface PlaybackSlice {
   sceneLog: readonly SceneLine[]
   cast: readonly string[]
   sceneClass: string | null
+  sceneEvent: SceneEvent | null
+  sceneReceivedGift: ReceivedGift | null
   sceneQuiz: QuizState | null
   sceneEnding: boolean
   statusShown: boolean
@@ -97,12 +106,23 @@ export function forwardOpenOf(s: PlaybackSlice): boolean {
 export type InterjectOffer = 'none' | 'open' | 'locked'
 
 /**
- * Whether the scene lets the reader through: locked in a class scene while the line on screen
- * is no later than the reply to the action that opened it.
+ * What holds the scene's opening reply shut, or null: a class in session, one the professor has
+ * not called off, or a girl with a present still to hand him.
+ */
+export function openingLockOf(
+  s: Pick<PlaybackSlice, 'sceneClass' | 'sceneEvent' | 'sceneReceivedGift'>
+): 'class' | 'gift' | null {
+  if (s.sceneClass !== null && s.sceneEvent?.id !== 'classCancelled') return 'class'
+  return s.sceneReceivedGift !== null ? 'gift' : null
+}
+
+/**
+ * Whether the scene lets the reader through: locked by {@link openingLockOf} while the line on
+ * screen is no later than the reply to the action that opened it.
  */
 function lockOf(s: PlaybackSlice): 'locked' | 'open' {
   const acted = readPrefixOf(s).filter(isReaderLine).length
-  return s.sceneClass !== null && acted <= 1 ? 'locked' : 'open'
+  return openingLockOf(s) !== null && acted <= 1 ? 'locked' : 'open'
 }
 
 /**

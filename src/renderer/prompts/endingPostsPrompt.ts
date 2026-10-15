@@ -12,7 +12,14 @@ import { formatGameDate } from './gameDate'
 import { GRADUATION_DATE } from './occasions'
 import { relationshipLines } from './relationship'
 import { objectSchema } from './schema'
-import { memoryLines, notesLines, personaFor, profileLines, spaced } from './scenePrompt'
+import {
+  memoryLines,
+  notesLines,
+  personaFor,
+  profileLines,
+  secretLines,
+  spaced
+} from './scenePrompt'
 
 /** The epilogue's status updates: the one call the days after graduation are written by. */
 
@@ -40,6 +47,8 @@ export interface EndingPostsInput {
   stats?: PlayerStats
   /** The player's `lessNsfwText` setting; picks which persona heads this call's prefix. */
   lessNsfwText: boolean
+  /** How many of her told secrets each poster's entry carries; absent is the default. */
+  secretBudget?: number
   /** The semester's season, which names the month of every date and the break that follows it. */
   season: Season
   /** The reader graduated at the ceremony too, which is the end of his time at Venus. */
@@ -110,6 +119,7 @@ function characterBlock(input: EndingPostsInput): string[] {
         { date, offset: info.moodCycleOffset ?? 0 }
       ),
       ...memoryLines(character, dedupedMemoriesFor(info).slice(-3), info.textMemory, input.season),
+      ...secretLines(info.toldSecrets, input.secretBudget),
       postingLine(poster, input.season),
       ...notesLines(character.firstName, info.notes)
     ]

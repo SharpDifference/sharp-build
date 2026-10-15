@@ -144,8 +144,12 @@ function carriedState(
   delete state.metSlots
   delete state.ignoredInvitation
   delete state.suspicions
-  // A graduate is never cast again, so her romance count has nothing left to settle.
-  if (graduate) delete state.romanceScenes
+  // A graduate is never cast again, so her romance count and break penalty have nothing left to
+  // settle.
+  if (graduate) {
+    delete state.romanceScenes
+    delete state.breakPenalty
+  }
   return state
 }
 
@@ -294,7 +298,10 @@ export function carryOf(input: CarryInput, view: SemesterView): SemesterHandoff 
     money: input.money,
     ...(input.bio ? { bio: input.bio } : {}),
     tallies: input.tallies,
-    inventory: [...input.inventory],
+    // A present keeps the day she gave it, moved onto the next semester's clock.
+    inventory: input.inventory.map((entry) =>
+      entry.from ? { ...entry, from: { ...entry.from, date: entry.from.date - shift } } : entry
+    ),
     jobsClosed: jobs.jobsClosed,
     formerJobs: jobs.formerJobs,
     transcript: carriedTranscript(input),

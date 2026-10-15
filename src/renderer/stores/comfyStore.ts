@@ -1,6 +1,8 @@
 import { create } from 'zustand'
-import type { AppError, ComfyRuntimeState } from '@shared/types'
-import { isWebBuild } from '../platform'
+import type { ComfyModelLists, ComfyModelRole, ComfyProbe } from '@shared/comfyModels'
+import type { AppError, ComfyRuntimeState, Result } from '@shared/types'
+import { isWebBuild, DESKTOP_ONLY_NOTE } from '../platform'
+import { useUiStore } from './uiStore'
 
 interface ComfyStoreState {
   state: ComfyRuntimeState
@@ -9,6 +11,17 @@ interface ComfyStoreState {
   ensureStarted: () => Promise<void>
   /** Kills the server; it stays down until someone starts it again or a render job needs it. */
   stop: () => Promise<void>
+  /** Each model slot's files in the app's own install; a failure is the form's to read. */
+  listLocalModels: () => Promise<Result<ComfyModelLists>>
+  /** What the player's own ComfyUI at `url` has; a failure is the form's to read. */
+  probe: (url: string) => Promise<Result<ComfyProbe>>
+  /** Opens one slot's model folder, the app's own install's where `url` is null. */
+  openModelFolder: (role: ComfyModelRole, url: string | null) => Promise<void>
+}
+
+/** What the browser answers a ComfyUI question with: there is no ComfyUI there to ask. */
+function desktopOnly<T>(): Result<T> {
+  return { ok: false, error: { code: 'DESKTOP_ONLY', message: DESKTOP_ONLY_NOTE } }
 }
 
 /**
@@ -27,6 +40,17 @@ export const useComfyStore = create<ComfyStoreState>(() => ({
 
   stop: async () => {
     await window.api.comfy.stop()
+  },
+
+  listLocalModels: async () =>
+    isWebBuild() ? desktopOnly() : window.api.comfy.listLocalModels(),
+
+  probe: async (url) => (isWebBuild() ? desktopOnly() : window.api.comfy.probe(url)),
+
+  openModelFolder: async (role, url) => {
+    if (isWebBuild()) return
+    const result = await window.api.comfy.openModelFolder(role, url)
+    if (!result.ok) useUiStore.getState().showError(result.error)
   }
 }))
 

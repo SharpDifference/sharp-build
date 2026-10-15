@@ -54,7 +54,7 @@
     }
   },
   "9": {
-    "class_type": "SaveImage",
+    "class_type": "PreviewImage",
     "_meta": {
       "title": "SaveImage"
     },
@@ -62,8 +62,7 @@
       "images": [
         "63",
         0
-      ],
-      "filename_prefix": "venus-university/expression"
+      ]
     }
   },
   "10": {
@@ -295,7 +294,7 @@
     }
   },
   "79": {
-    "class_type": "SaveImage",
+    "class_type": "PreviewImage",
     "_meta": {
       "title": "SaveFaceMask"
     },
@@ -303,8 +302,7 @@
       "images": [
         "70",
         0
-      ],
-      "filename_prefix": "venus-university/face"
+      ]
     }
   }
 }

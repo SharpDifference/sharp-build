@@ -1,8 +1,16 @@
 import { rollPostLikes } from '@shared/feed'
 import { placeNpcShifts, rollFreshmanJobStart, rollJobClosures } from '@shared/jobs'
 import { npcFriendsOf } from '@shared/npcRelationships'
-import { initialFlags } from '@shared/relationship'
+import { breakDecayedStats, STAT_KEYS, tierOf, type PlayerStats } from '@shared/playerStats'
+import {
+  affectionFor,
+  breakPenaltyAt,
+  initialFlags,
+  meetsCrushStandards,
+  observedUpperHalves
+} from '@shared/relationship'
 import { SAVE_SCHEMA_VERSION } from '@shared/saveRules'
+import { observedSecretTiers } from '@shared/secrets'
 import { seasonOf } from '@shared/semesters'
 import { shuffle } from '@shared/shuffle'
 import {
@@ -84,9 +92,32 @@ function byPostingOrder(feed: readonly SocialPost[]): SocialPost[] {
 }
 
 /**
+ * A returning girl as the break leaves her: a penalty taking her a tier down where she would open
+ * friendly or warmer, the half it pushed her out of read as left, every secret whose tier she
+ * still stands in reached, and a standard she was told he met forgotten where the decayed stats
+ * no longer meet it.
+ */
+function cooledByBreak(entry: CharState, character: Character, stats: PlayerStats): CharState {
+  const cooled: CharState = { ...entry }
+  const penalty = breakPenaltyAt(affectionFor(entry, 0, character), entry.breakPenalty)
+  if (penalty) {
+    cooled.breakPenalty = penalty
+    const upperHalves = observedUpperHalves(entry.upperHalves, affectionFor(cooled, 0, character))
+    if (upperHalves) cooled.upperHalves = upperHalves
+  }
+  const secrets = observedSecretTiers(cooled.secrets, affectionFor(cooled, 0, character))
+  if (secrets) cooled.secrets = secrets
+  if (cooled.crushHint && 'met' in cooled.crushHint && !meetsCrushStandards(character, stats)) {
+    delete cooled.crushHint
+  }
+  return cooled
+}
+
+/**
  * A next semester as Finalize writes it, off its registration and the reader's timetable: the
  * roster's shifts and weeks dealt around the new catalog, the break's posts dated, the profiles
- * of the roster and the graduates, and the save it opens on, carrying what the last ending left.
+ * of the roster and the graduates, and the save it opens on, carrying what the last ending left
+ * less what the break cost.
  */
 export function continuedStartOf(
   enrollment: EnrollmentDraft,
@@ -165,6 +196,11 @@ export function continuedStartOf(
       window
     )
 
+  // The break's cost: every stat a tier down, and the girls it cooled, kept for the first morning.
+  const stats = breakDecayedStats(carry.stats)
+  const decayed = STAT_KEYS.filter((key) => tierOf(stats[key]) < tierOf(carry.stats[key]))
+  const penalized: string[] = []
+
   const profiles: Record<string, CharProfile> = {}
   const charInfo: Record<string, CharState> = {}
   for (const character of roster) {
@@ -184,20 +220,32 @@ export function continuedStartOf(
 
     const job = charJobs[charId]
     const carried = carry.charInfo[charId]
+    // This semester's secrets, after whatever she still has untold.
+    const written = enrollment.secrets?.[charId] ?? []
     if (carried) {
       const posted = breakPostsOf(charId)
-      charInfo[charId] = {
-        ...carried,
-        ...(job ? { job } : {}),
-        ...(posted.length > 0 ? { feed: byPostingOrder([...(carried.feed ?? []), ...posted]) } : {})
-      }
+      const entry = cooledByBreak(
+        {
+          ...carried,
+          ...(job ? { job } : {}),
+          ...(posted.length > 0
+            ? { feed: byPostingOrder([...(carried.feed ?? []), ...posted]) }
+            : {}),
+          ...(written.length > 0 ? { secrets: [...(carried.secrets ?? []), ...written] } : {})
+        },
+        character,
+        stats
+      )
+      if (entry.breakPenalty && entry.breakPenalty !== carried.breakPenalty) penalized.push(charId)
+      charInfo[charId] = entry
     } else {
       // A first-year: a stranger to everybody, posting nothing from before she arrived.
       charInfo[charId] = {
         memories: [],
         flags: initialFlags(character),
         nameKnown: false,
-        ...(job ? { job } : {})
+        ...(job ? { job } : {}),
+        ...(written.length > 0 ? { secrets: written } : {})
       }
     }
   }
@@ -235,13 +283,16 @@ export function continuedStartOf(
     weather,
     profiles,
     ...(continued.fallGraduate !== undefined ? { fallGraduate: continued.fallGraduate } : {}),
+    ...(decayed.length > 0 || penalized.length > 0
+      ? { breakDecay: { stats: decayed, girls: penalized } }
+      : {}),
     before: carry.before
   }
 
   const save: SaveDraft = {
     schemaVersion: SAVE_SCHEMA_VERSION,
     semester: continued.id,
-    stats: carry.stats,
+    stats,
     money: carry.money,
     ...(carry.bio ? { bio: carry.bio } : {}),
     tallies: {

@@ -9,7 +9,13 @@ import type { DormId } from '@shared/dorms'
 import { locationDefOf, LOWRISE_LOCATION, ROOM_LOCATION } from '@shared/locations'
 import { useGameStore } from '../gameStore'
 import { createRetryGate } from '../retryGate'
-import { charHiddenLocationNow, charJobNow, charRoomDormNow, playerClassNow } from '../timetable'
+import {
+  castableIds,
+  charHiddenLocationNow,
+  charJobNow,
+  charRoomDormNow,
+  playerClassNow
+} from '../timetable'
 import { classesNow, studentsHere } from './cast'
 import { playerProjectClasses } from './jobs'
 import { currentRun, runStale, LOOP_LLM_GROUP } from './state'
@@ -102,8 +108,9 @@ export interface ClassifyAttempt {
 /** Prepares a turn's classifier call without sending it. */
 export function buildClassifyAttempt(action: string): ClassifyAttempt {
   const game = useGameStore.getState()
-  // The on-campus roster alone: a graduate is gone from Veridan and can be named by nobody.
-  const onCampus = game.chars.flatMap((charId) =>
+  // The on-campus roster alone: a graduate is gone from Veridan and can be named by nobody,
+  // but for the one back for Homecoming.
+  const onCampus = castableIds().flatMap((charId) =>
     game.characters[charId] ? [game.characters[charId]] : []
   )
   const charKeys = onCampus.map((character) => charKeyOf(character.firstName, character.lastName))

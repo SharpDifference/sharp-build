@@ -1,4 +1,10 @@
 import { dormBuildingOf } from '@shared/dorms'
+import {
+  EXTRA_CHARACTER_CHANCE,
+  LOCAL_INJECT_CHANCE,
+  MEET_SOMEBODY_CHANCE,
+  PUBLIC_INJECT_CHANCE
+} from '@shared/odds'
 import { affectionFor } from '@shared/relationship'
 import { shuffle } from '@shared/shuffle'
 import { PORTRAIT_SLOTS, useGameStore } from '../gameStore'
@@ -10,6 +16,7 @@ import {
   charJobNow,
   charOverlayGroupNow,
   charRoomDormNow,
+  castableIds,
   charStandingHauntAt,
   charUnavailableNow
 } from '../timetable'
@@ -49,13 +56,6 @@ function atRoomBuilding(charId: string, location: string | null | undefined): bo
   if (building === null) return false
   return location === (building === 'elysium' ? ELYSIUM_LOCATION : LOWRISE_LOCATION)
 }
-
-/** The odds of running into somebody while anyone on the roster is still unmet. */
-const MEET_SOMEBODY_CHANCE = 0.75
-/** The odds of any other body joining a nobody-named action. */
-const EXTRA_CHARACTER_CHANCE = 0.25
-/** The odds a public scene the reader cast by name is walked in on. */
-const PUBLIC_INJECT_CHANCE = 0.1
 
 /** One uniform draw off a non-empty pool. */
 export function anyOf(pool: readonly string[]): string {
@@ -145,7 +145,8 @@ export function resolveAttendance(
   required?: string,
   exempt: readonly string[] = []
 ): { cast: string[]; notes: string[] } {
-  const roster = useGameStore.getState().chars
+  // A graduate back for Homecoming can be named in too.
+  const roster = castableIds()
   const ordered: string[] = []
   for (const charId of [...(required ? [required] : []), ...mentionedIds]) {
     if (roster.includes(charId) && !ordered.includes(charId)) ordered.push(charId)
@@ -346,12 +347,6 @@ export function admitWorkers(
   }
   return { cast: next, notes, jobId: workers[0].jobId }
 }
-
-/**
- * The odds a girl at her own haunt joins a scene the reader cast by name
- * holding nobody she is spending the slot with — the crash-the-party roll.
- */
-const LOCAL_INJECT_CHANCE = 0.25
 
 /**
  * Puts whoever the scene's location holds into it — the last casting step, where both

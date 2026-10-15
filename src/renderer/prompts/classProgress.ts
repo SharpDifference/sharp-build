@@ -284,7 +284,8 @@ export function recapOf(
     week: classMeetingIndexOf(entry.slot, meeting.date, calendar) ?? 0,
     attended: meeting.attended,
     summary: meeting.summary,
-    factoid: meeting.factoid
+    factoid: meeting.factoid,
+    ...(meeting.cancelled ? { cancelled: true } : {})
   })
 
   const kind = kindOf(entry)

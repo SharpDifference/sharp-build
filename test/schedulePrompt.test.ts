@@ -89,7 +89,6 @@ describe('the PLANS half of the ledger request', () => {
       playthroughId: 'p1',
       date: 0,
       time: 0 as TimeSlot,
-      seedWord: 'aspen',
       backgrounds: { interior: ['library'], exterior: ['quad'] },
       charInfo: {},
       npcRelationships: {},

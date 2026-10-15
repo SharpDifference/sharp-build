@@ -323,6 +323,18 @@ export function tierUps(before: PlayerStats, deltas: PlayerStats): StatKey[] {
   return STAT_KEYS.filter((key) => tierOf(after[key]) > tierOf(before[key]))
 }
 
+/**
+ * The stats a later semester's start leaves: each above the floor tier dropped to the bottom of
+ * the tier below.
+ */
+export function breakDecayedStats(stats: PlayerStats): PlayerStats {
+  const decayed = (points: number): number => {
+    const tier = tierOf(points)
+    return tier === MIN_TIER ? points : pointsForTier((tier - 1) as StatTier)
+  }
+  return { brain: decayed(stats.brain), body: decayed(stats.body), heart: decayed(stats.heart) }
+}
+
 /** Adds `deltas` to `stats`, flooring each at the scale's floor. Never mutates its input. */
 export function applyStatDeltas(stats: PlayerStats, deltas: PlayerStats): PlayerStats {
   const floor = pointsForTier(MIN_TIER)

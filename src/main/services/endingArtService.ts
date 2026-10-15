@@ -1,4 +1,4 @@
-import { copyFile, mkdir, readdir, readFile, rename, unlink, writeFile } from 'fs/promises'
+import { copyFile, mkdir, readdir, readFile } from 'fs/promises'
 import { dirname } from 'path'
 import { appError, messageOf } from '@shared/errors'
 import { assertEndingRequest, ENDING_PICTURE_SIZE, endingPicturePrompt } from '@shared/endingPicture'
@@ -7,6 +7,7 @@ import { LINEUP_MIME_TYPE } from '@shared/lineup'
 import { ENDING_IMAGE_MODEL_ID } from '@shared/providers'
 import { SAFE_NUMERIC_ID } from '@shared/saveRules'
 import { endingArtSemesterOf, getEndingArtPath, getPlaythroughPath } from '../paths'
+import { imagePath, writeImageFile } from './imageFiles'
 import { assertSafePlaythroughId } from './saveService'
 
 /**
@@ -21,14 +22,16 @@ function assertSafeSemesterId(semesterId: string | undefined): void {
   }
 }
 
-/** The later semesters a playthrough folder holds a graduation picture for. */
+/** The later semesters a playthrough folder holds a graduation picture for, each once. */
 export async function endingArtSemesters(playthroughId: string): Promise<string[]> {
   assertSafePlaythroughId(playthroughId)
   const entries = await readdir(getPlaythroughPath(playthroughId)).catch(() => [] as string[])
-  return entries.flatMap((entry) => {
+  // A picture caught mid-conversion stands under both extensions.
+  const semesterIds = entries.flatMap((entry) => {
     const semesterId = endingArtSemesterOf(entry)
     return semesterId ? [semesterId] : []
   })
+  return [...new Set(semesterIds)]
 }
 
 /**
@@ -60,21 +63,14 @@ export async function generateEndingArt(
   // was deleted while the picture was being drawn.
   if (signal?.aborted) throw appError('CANCELLED', 'Generation was cancelled.')
 
-  // Atomic like every other write.
   const path = getEndingArtPath(playthroughId, semesterId)
-  const temp = `${path}.tmp`
+  const unwritable = { code: 'ENDING_ART_UNWRITABLE', message: 'Failed to generate CG.' }
   try {
     await mkdir(dirname(path), { recursive: true })
-    await writeFile(temp, art)
-    await rename(temp, path)
   } catch (err) {
-    await unlink(temp).catch(() => {})
-    throw appError(
-      'ENDING_ART_UNWRITABLE',
-      'Failed to generate CG.',
-      messageOf(err)
-    )
+    throw appError(unwritable.code, unwritable.message, messageOf(err))
   }
+  await writeImageFile(path, art, { error: unwritable })
   return art
 }
 
@@ -86,7 +82,7 @@ export async function readEndingArt(
   assertSafePlaythroughId(playthroughId)
   assertSafeSemesterId(semesterId)
   try {
-    return await readFile(getEndingArtPath(playthroughId, semesterId))
+    return await readFile(await imagePath(getEndingArtPath(playthroughId, semesterId)))
   } catch (err) {
     if ((err as NodeJS.ErrnoException).code === 'ENOENT') return null
     throw appError(
@@ -106,7 +102,7 @@ export async function copyEndingArtTo(
   assertSafePlaythroughId(playthroughId)
   assertSafeSemesterId(semesterId)
   try {
-    await copyFile(getEndingArtPath(playthroughId, semesterId), to)
+    await copyFile(await imagePath(getEndingArtPath(playthroughId, semesterId)), to)
   } catch (err) {
     throw appError(
       'ENDING_ART_UNEXPORTABLE',

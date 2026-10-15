@@ -54,7 +54,7 @@
     }
   },
   "9": {
-    "class_type": "SaveImage",
+    "class_type": "PreviewImage",
     "_meta": {
       "title": "Save Cutout"
     },
@@ -62,8 +62,7 @@
       "images": [
         "63",
         0
-      ],
-      "filename_prefix": "venus-university/hands"
+      ]
     }
   },
   "10": {
@@ -257,7 +256,7 @@
     }
   },
   "79": {
-    "class_type": "SaveImage",
+    "class_type": "PreviewImage",
     "_meta": {
       "title": "Save Region"
     },
@@ -265,8 +264,7 @@
       "images": [
         "89",
         0
-      ],
-      "filename_prefix": "venus-university/hands_region"
+      ]
     }
   },
   "80": {

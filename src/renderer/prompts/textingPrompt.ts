@@ -39,6 +39,7 @@ import {
   graduateLines,
   herClassmates,
   memoryLines,
+  secretLines,
   notesLines,
   profileLines,
   readerClassmates,
@@ -126,6 +127,8 @@ export interface TextingPromptState {
    * open through an absence, so this is what says she is texting from somewhere else.
    */
   springBreakAway?: readonly string[] | null
+  /** The graduate back in town for Homecoming, as a charId; absent on every other slot. */
+  homecomingVisitor?: string
   /**
    * Each character's plans with the reader from this slot on, one sentence apiece, by charId —
    * hers and the lorebook's people's.
@@ -133,6 +136,8 @@ export interface TextingPromptState {
   upcomingPlans?: Record<string, string[]>
   /** How many of her memories the thread carries: the one-character budget, the thread being the two of them. */
   memoryBudget: number
+  /** How many of her told secrets the thread carries; absent is the default. */
+  secretBudget?: number
   /** The playthrough log, read for the lorebook's dated recaps. */
   history: GameHistory
 }
@@ -326,9 +331,10 @@ export function buildTextingPrompt(
   reader: string
 ): StructuredRequest {
   const name = character.firstName
-  // Off campus: away for the break, or graduated and gone from Veridan.
+  // Off campus: away for the break, or graduated and gone from Veridan but for Homecoming.
+  const visiting = state.homecomingVisitor === character.charId
   const away =
-    info?.pursuing !== undefined ||
+    (info?.pursuing !== undefined && !visiting) ||
     isAwayForSpringBreak(state.springBreakAway, character.charId, state.date)
   const thread: ChatMessage[] = [
     ...(conversation?.messages ?? []).slice(-TEXTING_HISTORY_CAP),
@@ -368,9 +374,17 @@ export function buildTextingPrompt(
       state.charInfo,
       state.date,
       relations,
-      state.upcomingPlans
+      state.upcomingPlans,
+      state.homecomingVisitor
     ),
-    ...characterLoreForIds(ambient, state.charInfo, state.date, relations, state.upcomingPlans),
+    ...characterLoreForIds(
+      ambient,
+      state.charInfo,
+      state.date,
+      relations,
+      state.upcomingPlans,
+      state.homecomingVisitor
+    ),
     // Only this slot's texts: an older one's "last night" was a different night.
     ...recapLore(
       thread
@@ -388,7 +402,7 @@ export function buildTextingPrompt(
     'CHARACTER',
     `${name} ${character.lastName}.`,
     ...(info?.major ? [yearMajorLine(info)] : []),
-    ...graduateLines(name, info),
+    ...graduateLines(name, info, visiting),
     // The phone takes the one-character budget.
     ...profileLines(character, info?.flags ?? emptyFlags()),
     ...relationshipLines(
@@ -430,6 +444,7 @@ export function buildTextingPrompt(
       info?.textMemory,
       state.calendar.season
     ),
+    ...secretLines(info?.toldSecrets, state.secretBudget),
     ...notesLines(name, info?.notes)
   ]
 

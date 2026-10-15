@@ -8,9 +8,10 @@ import { useMemo, type JSX } from 'react'
 import { createPortal } from 'react-dom'
 import { motion } from 'motion/react'
 
-import { itemDefOf } from '@shared/shop'
+import { itemDefOf, type ItemPick } from '@shared/shop'
 import { useModalShell } from '../components/useModalShell'
 import { TitleTab } from '../components/TitleTab'
+import { formatShortGameDate } from '../prompts/gameDate'
 import { useGameStore } from '../stores/gameStore'
 import type { ScreenTheme } from './clockTheme'
 import { ItemCard } from './ItemCard'
@@ -26,8 +27,8 @@ export interface InventoryModalProps {
   /** `stuff` is the reader looking at what he has; `gift` is him picking one to hand over. */
   mode?: 'stuff' | 'gift'
   onClose: () => void
-  /** Called with the chosen item id in `gift` mode; nothing is spent until the message is sent. */
-  onGift?: (itemId: string) => void
+  /** Called with the chosen line in `gift` mode; nothing is spent until the message is sent. */
+  onGift?: (pick: ItemPick) => void
 }
 
 export function InventoryModal({
@@ -37,16 +38,30 @@ export function InventoryModal({
   onGift
 }: InventoryModalProps): JSX.Element | null {
   const inventory = useGameStore((s) => s.inventory)
+  const characters = useGameStore((s) => s.characters)
+  const charInfo = useGameStore((s) => s.charInfo)
+  const season = useGameStore((s) => s.calendar.season)
   const { host, overlayProps } = useModalShell(onClose)
 
-  // An item id the catalog does not know is dropped: the def owns everything a card shows.
+  // An item id the catalog does not know is dropped: the def owns everything a card shows. A
+  // present says who gave it to him and when, her name only where he knows it.
   const held = useMemo(
     () =>
       inventory.flatMap((entry) => {
         const item = itemDefOf(entry.itemId)
-        return item ? [{ item, count: entry.count }] : []
+        if (!item) return []
+        const { from } = entry
+        const pick: ItemPick = { itemId: entry.itemId, ...(from ? { from } : {}) }
+        const giver = from && charInfo[from.charId]?.nameKnown ? characters[from.charId] : undefined
+        const fromLine = from
+          ? [giver ? `From ${giver.firstName}` : null, formatShortGameDate(from.date, season)]
+              .filter((part): part is string => part !== null)
+              .join(' · ')
+          : undefined
+        const key = from ? `${entry.itemId}:${from.charId}:${from.date}` : entry.itemId
+        return [{ item, count: entry.count, pick, fromLine, key }]
       }),
-    [inventory]
+    [inventory, characters, charInfo, season]
   )
 
   if (!host) return null
@@ -83,14 +98,15 @@ export function InventoryModal({
               {carried} {carried === 1 ? 'ITEM' : 'ITEMS'}
             </p>
             <motion.div className="vu-inv-grid" variants={STUFF_DEAL}>
-              {held.map(({ item, count }) => (
+              {held.map(({ item, count, pick, fromLine, key }) => (
                 <ItemCard
-                  key={item.id}
+                  key={key}
                   item={item}
                   count={count}
+                  from={fromLine}
                   word="Gift"
                   // Absent outside gift mode: a panel he is only looking at offers nothing.
-                  onAnswer={gifting && onGift ? () => onGift(item.id) : undefined}
+                  onAnswer={gifting && onGift ? () => onGift(pick) : undefined}
                 />
               ))}
             </motion.div>

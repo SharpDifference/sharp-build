@@ -6,12 +6,16 @@ import {
   observedUpperHalves,
   refreshedFlags,
   withMemoryReplaced,
+  withBreakPenaltiesStepped,
   withRomanceScenes
 } from '@shared/relationship'
 import { escapeRegExp } from '@shared/sentences'
 import { affectionsOf, type SceneSetup } from '@shared/sceneCreator'
 import type { GameReplays } from '@shared/replays'
 import { SAVE_SCHEMA_VERSION } from '@shared/saveRules'
+import { observedSecretTiers, withSecretTold } from '@shared/secrets'
+import { HAPPY_SPARKLE_CHANCE } from '@shared/odds'
+import { withFiredEvent } from '@shared/sceneEvents'
 import {
   calendarOf,
   charStateOf,
@@ -58,7 +62,10 @@ import {
   giftReactionOf,
   itemDefOf,
   withGiftMemory,
-  type GiftReaction
+  withItem,
+  withoutItem,
+  type GiftReaction,
+  type ItemPick
 } from '@shared/shop'
 import type { GameOverReason } from '@shared/gameOver'
 import type { Weather } from '@shared/weather'
@@ -82,7 +89,10 @@ import {
   type CharMemory,
   type CrushHint,
   type ChatMessage,
+  type ReceivedGift,
   type RelationshipEvent,
+  type SceneEvent,
+  type SceneEventsFired,
   type Suspicion,
   type Character,
   type CharInfo,
@@ -126,9 +136,6 @@ export { PORTRAIT_SLOTS }
 
 /** What a character is called before the reader has learned her name. */
 export const UNKNOWN_NAME = '???'
-
-/** How often the first happy expression of a turn throws sparkles off her. */
-const HAPPY_SPARKLE_CHANCE = 0.5
 
 /** Whether one first-happy-of-the-turn wins its sparkle. */
 function rollsSparkle(rand: () => number): boolean {
@@ -217,6 +224,12 @@ export interface SceneKind {
    * Absent means public.
    */
   inPublic?: boolean
+  /** The secret the scene's one girl tells in it, decided as she is cast. */
+  secret?: string | null
+  /** The curveball the scene opens on, rolled as it is cast. */
+  event?: SceneEvent | null
+  /** The present a girl brings him in it, rolled as it is cast. */
+  receivedGift?: ReceivedGift | null
 }
 
 /** The scene-kind facts a `set` writes onto the store, unpacked from one verdict. */
@@ -233,7 +246,10 @@ function sceneKindFields(scene: SceneKind | null | undefined) {
     sceneJobStats: [...(scene?.jobStats ?? [])],
     sceneMentions: [...(scene?.mentions ?? [])],
     sceneLocation: scene?.location ?? null,
-    sceneInPublic: scene?.inPublic ?? true
+    sceneInPublic: scene?.inPublic ?? true,
+    sceneSecret: scene?.secret ?? null,
+    sceneEvent: scene?.event ? { ...scene.event } : null,
+    sceneReceivedGift: scene?.receivedGift ? { ...scene.receivedGift } : null
   }
 }
 
@@ -365,6 +381,8 @@ interface GameStoreState {
   outingSlots: Record<string, number>
   /** Who leaves campus for spring break, null until it is settled. Persisted. */
   springBreakAway: string[] | null
+  /** The graduate back in town for this fall's Homecoming, null until then or with none. Persisted. */
+  homecomingVisitor: string | null
   /** The feed items belonging to today alone, stamped with it. Persisted. */
   feedExtras: FeedExtras | null
   /** The graduation narration has played. Persisted. */
@@ -426,6 +444,14 @@ interface GameStoreState {
   sceneLocation: string | null
   /** The scene is somewhere people can see them — the witness roll's input. */
   sceneInPublic: boolean
+  /** The secret the scene's one girl tells in it; null when she tells none. */
+  sceneSecret: string | null
+  /** The curveball the scene opened on; null when it opened on none. */
+  sceneEvent: SceneEvent | null
+  /** The present a girl brings him in this scene; null when nobody does. */
+  sceneReceivedGift: ReceivedGift | null
+  /** When each scene event last fired this semester. Persisted. */
+  sceneEventsFired: SceneEventsFired
   /** The gifts given so far in this scene, oldest first. */
   sceneGifts: SceneGift[]
   /** The exam being sat this slot, or null when the slot is an ordinary scene. */
@@ -800,9 +826,13 @@ interface GameStoreState {
    * stamping `repeat` from `charInfo` and earlier gifts this scene, and `at` where its action
    * will land on the transcript.
    */
-  giftItem: (charId: string, itemId: string) => GiftReaction
+  giftItem: (charId: string, pick: ItemPick) => GiftReaction
   /** Undoes the newest gift, putting the item back: its turn was abandoned. */
   ungiftItem: () => void
+  /** Puts the present a girl brought this scene in his inventory, once. */
+  receiveSceneGift: () => void
+  /** Files the scene's curveball as fired today — run once at the boundary. */
+  commitSceneEvent: () => void
   /** Folds this scene's gifts into `charInfo` — run once at the boundary. */
   recordGifts: () => void
   /** Empties the scene's gift list at a scene boundary or a slot opening. */
@@ -849,14 +879,22 @@ interface GameStoreState {
     before: Readonly<Record<string, CharInfo>>,
     charIds: readonly string[]
   ) => void
+  /** Steps the break penalty of every girl in `charIds`, the cast, over the boundary. */
+  stepBreakPenalties: (charIds: readonly string[]) => void
   /** Records which upper halves of her tiers each girl is in, off her affection today. */
   observeUpperHalves: () => void
+  /** Files the secret the scene's one girl told in it as told. */
+  tellSceneSecret: () => void
+  /** Marks every untold secret whose tier each girl stands in today as reached. */
+  observeSecretTiers: () => void
 
   /**
    * Appends one Bunnyboard message, creating the conversation on first use.
    * `unreadDelta` is 1 for a message that should light the badge, 0 otherwise.
    */
   appendChatMessage: (charId: string, message: ChatMessage, unreadDelta: number) => void
+  /** Takes one message out of a conversation by id; the unread count is left alone. */
+  removeChatMessage: (charId: string, messageId: string) => void
   /** The player opened the conversation — its unread count clears. */
   markConversationRead: (charId: string) => void
   /** Banks a texting turn's merged recap on the conversation. */
@@ -1007,6 +1045,8 @@ interface GameStoreState {
   recordOutingSlots: (charIds: readonly string[], slotId: number) => void
   /** Files who leaves campus for spring break. One-way. */
   setSpringBreakAway: (charIds: readonly string[]) => void
+  /** Files the graduate back in town for Homecoming, or that nobody is. */
+  setHomecomingVisitor: (charId: string | null) => void
   /** Marks the graduation narration played, so a resumed epilogue skips it. */
   markGraduationSeen: () => void
   /** Spends one goodbye off the epilogue's menu. Idempotent. */
@@ -1115,21 +1155,9 @@ export function blankCharInfo(): CharInfo {
   }
 }
 
-/** The inventory with one more of `itemId`, appending a line if it holds none. */
-function addItem(inventory: readonly OwnedItem[], itemId: string): OwnedItem[] {
-  const held = inventory.find((entry) => entry.itemId === itemId)
-  if (!held) return [...inventory, { itemId, count: 1 }]
-  return inventory.map((entry) =>
-    entry.itemId === itemId ? { ...entry, count: entry.count + 1 } : entry
-  )
-}
-
-/** The inventory with one fewer of `itemId`; a line that reaches zero is dropped. */
-function removeItem(inventory: readonly OwnedItem[], itemId: string): OwnedItem[] {
-  return inventory.flatMap((entry) => {
-    if (entry.itemId !== itemId) return [entry]
-    return entry.count > 1 ? [{ ...entry, count: entry.count - 1 }] : []
-  })
+/** The inventory line a gift came off, so taking it back puts it where it was. */
+function pickOfGift(gift: SceneGift): ItemPick {
+  return { itemId: gift.itemId, ...(gift.from ? { from: { ...gift.from } } : {}) }
 }
 
 /** The blank stage: no background, no portraits, no sticky emotions. */
@@ -1239,7 +1267,7 @@ function giftsWithin(
   if (taken.length === 0) return {}
   return {
     sceneGifts: state.sceneGifts.filter((gift) => !cut(gift)),
-    inventory: taken.reduce((inventory, gift) => addItem(inventory, gift.itemId), state.inventory)
+    inventory: taken.reduce((inventory, gift) => withItem(inventory, pickOfGift(gift)), state.inventory)
   }
 }
 
@@ -1416,6 +1444,7 @@ const initialState = {
   weekendOutings: {} as Record<string, number>,
   outingSlots: {} as Record<string, number>,
   springBreakAway: null as string[] | null,
+  homecomingVisitor: null as string | null,
   feedExtras: null as FeedExtras | null,
   graduationSeen: false,
   farewellsDone: [] as string[],
@@ -1436,6 +1465,10 @@ const initialState = {
   sceneMentions: [] as string[],
   sceneLocation: null as string | null,
   sceneInPublic: true,
+  sceneSecret: null as string | null,
+  sceneEvent: null as SceneEvent | null,
+  sceneReceivedGift: null as ReceivedGift | null,
+  sceneEventsFired: {} as SceneEventsFired,
   sceneGifts: [] as SceneGift[],
   sceneQuiz: null as QuizState | null,
   currentSceneTranscript: [] as SceneLine[],
@@ -1552,6 +1585,8 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
       weekendOutings: save.weekendOutings,
       outingSlots: save.outingSlots,
       springBreakAway: save.springBreakAway,
+      homecomingVisitor: save.homecomingVisitor ?? null,
+      sceneEventsFired: save.sceneEventsFired ?? {},
       feedExtras: save.feedExtras,
       graduationSeen: save.graduationSeen,
       farewellsDone: save.farewellsDone,
@@ -1699,6 +1734,9 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
       ...(state.sceneLocation ? { location: state.sceneLocation } : {}),
       // Written only when *false*: absent is the classifier's own default.
       ...(state.sceneInPublic ? {} : { inPublic: false }),
+      ...(state.sceneSecret ? { secret: state.sceneSecret } : {}),
+      ...(state.sceneEvent ? { event: { ...state.sceneEvent } } : {}),
+      ...(state.sceneReceivedGift ? { receivedGift: { ...state.sceneReceivedGift } } : {}),
       ...(state.sceneGifts.length > 0 ? { gifts: state.sceneGifts.map((g) => ({ ...g })) } : {}),
       ...(state.sceneQuiz
         ? { quiz: { ...state.sceneQuiz, questions: state.sceneQuiz.questions.map((q) => ({ ...q })) } }
@@ -2092,14 +2130,17 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
 
   buyItem: (itemId, price) =>
     set((state) => ({
-      inventory: addItem(state.inventory, itemId),
+      inventory: withItem(state.inventory, { itemId }),
       // No affordability check: buying past the debt floor ends the playthrough at the next
       // slot opening, or on the epilogue's next button.
       money: state.money - price
     })),
 
-  giftItem: (charId, itemId) => {
+  giftItem: (charId, pick) => {
     const state = get()
+    const { itemId } = pick
+    // Her own present going back to her lands badly, whatever she thinks of it.
+    const returned = pick.from?.charId === charId
     // Stamped now: once the boundary has folded this gift into `charInfo`, the same question
     // would answer yes about the gift itself.
     const repeat =
@@ -2107,15 +2148,25 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
       state.sceneGifts.some((gift) => gift.charId === charId && gift.itemId === itemId)
     // The verdict is stamped here and nowhere else: the action line says it out loud.
     const item = itemDefOf(itemId)
-    const reaction: GiftReaction = item
-      ? giftReactionOf(item, state.characters[charId], repeat)
-      : 'neutral'
+    const reaction: GiftReaction = returned
+      ? 'unimpressed'
+      : item
+        ? giftReactionOf(item, state.characters[charId], repeat)
+        : 'neutral'
     set({
-      inventory: removeItem(state.inventory, itemId),
+      inventory: withoutItem(state.inventory, pick),
       // The action that hands it over is the next line the transcript takes.
       sceneGifts: [
         ...state.sceneGifts,
-        { charId, itemId, repeat, reaction, at: state.currentSceneTranscript.length }
+        {
+          charId,
+          itemId,
+          repeat,
+          reaction,
+          at: state.currentSceneTranscript.length,
+          ...(pick.from ? { from: { ...pick.from } } : {}),
+          ...(returned ? { returned: true as const } : {})
+        }
       ]
     })
     return reaction
@@ -2126,9 +2177,29 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
       const last = state.sceneGifts[state.sceneGifts.length - 1]
       if (!last) return {}
       return {
-        inventory: addItem(state.inventory, last.itemId),
+        inventory: withItem(state.inventory, pickOfGift(last)),
         sceneGifts: state.sceneGifts.slice(0, -1)
       }
+    }),
+
+  receiveSceneGift: () =>
+    set((state) => {
+      const gift = state.sceneReceivedGift
+      if (!gift || gift.delivered) return {}
+      return {
+        inventory: withItem(state.inventory, {
+          itemId: gift.itemId,
+          from: { charId: gift.charId, date: state.date }
+        }),
+        sceneReceivedGift: { ...gift, delivered: true }
+      }
+    }),
+
+  commitSceneEvent: () =>
+    set((state) => {
+      if (!state.sceneEvent) return {}
+      const fired = withFiredEvent(state.sceneEventsFired, state.sceneEvent.id, state.date)
+      return fired === state.sceneEventsFired ? {} : { sceneEventsFired: fired }
     }),
 
   recordGifts: () =>
@@ -2206,6 +2277,13 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
       return charInfo === state.charInfo ? {} : { charInfo }
     }),
 
+  // The step lives in `shared/relationship`, shared with the ending's projection.
+  stepBreakPenalties: (charIds) =>
+    set((state) => {
+      const charInfo = withBreakPenaltiesStepped(state.charInfo, charIds)
+      return charInfo === state.charInfo ? {} : { charInfo }
+    }),
+
   observeUpperHalves: () =>
     set((state) => {
       let charInfo = state.charInfo
@@ -2218,6 +2296,29 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
         if (upperHalves === info.upperHalves) continue
         if (charInfo === state.charInfo) charInfo = { ...charInfo }
         charInfo[charId] = { ...info, upperHalves }
+      }
+      return charInfo === state.charInfo ? {} : { charInfo }
+    }),
+
+  // The move lives in `shared/secrets`, shared with the ending's projection.
+  tellSceneSecret: () =>
+    set((state) => {
+      const charInfo = withSecretTold(state.charInfo, state.cast, state.sceneSecret)
+      return charInfo === state.charInfo ? {} : { charInfo }
+    }),
+
+  observeSecretTiers: () =>
+    set((state) => {
+      let charInfo = state.charInfo
+      for (const charId of [...state.chars, ...state.alumni]) {
+        const info = charInfo[charId]
+        if (!info?.secrets) continue
+        const affection = affectionFor(info, state.date, state.characters[charId])
+        const secrets = observedSecretTiers(info.secrets, affection)
+        // An entry nothing moved keeps its identity.
+        if (secrets === info.secrets) continue
+        if (charInfo === state.charInfo) charInfo = { ...charInfo }
+        charInfo[charId] = { ...info, secrets }
       }
       return charInfo === state.charInfo ? {} : { charInfo }
     }),
@@ -2330,6 +2431,15 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
         messages: [...chat.messages, message],
         unread: chat.unread + unreadDelta
       }))
+    ),
+
+  removeChatMessage: (charId, messageId) =>
+    set((state) =>
+      patchConversation(state, charId, (chat) =>
+        chat.messages.some((message) => message.id === messageId)
+          ? { ...chat, messages: chat.messages.filter((message) => message.id !== messageId) }
+          : null
+      )
     ),
 
   markConversationRead: (charId) =>
@@ -2803,6 +2913,8 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
 
   setSpringBreakAway: (charIds) => set({ springBreakAway: [...charIds] }),
 
+  setHomecomingVisitor: (charId) => set({ homecomingVisitor: charId }),
+
   markGraduationSeen: () => set({ graduationSeen: true }),
 
   markEndingArtWanted: () => set({ endingArtWanted: true }),
@@ -2904,6 +3016,10 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
       weekendOutings: state.weekendOutings,
       outingSlots: state.outingSlots,
       springBreakAway: state.springBreakAway,
+      ...(state.homecomingVisitor ? { homecomingVisitor: state.homecomingVisitor } : {}),
+      ...(Object.keys(state.sceneEventsFired).length > 0
+        ? { sceneEventsFired: state.sceneEventsFired }
+        : {}),
       feedExtras: state.feedExtras,
       graduationSeen: state.graduationSeen,
       farewellsDone: state.farewellsDone,

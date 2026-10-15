@@ -18,7 +18,8 @@ import {
   relationshipTagOf
 } from '@shared/relationship'
 import { isCharacterTrait } from '@shared/traits'
-import { fullNameOf, type CharMemory, type StockOutfitSet } from '@shared/types'
+import { pendingSecretOf, SECRET_TIERS } from '@shared/secrets'
+import { fullNameOf, type CharMemory, type SecretTier, type StockOutfitSet } from '@shared/types'
 import { formatShortGameDate } from '../prompts/gameDate'
 import { useBunnyboardStore } from '../stores/bunnyboardStore'
 import { profileUrl, spriteUrl, useSpriteVersion } from '../stores/characterStore'
@@ -46,6 +47,13 @@ import '../vu_styles/ContactPage.css'
 
 /** The one thing a stranger's every locked slot names, since it is the one thing he can do. */
 const AFTER_ADDING = '??? — Unlocked after adding'
+
+/** What the page calls the standing each tier's secret opens at. */
+const SECRET_TIER_LABELS: Record<SecretTier, string> = {
+  friendly: 'Friends',
+  trusted: 'Best Friends',
+  devoted: 'BFFs'
+}
 
 /** The reading arriving beside her, and the three cards dealt into it. Module scope. */
 const SIDE_IN = fadeIn(0.14, 0.4)
@@ -131,6 +139,18 @@ export function ContactPage({
   // The same paragraph the prompts are given.
   const loveLife = loveLifeBlurb(character, flags)
   const showLoveLife = Boolean(loveLife) && (flags.knowsLoveLife || flags.isLover)
+  // What she has told him, and the one she tells next: waiting on a scene alone with her once
+  // its tier is reached, otherwise on the lowest tier still to come.
+  const toldSecrets = info?.toldSecrets ?? []
+  const untoldSecrets = info?.secrets ?? []
+  const nextSecretTier = SECRET_TIERS.find((tier) =>
+    untoldSecrets.some((secret) => secret.tier === tier)
+  )
+  const nextSecretLock = pendingSecretOf(info)
+    ? '??? — Unlocked alone with her'
+    : nextSecretTier
+      ? `??? — Unlocked at ${SECRET_TIER_LABELS[nextSecretTier]}`
+      : null
   // Her friends are published like any other field of her page, met or not, graduates or not.
   const known = [...chars, ...alumni].filter((id) => Boolean(characters[id]))
   const friends = npcFriendsOf(npcRelationships, charId, known)
@@ -236,6 +256,18 @@ export function ContactPage({
                     ) : (
                       <Locked>??? — Unlocked at Best Friends</Locked>
                     )}
+                  </Field>
+                )}
+
+                {/* Absent when she has none, told or untold, as on a save from before them. */}
+                {(toldSecrets.length > 0 || nextSecretLock) && (
+                  <Field label="Secrets">
+                    {toldSecrets.map((secret, index) => (
+                      <p key={index} className="vu-contact-text">
+                        {secret}
+                      </p>
+                    ))}
+                    {nextSecretLock && <Locked>{nextSecretLock}</Locked>}
                   </Field>
                 )}
 
@@ -550,6 +582,9 @@ function StrangerProfile(): JSX.Element {
       </Field>
       <Field label="Backstory">
         <Locked>??? — Unlocked at Best Friends</Locked>
+      </Field>
+      <Field label="Secrets">
+        <Locked>??? — Unlocked at Friends</Locked>
       </Field>
       <Field label="Love life">
         <Locked>??? — Unlocked at Lovers</Locked>

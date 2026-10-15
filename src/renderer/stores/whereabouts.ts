@@ -24,6 +24,7 @@ import { placeClosedOn } from '../prompts/occasions'
 import { useGameStore } from './gameStore'
 import { localsAtLocation, workersAtLocation } from './loop/casting'
 import {
+  castableIds,
   charAwayNow,
   charClassNow,
   charHiddenLocationNow,
@@ -228,7 +229,8 @@ export function knownWhereabouts(date?: number, time?: TimeSlot): Whereabouts[] 
   const slot = shiftSlotOf(shiftWeekdayOf(on), half)
 
   const rows: Whereabouts[] = []
-  for (const charId of game.chars) {
+  // The roster, and a graduate back for Homecoming, who is somewhere he cannot place.
+  for (const charId of castableIds(on)) {
     const info = game.charInfo[charId]
     if (!info?.nameKnown) continue
 

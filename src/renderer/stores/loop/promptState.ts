@@ -4,7 +4,8 @@ import type { PlayerStats } from '@shared/playerStats'
 import { STOCK_POSITIONS } from '@shared/positions'
 import { ROOM_VARIANTS } from '@shared/room'
 import { giftLoreNote, itemDefOf } from '@shared/shop'
-import { memoryBudgetsOf } from '@shared/settingsRules'
+import { pendingSecretOf } from '@shared/secrets'
+import { memoryBudgetsOf, secretBudgetOf } from '@shared/settingsRules'
 import { affectionsOf } from '@shared/sceneCreator'
 import {
   charKeyOf,
@@ -13,6 +14,7 @@ import {
   type CustomCgSlot,
   type MemoryBudgets,
   type OutfitSet,
+  type SceneEvent,
   type SceneLine,
   type TimeSlot
 } from '@shared/types'
@@ -22,14 +24,14 @@ import {
   projectSceneContextOf,
   recapOf
 } from '../../prompts/classProgress'
-import { formatChatDivider } from '../../prompts/gameDate'
+import { formatChatDivider, formatGameDate } from '../../prompts/gameDate'
 import { firstMeetingAfter, meetingsBefore } from '../../prompts/occasions'
 import type { SchedulePromptInput } from '../../prompts/schedulePrompt'
 import type {
   AddedNotice,
+  ClassSceneContext,
   DroppedNotice,
-  PromptState,
-  ScenePromptState
+  PromptState
 } from '../../prompts/scenePrompt'
 import { recentLines, SCENE_WINDOW_WORDS, windowFloor } from '../../prompts/sceneWindow'
 import { readerBlockOf } from '../../prompts/setting'
@@ -39,14 +41,13 @@ import {
   unansweredReachOuts
 } from '../../prompts/textingPrompt'
 import { upcomingPlanLines } from '../../prompts/upcomingPlans'
-import { SEED_WORD_BAG, SEED_WORDS } from '../../prompts/seedWords'
 import { useAssetStore } from '../assetStore'
 import { useSettingsStore } from '../settingsStore'
 import { readyCustomCgs, readyOutfitSets } from '../characterStore'
 import { useGameStore, type SceneKind } from '../gameStore'
-import { useGrabBagStore } from '../grabBagStore'
 import { stageAsWritten } from '../sceneSanitizer'
 import { cancelAllTexts, expireHangoutInvitations } from '../textingLoop'
+import { homecomingVisitorNow } from '../timetable'
 import { presentCastOf } from './cast'
 import { partsForAWhile } from './farewells'
 import { prefetchTextLedger } from './hooks'
@@ -186,15 +187,18 @@ export async function loadCgReady(cast: readonly string[]): Promise<void> {
 
 /**
  * Puts a decided cast on the stage and settles the phone for the slot it spends — the one
- * sequence every scene start runs.
+ * sequence every scene start runs. A girl cast alone tells the secret she has waiting.
  */
 export async function applyCast(cast: string[], scene?: SceneKind): Promise<void> {
   cancelAllTexts()
   const { ignored, turnedDown } = expireHangoutInvitations(cast)
+  const secret =
+    cast.length === 1 ? pendingSecretOf(useGameStore.getState().charInfo[cast[0]]) : undefined
   await stageCast(cast, {
     ...scene,
     ...(ignored.length > 0 ? { ignoredInvites: ignored } : {}),
-    ...(turnedDown.length > 0 ? { turnedDownInvites: turnedDown } : {})
+    ...(turnedDown.length > 0 ? { turnedDownInvites: turnedDown } : {}),
+    ...(secret ? { secret } : {})
   })
   // Last, and the order is load-bearing in both directions.
   prefetchTextLedger()
@@ -286,6 +290,20 @@ export function memoryBudgetsNow(): Required<MemoryBudgets> {
   return memoryBudgetsOf(settings ?? {})
 }
 
+/** How many of her told secrets a prompt carries, the default where none is set. */
+export function secretBudgetNow(): number {
+  return secretBudgetOf(useSettingsStore.getState().settings ?? {})
+}
+
+/** A meeting's context, marked when the scene opened on the professor calling it off. */
+function withCancellation(
+  meeting: ClassSceneContext | null,
+  event: SceneEvent | null
+): ClassSceneContext | undefined {
+  if (!meeting) return undefined
+  return event?.id === 'classCancelled' ? { ...meeting, cancelled: true } : meeting
+}
+
 /** Reads the prompt-facing slice of game state. */
 export function promptState(): PromptState {
   const game = useGameStore.getState()
@@ -323,6 +341,22 @@ export function promptState(): PromptState {
   const hiddenCast = presentCastOf(game.cast).filter((character) =>
     stage.hidden.has(character.charId)
   )
+
+  // Met in an earlier semester and not yet seen in this one: the carry empties `metSlots` and
+  // every scene's boundary files its cast there. A graduate back for Homecoming has a line of
+  // her own instead.
+  const visitor = homecomingVisitorNow()
+  const backFromBreak =
+    game.semesterIndex > 0 && !game.createdScene
+      ? game.cast.filter((charId) => {
+          const info = game.charInfo[charId]
+          return (
+            charId !== visitor &&
+            info?.flags?.hasMet === true &&
+            (info.metSlots?.length ?? 0) === 0
+          )
+        })
+      : []
 
   const goodbyeWith = game.sceneFarewell ? game.characters[game.sceneFarewell] : undefined
   const farewell = goodbyeWith
@@ -375,6 +409,9 @@ export function promptState(): PromptState {
       .map((charId) => game.characters[charId])
       .filter((character): character is Character => Boolean(character)),
     sceneLocation: game.sceneLocation,
+    sceneSecret: game.sceneSecret,
+    ...(game.sceneEvent ? { sceneEvent: game.sceneEvent } : {}),
+    ...(game.sceneReceivedGift ? { receivedGift: game.sceneReceivedGift } : {}),
     // Only while the stamp is this very slot: a rumor outlives no opening but its own,
     // and the three openings that return early never write one over the last.
     ...(game.slotRumor && game.slotRumor.date === game.date && game.slotRumor.time === game.time
@@ -383,13 +420,15 @@ export function promptState(): PromptState {
     // The class meeting this scene is, off the occasion calendar.
     ...(classEntry
       ? {
-          classMeeting:
+          classMeeting: withCancellation(
             classSceneContextOf(
               classEntry,
               game.date,
               game.classRecords[classEntry.code],
               game.calendar
-            ) ?? undefined
+            ),
+            game.sceneEvent
+          )
         }
       : {}),
     // The project's recap and meeting, for a scene with no `CLASS` block to carry them.
@@ -415,7 +454,10 @@ export function promptState(): PromptState {
       const character = game.characters[gift.charId]
       const item = itemDefOf(gift.itemId)
       if (!character || !item) return []
-      return [giftLoreNote(character.firstName, item, gift.repeat, gift.reaction)]
+      // Her own present going back to her says when she gave it.
+      const returnedOn =
+        gift.returned && gift.from ? formatGameDate(gift.from.date, game.calendar.season) : undefined
+      return [giftLoreNote(character.firstName, item, gift.repeat, gift.reaction, returnedOn)]
     }),
     emotions: stage.emotions,
     // The same stage as charIds; a key the roster no longer knows is dropped.
@@ -427,6 +469,7 @@ export function promptState(): PromptState {
     // Absent when the player has set no custom one, which is what `scenePersonaFor` reads as.
     ...(scenePersona !== undefined ? { scenePersona } : {}),
     memoryBudgets: memoryBudgetsNow(),
+    secretBudget: secretBudgetNow(),
     history: game.history,
     cgReady: game.cgReady,
     customCgReady: game.customCgReady,
@@ -434,6 +477,8 @@ export function promptState(): PromptState {
     roomReady: game.roomReady,
     textingSummaries,
     textedWith,
+    ...(backFromBreak.length > 0 ? { backFromBreak } : {}),
+    ...(visitor ? { homecomingVisitor: visitor } : {}),
     // The slots after this one: this slot's plan is the scene itself, or one he is skipping.
     upcomingPlans: upcomingPlanLines(
       game.events,
@@ -448,9 +493,4 @@ export function promptState(): PromptState {
       ? { createdScene: true as const, affection: affectionsOf(game.createdScene.setup) }
       : {})
   }
-}
-
-/** The state a call that writes a scene reads: the same, plus the inspiration word it carries. */
-export function scenePromptState(): ScenePromptState {
-  return { ...promptState(), seedWord: useGrabBagStore.getState().draw(SEED_WORD_BAG, SEED_WORDS) }
 }

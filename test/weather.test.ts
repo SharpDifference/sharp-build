@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { FINAL_DATE } from '@shared/classes'
+import type { Season } from '@shared/types'
 import {
   isWet,
   rollSemesterWeather,
@@ -14,15 +15,17 @@ import { lcg } from './fixtures'
 
 /**
  * The semester weather roll: every slot lands in the vocabulary, the chain stays dry where
- * the roll requires it, storms lean toward the end of the term, and `weatherAt` never reads
- * past what its table actually holds.
+ * the roll requires it, storms lean toward a spring's end and a fall's start, and `weatherAt`
+ * never reads past what its table actually holds.
  */
 
-/** `rollSemesterWeather` under many seeds, over the dry-occasion mask every New Game uses. */
-function seededRolls(count: number): Weather[][] {
-  const dryDates = dryOccasionDates('spring')
+const SEASONS: readonly Season[] = ['spring', 'fall']
+
+/** `rollSemesterWeather` under many seeds, over the dry-occasion mask a season's start uses. */
+function seededRolls(count: number, season: Season): Weather[][] {
+  const dryDates = dryOccasionDates(season)
   const tables: Weather[][] = []
-  for (let seed = 1; seed <= count; seed++) tables.push(rollSemesterWeather(dryDates, 'spring', lcg(seed)))
+  for (let seed = 1; seed <= count; seed++) tables.push(rollSemesterWeather(dryDates, season, lcg(seed)))
   return tables
 }
 
@@ -56,8 +59,8 @@ describe('rollSemesterWeather', () => {
     expect(table.every((reading) => reading === 'clear')).toBe(true)
   })
 
-  it('keeps the wet share of a semester in a plausible range, pooled over many seeded rolls', () => {
-    const tables = seededRolls(200)
+  it.each(SEASONS)('keeps the wet share of a %s in a plausible range, pooled over many seeded rolls', (season) => {
+    const tables = seededRolls(200, season)
     let wet = 0
     let total = 0
     for (const table of tables) {
@@ -69,9 +72,10 @@ describe('rollSemesterWeather', () => {
     expect(share).toBeLessThanOrEqual(0.3)
   })
 
-  it('makes a storm a bigger share of wet slots late in the term than early, pooled over many seeded rolls', () => {
-    const tables = seededRolls(200)
-    const stormShareOver = (inRange: (date: number) => boolean): number => {
+  it('makes a storm a bigger share of wet slots at the warm end of the term, pooled over many seeded rolls', () => {
+    const spring = seededRolls(200, 'spring')
+    const fall = seededRolls(200, 'fall')
+    const stormShareOver = (tables: Weather[][], inRange: (date: number) => boolean): number => {
       let storm = 0
       let wet = 0
       for (const table of tables) {
@@ -85,9 +89,10 @@ describe('rollSemesterWeather', () => {
       }
       return storm / wet
     }
-    const early = stormShareOver((date) => date < 31)
-    const late = stormShareOver((date) => date > FINAL_DATE - 31)
-    expect(late).toBeGreaterThan(early)
+    const early = (date: number): boolean => date < 31
+    const late = (date: number): boolean => date > FINAL_DATE - 31
+    expect(stormShareOver(spring, late)).toBeGreaterThan(stormShareOver(spring, early))
+    expect(stormShareOver(fall, early)).toBeGreaterThan(stormShareOver(fall, late))
   })
 })
 

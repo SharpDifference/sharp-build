@@ -2,12 +2,14 @@ import { SENIOR_YEAR } from '@shared/classes'
 import { FALLBACK_DORM } from '@shared/dorms'
 import { appError, toAppError } from '@shared/errors'
 import { fallbackHandleOf } from '@shared/feed'
+import { heldSecretsOf, secretTiersWanted } from '@shared/secrets'
 import { intakeOf, seasonOf, semesterChain } from '@shared/semesters'
 import { emptyTallies } from '@shared/tallies'
 import {
   charKeyOf,
   type AppError,
   type Character,
+  type CharSecret,
   type Enrollment,
   type FeedAssignment,
   type HiddenScheduleAssignment,
@@ -46,6 +48,12 @@ import {
   type OccasionGenDraft,
   type OccasionRequest
 } from '../prompts/occasionPrompt'
+import {
+  buildSecretsPrompt,
+  validateSecretDraft,
+  type SecretsEntry,
+  type SecretsReply
+} from '../prompts/secretsPrompt'
 import { SEED_WORD_BAG, SEED_WORDS } from '../prompts/seedWords'
 import { buildSchedules, type ScheduleResult } from './classScheduler'
 import { useGameStore } from './gameStore'
@@ -53,10 +61,10 @@ import { useGrabBagStore } from './grabBagStore'
 import type { SemesterHandoff } from './semesterCarry'
 import { retrySilently } from './silentRetry'
 
-/** The cancellation group New Game's three one-shots register under. */
+/** The cancellation group New Game's four one-shots register under. */
 export const NEW_GAME_LLM_GROUP = 'newGame:llm'
 
-/** Everything the three one-shot New Game calls produce, settled together. */
+/** Everything the four one-shot New Game calls produce, settled together. */
 export interface StartResult {
   schedules: ScheduleResult
   /** Who works where, by charId — the slots themselves are picked at Finalize. */
@@ -68,6 +76,8 @@ export interface StartResult {
   /** What each of them does with spring break, by charId. */
   springBreakPlans: Record<string, string>
   occasions: Occasion[]
+  /** The secrets each girl starts the semester with, by charId. */
+  secrets: Record<string, CharSecret[]>
 }
 
 /**
@@ -86,16 +96,20 @@ interface StartAttempt {
   profileRequest: ReturnType<typeof buildProfilePrompt>
   occasionRequests: OccasionRequest[]
   occasionRequest: ReturnType<typeof buildOccasionPrompt>
+  secretEntries: SecretsEntry[]
+  secretRequest: ReturnType<typeof buildSecretsPrompt>
   classDraft?: ClassGenReply
   profiles?: ProfileGenDraft
   occasions?: Occasion[]
+  secrets?: Record<string, CharSecret[]>
 }
 
 /** What each call is called on the modal, in the order failures are reported. */
 const CALL_LABELS = {
   classes: 'the class catalog',
   profiles: "the students' profiles",
-  occasions: 'the semester’s calendar'
+  occasions: 'the semester’s calendar',
+  secrets: "the students' secrets"
 } as const
 
 let attempt: StartAttempt | null = null
@@ -210,12 +224,28 @@ async function fetchOccasions(
   return { ok: true, data: occasions }
 }
 
+/** Fetches and validates the roster's secrets, keyed by charKey. */
+async function fetchSecrets(
+  current: Pick<StartAttempt, 'secretEntries' | 'secretRequest'>
+): Promise<Result<Record<string, CharSecret[]>>> {
+  const generated = await window.api.llm.generateSecrets<SecretsReply>(
+    current.secretRequest,
+    NEW_GAME_LLM_GROUP
+  )
+  if (!generated.ok) return { ok: false, error: generated.error }
+  try {
+    return { ok: true, data: validateSecretDraft(generated.data, current.secretEntries) }
+  } catch (err) {
+    return { ok: false, error: toAppError(err) }
+  }
+}
+
 /**
- * Runs whatever the attempt is still missing, then composes the semester out of the three
+ * Runs whatever the attempt is still missing, then composes the semester out of the four
  * replies.
  */
 async function runAttempt(current: StartAttempt, mine: object): Promise<StartOutcome> {
-  const [classResult, profileResult, occasionResult] = await Promise.all([
+  const [classResult, profileResult, occasionResult, secretResult] = await Promise.all([
     current.classDraft
       ? Promise.resolve<Result<ClassGenReply>>({ ok: true, data: current.classDraft })
       : sendUntilAnswered('classes', mine, () => fetchClassDraft(current)),
@@ -224,7 +254,10 @@ async function runAttempt(current: StartAttempt, mine: object): Promise<StartOut
       : sendUntilAnswered('profiles', mine, () => fetchProfiles(current)),
     current.occasions
       ? Promise.resolve<Result<Occasion[]>>({ ok: true, data: current.occasions })
-      : sendUntilAnswered('occasions', mine, () => fetchOccasions(current))
+      : sendUntilAnswered('occasions', mine, () => fetchOccasions(current)),
+    current.secrets
+      ? Promise.resolve<Result<Record<string, CharSecret[]>>>({ ok: true, data: current.secrets })
+      : sendUntilAnswered('secrets', mine, () => fetchSecrets(current))
   ])
   if (stale(mine)) return { status: 'cancelled' }
 
@@ -232,9 +265,10 @@ async function runAttempt(current: StartAttempt, mine: object): Promise<StartOut
   if (classResult.ok) current.classDraft = classResult.data
   if (profileResult.ok) current.profiles = profileResult.data
   if (occasionResult.ok) current.occasions = occasionResult.data
+  if (secretResult.ok) current.secrets = secretResult.data
 
   // The first failure is the one the modal shows; the rest are named beside it.
-  if (!classResult.ok || !profileResult.ok || !occasionResult.ok) {
+  if (!classResult.ok || !profileResult.ok || !occasionResult.ok || !secretResult.ok) {
     const failures: { label: string; error: AppError }[] = []
     if (!classResult.ok) failures.push({ label: CALL_LABELS.classes, error: classResult.error })
     if (!profileResult.ok) {
@@ -242,6 +276,9 @@ async function runAttempt(current: StartAttempt, mine: object): Promise<StartOut
     }
     if (!occasionResult.ok) {
       failures.push({ label: CALL_LABELS.occasions, error: occasionResult.error })
+    }
+    if (!secretResult.ok) {
+      failures.push({ label: CALL_LABELS.secrets, error: secretResult.error })
     }
     return {
       status: 'failed',
@@ -273,13 +310,14 @@ async function runAttempt(current: StartAttempt, mine: object): Promise<StartOut
       haunts: byCharId(hiddenScheduleAssignmentsOf(profiles)),
       feeds: byCharId(feedAssignmentsOf(profiles)),
       springBreakPlans: byCharId(springBreakAssignmentsOf(profiles)),
-      occasions: occasionResult.data
+      occasions: occasionResult.data,
+      secrets: byCharId(secretResult.data)
     }
   }
 }
 
 /**
- * Start Game's generation pass: the three one-shots in parallel, then the local passes
+ * Start Game's generation pass: the four one-shots in parallel, then the local passes
  * that turn them into a semester.
  */
 export async function startNewGame(roster: readonly Character[]): Promise<StartOutcome> {
@@ -292,12 +330,20 @@ export async function startNewGame(roster: readonly Character[]): Promise<StartO
     (count) => useGrabBagStore.getState().drawMany(SEED_WORD_BAG, SEED_WORDS, count),
     'spring'
   )
+  // Every girl is new to the playthrough, so each is asked for all three.
+  const secretEntries: SecretsEntry[] = roster.map((character) => ({
+    character,
+    tiers: secretTiersWanted(undefined),
+    held: []
+  }))
   const current: StartAttempt = {
     roster,
     classRequest: buildClassPrompt(roster),
     profileRequest: buildProfilePrompt(roster),
     occasionRequests,
-    occasionRequest: buildOccasionPrompt(occasionRequests, 'spring')
+    occasionRequest: buildOccasionPrompt(occasionRequests, 'spring'),
+    secretEntries,
+    secretRequest: buildSecretsPrompt(secretEntries)
   }
   attempt = current
 
@@ -384,9 +430,12 @@ interface NextAttempt {
   profileRequest: ReturnType<typeof buildContinuedProfilePrompt>
   occasionRequests: OccasionRequest[]
   occasionRequest: ReturnType<typeof buildOccasionPrompt>
+  secretEntries: SecretsEntry[]
+  secretRequest: ReturnType<typeof buildSecretsPrompt>
   classDraft?: ClassGenReply
   profiles?: ContinuedProfileDraft
   occasions?: Occasion[]
+  secrets?: Record<string, CharSecret[]>
 }
 
 let nextAttempt: NextAttempt | null = null
@@ -434,14 +483,15 @@ async function fetchNextProfiles(current: NextAttempt): Promise<Result<Continued
 }
 
 /**
- * A next semester composed out of its three replies: the returning girls kept on their year,
+ * A next semester composed out of its four replies: the returning girls kept on their year,
  * dorm, course load, employer and habits, the first-years as New Game deals them.
  */
 function composeNext(
   current: NextAttempt,
   classDraft: ClassGenReply,
   profiles: ContinuedProfileDraft,
-  occasions: Occasion[]
+  occasions: Occasion[],
+  secrets: Record<string, CharSecret[]>
 ): NextSemesterResult {
   const { roster, characters } = current
   const { handoff } = current.continuation
@@ -523,6 +573,7 @@ function composeNext(
     feeds,
     springBreakPlans: byCharId(profiles.springBreakPlans, roster),
     occasions,
+    secrets: byCharId(secrets, roster),
     pursuits: byCharId(profiles.pursuits, graduates),
     ...(fallGraduate ? { fallGraduate } : {})
   }
@@ -530,7 +581,7 @@ function composeNext(
 
 /** Runs whatever a next semester's attempt is still missing, then composes it. */
 async function runNextAttempt(current: NextAttempt, mine: object): Promise<NextOutcome> {
-  const [classResult, profileResult, occasionResult] = await Promise.all([
+  const [classResult, profileResult, occasionResult, secretResult] = await Promise.all([
     current.classDraft
       ? Promise.resolve<Result<ClassGenReply>>({ ok: true, data: current.classDraft })
       : sendUntilAnswered('classes', mine, () => fetchNextClasses(current)),
@@ -539,7 +590,10 @@ async function runNextAttempt(current: NextAttempt, mine: object): Promise<NextO
       : sendUntilAnswered('profiles', mine, () => fetchNextProfiles(current)),
     current.occasions
       ? Promise.resolve<Result<Occasion[]>>({ ok: true, data: current.occasions })
-      : sendUntilAnswered('occasions', mine, () => fetchOccasions(current))
+      : sendUntilAnswered('occasions', mine, () => fetchOccasions(current)),
+    current.secrets
+      ? Promise.resolve<Result<Record<string, CharSecret[]>>>({ ok: true, data: current.secrets })
+      : sendUntilAnswered('secrets', mine, () => fetchSecrets(current))
   ])
   if (stale(mine)) return { status: 'cancelled' }
 
@@ -547,8 +601,9 @@ async function runNextAttempt(current: NextAttempt, mine: object): Promise<NextO
   if (classResult.ok) current.classDraft = classResult.data
   if (profileResult.ok) current.profiles = profileResult.data
   if (occasionResult.ok) current.occasions = occasionResult.data
+  if (secretResult.ok) current.secrets = secretResult.data
 
-  if (!classResult.ok || !profileResult.ok || !occasionResult.ok) {
+  if (!classResult.ok || !profileResult.ok || !occasionResult.ok || !secretResult.ok) {
     const failures: { label: string; error: AppError }[] = []
     if (!classResult.ok) failures.push({ label: CALL_LABELS.classes, error: classResult.error })
     if (!profileResult.ok) {
@@ -556,6 +611,9 @@ async function runNextAttempt(current: NextAttempt, mine: object): Promise<NextO
     }
     if (!occasionResult.ok) {
       failures.push({ label: CALL_LABELS.occasions, error: occasionResult.error })
+    }
+    if (!secretResult.ok) {
+      failures.push({ label: CALL_LABELS.secrets, error: secretResult.error })
     }
     return {
       status: 'failed',
@@ -567,14 +625,21 @@ async function runNextAttempt(current: NextAttempt, mine: object): Promise<NextO
   nextAttempt = null
   return {
     status: 'ready',
-    data: composeNext(current, classResult.data, profileResult.data, occasionResult.data)
+    data: composeNext(
+      current,
+      classResult.data,
+      profileResult.data,
+      occasionResult.data,
+      secretResult.data
+    )
   }
 }
 
 /**
- * A next semester's Start: the three one-shots in parallel — a catalog around the returning
+ * A next semester's Start: the four one-shots in parallel — a catalog around the returning
  * majors and away from every class already run, the first-years' profiles beside the returning
- * girls' break and the graduates' lives, and the season's occasions — then the local passes.
+ * girls' break and the graduates' lives, the season's occasions and the roster's new secrets —
+ * then the local passes.
  */
 export async function startNextSemester(
   next: Continuation,
@@ -617,6 +682,16 @@ export async function startNextSemester(
     (count) => useGrabBagStore.getState().drawMany(SEED_WORD_BAG, SEED_WORDS, count),
     season
   )
+  // A returning girl is asked for one more beside what she holds, or for three if she holds none.
+  const secretEntries: SecretsEntry[] = roster.map((character) => {
+    const carried = handoff.carry.charInfo[character.charId]
+    return {
+      character,
+      tiers: secretTiersWanted(carried),
+      held: heldSecretsOf(carried),
+      ...(carried?.flags?.hadSex ? { hadSex: true } : {})
+    }
+  })
   const current: NextAttempt = {
     roster,
     characters,
@@ -626,7 +701,9 @@ export async function startNextSemester(
     classRequest: buildClassPrompt(roster, catalog),
     profileRequest: buildContinuedProfilePrompt(profileInput),
     occasionRequests,
-    occasionRequest: buildOccasionPrompt(occasionRequests, season)
+    occasionRequest: buildOccasionPrompt(occasionRequests, season),
+    secretEntries,
+    secretRequest: buildSecretsPrompt(secretEntries)
   }
   nextAttempt = current
   return runNextAttempt(current, mine)

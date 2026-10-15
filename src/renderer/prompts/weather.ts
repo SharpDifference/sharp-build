@@ -11,7 +11,8 @@ import { staticOccasionsOf } from './occasions'
 
 /**
  * The occasions held under an open sky, which the roll never rains on, of either season: the
- * first day, the ceremony, the beach festivals and the holidays whose programme is outdoors.
+ * first day, the ceremony, the beach festivals, the homecoming game and the holidays whose
+ * programme is outdoors.
  */
 export const DRY_OCCASION_IDS: ReadonlySet<string> = new Set([
   'orientation',
@@ -23,6 +24,7 @@ export const DRY_OCCASION_IDS: ReadonlySet<string> = new Set([
   'thorne-day',
   'selkie-send-off',
   'oktoberfest',
+  'homecoming-game',
   'halloween'
 ])
 

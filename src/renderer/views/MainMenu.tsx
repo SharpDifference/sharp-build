@@ -25,7 +25,7 @@ import {
   type ResolvedEnrollment
 } from '../stores/saveStore'
 import { useSettingsStore } from '../stores/settingsStore'
-import { useSetupStore } from '../stores/setupStore'
+import { comfyAvailable, useSetupStore } from '../stores/setupStore'
 import { useUiStore } from '../stores/uiStore'
 import { useUpdateStore } from '../stores/updateStore'
 import { bgUrl } from './bgAssets'
@@ -89,8 +89,8 @@ export function MainMenu(): JSX.Element {
   const loadPlaythroughs = useSaveStore((s) => s.loadPlaythroughs)
   const continueNewest = useSaveStore((s) => s.continueNewest)
 
-  const comfyInstalled = status?.comfyReady ?? false
-  const comfyDeferred = useSettingsStore((s) => s.settings?.comfyDeferred ?? false)
+  // Whether characters can be rendered, which the footer's setup notice answers for.
+  const renderable = useSettingsStore((s) => comfyAvailable(s.settings, status))
   const available = useUpdateStore((s) => s.available)
   // The browser has no local renderer to install and no window of its own to close.
   const webBuild = isWebBuild()
@@ -465,7 +465,7 @@ export function MainMenu(): JSX.Element {
         </motion.nav>
 
         <motion.div className="vu-menu-footer" variants={fadeIn(0.95)}>
-          {!webBuild && (comfyDeferred || !comfyInstalled) && (
+          {!webBuild && !renderable && (
             <button className="vu-menu-notice" onClick={() => setView('setup')}>
               Image generation isn&apos;t installed — open Setup
             </button>

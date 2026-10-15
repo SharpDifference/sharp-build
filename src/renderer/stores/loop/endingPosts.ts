@@ -16,7 +16,7 @@ import { endingPostsDelivered, isFeedContact } from '../feedView'
 import { useGameStore } from '../gameStore'
 import { retrySilently } from '../silentRetry'
 import { deliverEndingPosts } from './feed'
-import { lessNsfwTextNow, reader } from './promptState'
+import { lessNsfwTextNow, reader, secretBudgetNow } from './promptState'
 import { writeEpilogueSave } from './saves'
 import { currentRun, loopState, runStale, LOOP_LLM_GROUP } from './state'
 
@@ -59,6 +59,7 @@ async function fetchEndingPosts(
         playthroughId: game.playthroughId ?? 'unsaved',
         stats: game.stats,
         lessNsfwText: lessNsfwTextNow(),
+        secretBudget: secretBudgetNow(),
         season: game.calendar.season,
         readerGraduated: game.semesterIndex === LAST_SEMESTER,
         posters

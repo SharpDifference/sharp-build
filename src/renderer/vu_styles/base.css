@@ -433,8 +433,8 @@ body {
 }
 
 /* Sprites are full-body 1160x1696 but display thigh-up: the container shows the top of the
-   image, scaled so that at full size the visible portion fills the stage's own height. The PNG
-   itself is never modified — this is a CSS crop.
+   image, scaled so that at full size the visible portion fills the stage's own height and a
+   taller character runs off its top. The PNG itself is never modified — this is a CSS crop.
 
    **The dim on whoever is not speaking is not here**: motion writes the `filter`
    (`spriteLit`/`spriteDim`), so the stage keeps no transition of its own for it. */

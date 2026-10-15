@@ -1,4 +1,4 @@
-import { useRef, useState, type CSSProperties, type JSX } from 'react'
+import { useEffect, useRef, useState, type CSSProperties, type JSX } from 'react'
 import { createPortal } from 'react-dom'
 import { AnimatePresence, motion } from 'motion/react'
 import { CheckField } from '../components/CheckField'
@@ -80,6 +80,7 @@ import {
   doneCountOf,
   expressionTargetFor,
   isInFlight,
+  isPregenOf,
   liveCgTasks,
   liveExpressionTasks,
   liveTaskFor,
@@ -95,7 +96,7 @@ import {
 } from '../stores/characterStore'
 import { renameMentions } from '../stores/renameMentions'
 import { noNsfwImagesOf, useSettingsStore } from '../stores/settingsStore'
-import { useSetupStore } from '../stores/setupStore'
+import { comfyAvailable, useSetupStore } from '../stores/setupStore'
 import {
   BEHAVIOR_FIELDS,
   CG_INSTRUCTIONS_HINT,
@@ -111,7 +112,7 @@ import {
   TRAIT_OPTIONS,
   WARDROBES
 } from './characterFields'
-import { CardIcon, DuplicateIcon, FolderIcon, SpritesIcon } from './characterIcons'
+import { CardIcon, DuplicateIcon, FolderIcon, ResetIcon, SpritesIcon } from './characterIcons'
 import { CustomCgEditModal } from './CustomCgEditModal'
 import { CustomCgsModal } from './CustomCgsModal'
 import { CustomOutfitsModal } from './CustomOutfitsModal'
@@ -314,6 +315,8 @@ export function EditCharacterModal({
   const [exportingSprites, setExportingSprites] = useState(false)
   const [duplicating, setDuplicating] = useState(false)
   const [closing, setClosing] = useState(false)
+  const [confirmingReset, setConfirmingReset] = useState(false)
+  const [resetting, setResetting] = useState(false)
 
   const setField =
     <K extends keyof Form>(key: K) =>
@@ -361,9 +364,15 @@ export function EditCharacterModal({
   const exportSpritePack = useCharacterStore((s) => s.exportSpritePack)
   const duplicateCharacter = useCharacterStore((s) => s.duplicateCharacter)
   const openFolder = useCharacterStore((s) => s.openFolder)
-  // The same gate the new-character slot uses: rendering needs the optional install.
-  const comfyInstalled = useSetupStore((s) => s.status?.comfyReady ?? false)
-  const comfyDeferred = useSettingsStore((s) => s.settings?.comfyDeferred ?? false)
+  const resetDefault = useCharacterStore((s) => s.resetDefault)
+  const loadDefaults = useCharacterStore((s) => s.loadDefaults)
+  const shipped = useCharacterStore((s) => isPregenOf(s, charId))
+  const edited = useCharacterStore((s) => s.editedDefaults.includes(charId))
+  const defaultsInPlace = useCharacterStore((s) => s.defaultsInPlace)
+  // The same gate the new-character slot uses: rendering needs a ComfyUI, the app's own or the
+  // player's.
+  const setupStatus = useSetupStore((s) => s.status)
+  const renderable = useSettingsStore((s) => comfyAvailable(s.settings, setupStatus))
   // The room renders in the cloud, so its gate is whichever key draws the pictures.
   const picturesReady = useSettingsStore((s) => (s.settings ? pictureKeySet(s.settings) : false))
   // Under a custom endpoint that key is the images one, asked for by a name of its own.
@@ -375,7 +384,7 @@ export function EditCharacterModal({
   const webBuild = isWebBuild()
 
   /** Whether the local renderer is out of reach, which every ComfyUI job in here waits on. */
-  const comfyMissing = webBuild || !comfyInstalled || comfyDeferred
+  const comfyMissing = !renderable
 
   /* What a hover raises over a control these are holding dead: the one thing the player would
      have to go and get, and nothing the moment he has it. A control dead for anything else —
@@ -562,6 +571,33 @@ export function EditCharacterModal({
       setWorking(false)
       setPending(null)
       if (ok) action.run()
+    })
+  }
+
+  /**
+   * Throws her edited copy away and shows her as shipped. The form is re-seeded from the
+   * shipped record, and everything open on a slot, a set or a staged render of the copy
+   * goes with it, since the copy may have held a wardrobe or CG pair the shipped one lacks.
+   */
+  const runReset = (): void => {
+    setResetting(true)
+    void resetDefault(charId).then((reset) => {
+      setResetting(false)
+      setConfirmingReset(false)
+      if (!reset) return
+      const seeded = formOf(reset)
+      previewedVoice.current = seeded.voicePitch
+      setForm(seeded)
+      setSaved(false)
+      setEditingName(false)
+      setDeleting(null)
+      setInstructing(null)
+      setDeletingCg(null)
+      setEditingCg(null)
+      setFixing(null)
+      setRegen(null)
+      setConfirmSet(null)
+      setPending(null)
     })
   }
 
@@ -900,6 +936,13 @@ export function EditCharacterModal({
 
   const rendering = isInFlight(progress)
 
+  // Her first edit makes the copy that Reset throws away; main answers which shipped
+  // characters have one, so it is asked again whenever she is written or her images change.
+  const updatedAt = character.updatedAt
+  useEffect(() => {
+    if (shipped) void loadDefaults()
+  }, [shipped, updatedAt, version, rendering, loadDefaults])
+
   /** How many of the five slots hold a whole wardrobe. */
   const customsOnDisk = CUSTOM_OUTFIT_SLOTS.filter(
     (slot) => wardrobeDone(slot) === EMOTIONS.length
@@ -1133,6 +1176,24 @@ export function EditCharacterModal({
                     onClick={() => void openFolder(charId)}
                   >
                     <FolderIcon />
+                  </motion.button>
+                </DeadNote>
+              )}
+              {/* A shipped character's way back to the one the game ships: held dead until she
+                  has been edited, and while a render is writing to her copy. Run in place,
+                  an edit is the shipped folder itself, so there is nothing to go back to. */}
+              {shipped && !defaultsInPlace && (
+                <DeadNote note="Reset to default" align="center" below>
+                  <motion.button
+                    id="edit-reset"
+                    className="vu-edit-icon"
+                    type="button"
+                    aria-label="Reset to default"
+                    disabled={rendering || resetting || !edited}
+                    {...gestures(rendering || resetting || !edited, quietLift, quietPress)}
+                    onClick={() => setConfirmingReset(true)}
+                  >
+                    <ResetIcon />
                   </motion.button>
                 </DeadNote>
               )}
@@ -1631,6 +1692,21 @@ export function EditCharacterModal({
             charId={charId}
             slot={editingCg}
             onClose={() => setEditingCg(null)}
+          />
+        )}
+
+        {confirmingReset && (
+          <ConfirmModal
+            key="reset-default"
+            id="edit-reset-confirm"
+            theme={theme}
+            title="Reset to default?"
+            message={`${fullNameOf(character) || 'This character'}'s edits and all generated sprites will be permanently deleted, and she will go back to how the game ships her.`}
+            confirmText="Reset"
+            busy={resetting}
+            busyText="Resetting…"
+            onConfirm={runReset}
+            onCancel={() => setConfirmingReset(false)}
           />
         )}
 

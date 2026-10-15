@@ -13,9 +13,11 @@ import type { DormId } from './dorms'
 import type { AudioGroup } from './audio'
 import type { GameReplays } from './replays'
 import type { ComfyGpu } from './setupManifest'
+import type { ComfyModelPicks, ComfySource } from './comfyModels'
 import type { Weather } from './weather'
 import type { ReaderTallies } from './tallies'
 import type { PromptEdit } from './imagePrompt'
+import type { SceneEventId } from './sceneEvents'
 
 /** Discriminated result envelope returned by every IPC handler. */
 export type Result<T> = { ok: true; data: T } | { ok: false; error: AppError }
@@ -217,6 +219,18 @@ export interface ProfileCrop {
   height: number
 }
 
+/**
+ * The shipped cast as this build holds it: every charId, the ones the player took off the roster,
+ * the ones edited into a copy of their own, and whether edits land in the shipped folders
+ * themselves (an unpackaged desktop run), which leaves no default to reset to.
+ */
+export interface DefaultsStatus {
+  ids: string[]
+  removed: string[]
+  edited: string[]
+  inPlace: boolean
+}
+
 /** What the crop modal opens on: what is stored, what the frame would be, and the sprite. */
 export interface ProfileCropInfo {
   stored: ProfileCrop | null
@@ -324,7 +338,7 @@ export interface Character {
    */
   preferredStat: StatKey
   /**
-   * How tall she stands on the stage, as a share of the maximum in [0.9, 1]
+   * How tall she stands on the stage, as a share of full size in [0.9, 1.05]
    * (`shared/spriteScale.ts`).
    */
   height: number
@@ -538,6 +552,8 @@ export interface ClassMeetingRecord {
   summary?: string
   /** The one thing he learned, from the ledger's `classFactoid`. Lecture classes only, week 2 onward. */
   factoid?: string
+  /** The professor called it off at the last second: attended, and nothing was taught. */
+  cancelled?: true
 }
 
 /** A sat exam: how many questions were asked and how many he got right. */
@@ -671,6 +687,18 @@ export type CrushHint = { stat: StatKey; tier: StatTier } | { met: true }
 /** A disposition tier whose upper half reads differently from its lower one. */
 export type UpperHalf = 'neutral' | 'friendly' | 'trusted'
 
+/** A disposition tier a secret is told at. */
+export type SecretTier = 'friendly' | 'trusted' | 'devoted'
+
+/** A secret she has not told the reader yet, and the tier she tells it at. */
+export interface CharSecret {
+  /** One or two sentences in the third person, naming her. */
+  text: string
+  tier: SecretTier
+  /** She has stood in {@link tier} since the secret was written; never taken back. */
+  reached?: true
+}
+
 /** What a standing haunt is for: the menu it was dealt from. */
 export type HauntKind = 'fun' | 'study' | 'activity' | 'meal' | 'grocery' | 'room'
 
@@ -782,6 +810,11 @@ export interface CharState {
    */
   upperHalves?: Partial<Record<UpperHalf, 'first' | 'again'>>
   /**
+   * The affection a later semester's start took off her, one tier's worth; halved by the first
+   * scene she is cast in that semester and gone after the second.
+   */
+  breakPenalty?: { points: number; halved?: true }
+  /**
    * Everything she has ever posted, oldest first: her winter-break posts, then the
    * per-slot roll's. Absent for a girl whose break was somewhere else — and on the save rather
    * than the profile, since a like rewrites a post.
@@ -798,6 +831,13 @@ export interface CharState {
    * prompt that describes her in full; absent when there are none.
    */
   notes?: string
+  /**
+   * The secrets she has yet to tell the reader, in the order they were written; absent before
+   * any were written and once every one has been told.
+   */
+  secrets?: CharSecret[]
+  /** The secrets she has told the reader, oldest first; absent until she has told one. */
+  toldSecrets?: string[]
 }
 
 /**
@@ -865,6 +905,12 @@ export const EVERYDAY_ASKS = ['help', 'exercise', 'meal', 'shopping'] as const
 /** One of {@link EVERYDAY_ASKS}. */
 export type EverydayAsk = (typeof EVERYDAY_ASKS)[number]
 
+/** What an invitation out of nowhere may be rolled into asking; appended, never reordered. */
+export const INVITE_KINDS = ['herRoom', 'study', 'hisRoom', 'outing', 'everyday'] as const
+
+/** One of {@link INVITE_KINDS}. */
+export type InviteKind = (typeof INVITE_KINDS)[number]
+
 /** One Bunnyboard text message. */
 export interface ChatMessage {
   /** crypto.randomUUID(); the stable list key. */
@@ -885,6 +931,8 @@ export interface ChatMessage {
   reachOut?: true
   /** The everyday ask her invitation was rolled into: what the round of them is read off. */
   everydayAsk?: EverydayAsk
+  /** What her invitation was rolled into asking: what a hangout answering it is read off. */
+  inviteKind?: InviteKind
 }
 
 /** One Bunnyboard conversation with a contact, keyed by her charId. */
@@ -1033,6 +1081,14 @@ export interface OwnedItem {
   itemId: string
   /** Always at least 1 — an entry that reaches zero is removed instead. */
   count: number
+  /** A present a girl gave him: who, and the day. Never on a line with a bought item. */
+  from?: ReceivedFrom
+}
+
+/** Who gave the reader a present, and on which day of the semester he holds it in. */
+export interface ReceivedFrom {
+  charId: string
+  date: number
 }
 
 /** One gift handed over during a scene. */
@@ -1049,7 +1105,29 @@ export interface SceneGift {
    * field existed.
    */
   at?: number
+  /** The line it came off, when it was a present a girl gave him. */
+  from?: ReceivedFrom
+  /** It went back to the girl who gave it to him. */
+  returned?: true
 }
+
+/** The curveball a scene opened on, and the girl it happens to where it names one. */
+export interface SceneEvent {
+  id: SceneEventId
+  charId?: string
+}
+
+/** The present a girl brings to a scene, and whether it is in his inventory yet. */
+export interface ReceivedGift {
+  itemId: string
+  /** The girl giving it. */
+  charId: string
+  /** Put in his inventory once the scene's opening reply landed. */
+  delivered?: true
+}
+
+/** When each scene event last fired this semester, by event id: its cooldown's record. */
+export type SceneEventsFired = Record<string, number>
 
 /** A running summary a scene reply came with, and the transcript length it covers up to. */
 export interface SceneSummaryMark {
@@ -1162,6 +1240,15 @@ export interface SceneState {
   inPublic?: boolean
   /** The gifts handed over in this scene, in order, or absent when none were. */
   gifts?: SceneGift[]
+  /**
+   * The secret the scene's one girl tells the reader in it, or absent when she tells none; the
+   * boundary files it as told.
+   */
+  secret?: string
+  /** The curveball the scene opened on, or absent when it opened on none. */
+  event?: SceneEvent
+  /** The present a girl brings him in this scene, or absent when nobody does. */
+  receivedGift?: ReceivedGift
   /** The exam being sat, or absent when the slot is an ordinary scene. */
   quiz?: QuizState
   /** The line last shown, so resuming doesn't land on an empty dialogue box. */
@@ -1220,6 +1307,11 @@ export interface SlotOpening {
    * invitation at step 1. Absent for an opening that rolled none.
    */
   everydayAsks?: Record<string, EverydayAsk>
+  /**
+   * What each asker's invitation was rolled into asking, by charKey, stamped onto her invitation
+   * at step 1. Absent for an opening that rolled none.
+   */
+  inviteKinds?: Record<string, InviteKind>
   /** The plans the merged ledger found, normalized and attendance-filtered. */
   events: CalendarEvent[]
   /** Who that filtering took off an event, announced by text at step 1. */
@@ -1237,11 +1329,19 @@ export interface SlotOpening {
   springBreakTexts?: SlotIntroResponse['springBreakTexts']
   /** The texts of the one girl the opening rolled to reach out just to talk, delivered at step 1. */
   reachOuts?: SlotIntroResponse['reachOuts']
+  /** The texts the graduate back for Homecoming wrote to say she is in town, delivered at step 1. */
+  homecomingTexts?: SlotIntroResponse['homecomingTexts']
   /**
    * Who leaves campus for spring break, picked by the ending whose next slot is the first on or
    * after the notice and assigned by the boundary. Absent on every other opening.
    */
   springBreakAway?: string[]
+  /**
+   * The graduate back in town for Homecoming, picked by the ending whose next slot is Homecoming
+   * morning and assigned by the boundary. Absent on every other opening, and on that one when
+   * nobody qualifies.
+   */
+  homecomingVisitor?: string
   /**
    * What campus saw of the scene that ended into this slot — rolled at the ending off
    * the ledger it just paid for, so the narration above can say what is being said.
@@ -1347,8 +1447,13 @@ export interface GameSave {
   formerJobs?: Record<string, FormerJob>
   /** What the semesters before this one left on his record; absent in the first semester. */
   transcript?: Transcript
-  /** What the reader has bought and not yet given away, one entry per distinct item. */
+  /**
+   * What the reader has bought or been given and not yet given away: one entry per distinct item
+   * bought, and one per present a girl gave him.
+   */
   inventory: OwnedItem[]
+  /** When each scene event last fired this semester; absent before any has. */
+  sceneEventsFired?: SceneEventsFired
   /**
    * What each of the reader's classes has accumulated — meetings, exams, projects and scores —
    * keyed by class code.
@@ -1443,6 +1548,11 @@ export interface GameSave {
   outingSlots: Record<string, number>
   /** Who leaves campus for spring break, as charIds. */
   springBreakAway: string[] | null
+  /**
+   * The graduate back in town for this fall's Homecoming, as a charId, settled on Homecoming
+   * morning; absent before then and when nobody qualified.
+   */
+  homecomingVisitor?: string
   /**
    * The feed items that belong to today alone — the stranger's post the day surfaced and
    * the random student's — stamped with the date they were rolled for.
@@ -1709,6 +1819,11 @@ export interface SemesterRecord {
   profiles: Record<string, CharProfile>
   /** The senior picked to graduate early at this fall's ceremony; absent in a spring or with none. */
   fallGraduate?: string
+  /**
+   * What the break cost, for the first morning's line: the stats that fell a tier and the girls
+   * handed a break penalty, in roster order; absent when it cost nothing.
+   */
+  breakDecay?: { stats: StatKey[]; girls: string[] }
   /** The semester it continued from, as the ending that continued it left it. */
   before: SemesterLog
 }
@@ -1833,6 +1948,11 @@ export interface QuickstartBundle {
   springBreakPlans: Record<string, string>
   /** The occasions this semester invents; the fixed calendar is code. */
   occasions: Occasion[]
+  /**
+   * Keyed by charId: the secrets each girl starts the semester with, beside whatever she already
+   * holds. Absent on a bundle or an enrollment written before secrets were.
+   */
+  secrets?: Record<string, CharSecret[]>
 }
 
 /** A whole semester with the reader beside it, as the screen that generated it hands it over. */
@@ -1969,22 +2089,38 @@ export interface Settings {
    */
   secondaryModelFor?: PromptKind[]
   /**
-   * Which inference queue serves text calls; resolved at call time. **Not a player
-   * setting** — hand-edited beside `forceTime`, absent meaning `priority`.
+   * Which inference queue serves Gemini's text calls, picked in Settings and resolved at call
+   * time against the provider that runs. Optional on disk, absent meaning `priority`.
    */
   serviceTier?: ServiceTier
   /**
    * Stream scene and texting replies for a live preview; off sends the same calls to the
-   * whole-reply endpoint instead. Hand-edited like {@link serviceTier}, absent meaning on.
+   * whole-reply endpoint instead. **Not a player setting** — hand-edited beside `forceTime`,
+   * absent meaning on.
    */
   streamResponses?: boolean
   /** The player skipped the optional ComfyUI install; boot stops verifying it. */
   comfyDeferred: boolean
   /**
    * Which ComfyUI portable build is installed and verified. **Not a player setting** —
-   * hand-edited like {@link serviceTier}, absent meaning the GPUs Electron reports decide.
+   * hand-edited like {@link streamResponses}, absent meaning the GPUs Electron reports decide.
    */
   comfyGpu?: ComfyGpu
+  /**
+   * Which ComfyUI draws: the app's own install, or the player's own at {@link comfyUrl}. Optional
+   * on disk, absent meaning the app's own.
+   */
+  comfySource?: ComfySource
+  /** Where the player's own ComfyUI answers. Absent is `DEFAULT_COMFY_URL`. */
+  comfyUrl?: string
+  /** The models the app's own ComfyUI draws with, a slot absent where it draws the shipped one. */
+  comfyModels?: ComfyModelPicks
+  /** The models the player's own ComfyUI draws with, kept apart from the app's own install's. */
+  comfyExternalModels?: ComfyModelPicks
+  /** The weight the app's own ComfyUI draws its LoRA at. Absent is `DEFAULT_LORA_WEIGHT`. */
+  comfyLoraWeight?: number
+  /** The weight the player's own ComfyUI draws its LoRA at, kept apart like its picks. */
+  comfyExternalLoraWeight?: number
   /**
    * Whether a newer build the launch check finds is offered before the first screen; the main
    * menu's notice offers it either way. Optional on disk, absent meaning it is.
@@ -2007,12 +2143,12 @@ export interface Settings {
   warnEndingEdit?: boolean
   /**
    * The version the update check pretends this build is. **Not a player setting** — hand-edited
-   * like {@link serviceTier}, for exercising an update against a build already on itch.io.
+   * like {@link streamResponses}, for exercising an update against a build already on itch.io.
    */
   updateAsVersion?: string
   /**
    * An https URL answering `{ latest, url }` in place of itch.io, for exercising an update
-   * against a build served locally. **Not a player setting** — hand-edited like {@link serviceTier}.
+   * against a build served locally. **Not a player setting** — hand-edited like {@link streamResponses}.
    */
   updateFeed?: string
   /**
@@ -2037,11 +2173,6 @@ export interface Settings {
    * `generationSeed` and write no seed state at all. Absent means off.
    */
   freezeSeeds?: boolean
-  /**
-   * Dev-only, hand-edited into the file: the shipped cast is editable in place —
-   * written, rendered and re-rendered like the player's own. Absent means off.
-   */
-  editPregens?: boolean
   /**
    * Dev-only, hand-edited into the file: pins the theme a screen opens in, so
    * either one can be looked at whatever the hour. Absent means the clock decides.
@@ -2071,6 +2202,8 @@ export interface Settings {
   topK?: number
   /** How many memories per character a cast scene's prompt carries, by cast size. */
   memoryBudgets?: MemoryBudgets
+  /** How many of her told secrets every prompt carrying her memories carries; absent is the default. */
+  secretBudget?: number
   /**
    * The persona cast scene calls are written under in place of the shipped one, sent verbatim
    * whatever `lessNsfwText` says. Absent is the shipped persona.
@@ -2108,10 +2241,8 @@ export type SettingsPatch = Omit<
   | 'endpointApiKey'
   | 'imageApiKey'
   | 'freezeSeeds'
-  | 'editPregens'
   | 'forceTime'
   | 'removedDefaults'
-  | 'serviceTier'
   | 'streamResponses'
   | 'comfyGpu'
   | 'updateAsVersion'
@@ -2277,6 +2408,11 @@ export interface SlotIntroResponse {
    * `texts` the run of messages in the order she sends them.
    */
   reachOuts?: Array<{ char: string; texts: string[] }>
+  /**
+   * The messages the graduate back for Homecoming sends to tell the reader she is in town:
+   * `char` is her charKey, `texts` the run of messages in the order she sends them.
+   */
+  homecomingTexts?: Array<{ char: string; texts: string[] }>
 }
 
 /**
@@ -2370,6 +2506,29 @@ export interface UpdateProgress {
   percent?: number
   bytesDone?: number
   bytesTotal?: number
+}
+
+/** How far the boot's conversion of older pictures to WebP has got, on the fixed `images:progress` channel. */
+export interface LegacyImageProgress {
+  done: number
+  total: number
+}
+
+/** What the boot's conversion of older pictures to WebP did, for the log. */
+export interface LegacyImageReport {
+  /** Pictures still under a PNG or JPEG name when the pass began. */
+  total: number
+  /** Re-encoded as WebP, their old file removed. */
+  converted: number
+  /** Removed for standing beside a WebP twin, which is the picture read. */
+  dropped: number
+  /** Left as they were: unreadable as a picture, or no encoder to hand. */
+  left: number
+  /** Bytes the converted and dropped files held, and what the converted ones hold now. */
+  bytesBefore: number
+  bytesAfter: number
+  /** Whether no WebP encoder could be loaded, so nothing was converted. */
+  unavailable: boolean
 }
 
 /** One shipped file, as the build's manifest records it: a forward-slash path under the app folder. */

@@ -60,6 +60,11 @@ function monthDayOf(date: number, season: Season): Date {
   return new Date(Date.UTC(ANCHOR_YEAR, 0, 1 + dayOfYear))
 }
 
+/** The month a `season` semester's game day falls in, January 0. */
+export function monthOf(date: number, season: Season): number {
+  return monthDayOf(date, season).getUTCMonth()
+}
+
 /** "January 19" for a spring's date 0. Month and day only — the year is an implementation detail. */
 export function formatGameDate(date: number, season: Season): string {
   const at = monthDayOf(date, season)
@@ -188,9 +193,9 @@ export function formatDateBanner(date: number, time: TimeSlot, season: Season): 
   return `${formatDatePart(date, season)}. ${formatTimeSlot(time)}.`
 }
 
-/** The first line of every slot opening: date, weekday and half, semester phrase. */
+/** The first line of every slot opening: date, weekday with morning or night, semester phrase. */
 export function formatSlotOpening(date: number, time: TimeSlot, season: Season): string {
-  return `${formatGameDate(date, season)}, ${formatWeekday(date)} ${slotHalf(time)}. ${formatSemesterPhrase(date)}`
+  return `${formatGameDate(date, season)}, ${formatWeekday(date)} ${time === 0 ? 'morning' : 'night'}. ${formatSemesterPhrase(date)}`
 }
 
 /** The slot after this one — night wraps to the next date's day. */

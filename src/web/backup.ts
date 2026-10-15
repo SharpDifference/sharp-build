@@ -24,7 +24,7 @@ import {
   type BackupSave,
   type SemesterPicture
 } from '@shared/backup'
-import { namedRel } from '@shared/characterFiles'
+import { namedRel, storedRel } from '@shared/characterFiles'
 import { SAFE_CHAR_ID } from '@shared/characterRules'
 import {
   BG_VARIANTS,
@@ -47,7 +47,8 @@ import { forgetRels } from './db/chars'
 import { database, storage } from './db/open'
 import { offerDownload } from './download'
 import { revokeAll } from './images'
-import { buildPack, isShipped } from './packs'
+import { isPackRead, loadCopied } from './copies'
+import { buildPack } from './packs'
 import { currentSettings, forgetSettings, rendererSettings, rowFor } from './settings'
 import { encodeJson, openArchive, packagedRel, pickFile, readJsonEntry, ZIP_TYPE } from './transfer'
 
@@ -137,9 +138,10 @@ export async function exportBackup(): Promise<string> {
       files[photoEntry(playthroughId, photoId)] = bytes
     }
 
-    // The shipped cast is the build's and never travels in a backup, record or image.
+    // A shipped character travels only once the player has changed her; until then she is the
+    // build's, record and images alike.
     for (const key of await db.getAllKeys('charFiles')) {
-      if (isShipped(key[0])) continue
+      if (isPackRead(key[0])) continue
       const file = await db.get('charFiles', key)
       if (!file) continue
       const bytes = await bytesOf(file.blob)
@@ -200,7 +202,7 @@ export async function exportBackup(): Promise<string> {
       scenes,
       replays,
       characters: (await db.getAll('characters')).filter(
-        (character) => !isShipped(character.charId)
+        (character) => !isPackRead(character.charId)
       )
     }
     return backup
@@ -212,8 +214,8 @@ export async function exportBackup(): Promise<string> {
 
 /**
  * Puts a backup back: settings, grab bags, playthroughs, saves and replays replace what is
- * there, the player's own characters, backgrounds and saved scenes are merged in by id and name,
- * and the shipped cast is left as the build ships it. One transaction, with every blob built
+ * there, and the player's own characters (shipped ones they have changed included), backgrounds and
+ * saved scenes are merged in by id and name. One transaction, with every blob built
  * before it opens.
  */
 export async function importBackup(): Promise<boolean> {
@@ -337,10 +339,10 @@ export async function importBackup(): Promise<boolean> {
     }
 
     // Merged rather than replaced: a character made since the backup is still the player's. A
-    // shipped character is never written, neither her record nor any of her images.
+    // shipped character comes back as a copy under her own id.
     const characters = tx.objectStore('characters')
     for (const character of record.characters) {
-      if (!SAFE_CHAR_ID.test(character.charId) || isShipped(character.charId)) continue
+      if (!SAFE_CHAR_ID.test(character.charId)) continue
       void characters.put(character, character.charId)
     }
 
@@ -355,10 +357,11 @@ export async function importBackup(): Promise<boolean> {
     const charFiles = tx.objectStore('charFiles')
     for (const [name, bytes] of Object.entries(entries)) {
       const at = charFileOf(name)
-      if (!at || bytes.length === 0 || isShipped(at.charId)) continue
+      if (!at || bytes.length === 0) continue
       const rel = namedRel(at.rel)
-      // An archive holding both twins of one picture keeps the one already under the stored name.
-      if (rel !== at.rel && entries[charFileEntry(at.charId, rel)]) continue
+      // An archive holding both twins of one picture keeps the WebP, which a folder reads first.
+      const twin = storedRel(at.rel)
+      if (twin !== at.rel && (entries[charFileEntry(at.charId, twin)]?.length ?? 0) > 0) continue
       void charFiles.put({ blob: imageBlob(bytes), updatedAt }, [at.charId, rel])
     }
 
@@ -369,5 +372,7 @@ export async function importBackup(): Promise<boolean> {
   forgetRels()
   revokeAll()
   forgetBackgroundUrls()
+  // The restore may have brought in copies of shipped characters, and left others as they were.
+  await loadCopied()
   return true
 }

@@ -232,6 +232,12 @@ export function queuedScene(
   // Set-or-delete on the same terms, and only ever *false*: absent is public.
   if (game.sceneInPublic) delete scene.inPublic
   else scene.inPublic = false
+  if (game.sceneSecret) scene.secret = game.sceneSecret
+  else delete scene.secret
+  if (game.sceneEvent) scene.event = { ...game.sceneEvent }
+  else delete scene.event
+  if (game.sceneReceivedGift) scene.receivedGift = { ...game.sceneReceivedGift }
+  else delete scene.receivedGift
   return scene
 }
 

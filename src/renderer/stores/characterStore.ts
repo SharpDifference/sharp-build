@@ -261,6 +261,10 @@ interface CharacterStoreState {
   pregenIds: string[]
   /** Which of them the player has taken off the roster; they stay in `characters`. */
   removedDefaults: string[]
+  /** Which of the shipped cast have an edited copy of their own, for Reset to default. */
+  editedDefaults: string[]
+  /** Whether edits write to the shipped folders themselves, with no copy and no reset. */
+  defaultsInPlace: boolean
 
   load: () => Promise<void>
   /** Reads the shipped cast and what the player has removed from it. */
@@ -398,6 +402,11 @@ interface CharacterStoreState {
   /** Cancels outstanding work, then deletes the folder. */
   remove: (charId: string) => Promise<void>
   /**
+   * Throws away the edited copy of a shipped character, cancelling her outstanding work first,
+   * and answers her as shipped — null when main refuses, with the error shown.
+   */
+  resetDefault: (charId: string) => Promise<Character | null>
+  /**
    * Cancels every character's outstanding work and keeps them all: what leaving Manage
    * Characters does.
    */
@@ -451,6 +460,8 @@ export const useCharacterStore = create<CharacterStoreState>((set, get) => ({
   loading: false,
   pregenIds: [],
   removedDefaults: [],
+  editedDefaults: [],
+  defaultsInPlace: false,
 
   loadDefaults: async () => {
     const result = await window.api.chars.defaults()
@@ -459,7 +470,12 @@ export const useCharacterStore = create<CharacterStoreState>((set, get) => ({
       console.warn('[characters] could not read the shipped cast:', result.error)
       return
     }
-    set({ pregenIds: result.data.ids, removedDefaults: result.data.removed })
+    set({
+      pregenIds: result.data.ids,
+      removedDefaults: result.data.removed,
+      editedDefaults: result.data.edited,
+      defaultsInPlace: result.data.inPlace
+    })
   },
 
   refreshImages: (charId) => set((state) => bumpSpriteVersion(state, charId)),
@@ -468,9 +484,8 @@ export const useCharacterStore = create<CharacterStoreState>((set, get) => ({
     const written: Character[] = []
     for (const character of roster) {
       const height = heights[character.charId]
-      // Main refuses a write to a locked character; an unchanged height is not an edit.
+      // An unchanged height is not an edit.
       if (height === undefined || height === character.height) continue
-      if (isLockedOf(get(), character.charId)) continue
       const next = { ...character, height }
       if (await get().save(next)) written.push(next)
     }
@@ -1010,16 +1025,35 @@ export const useCharacterStore = create<CharacterStoreState>((set, get) => ({
         order: state.order.filter((id) => id !== charId)
       }
     })
-    activeRuns.delete(charId)
-
     // Cancel before deleting.
-    await window.api.jobs.cancelGroup(charId)
-    // After the cancel: cancelling emits a progress event per job, which would repopulate the group.
-    useJobStore.getState().clearGroup(charId)
-    cancelledBuckets.delete(charId)
+    await cancelCharacterJobs(charId)
 
     const result = await window.api.chars.delete(charId)
     if (!result.ok) useUiStore.getState().showError(result.error)
+  },
+
+  resetDefault: async (charId) => {
+    // Dropped before the awaits, as in `remove`.
+    set((state) => {
+      const { [charId]: _p, ...progress } = state.progress
+      const { [charId]: _s, ...staged } = state.staged
+      return { progress, staged }
+    })
+    // Cancel before throwing her copy away.
+    await cancelCharacterJobs(charId)
+
+    const result = await window.api.chars.resetDefault(charId)
+    if (!result.ok) {
+      useUiStore.getState().showError(result.error)
+      return null
+    }
+
+    await adoptCharacter(result.data, set)
+    set((state) => ({
+      editedDefaults: state.editedDefaults.filter((id) => id !== charId),
+      ...bumpSpriteVersion(state, charId)
+    }))
+    return result.data
   },
 
   cancelAllGeneration: async () => {
@@ -1124,9 +1158,13 @@ function seedsFrozen(): boolean {
   return useSettingsStore.getState().settings?.freezeSeeds === true
 }
 
-/** The dev switch that lets the shipped cast be written and rendered in place. */
-function pregensEditable(): boolean {
-  return useSettingsStore.getState().settings?.editPregens === true
+/** Ends one character's run and cancels every job of hers, queued or running. */
+async function cancelCharacterJobs(charId: string): Promise<void> {
+  activeRuns.delete(charId)
+  await window.api.jobs.cancelGroup(charId)
+  // After the cancel: cancelling emits a progress event per job, which would repopulate the group.
+  useJobStore.getState().clearGroup(charId)
+  cancelledBuckets.delete(charId)
 }
 
 /** `'cgs'` is the CG set's UI name; `'cg'` is its key in the seed records. */
@@ -1426,6 +1464,8 @@ type MissingContentState = Pick<
   | 'rooms'
   | 'progress'
   | 'pregenIds'
+  | 'editedDefaults'
+  | 'defaultsInPlace'
 >
 
 /**
@@ -1441,8 +1481,9 @@ export function missingContentPlan(
   for (const charId of state.order) {
     const character = state.characters[charId]
     if (!character) continue
-    // A locked character renders nothing — main refuses the job.
-    if (isLockedOf(state, charId)) continue
+    // A shipped character nobody has edited stays as shipped: a render would fork her copy.
+    const untouched = !state.defaultsInPlace && !state.editedDefaults.includes(charId)
+    if (isPregenOf(state, charId) && untouched) continue
 
     const progress = state.progress[charId]
     // A character still being written is skipped; a rendering run is appended to.
@@ -2517,19 +2558,9 @@ export function isUnfinished(
 /** The store slices the two shipped-cast reads need. */
 type DefaultsState = Pick<CharacterStoreState, 'order' | 'pregenIds' | 'removedDefaults'>
 
-/** True for a character shipped with the game, dev switch or not; see {@link isLockedOf}. */
+/** True for a character shipped with the game, whether or not she has been edited. */
 export function isPregenOf(state: Pick<DefaultsState, 'pregenIds'>, charId: string): boolean {
   return state.pregenIds.includes(charId)
-}
-
-/** True for a character this build will not write to — not editable, not rendered. */
-export function isLockedOf(state: Pick<DefaultsState, 'pregenIds'>, charId: string): boolean {
-  return isPregenOf(state, charId) && !pregensEditable()
-}
-
-/** {@link isLockedOf} as the list the height lineup's `lockedIds` takes. */
-export function lockedIdsOf(state: Pick<DefaultsState, 'pregenIds'>): string[] {
-  return pregensEditable() ? [] : state.pregenIds
 }
 
 /** The roster as the player has it: every character except the shipped ones he removed. */
@@ -2556,7 +2587,6 @@ export function manageOrderOf(state: ManageOrderState): string[] {
 
   for (const charId of visibleOrderOf(state)) {
     if (isInFlight(state.progress[charId])) running.push(charId)
-    // `isPregenOf`, not `isLockedOf`: the dev switch makes the shipped cast editable, not new.
     else if (isPregenOf(state, charId)) shipped.push(charId)
     else own.push(charId)
   }

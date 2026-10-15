@@ -52,6 +52,8 @@ export function classOutcomeNow(): StatContext['classOutcome'] {
   const game = useGameStore.getState()
   const entry = game.classes[enrolled]
   const attended = game.sceneClass === enrolled
+  // A meeting the professor called off teaches nothing and costs nothing.
+  if (attended && game.sceneEvent?.id === 'classCancelled') return null
 
   if (entry && examOn(entry, game.date, game.calendar) !== null) {
     return kindOf(entry) === 'project' && attended
@@ -273,12 +275,15 @@ export function recordAcademics(ledger: LedgerResponse | null): void {
     })
   } else if (game.sceneClass) {
     const summary = ledger?.classSummary?.trim()
-    const factoid = ledger?.classFactoid?.trim()
+    // A meeting the professor called off is attended and taught nothing, so it asks no question.
+    const cancelled = game.sceneEvent?.id === 'classCancelled'
+    const factoid = cancelled ? undefined : ledger?.classFactoid?.trim()
     game.recordClassMeeting(game.sceneClass, {
       date,
       attended: true,
       ...(summary ? { summary } : {}),
-      ...(factoid ? { factoid } : {})
+      ...(factoid ? { factoid } : {}),
+      ...(cancelled ? { cancelled: true } : {})
     })
   }
 

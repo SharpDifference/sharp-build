@@ -136,7 +136,7 @@ function cardOf(entry: ResolvedSave, sticker: string): SaveGridCard {
   const season: Season = semester?.season ?? 'spring'
   const named =
     semester && Object.keys(entry.record?.semesters ?? {}).length > 0
-      ? `${semesterName(semester.index)} · `
+      ? `${semesterName(semester.index)}\n`
       : ''
   return {
     kind: 'card',

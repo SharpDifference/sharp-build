@@ -362,7 +362,7 @@
     }
   },
   "41": {
-    "class_type": "SaveImage",
+    "class_type": "PreviewImage",
     "_meta": {
       "title": "Save Base"
     },
@@ -370,8 +370,7 @@
       "images": [
         "63",
         0
-      ],
-      "filename_prefix": "venus-university/expression_base"
+      ]
     }
   },
   "62": {

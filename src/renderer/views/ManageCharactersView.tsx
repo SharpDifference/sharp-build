@@ -9,7 +9,6 @@ import { DESKTOP_ONLY_NOTE, isWebBuild } from '../platform'
 import {
   doneCountOf,
   isInFlight,
-  isLockedOf,
   isPregenOf,
   isUnfinished,
   manageOrderOf,
@@ -19,9 +18,8 @@ import {
 import { reshuffleSuggestions } from '../prompts/characterSuggestions'
 import { useComfyStore } from '../stores/comfyStore'
 import { noNsfwImagesOf, useSettingsStore } from '../stores/settingsStore'
-import { useSetupStore } from '../stores/setupStore'
+import { comfyAvailable, useSetupStore } from '../stores/setupStore'
 import { useUiStore } from '../stores/uiStore'
-import { CharacterModal } from './CharacterModal'
 import { EditCharacterModal } from './EditCharacterModal'
 import { GenerateCharacterModal } from './GenerateCharacterModal'
 import { heldScreenTheme } from './clockTheme'
@@ -42,11 +40,21 @@ import {
 import { BackIcon, CloseIcon, DownloadIcon } from './screenIcons'
 import '../vu_styles/ManageCharacters.css'
 
-/** The header chip's wording for each state it reports; a stopped server is a button instead. */
+/**
+ * The header chip's wording for each state it reports, the app's own server's and the player's
+ * own one's; a stopped or forgotten server is a button instead.
+ */
 const COMFY_PILL = {
-  starting: '◌ COMFYUI STARTING…',
-  ready: '● COMFYUI READY',
-  error: '● COMFYUI FAILED'
+  managed: {
+    starting: '◌ COMFYUI STARTING…',
+    ready: '● COMFYUI READY',
+    error: '● COMFYUI FAILED'
+  },
+  external: {
+    starting: '◌ COMFYUI CONNECTING…',
+    ready: '● COMFYUI READY',
+    error: '● COMFYUI FAILED'
+  }
 } as const
 
 /** What a confirm calls her, for a character who may have neither name filled in. */
@@ -63,6 +71,8 @@ export function ManageCharactersView(): JSX.Element {
   const allOrder = useCharacterStore((s) => s.order)
   const pregenIds = useCharacterStore((s) => s.pregenIds)
   const removedDefaults = useCharacterStore((s) => s.removedDefaults)
+  const editedDefaults = useCharacterStore((s) => s.editedDefaults)
+  const defaultsInPlace = useCharacterStore((s) => s.defaultsInPlace)
   const expressions = useCharacterStore((s) => s.expressions)
   const cgs = useCharacterStore((s) => s.cgs)
   const outfits = useCharacterStore((s) => s.outfits)
@@ -83,13 +93,15 @@ export function ManageCharactersView(): JSX.Element {
   const comfyError = useComfyStore((s) => s.error)
   const ensureStarted = useComfyStore((s) => s.ensureStarted)
   const stopComfy = useComfyStore((s) => s.stop)
-  const comfyDeferred = useSettingsStore((s) => s.settings?.comfyDeferred ?? false)
   const setComfyDeferred = useSettingsStore((s) => s.setComfyDeferred)
   // The room renders in the cloud, so its half of the sweep is gated on whichever key draws
   // the pictures.
   const picturesReady = useSettingsStore((s) => (s.settings ? pictureKeySet(s.settings) : false))
   const noNsfwImages = useSettingsStore(noNsfwImagesOf)
-  const comfyInstalled = useSetupStore((s) => s.status?.comfyReady ?? false)
+  const setupStatus = useSetupStore((s) => s.status)
+  const renderable = useSettingsStore((s) => comfyAvailable(s.settings, setupStatus))
+  // The player's own ComfyUI is connected to and let go of, never started or stopped.
+  const ownComfy = useSettingsStore((s) => s.settings?.comfySource === 'external')
   const setView = useUiStore((s) => s.setView)
 
   const [generating, setGenerating] = useState(false)
@@ -124,8 +136,6 @@ export function ManageCharactersView(): JSX.Element {
 
   const deletingCharacter = deleting ? characters[deleting] : null
   const editingCharacter = editing ? characters[editing] : null
-  // A shipped character opens the read-only panel, unless the dev switch is on.
-  const editingIsLocked = editing !== null && isLockedOf({ pregenIds }, editing)
   const deletingIsShipped = deleting !== null && isPregenOf({ pregenIds }, deleting)
 
   // Generation outlives this view, so leaving has to cancel it explicitly.
@@ -151,13 +161,24 @@ export function ManageCharactersView(): JSX.Element {
   const webBuild = isWebBuild()
 
   // Only sprite rendering needs the local install, so this gates the "+" slot.
-  const canGenerate = !webBuild && comfyInstalled && !comfyDeferred
+  const canGenerate = renderable
 
   // Every optional set the roster is short of, off the status maps already
   // loaded; a `load()` here would reset every card.
   const gates = { comfyReady: canGenerate, pictureKeySet: picturesReady, noNsfwImages }
   const missing = missingContentPlan(
-    { characters, order, expressions, cgs, outfits, rooms, progress, pregenIds },
+    {
+      characters,
+      order,
+      expressions,
+      cgs,
+      outfits,
+      rooms,
+      progress,
+      pregenIds,
+      editedDefaults,
+      defaultsInPlace
+    },
     gates
   )
   const missingImages = missing.reduce((total, entry) => total + entry.missing, 0)
@@ -217,7 +238,7 @@ export function ManageCharactersView(): JSX.Element {
             {...gestures(false, quietLift, quietPress)}
             onClick={() => void ensureStarted()}
           >
-            Start ComfyUI
+            {ownComfy ? 'Connect ComfyUI' : 'Start ComfyUI'}
           </motion.button>
         ) : (
           <span className="vu-manage-comfy-wrap">
@@ -225,11 +246,11 @@ export function ManageCharactersView(): JSX.Element {
               className={`vu-manage-comfy vu-manage-comfy--stoppable${comfyTint}`}
               animate={comfyState === 'starting' ? pulse : { opacity: 1 }}
             >
-              {COMFY_PILL[comfyState]}
+              {COMFY_PILL[ownComfy ? 'external' : 'managed'][comfyState]}
             </motion.span>
             <motion.button
               className="vu-x vu-manage-comfy-x"
-              aria-label="Stop ComfyUI"
+              aria-label={ownComfy ? 'Disconnect from ComfyUI' : 'Stop ComfyUI'}
               {...gestures(stopping, quietLift, quietPress)}
               disabled={stopping}
               onClick={() => {
@@ -388,23 +409,14 @@ export function ManageCharactersView(): JSX.Element {
           />
         )}
 
-        {editingCharacter &&
-          (editingIsLocked ? (
-            <CharacterModal
-              key={editingCharacter.charId}
-              character={editingCharacter}
-              theme={theme}
-              library
-              onClose={() => setEditing(null)}
-            />
-          ) : (
-            <EditCharacterModal
-              key={editingCharacter.charId}
-              character={editingCharacter}
-              theme={theme}
-              onClose={() => setEditing(null)}
-            />
-          ))}
+        {editingCharacter && (
+          <EditCharacterModal
+            key={editingCharacter.charId}
+            character={editingCharacter}
+            theme={theme}
+            onClose={() => setEditing(null)}
+          />
+        )}
 
         {deletingCharacter && (
           <ConfirmModal

@@ -339,11 +339,13 @@ export function markCrossingWait(): void {
 /**
  * The same, with the reason written beside the mark, after `begin` — the two screens that call
  * this only know what they are waiting for once a question in front of the curtain is answered.
+ * Null takes the words down again and leaves the wait itself as it stands.
  */
-export function nameCrossingWait(reason: string): void {
+export function nameCrossingWait(reason: string | null): void {
   if (core.phase === 'idle' || core.phase === 'opening') return
   payload = { ...payload, reason }
-  advance('wait')
+  if (reason === null) publish()
+  else advance('wait')
 }
 
 /**

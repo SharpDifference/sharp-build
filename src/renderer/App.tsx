@@ -27,9 +27,11 @@ import { useCharacterStore } from './stores/characterStore'
 import { cancelCrossing, endCrossing } from './stores/crossingStore'
 import { useGameStore } from './stores/gameStore'
 import { useGrabBagStore } from './stores/grabBagStore'
+import { convertLegacyImages } from './stores/legacyImageStore'
 import { useSaveStore } from './stores/saveStore'
 import { useSettingsStore } from './stores/settingsStore'
-import { useSetupStore } from './stores/setupStore'
+import { comfySourceOf } from '@shared/comfyModels'
+import { comfySettled, useSetupStore } from './stores/setupStore'
 import { useUiStore, type ViewName } from './stores/uiStore'
 import { useUpdateStore } from './stores/updateStore'
 import { isWebBuild } from './platform'
@@ -72,16 +74,22 @@ async function boot(): Promise<void> {
     if ((await update.apply()) === null) return
   }
 
+  // Every picture an older build kept as PNG or JPEG is converted to WebP before anything reads
+  // one, captioned on the cover while it runs.
+  await convertLegacyImages()
+
   // Non-fatal: a failed read leaves the grab bags running in memory for the session.
   await useGrabBagStore.getState().load()
 
   // The graph opens as soon as the sliders it mixes against are in.
   useAudioStore.getState().start()
 
-  // A deferred ComfyUI install skips the verify pass outright, and the browser build, which
-  // has no local image generation at all, never asks.
-  const deferred = Boolean(useSettingsStore.getState().settings?.comfyDeferred)
-  if (!isWebBuild() && !deferred) {
+  // A deferred ComfyUI install skips the verify pass outright, as does the player's own ComfyUI,
+  // which has no install of the app's to verify; the browser build, which has no local image
+  // generation at all, never asks.
+  const loaded = useSettingsStore.getState().settings
+  const ownComfy = loaded ? comfySourceOf(loaded) === 'external' : false
+  if (!isWebBuild() && !loaded?.comfyDeferred && !ownComfy) {
     await useSetupStore.getState().refresh()
     if (useUiStore.getState().fatalError) {
       cancelCrossing()
@@ -99,7 +107,6 @@ async function boot(): Promise<void> {
   // so its top button does not change under the player.
   await useSaveStore.getState().loadPlaythroughs()
 
-  const comfyInstalled = Boolean(useSetupStore.getState().status?.comfyReady)
   // The content question is the first run's last step, so an unanswered one is the whole of
   // how a boot knows the run never finished; the screen it opens picks up at whichever stage
   // is still unsettled.
@@ -108,7 +115,8 @@ async function boot(): Promise<void> {
   const writerOk = stored ? writerReady(stored, stored.apiKeySet) : false
 
   // The boot's own cover, raised before the first frame (`main.tsx`), opens here.
-  endCrossing(() => ui.setView(bootView(firstRun, deferred || comfyInstalled, writerOk)))
+  const settled = comfySettled(stored, useSetupStore.getState().status)
+  endCrossing(() => ui.setView(bootView(firstRun, settled, writerOk)))
 }
 
 function App(): JSX.Element {

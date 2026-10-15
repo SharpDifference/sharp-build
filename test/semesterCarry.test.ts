@@ -147,6 +147,10 @@ describe('the clock across the break', () => {
           })
         },
         npcFriendships: [{ a: 'a', b: 'b', date: 40, time: 1 }],
+        inventory: [
+          { itemId: 'rose', count: 1 },
+          { itemId: 'coin', count: 1, from: { charId: 'a', date: 100 } }
+        ],
         npcRelationships: {
           'a|b': { affinity: 30, encounter: { date: 120, kind: 'class', ref: 'X', positive: true } }
         }
@@ -167,6 +171,10 @@ describe('the clock across the break', () => {
     expect(carried.datingSince).toBe(60 - 210)
     expect(carried.brokeUpOn).toBe(110 - 210)
     expect(handoff.carry.npcFriendships?.[0].date).toBe(40 - 210)
+    expect(handoff.carry.inventory).toEqual([
+      { itemId: 'rose', count: 1 },
+      { itemId: 'coin', count: 1, from: { charId: 'a', date: 100 - 210 } }
+    ])
     expect(handoff.carry.npcRelationships['a|b']).toEqual({ affinity: 30 })
 
     // On the next semester's first day, the ending's memory weighs what it did on the ending.
@@ -234,7 +242,8 @@ describe('what a carried entry keeps', () => {
             metSlots: [3],
             ignoredInvitation: true,
             suspicions: [{ subject: 'b', slot: 200 }],
-            romanceScenes: 1
+            romanceScenes: 1,
+            breakPenalty: { points: 12, halved: true }
           })
         }
       }),
@@ -248,10 +257,16 @@ describe('what a carried entry keeps', () => {
     for (const key of ['job', 'metSlots', 'ignoredInvitation', 'suspicions']) {
       expect(carried).not.toHaveProperty(key)
     }
-    expect(carried).toMatchObject({ nameKnown: true, gifts: ['rose'], notes: 'likes jazz', romanceScenes: 1 })
+    expect(carried).toMatchObject({
+      nameKnown: true,
+      gifts: ['rose'],
+      notes: 'likes jazz',
+      romanceScenes: 1,
+      breakPenalty: { points: 12, halved: true }
+    })
   })
 
-  it('folds a graduate’s texting memory into her memories, said as texted, and settles her romance', () => {
+  it('folds a graduate’s texting memory into her memories, said as texted, and settles her romance and break penalty', () => {
     const senior = profile(4)
     const handoff = carryOf(
       input({
@@ -262,7 +277,8 @@ describe('what a carried entry keeps', () => {
               { date: 122, type: 'liked', desc: 'last' }
             ],
             textMemory: { date: 110, type: 'loved', desc: 'the reader sent her a song' },
-            romanceScenes: 1
+            romanceScenes: 1,
+            breakPenalty: { points: 12 }
           })
         }
       }),
@@ -272,6 +288,7 @@ describe('what a carried entry keeps', () => {
 
     expect(carried.textMemory).toBeUndefined()
     expect(carried.romanceScenes).toBeUndefined()
+    expect(carried.breakPenalty).toBeUndefined()
     expect(carried.memories.map((memory) => memory.desc)).toEqual([
       'first',
       'the reader sent her a song over text.',

@@ -602,7 +602,7 @@ export function buildContinuedProfilePrompt(input: ContinuedProfileInput): Struc
  * One array of records keyed by charKey: the shape a record per student has to take, since a
  * record keyed once per student trips Gemini's schema-complexity cap past ten of them.
  */
-function keyedArray(keys: readonly string[], properties: Record<string, unknown>): unknown {
+export function keyedArray(keys: readonly string[], properties: Record<string, unknown>): unknown {
   return {
     type: 'array',
     items: {

@@ -23,6 +23,7 @@ import {
   type Character,
   type CharJob,
   type CharProfile,
+  type CharSecret,
   type EnrollmentDraft,
   type FeedAssignment,
   type HiddenScheduleAssignment,
@@ -65,7 +66,7 @@ import {
   useCrossingStore
 } from '../stores/crossingStore'
 import { slotStampOf } from '../stores/slotCrossing'
-import { lockedIdsOf, spriteUrl, useCharacterStore, visibleOrderOf } from '../stores/characterStore'
+import { spriteUrl, useCharacterStore, visibleOrderOf } from '../stores/characterStore'
 import { useSaveStore } from '../stores/saveStore'
 import { useUiStore } from '../stores/uiStore'
 import { CharacterHeightModal } from './CharacterHeightModal'
@@ -130,8 +131,6 @@ export function NewGameView(): JSX.Element {
     [allOrder, removedDefaults]
   )
   const expressions = useCharacterStore((s) => s.expressions)
-  // The shipped cast, whose heights the lineup below cannot change.
-  const pregenIds = useCharacterStore((s) => s.pregenIds)
   const saveHeights = useCharacterStore((s) => s.saveHeights)
   const load = useCharacterStore((s) => s.load)
   const view = useUiStore((s) => s.view)
@@ -180,6 +179,10 @@ export function NewGameView(): JSX.Element {
   // What each of them does with spring break: one string per girl, read in March.
   const [springBreakPlans, setSpringBreakPlans] = useState<Record<string, string>>(
     resumed?.enrollment.springBreakPlans ?? {}
+  )
+  // The secrets each girl starts the semester with; written onto her entry at Finalize.
+  const [secrets, setSecrets] = useState<Record<string, CharSecret[]>>(
+    resumed?.enrollment.secrets ?? {}
   )
   // The folder the semester above was written into, which Finalize writes the record and the
   // opening save into; null until the enrollment lands, and Finalize then mints one.
@@ -303,6 +306,7 @@ export function NewGameView(): JSX.Element {
       setHaunts(bundle.haunts)
       setFeeds(bundle.feeds)
       setSpringBreakPlans(bundle.springBreakPlans)
+      setSecrets(bundle.secrets ?? {})
       setOccasions(bundle.occasions)
       // No `endCrossing`: the curtain stays down behind the question it is the ground for, and
       // the answer is what ends the menu's crossing.
@@ -488,6 +492,7 @@ export function NewGameView(): JSX.Element {
       feeds: semester.feeds,
       springBreakPlans: semester.springBreakPlans,
       occasions: semester.occasions,
+      secrets: semester.secrets,
       playerFirstName: first,
       playerLastName: last,
       stats,
@@ -534,6 +539,7 @@ export function NewGameView(): JSX.Element {
         setHaunts(outcome.data.haunts)
         setFeeds(outcome.data.feeds)
         setSpringBreakPlans(outcome.data.springBreakPlans)
+        setSecrets(outcome.data.secrets)
         setOccasions(outcome.data.occasions)
         setView('classSelect')
       })
@@ -586,7 +592,7 @@ export function NewGameView(): JSX.Element {
         return
       }
       void (async () => {
-        const semester = { schedules, jobs, haunts, feeds, springBreakPlans, occasions }
+        const semester = { schedules, jobs, haunts, feeds, springBreakPlans, occasions, secrets }
         await enroll(semester, first, last, stats, bio)
         endCrossing(() => setView('classSelect'))
       })()
@@ -617,6 +623,7 @@ export function NewGameView(): JSX.Element {
       feeds: semester.feeds,
       springBreakPlans: semester.springBreakPlans,
       occasions: semester.occasions,
+      secrets: semester.secrets,
       playerFirstName: next.record.playerFirstName,
       playerLastName: next.record.playerLastName,
       stats: handoff.carry.stats,
@@ -834,7 +841,8 @@ export function NewGameView(): JSX.Element {
                 nameKnown: false,
                 ...(job ? { job } : {}),
                 // Omitted for a freshman, whose break was somewhere else.
-                ...(winterFeeds[c.charId]?.length > 0 ? { feed: winterFeeds[c.charId] } : {})
+                ...(winterFeeds[c.charId]?.length > 0 ? { feed: winterFeeds[c.charId] } : {}),
+                ...(secrets[c.charId]?.length > 0 ? { secrets: secrets[c.charId] } : {})
               }
             ]
           })
@@ -1130,10 +1138,10 @@ export function NewGameView(): JSX.Element {
             key="leaving"
             id="new-game-leave"
             theme={theme}
-            title="Leave the next semester?"
-            message="You can continue again from this semester's Goodbyes save."
-            cancelText="Stay"
-            confirmText="Leave"
+            title="Return to main menu?"
+            message="You can return to this screen by going home on your Goodbyes save."
+            cancelText="Cancel"
+            confirmText="Return to main menu"
             onCancel={() => setLeaving(false)}
             onConfirm={() => {
               setLeaving(false)
@@ -1169,7 +1177,6 @@ export function NewGameView(): JSX.Element {
             key="heights"
             roster={roster}
             theme={theme}
-            lockedIds={lockedIdsOf({ pregenIds })}
             onConfirm={(scales) => {
               // Written to the characters themselves; the roster takes the records
               // back so `enterGame` stages the heights just written.

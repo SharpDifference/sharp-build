@@ -66,6 +66,8 @@ const SAVE_REQUIRED: Record<
     | 'semester'
     | 'formerJobs'
     | 'transcript'
+    | 'homecomingVisitor'
+    | 'sceneEventsFired'
   >,
   true
 > = {
@@ -133,7 +135,7 @@ const RECORD_REQUIRED: Record<keyof Omit<PlaythroughRecord, 'name' | 'semesters'
  * the fields an enrollment written before them lacks are optional on the type and omitted here.
  */
 const ENROLLMENT_REQUIRED: Record<
-  keyof Omit<Enrollment, 'bio' | 'tokensGenerated' | 'continued'>,
+  keyof Omit<Enrollment, 'bio' | 'tokensGenerated' | 'continued' | 'secrets'>,
   true
 > = {
   schemaVersion: true,
@@ -169,7 +171,10 @@ export const SAVE_UNREADABLE = { code: 'SAVE_UNREADABLE', message: 'Could not re
 export const SAVE_NOT_FOUND = { code: 'SAVE_NOT_FOUND', message: 'That save no longer exists.' }
 
 /** What every semester past the first must carry: the record's own fields for it and its log. */
-const SEMESTER_REQUIRED: Record<keyof Omit<SemesterRecord, 'parent' | 'fallGraduate'>, true> = {
+const SEMESTER_REQUIRED: Record<
+  keyof Omit<SemesterRecord, 'parent' | 'fallGraduate' | 'breakDecay'>,
+  true
+> = {
   index: true,
   chars: true,
   alumni: true,

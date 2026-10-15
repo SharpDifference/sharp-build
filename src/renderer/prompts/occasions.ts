@@ -26,7 +26,7 @@ const SPRING_HOLIDAYS: readonly Occasion[] = [
     id: 'valentines',
     title: "Valentine's Day",
     description:
-      "On Valentine's Day, every florist and sweets counter in Veridan is picked clean by noon, the Pastel Palace has a queue out the door, and the SEB hangs paper hearts off everything on the Rose Road that will hold one.",
+      'On Valentine\'s Day, couples queue for photos where Gold crosses Rose to re-create the poster for "Love Between Gods". The CAPC hangs paper hearts with love fortunes all around campus for people to open, and Pastel Palace offers free chocolates to couples.',
     startDate: 26, // Saturday, February 14
     endDate: 26,
     time: null,
@@ -37,7 +37,7 @@ const SPRING_HOLIDAYS: readonly Occasion[] = [
     id: 'mardi-gras',
     title: 'Mardi Gras',
     description:
-      'On Mardi Gras, Stanchion Street lights up with the official parade that includes the VU Marching Band and a lush CAPC floral installation on a float. Expect about a quarter of VU students to be drunk by six PM.',
+      'On Mardi Gras, Stanchion Street lights up with an official parade that includes the VU Marching Band and a lush CAPC floral installation on a float. Expect about a quarter of VU students to be drunk by six PM.',
     startDate: 29, // Tuesday, February 17
     endDate: 29,
     time: null,
@@ -48,7 +48,7 @@ const SPRING_HOLIDAYS: readonly Occasion[] = [
     id: 'st-patricks',
     title: "St. Patrick's Day",
     description:
-      "On St. Patrick's Day, green is everywhere it can be got away with, drinks at Stalestein are dyed, and the VU campus comes alive with CAPC greenery and rainbow displays. The SEB organizes a scavenger hunt for limited-edition wishing coins.",
+      "On St. Patrick's Day, green decorations litter every possible surface, drinks at Stalestein are dyed, and the VU campus comes alive with CAPC greenery and rainbow displays. The SEB also organizes a scavenger hunt for limited-edition wishing coins.",
     startDate: 57, // Tuesday, March 17
     endDate: 57,
     time: null,
@@ -59,7 +59,7 @@ const SPRING_HOLIDAYS: readonly Occasion[] = [
     id: 'april-fools',
     title: "April Fool's Day",
     description:
-      "On April Fool's Day, somebody has done something to the Venus statue, half the doors in the Lowrises are papered over, and nothing anyone tells you today should be believed on the first pass.",
+      "On April Fool's Day, students compete to be the first to do something funny to the Venus statue, while dining halls serve a special menu of mystery dishes.",
     startDate: 72, // Wednesday, April 1
     endDate: 72,
     time: null,
@@ -70,7 +70,7 @@ const SPRING_HOLIDAYS: readonly Occasion[] = [
     id: 'easter',
     title: 'Easter Sunday',
     description:
-      'Easter Sunday is a popular time for families to visit students. The egg hunt in Green Hill Park draws large crowds and many restaurants offer a special brunch menu.',
+      'Easter Sunday is a popular time for families to visit students, and many restaurants offer a special brunch menu. The egg hunt in Green Hill Park draws large crowds of adults too, since whoever finds the single golden egg is said to be engaged within the year.',
     startDate: 76, // Sunday, April 5
     endDate: 76,
     time: null,
@@ -103,7 +103,7 @@ const SPRING_HOLIDAYS: readonly Occasion[] = [
     id: 'cinco-de-mayo',
     title: 'Cinco de Mayo',
     description:
-      'On Cinco de Mayo, Lotterdale Market hosts Mexican music performances and sells traditional trinkets. Every dining hall from the Agora to the Lowrise communal kitchens has a special menu, and the SEB hosts a salsa dance night in the Quad.',
+      'On Cinco de Mayo, Lotterdale Market hosts Mexican music performances and sells traditional trinkets. Dining halls serve a special menu of authentic Mexican cuisine, and the SEB throws a salsa dance night in the Quad.',
     startDate: 106, // Tuesday, May 5
     endDate: 106,
     time: null,
@@ -114,7 +114,7 @@ const SPRING_HOLIDAYS: readonly Occasion[] = [
     id: 'mothers-day',
     title: "Mother's Day",
     description:
-      "On Mother's Day, students fend off visits or calls from their family and every restaurant in town is packed to the brim.",
+      "On Mother's Day, students fend off visits or calls from their family and every restaurant in town is packed to the brim. Many restaurants offer special menus and desserts to celebrate the occasion.",
     startDate: 111, // Sunday, May 10
     endDate: 111,
     time: null,
@@ -129,7 +129,7 @@ const SPRING_ACADEMIC: readonly Occasion[] = [
     id: 'orientation',
     title: 'Freshman Orientation',
     description:
-      'Freshman orientation. No classes meet: the entire first-year intake is being walked around campus in groups, handed lanyards and shown where the Agora is, and the SEB has a welcome mixer running in the Quad until late night.',
+      'During Freshman Orientation, no classes meet while the first-year intake is paraded around campus in groups to play games and learn about campus resources. The SEB has a welcome mixer running in the Quad until late night for freshmen to mingle with upperclassmen.',
     startDate: 0, // Monday, January 19
     endDate: 0,
     time: null,
@@ -140,7 +140,7 @@ const SPRING_ACADEMIC: readonly Occasion[] = [
     id: 'add-drop',
     title: 'Add/Drop Deadline',
     description:
-      'The add/drop deadline — the last day of the semester a student can change their class schedule. Classes still meet. The registrar closes enrollment at midnight, so anybody still unsure about a course has spent the week sitting in on the alternatives, and dropping one today is final: a dropped class cannot be picked back up.',
+      'The Add/Drop deadline on February 13 is the last day of the semester a student can change their class schedule. Registration closes at midnight and dropped classes cannot be re-enrolled in.',
     startDate: 25, // Friday, February 13
     endDate: 25,
     time: null,
@@ -151,7 +151,7 @@ const SPRING_ACADEMIC: readonly Occasion[] = [
     id: 'presidents-day',
     title: "Presidents' Day",
     description:
-      "Presidents' Day. Campus is closed and there are no classes, and students are everywhere in the city enjoying their long weekend.",
+      "On Presidents' Day, the campus is closed and there are no classes, and students are everywhere in the city enjoying their long weekend. Most restaurants in town offer discounted lunch and dinner specials to draw VU students in.",
     startDate: 28, // Monday, February 16
     endDate: 28,
     time: null,
@@ -162,7 +162,7 @@ const SPRING_ACADEMIC: readonly Occasion[] = [
     id: 'midterm-week',
     title: 'Midterm Week',
     description:
-      'Midterm week. All classes have exams or project showcases. Kendall Library is full to the walls, the Agora study pods are impossible to get, and everybody is running on too little sleep. Spring break starts the moment it is over, which is the only thing keeping anybody upright.',
+      'All classes have exams or showcases during Midterm week. The SEB pairs students up with study buddies and the Library and the Agora are open 24 hours, with snack stations operated by local businesses. Spring break follows immediately after.',
     startDate: 42, // Monday, March 2
     endDate: 46, // Friday, March 6
     time: null,
@@ -173,7 +173,7 @@ const SPRING_ACADEMIC: readonly Occasion[] = [
     id: 'spring-break',
     title: 'Spring Break',
     description:
-      'Spring break. No classes all week. Half the campus has gone home or somewhere exotic, and the half still here has the campus almost to itself.',
+      'VU campus closes for a week during Spring Break. Most students go home or somewhere exotic, while the rest enjoy a sleepy, quieter atmosphere on campus.',
     startDate: 49, // Monday, March 9
     endDate: 53, // Friday, March 13
     time: null,
@@ -184,7 +184,7 @@ const SPRING_ACADEMIC: readonly Occasion[] = [
     id: 'lottery-day',
     title: 'Lottery Day',
     description:
-      "On Lottery Day, the draw that decides next year's intake is performed. Superstitious types rub the Venus statue's foot for anybody they know who entered. Numbered lots are pulled live on the Thorne Auditorium stage and put up on screens across campus, CAPC hangs the drawn numbers as banners down the Rose Road. Parties celebrating the anniversary of getting into VU continue late into the night on the quad or in townhouses.",
+      "On Lottery Day, the draw that decides next year's intake is performed. Superstitious types rub the Venus statue's foot for anybody they know who entered. Numbered lots are pulled live on the Thorne Auditorium stage and put up on screens across campus, and CAPC hangs the drawn numbers as banners on the Rose Road. Parties celebrating the anniversary of getting into VU continue late into the night, like the SEB-sponsored one on the quad.",
     startDate: 67, // Friday, March 27
     endDate: 67,
     time: null,
@@ -195,7 +195,7 @@ const SPRING_ACADEMIC: readonly Occasion[] = [
     id: 'good-friday',
     title: 'Good Friday',
     description:
-      'On Good Friday, the university closes and no classes meet, a long weekend unique to VU\'s schedule.',
+      'On Good Friday, VU cancels classes and provides a long weekend unique to VU\'s schedule. The Riverside Mall traditionally hosts a massive Good Friday sale.',
     startDate: 74, // Friday, April 3
     endDate: 74,
     time: null,
@@ -206,7 +206,7 @@ const SPRING_ACADEMIC: readonly Occasion[] = [
     id: 'thorne-day',
     title: 'Thorne Day',
     description:
-      'Thorne Day is an academic holiday celebrating the university’s founder, and the university is closed. Thorne personally gives a speech from the auditorium stage about the importance of social connection, and SEB hosts a full day of events in the Quad, including a student talent show and speed-dating tables.',
+      'Thorne Day is an academic holiday celebrating the university’s founder during which no classes meet. Thorne personally gives a speech from the auditorium stage about the importance of social connection, and SEB hosts a full day of events in the Quad, including a student talent show and speed-dating tables.',
     startDate: 88, // Friday, April 17
     endDate: 88,
     time: null,
@@ -218,7 +218,7 @@ const SPRING_ACADEMIC: readonly Occasion[] = [
     id: 'last-day-of-classes',
     title: 'Last day of classes',
     description:
-      'The last day of classes. Every lecture hall on campus is holding its final ordinary meeting of the semester, professors are cramming a term of loose ends into fifty minutes, and people keep saying goodbye to rooms they will not sit in again.',
+      'VU\'s last day of classes is May 7. With finals looming, many students hold group study sessions, while others throw big celebration parties.',
     startDate: 108, // Thursday, May 7
     endDate: 108,
     time: null,
@@ -229,7 +229,7 @@ const SPRING_ACADEMIC: readonly Occasion[] = [
     id: 'reading-day',
     title: 'Reading Day',
     description:
-      'Reading day. Classes have stopped and finals have not started: one quiet, strange Friday of nothing but studying, with every flat surface in Kendall Library already spoken for.',
+      'On Reading Day, VU cancels classes to give students a quiet Friday to study. The university partners with food trucks that park around campus to provide meals and beverages.',
     startDate: 109, // Friday, May 8
     endDate: 109,
     time: null,
@@ -241,7 +241,7 @@ const SPRING_ACADEMIC: readonly Occasion[] = [
     id: 'finals-week',
     title: 'Finals Week',
     description:
-      'Finals week. Every class meets once more, as its exam. Nobody is sleeping properly, the Reserve Bank Cafe has stopped closing, and the mood on campus swings between grim and giddy by the hour.',
+      'During Finals week, final exams and showcases are held for all classes. Like Midterm week, Kendall Library and the Agora are open 24 hours. The SEB hosts spontaneous stress-relief events in the quad for passing students, including therapy dog visits and meditation sessions.',
     startDate: 112, // Monday, May 11
     endDate: 116, // Friday, May 15
     time: null,
@@ -253,7 +253,7 @@ const SPRING_ACADEMIC: readonly Occasion[] = [
     id: 'summer-vacation',
     title: 'Summer Vacation',
     description:
-      'Summer vacation, which has technically already started — finals are marked and nothing meets again. Half of campus is packing, cars are double-parked outside every Lowrise, and people are leaving a few at a time. Whoever is left is waiting on the graduation ceremony on Friday, May 22, and going home after it.',
+      'Once finals are over, summer vacation starts. Most students stay on campus until the graduation ceremony on Friday, May 22, during which farewell parties are thrown and rooms are cleaned in preparation to leave for the summer. The town starts to fill up with visiting parents.',
     startDate: 117, // Saturday, May 16
     endDate: 122, // Thursday, May 21
     time: null,
@@ -264,7 +264,7 @@ const SPRING_ACADEMIC: readonly Occasion[] = [
     id: 'graduation',
     title: 'Graduation Day',
     description:
-      "Graduation day, and the last day of the semester. The Quad is full of chairs and gowns and somebody's crying parents, the seniors are leaving, and everyone else is packing up a room they will not see again until autumn.",
+      "Graduation Day is the official end of the semester. Campus is chock full of the cars of visiting families, and the quad is converted into a massive ceremony space with floral arrangements and plenty of shade.",
     startDate: 123, // Friday, May 22 — FINAL_DATE
     endDate: 123,
     time: null,
@@ -279,7 +279,7 @@ const FALL_HOLIDAYS: readonly Occasion[] = [
     id: 'selkie-send-off',
     title: 'Selkie Summer Send-Off',
     description:
-      "The Selkie Summer Send-Off is Labor Day weekend's last hurrah at Selkie Beach: three days of DJs, volleyball nets and bonfires along the shore, thrown by the company that owns the beach. Half of VU turns up in swimsuits to pretend the summer isn't over, and the Loop runs packed trams to the Promenade until well past midnight.",
+      "The Selkie Summer Send-Off is a three-day Labor Day weekend party thrown by the company that owns Selkie Beach, with DJs, volleyball nets and bonfires along the shore. After a couple was caught screwing near the cliffs during the first one, daring couples attempt the 'Sex on the Beach' challenge every year now.",
     startDate: 19, // Saturday, September 5
     endDate: 21, // Monday, September 7
     time: null,
@@ -290,7 +290,7 @@ const FALL_HOLIDAYS: readonly Occasion[] = [
     id: 'oktoberfest',
     title: 'Oktoberfest',
     description:
-      'Oktoberfest comes to Veridan for a weekend of steins, pretzels and brass bands. Beer tents go up all over town, Stalestein swaps its taps for a German menu, the market stalls sell bratwurst by the yard, and anybody wearing lederhosen gets a free round somewhere.',
+      'During Oktoberfest, parades of people in traditional German dress march around the city, offering free beer to passerby. Most students ditch class to drink, so most professors know not to schedule anything important.',
     startDate: 40, // Saturday, September 26
     endDate: 40,
     time: null,
@@ -301,7 +301,7 @@ const FALL_HOLIDAYS: readonly Occasion[] = [
     id: 'halloween',
     title: 'Halloween',
     description:
-      'On Halloween, Veridan dresses up. The Lowrises run a costume crawl from building to building, every bar on Stanchion Street holds a costume contest, CAPC has carved a pumpkin for every planter on the Rose Road, and the SEB screens horror movies on the Quad after dark.',
+      "On Halloween, CAPC trucks in autumn leaves to scatter down the Rose Road to set the mood despite Veridan's eternal spring. Costumed trick-or-treaters knock on Lowrise and Elysium doors, joining in on any parties they find.",
     startDate: 75, // Saturday, October 31
     endDate: 75,
     time: null,
@@ -312,7 +312,7 @@ const FALL_HOLIDAYS: readonly Occasion[] = [
     id: 'dia-de-los-muertos',
     title: 'Día de los Muertos',
     description:
-      'On Día de los Muertos, marigolds, sugar skulls and pan de muerto fill the market stalls, families build ofrendas in shop windows across Downtown, and the SEB leads a candlelit procession through campus in the evening.',
+      'On Día de los Muertos, the Veridan Museum hosts an ofrenda for the Girl at the Window and other nameless deceased. At night, CAPC lights candles along the road, while the SEB distributes sugar skulls and hot chocolate to students in the quad.',
     startDate: 77, // Monday, November 2
     endDate: 77,
     time: null,
@@ -323,7 +323,7 @@ const FALL_HOLIDAYS: readonly Occasion[] = [
     id: 'friday-the-13th',
     title: 'Friday the 13th',
     description:
-      'On Friday the 13th, half of campus is pretending to be superstitious and the other half actually is. The cinema runs a horror marathon, the arcade holds a "cursed" tournament, and nobody will walk under the scaffolding outside Kendall Library.',
+      "On Friday the 13th, Future Cinema runs a horror marathon from dawn til dusk. The SEB randomly cuts power briefly in buildings to spook students, and students flock to CuteTea for their 'Lucky Tea` that comes in a limited edition mug.",
     startDate: 88, // Friday, November 13
     endDate: 88,
     time: null,
@@ -334,7 +334,7 @@ const FALL_HOLIDAYS: readonly Occasion[] = [
     id: 'thanksgiving',
     title: 'Thanksgiving',
     description:
-      "On Thanksgiving, VU's Friendsgiving takes over every dining hall and Lowrise kitchen: long tables of turkey, stuffing and pie for everybody on campus, which this year is everybody, and the restaurants in town serve set holiday menus to whoever is left.",
+      "On Thanksgiving, VU's Friendsgiving takes over every Lowrise kitchen and Elysium lounge, and even the most introverted are dragged to potlucks, parties, and dinners.",
     startDate: 101, // Thursday, November 26
     endDate: 101,
     time: null,
@@ -345,7 +345,7 @@ const FALL_HOLIDAYS: readonly Occasion[] = [
     id: 'black-friday',
     title: 'Black Friday',
     description:
-      'On Black Friday, Riverside Mall opens at dawn to a line around the block, every shop in town has a doorbuster sale, and the trams are full of shopping bags until late.',
+      'On Black Friday, Riverside Mall opens at dawn to a line around the block, and even its upper floor become a battle ground for discounted electronics, luxury goods, and more. Locals shop the Silktown Friday sale at Lotterdale Market instead.',
     startDate: 102, // Friday, November 27
     endDate: 102,
     time: null,
@@ -360,7 +360,7 @@ const FALL_ACADEMIC: readonly Occasion[] = [
     id: 'orientation',
     title: 'Freshman Orientation',
     description:
-      'Freshman orientation for the fall intake. No classes meet: the new first-years are being walked around campus in groups, handed lanyards and shown where the Agora is, everybody else is moving back in after the summer, and the SEB has a welcome mixer running in the Quad until late night.',
+      "During Freshman Orientation, no classes meet while the fall's first-year intake is paraded around campus in groups to play games and learn about campus resources. Everyone else takes the time to get settled in after summer vacation. The SEB has a welcome mixer running in the Quad late into the night for freshmen to mingle with upperclassmen.",
     startDate: 0, // Monday, August 17
     endDate: 0,
     time: null,
@@ -371,7 +371,7 @@ const FALL_ACADEMIC: readonly Occasion[] = [
     id: 'labor-day',
     title: 'Labor Day',
     description:
-      'Labor Day. Campus is closed and there are no classes, and half the city is spending the long weekend at the beach or out on the river.',
+      "On Labor Day, campus is closed and there are no classes. A big picnic and barbecue is traditionally held in Green Hill Park and is packed with students, locals, and visiting families.",
     startDate: 21, // Monday, September 7
     endDate: 21,
     time: null,
@@ -382,7 +382,7 @@ const FALL_ACADEMIC: readonly Occasion[] = [
     id: 'add-drop',
     title: 'Add/Drop Deadline',
     description:
-      'The add/drop deadline — the last day of the semester a student can change their class schedule. Classes still meet. The registrar closes enrollment at midnight, so anybody still unsure about a course has spent the week sitting in on the alternatives, and dropping one today is final: a dropped class cannot be picked back up.',
+      'The Add/Drop deadline is the last day of the semester a student can change their class schedule. Registration closes at midnight and dropped classes cannot be re-enrolled in.',
     startDate: 25, // Friday, September 11
     endDate: 25,
     time: null,
@@ -393,7 +393,7 @@ const FALL_ACADEMIC: readonly Occasion[] = [
     id: 'midterm-week',
     title: 'Midterm Week',
     description:
-      'Midterm week. All classes have exams or project showcases. Kendall Library is full to the walls, the Agora study pods are impossible to get, and everybody is running on too little sleep and too much pumpkin spice.',
+      'All classes have exams or showcases during Midterm week. The SEB pairs students up with study buddies and the Library and the Agora are open 24 hours, with relaxation stations operated by local businesses.',
     startDate: 49, // Monday, October 5
     endDate: 53, // Friday, October 9
     time: null,
@@ -401,10 +401,32 @@ const FALL_ACADEMIC: readonly Occasion[] = [
     kind: 'academic'
   },
   {
+    id: 'homecoming-game',
+    title: 'Homecoming Game',
+    description:
+      'The Homecoming Game is the most important football game of the year. Palaestra stadium fills with spectators as the Cupids play a rival school. The CAPC throws a decadent halftime show with student dancers accompanied by the VU Marching Band, and the pre-game tailgate party starts right back up after the game ends. Later in the day, the Homecoming Dance is held.',
+    startDate: 61, // Saturday, October 17
+    endDate: 61,
+    time: 0,
+    cancelsClasses: false,
+    kind: 'academic'
+  },
+  {
+    id: 'homecoming-dance',
+    title: 'Homecoming Dance',
+    description:
+      "The Homecoming Dance is a semi-formal occasion held in Palaestra's biggest gymnasium. The CAPC converts the gym to a Roman-themed venue with real marble columns hung with glittery gold balloons. SEB photographers prowl the floor searching for the best-dressed couples.",
+    startDate: 61, // Saturday, October 17
+    endDate: 61,
+    time: 1,
+    cancelsClasses: false,
+    kind: 'academic'
+  },
+  {
     id: 'thanksgiving-break',
     title: 'Thanksgiving Break',
     description:
-      "Thanksgiving break. No classes all week. VU's Friendsgiving keeps the whole campus here rather than scattering everybody home: the dining halls and the Lowrise kitchens are cooking for everyone, and the week is one long holiday on campus.",
+      "Classes are cancelled for the week of Thanksgiving Break, but most students stay on campus. All dining halls offer a special Thanksgiving menu that even some locals come in to enjoy.",
     startDate: 98, // Monday, November 23
     endDate: 102, // Friday, November 27
     time: null,
@@ -416,7 +438,7 @@ const FALL_ACADEMIC: readonly Occasion[] = [
     id: 'last-day-of-classes',
     title: 'Last day of classes',
     description:
-      'The last day of classes. Every lecture hall on campus is holding its final ordinary meeting of the semester, professors are cramming a term of loose ends into fifty minutes, and people keep saying goodbye to rooms they will not sit in again.',
+      "VU's last day of classes is December 3. Traditionally, a winter-themed game night is held in the Pino-Cola Lounge.",
     startDate: 108, // Thursday, December 3
     endDate: 108,
     time: null,
@@ -427,7 +449,7 @@ const FALL_ACADEMIC: readonly Occasion[] = [
     id: 'reading-day',
     title: 'Reading Day',
     description:
-      'Reading day. Classes have stopped and finals have not started: one quiet, strange Friday of nothing but studying, with every flat surface in Kendall Library already spoken for.',
+      'On Reading Day, VU cancels classes to give students a quiet Friday to study. Veridan businesses pop-up on campus in booths selling snacks, stationery, and care packages for the upcoming finals week.',
     startDate: 109, // Friday, December 4
     endDate: 109,
     time: null,
@@ -439,7 +461,7 @@ const FALL_ACADEMIC: readonly Occasion[] = [
     id: 'finals-week',
     title: 'Finals Week',
     description:
-      'Finals week. Every class meets once more, as its exam. Nobody is sleeping properly, the Reserve Bank Cafe has stopped closing, and the mood on campus swings between grim and giddy by the hour.',
+      'During Finals week, final exams and showcases are held for all classes. The CAPC sets up winter-themed study booths along the quad to ease Agora and Library occupancy.',
     startDate: 112, // Monday, December 7
     endDate: 116, // Friday, December 11
     time: null,
@@ -451,7 +473,7 @@ const FALL_ACADEMIC: readonly Occasion[] = [
     id: 'winter-vacation',
     title: 'Winter Vacation',
     description:
-      'Winter vacation, which has technically already started — finals are marked and nothing meets again. Half of campus is packing for the holidays, cars are double-parked outside every Lowrise, and people are leaving a few at a time. Whoever is left is waiting on the fall graduation ceremony on Friday, December 18, and going home after it.',
+      'Once finals are over, winter vacation starts. Most students stay on campus until the fall graduation ceremony on Friday, December 18, during which farewell parties are thrown and rooms are packed up for the holidays. CAPC lines the Rose Road with fake snow to combat Veridan\'s eternal spring, and the town starts to fill up with visiting parents.',
     startDate: 117, // Saturday, December 12
     endDate: 122, // Thursday, December 17
     time: null,
@@ -462,7 +484,7 @@ const FALL_ACADEMIC: readonly Occasion[] = [
     id: 'graduation',
     title: 'Fall Graduation',
     description:
-      'Fall graduation, and the last day of the semester. The Quad is full of chairs and gowns for the December ceremony, the seniors finishing this term are leaving for good, and everyone else is packing for winter break.',
+      'Fall Graduation is the official end of the semester. Campus is chock full of the cars of visiting families, and the CAPC converts the quad into a heated outdoor space for the graduation ceremony, though the weather is still far from normal winter temperatures elsewhere.', 
     startDate: 123, // Friday, December 18 — FINAL_DATE
     endDate: 123,
     time: null,
@@ -567,6 +589,8 @@ const OUTING_OCCASION_IDS: ReadonlySet<string> = new Set([
   'thorne-day',
   'selkie-send-off',
   'oktoberfest',
+  'homecoming-game',
+  'homecoming-dance',
   'halloween',
   'dia-de-los-muertos',
   'friday-the-13th',
@@ -763,6 +787,9 @@ export const GRADUATION_DATE = spanOf('spring', 'graduation').startDate
  * Inclusive: the deadline day itself is still open.
  */
 export const ADD_DROP_DATE = spanOf('spring', 'add-drop').startDate
+
+/** The fall's Homecoming day: the game in the day, the dance at night. */
+export const HOMECOMING_DATE = spanOf('fall', 'homecoming-game').startDate
 
 /** The two weeks nobody has anything to study for — {@link hauntClosedOn}'s second rule. */
 function breakWeeksOf(season: Season): CalendarSpan[] {

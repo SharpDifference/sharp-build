@@ -1,4 +1,5 @@
 import { areNpcFriends, npcFriendsOf, type NpcRelationshipMap } from './npcRelationships'
+import { PASSERBY_CHANCE } from './odds'
 import { readerize } from './readerVoice'
 import { andList } from './sentences'
 import { shuffle } from './shuffle'
@@ -12,9 +13,6 @@ import type { CharInfo, CharMemory, IntimateAct, Suspicion } from './types'
 
 /** The window a suspicion lives in, in global slots — a week. */
 const SUSPICION_SLOTS = 14
-
-/** The odds one girl with nowhere to be walks past an hour nobody else was there for. */
-const PASSERBY_CHANCE = 0.25
 
 /**
  * Files a jealousy memory, refreshing rather than duplicating: one that says the same in either

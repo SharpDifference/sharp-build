@@ -58,6 +58,7 @@ import {
   type SaveReadResult,
   type SemesterRecord
 } from '@shared/types'
+import { storedBlob } from '../webp'
 import {
   database,
   partRange,
@@ -762,10 +763,11 @@ export async function readEndingArt(
 /** Keeps a semester's graduation picture beside the playthrough it belongs to. */
 export async function writeEndingArt(
   playthroughId: string,
-  blob: Blob,
+  picture: Blob,
   semesterId?: string
 ): Promise<void> {
   const key = endingArtKey(playthroughId, semesterId)
+  const blob = await storedBlob(picture, false)
   await storage('save the graduation picture', async () =>
     (await database()).put('endingArt', blob, key)
   )
@@ -781,8 +783,9 @@ export async function readProfilePicture(playthroughId: string): Promise<Uint8Ar
 }
 
 /** Keeps the reader's own picture beside the playthrough it belongs to. */
-export async function writeProfilePicture(playthroughId: string, blob: Blob): Promise<void> {
+export async function writeProfilePicture(playthroughId: string, picture: Blob): Promise<void> {
   assertSafePlaythroughId(playthroughId)
+  const blob = await storedBlob(picture, false)
   await storage('save the profile picture', async () =>
     (await database()).put('profilePictures', blob, playthroughId)
   )

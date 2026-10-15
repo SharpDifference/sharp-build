@@ -5,6 +5,7 @@ import { jobDefOf, shiftSlotOf } from '@shared/jobs'
 import { ROOM_LOCATION } from '@shared/locations'
 import { classSlotOf, hauntClosedOn, jobClosedOn } from '../prompts/occasions'
 import { charJobAt, shiftWeekdayOf } from '../prompts/gameDate'
+import { isHomecomingVisit } from '../prompts/homecoming'
 import { isMoodHomebound } from '../prompts/moods'
 import type { Commitment } from '../prompts/slotIntroPrompt'
 import { isAwayForSpringBreak } from '../prompts/springBreak'
@@ -64,10 +65,30 @@ export function charJobNow(charId: string, date?: number, time?: TimeSlot): stri
   return jobClosedOn(jobId, on, game.calendar) ? null : jobId
 }
 
-/** True while `charId` is off campus: away for spring break, or graduated and gone from Veridan. */
+/** The graduate back in town on `date`, defaulting to today: Homecoming's visitor, or null. */
+export function homecomingVisitorNow(date?: number): string | null {
+  const game = useGameStore.getState()
+  if (!isHomecomingVisit(game.calendar.season, date ?? game.date)) return null
+  return game.homecomingVisitor
+}
+
+/**
+ * Everybody a scene may cast or a classifier may name on `date`, defaulting to today: the
+ * roster, and Homecoming's visitor.
+ */
+export function castableIds(date?: number): string[] {
+  const game = useGameStore.getState()
+  const visitor = homecomingVisitorNow(date)
+  return visitor && !game.chars.includes(visitor) ? [...game.chars, visitor] : game.chars
+}
+
+/**
+ * True while `charId` is off campus: away for spring break, or graduated and gone from Veridan
+ * on any day but the Homecoming she is back for.
+ */
 export function charAwayNow(charId: string, date?: number): boolean {
   const game = useGameStore.getState()
-  if (game.alumni.includes(charId)) return true
+  if (game.alumni.includes(charId)) return homecomingVisitorNow(date) !== charId
   return isAwayForSpringBreak(game.springBreakAway, charId, date ?? game.date)
 }
 
@@ -158,6 +179,8 @@ export function charHiddenLocationNow(
   if (charBusyNow(charId, on, half)) return null
   // Before the homebound branch, load-bearing: a girl abroad is not in her dorm room.
   if (charAwayNow(charId, on)) return null
+  // A graduate back for the day keeps no room or haunt in Veridan.
+  if (game.alumni.includes(charId)) return null
   if (isMoodHomebound(on, game.charInfo[charId]?.moodCycleOffset ?? 0)) return ROOM_LOCATION
   return (
     charOverlayGroupNow(charId, on, half)?.location ??
