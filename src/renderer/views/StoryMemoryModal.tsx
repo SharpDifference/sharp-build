@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom'
 import { motion } from 'motion/react'
 import {
   normalizeStoryMemory,
+  editStoryEncounter,
   STORY_CATEGORIES,
   STORY_FACT_LIMIT,
   storySlot,
@@ -148,10 +149,7 @@ export function StoryMemoryModal({
     if (!draft?.text.trim()) return
     void change((s) => {
       if (draft.kind === 'encounter')
-        return {
-          ...s,
-          encounterEdits: { ...s.encounterEdits, [draft.id]: { text: draft.text.trim() } }
-        }
+        return editStoryEncounter(s, draft.id, draft.text)
       const fact: StoryFact = {
         ...draft,
         id: draft.id || `manual:${crypto.randomUUID()}`,

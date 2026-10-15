@@ -4,6 +4,7 @@ import { settleWhisperConfession, whisperCanConfess, whisperIdentityKnown, type 
 import type { PromptState } from '../prompts/scenePrompt'
 import type { RequestSpots, SlotSettled } from '../mods/hooks'
 import { useGameStore } from './gameStore'
+import { isGraduationSlot } from '../prompts/graduation'
 
 /** A prompt must belong to the active campaign; replays and scene-creator previews are inert. */
 export function whisperIdentityContext(state: PromptState, cast: readonly Character[]): WhisperIdentityContext | null {
@@ -11,13 +12,14 @@ export function whisperIdentityContext(state: PromptState, cast: readonly Charac
   if (!game.playthroughId || game.createdScene || game.replaying || state.playthroughId !== game.playthroughId ||
       state.date !== game.date || state.time !== game.time) return null
   return { whisper: game.exVenusWhisper, term: whisperTerm(game), date: state.date, time: state.time, cast,
+    firstDiscoveryAvailable: !isGraduationSlot(game.date, game.time),
     charInfo: state.charInfo, classCode: state.classCode, jobId: state.jobId, visitJobId: state.visitJobId }
 }
 
 /** Adds a small evidence field to the existing scene ledger; no separate generation request. */
 export function whisperConfessionRequest(request: StructuredRequest, { state, charKeys }: RequestSpots['ledger']): StructuredRequest {
   const game = useGameStore.getState()
-  const cast = Object.values(game.characters).filter(c => charKeys.includes(charKeyOf(c.firstName, c.lastName)))
+  const cast = Object.values(game.characters).filter(c => charKeys.includes(charKeyOf(c.firstName, c.lastName)) && !game.departed.includes(c.charId))
   const ctx = whisperIdentityContext(state, cast)
   if (!ctx || !whisperCanConfess(ctx) || whisperIdentityKnown(ctx)) return request
   const key = charKeyOf(cast[0].firstName, cast[0].lastName)
@@ -41,7 +43,8 @@ export function recordWhisperConfession({ before, ledger, closingCast }: SlotSet
   if (!game.playthroughId || game.createdScene || game.replaying || game.playthroughId !== before.playthroughId ||
       game.loads !== before.loads || game.date !== before.date || game.time !== before.time) return
   const ctx: WhisperIdentityContext = { whisper: game.exVenusWhisper, term: whisperTerm(before), date: before.date, time: before.time,
-    cast: closingCast, charInfo: before.charInfo, classCode: before.sceneClass, jobId: before.sceneJob, visitJobId: before.sceneVisitJob }
+    firstDiscoveryAvailable: !isGraduationSlot(before.date, before.time),
+    cast: closingCast.filter(c => !before.departed.includes(c.charId)), charInfo: before.charInfo, classCode: before.sceneClass, jobId: before.sceneJob, visitJobId: before.sceneVisitJob }
   const next = settleWhisperConfession(ctx, ledger?.exWhisperConfession, before.currentSceneTranscript)
   if (next !== game.exVenusWhisper) useGameStore.setState({ exVenusWhisper: next })
 }

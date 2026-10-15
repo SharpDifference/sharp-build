@@ -1,5 +1,6 @@
 import { isCharFileRel } from './characterFiles'
-import { SAFE_CHAR_ID } from './characterRules'
+import { echoArtIdOf } from './echoArtwork'
+import { readCharacterRecord, SAFE_CHAR_ID } from './characterRules'
 import { isArchiveCruft } from './characterTransfer'
 import {
   isBgVariant,
@@ -10,10 +11,10 @@ import {
 } from './customBackgrounds'
 import { appError } from './errors'
 import { SOUNDTRACK_FILE, SOUNDTRACK_BACKUP_DIR } from './soundtracks'
-import type { ValidateRecordOptions } from './jsonValidate'
-import type { PhotoMeta } from './photos'
+import { validateRecord, type ValidateRecordOptions } from './jsonValidate'
+import { PHOTO_META_READ, type PhotoMeta } from './photos'
 import { REPLAY_ID, replayIdsOf, validateReplay, type SlotReplay } from './replays'
-import { SAFE_NUMERIC_ID } from './saveRules'
+import { classifySaveId, ENROLLMENT_READ, RECORD_READ, SAVE_READ, SAFE_NUMERIC_ID } from './saveRules'
 import { validateSavedScene, type SavedScene } from './sceneCreator'
 import type {
   Character,
@@ -70,6 +71,10 @@ export interface BackupPlaythrough {
 
 /** Everything a backup carries beside the images. */
 export interface BackupFile {
+  /** Optional desktop reflection images and positions, including shipped characters. */
+  exReflections?: Record<string, unknown>
+  /** Immutable Echo PNG IDs, with bytes under echoes/art; absent in older backups. */
+  exEchoArt?: string[]
   schemaVersion: number
   /** As the renderer sees them, so no backup can ever carry the API key. */
   settings: RendererSettings
@@ -105,6 +110,68 @@ export const BACKUP_READ: ValidateRecordOptions<BackupFile> = {
     saves: true,
     endingArt: true,
     characters: true
+  }
+}
+
+/** Check every collection and row used by restore before either backend changes live data. */
+export function preflightBackup(record: BackupFile): void {
+  const bad = (where: string): never => {
+    throw appError(BACKUP_READ.malformed.code, BACKUP_READ.malformed.message, where)
+  }
+  const object = (value: unknown, where: string): Record<string, unknown> => {
+    if (!value || typeof value !== 'object' || Array.isArray(value)) return bad(where)
+    return value as Record<string, unknown>
+  }
+  const array = (value: unknown, where: string): unknown[] => {
+    if (!Array.isArray(value)) return bad(where)
+    return value
+  }
+  const id = (value: unknown, where: string, pattern = SAFE_NUMERIC_ID): string => {
+    if (typeof value !== 'string' || !pattern.test(value)) return bad(where)
+    return value
+  }
+  const unique = (seen: Set<string>, key: string, where: string): void => {
+    if (seen.has(key)) bad(where)
+    seen.add(key)
+  }
+  object(record, BACKUP_NAME)
+  object(record.settings, 'settings')
+  for (const [key, values] of Object.entries(object(record.grabbags, 'grabbags'))) {
+    if (array(values, 'grabbags.' + key).some(value => typeof value !== 'string')) bad('grabbags.' + key)
+  }
+  for (const [key, value] of Object.entries(object(record.playthroughs, 'playthroughs'))) {
+    id(key, 'playthroughs')
+    const row = object(value, 'playthroughs.' + key)
+    if (typeof row.createdAt !== 'number' || !Number.isFinite(row.createdAt)) bad('playthroughs.' + key)
+    if (row.record !== null) validateRecord(object(row.record, key), key, RECORD_READ)
+    if (row.enrollment !== null) validateRecord(object(row.enrollment, key), key, ENROLLMENT_READ)
+  }
+  const saves = new Set<string>()
+  for (const [index, value] of array(record.saves, 'saves').entries()) {
+    const where = 'saves[' + index + ']'
+    const row = object(value, where)
+    const playthroughId = id(row.playthroughId, where)
+    if (typeof row.saveId !== 'string' || !classifySaveId(row.saveId)) bad(where)
+    unique(saves, playthroughId + '/' + row.saveId, where)
+    validateRecord(object(row.save, where), where, SAVE_READ)
+  }
+  for (const [field, values] of [['endingArt', record.endingArt], ['profilePictures', record.profilePictures ?? []]] as const) {
+    const seen = new Set<string>()
+    for (const value of array(values, field)) unique(seen, id(value, field), field)
+  }
+  const photos = new Set<string>()
+  for (const [index, value] of array(record.photos ?? [], 'photos').entries()) {
+    const where = 'photos[' + index + ']'
+    const row = object(value, where)
+    unique(photos, id(row.playthroughId, where) + '/' + id(row.photoId, where), where)
+    if (row.meta !== undefined) validateRecord(object(row.meta, where), where, PHOTO_META_READ)
+  }
+  const characters = new Set<string>()
+  for (const [index, value] of array(record.characters, 'characters').entries()) {
+    const where = 'characters[' + index + ']'
+    const row = object(value, where)
+    unique(characters, id(row.charId, where, SAFE_CHAR_ID), where)
+    readCharacterRecord(row, where)
   }
 }
 
@@ -186,6 +253,7 @@ function isBackgroundPicture(name: string): boolean {
  * archive carries that no unpack keeps, or something this build never wrote.
  */
 export function classifyBackupEntry(name: string): 'record' | 'image' | 'audio' | 'skip' | 'reject' {
+  if (echoArtIdOf(name)) return 'image'
   if (name.startsWith(SOUNDTRACK_BACKUP_DIR + '/') && SOUNDTRACK_FILE.test(name.slice(SOUNDTRACK_BACKUP_DIR.length + 1))) return 'audio'
   if (name === BACKUP_NAME) return 'record'
   if (isArchiveCruft(name)) return 'skip'

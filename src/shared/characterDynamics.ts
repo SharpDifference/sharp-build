@@ -65,7 +65,17 @@ export const PERSONALITY_NUDGES = [
 export type StartingRelationship = typeof STARTING_RELATIONSHIPS[number]['id']
 export type PersonalityNudge = typeof PERSONALITY_NUDGES[number]['id']
 
+export interface GrowthTag { id: string; name: string; description: string; reframes: string[] }
+export function growthTagOf(value: unknown): GrowthTag | undefined {
+  if(!value||typeof value!=='object')return undefined
+  const v=value as Record<string,unknown>
+  if(typeof v.id!=='string'||!v.id||v.id.length>160||typeof v.name!=='string'||!v.name.trim()||v.name.length>80||
+    typeof v.description!=='string'||!v.description.trim()||v.description.length>700||!Array.isArray(v.reframes)||v.reframes.length!==3||
+    v.reframes.some(s=>typeof s!=='string'||!s.trim()||s.length>500))return undefined
+  return {id:v.id,name:v.name,description:v.description,reframes:[...v.reframes] as string[]}
+}
 export interface CharacterDynamic {
+  growth?: GrowthTag
   relationship?: { kind: string; reason: string }
   traits: string[]
 }
@@ -107,6 +117,7 @@ export function dynamicFor(data: CharacterDynamics | undefined, charId: string):
   const relationship = entry?.relationship
   return {
     traits,
+    ...(growthTagOf(entry?.growth)?{growth:growthTagOf(entry?.growth)}:{}),
     ...(STARTING_RELATIONSHIPS.some(tag => tag.id === relationship?.kind) &&
       typeof relationship?.reason === 'string'
       ? { relationship: { kind: relationship.kind, reason: relationship.reason } }
@@ -136,8 +147,8 @@ export function settleCharacterDynamics(
       ? { ...entry.relationship, reason: entry.relationship.reason.trim() }
       : undefined
     delete characters[id]
-    if (relationship || entry.traits.length > 0) {
-      characters[id] = { traits: entry.traits, ...(relationship ? { relationship } : {}) }
+    if (relationship || entry.traits.length > 0 || entry.growth) {
+      characters[id] = { traits: entry.traits, ...(relationship ? { relationship } : {}), ...(entry.growth?{growth:entry.growth}:{}) }
     }
   }
   return { version: 1, characters }

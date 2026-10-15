@@ -37,6 +37,11 @@ import { useUiStore, type ViewName } from './uiStore'
  */
 
 interface AudioStoreState {
+  dungeonActive: boolean
+  setDungeonActive: (active: boolean) => void
+  reckoningActive: boolean
+  reckoningVictory: boolean
+  setReckoningActive: (active: boolean, victory?: boolean) => void
   /** Whether the title theme has been started this session; it plays once and never again. */
   previewSoundtrack: (key: SoundtrackKey) => Promise<void>
   stopSoundtrackPreview: () => void
@@ -58,6 +63,11 @@ interface AudioStoreState {
 }
 
 export const useAudioStore = create<AudioStoreState>(() => ({
+  dungeonActive: false,
+  setDungeonActive: active => { useAudioStore.setState({ dungeonActive: active }); if(started)recompute() },
+  reckoningActive: false,
+  reckoningVictory: false,
+  setReckoningActive: (active,victory=false) => { useAudioStore.setState({ reckoningActive: active, reckoningVictory: active&&victory }); if(started)recompute() },
   previewSoundtrack: key => engine.previewSoundtrack(key),
   stopSoundtrackPreview: () => engine.stopSnippet(),
   currentMusic: () => ({ music: engine.current('music'), ambience: engine.current('ambience') }),
@@ -180,6 +190,12 @@ let lastFacts: SoundFacts | null = null
 /** Reads the stores, works out the mix, hands each channel its cue and fires what just happened. */
 function recompute(): void {
   const facts = factsOf()
+  // The custom title never fired the native run-out callback. If it is removed after we
+  // left the menu, there is no title left to keep: allow normal menu ambience on returning.
+  if (lastFacts?.customTitle && !facts.customTitle && facts.titleStarted && !facts.titleDone && facts.music !== 'title') {
+    useAudioStore.setState({ titleDone: true })
+    facts.titleDone = true
+  }
   const mix = soundscapeOf(facts)
 
   if (mix.music !== 'keep' && mix.music.key === 'title' && !facts.titleStarted) {
@@ -212,6 +228,9 @@ function factsOf(): SoundFacts {
     titleStarted: audio.titleStarted,
     titleDone: audio.titleDone,
     customTitle: soundtrackActive('title'),
+    reckoning: audio.reckoningActive,
+    reckoningVictory: audio.reckoningVictory,
+    dungeon: audio.dungeonActive,
     music: engine.current('music'),
     crossing: {
       phase: crossing.phase,

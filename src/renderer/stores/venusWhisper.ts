@@ -31,7 +31,7 @@ export async function waitForWhisperCheckpoint(active: () => boolean): Promise<v
 }
 
 /** Public interactions follow the exact clock; scheduled delivery follows the same loaded game. */
-async function operation<T>(active: () => boolean, run: (commit: (next: VenusWhisper) => Promise<void>, current: () => boolean) => Promise<T>, followClock = false): Promise<T> {
+async function operation<T>(active: () => boolean, run: (commit: (update: (latest: VenusWhisper) => VenusWhisper) => Promise<void>, current: () => boolean) => Promise<T>, followClock = false): Promise<T> {
   if (!whisperReady()) throw Error('Wait until the current scene or messages have settled.')
   const start = useGameStore.getState()
   const current = (): boolean => {
@@ -40,10 +40,12 @@ async function operation<T>(active: () => boolean, run: (commit: (next: VenusWhi
       whisperTerm(now) === whisperTerm(start) && (followClock ? now.date >= start.date :
         now.date === start.date && now.time === start.time && !now.sceneEnding)
   }
-  const commit = async (next: VenusWhisper): Promise<void> => {
+  const commit = async (update: (latest: VenusWhisper) => VenusWhisper): Promise<void> => {
     if (followClock) await waitForWhisperCheckpoint(current)
     if (!current()) throw Error('The game changed. Reopen the newsletter.')
-    await writeWhisper(next, useGameStore.getState().exVenusWhisper, current)
+    // Read after the checkpoint wait. The save lane rejects any further change while queued.
+    const previous = useGameStore.getState().exVenusWhisper
+    await writeWhisper(update(previous), previous, current)
   }
   useWhisperActivity.setState({ working: true })
   try { return await run(commit, current) } finally { useWhisperActivity.setState({ working: false }) }
@@ -59,7 +61,7 @@ export async function publishWhisper(group: string, active: () => boolean, autom
     if (whisperWeekOccupied(game.exVenusWhisper, whisperTerm(game), game.date)) {
       return game.exVenusWhisper.issues.find(i => i.term === whisperTerm(game) && i.day >= day && i.day <= game.date)?.id ?? id
     }
-    await commit(ensureWhisperAuthor(game, Math.random))
+    await commit(latest => ensureWhisperAuthor({ ...useGameStore.getState(), exVenusWhisper: latest }, Math.random))
     game = useGameStore.getState()
     const previous = game.exVenusWhisper.issues.filter(i => i.term < whisperTerm(game) || i.day < day).sort((a,b) => b.term-a.term || b.day-a.day)[0]
     const editorial = whisperSpotlight(whisperSources({ ...game, date: day, time: 0 }, 7, postVisible), previous?.subjects)
@@ -76,7 +78,11 @@ export async function publishWhisper(group: string, active: () => boolean, autom
     const draft = validateWhisperDraft(response.data, sources, [])
     const issue: WhisperIssue = { id, term: whisperTerm(game), day, weekly: true, read: false, title: draft.title, body: draft.body,
       subjects: [...new Set(sources.filter(s => draft.sources.includes(s.id)).flatMap(s => s.subjects))], comments: [], answered: [] }
-    await commit(withWhisperIssue(useGameStore.getState().exVenusWhisper, issue))
+    await commit(latest => {
+      if (latest.dismissed.includes(id) || whisperWeekOccupied(latest, issue.term, issue.day))
+        throw Error('This edition was already published or removed.')
+      return withWhisperIssue(latest, issue)
+    })
     return id
   }, automatic)
 }
@@ -93,7 +99,12 @@ export async function commentOnWhisper(issueId: string, value: string, replyTo: 
     const id = crypto.randomUUID()
     const comment: WhisperComment = { id, person: { id: 'reader', name: [game.playerFirstName, game.playerLastName].filter(Boolean).join(' ') || 'Reader', handle: whisperPlayerHandle(game.playerFirstName, game.playerLastName) }, player: true,
       text: value.trim(), mentions: whisperMentions(value, whisperPeople(game)), ...(replyTo ? { replyTo } : {}) }
-    await commit(withWhisperIssue(state, { ...issue, comments: [...issue.comments, comment] }))
+    await commit(latest => {
+      const held = latest.issues.find(i => i.id === issueId)
+      if (!held || held.comments.length >= WHISPER_COMMENTS - 3 ||
+          (replyTo && !held.comments.some(c => c.id === replyTo))) throw Error('This discussion changed. Reopen it.')
+      return withWhisperIssue(latest, { ...held, comments: [...held.comments, comment] })
+    })
     return id
   })
 }
@@ -122,7 +133,14 @@ export async function replyOnWhisper(issueId: string, replyTo: string | undefine
       return { id: crypto.randomUUID(), person: { id: p.id, name: p.name, handle: p.handle }, player: false,
         text: c.text, mentions: whisperMentions(c.text, whisperPeople(game)), ...(replyTo ? { replyTo } : {}) }
     })
-    await commit(withWhisperIssue(state, { ...issue, comments: [...issue.comments, ...batch], answered: [...issue.answered, ...(replyTo ? [replyTo] : [])] }))
+    await commit(latest => {
+      const held = latest.issues.find(i => i.id === issueId)
+      if (!held || held.comments.length + batch.length > WHISPER_COMMENTS ||
+          (replyTo ? !held.comments.some(c => c.id === replyTo && c.player) || held.answered.includes(replyTo)
+            : held.comments.some(c => !c.player))) throw Error('This discussion changed. No replies were added.')
+      return withWhisperIssue(latest, { ...held, comments: [...held.comments, ...batch],
+        answered: [...held.answered, ...(replyTo ? [replyTo] : [])] })
+    })
     return batch.map(c => c.id)
   }, automatic)
 }
@@ -130,8 +148,7 @@ export async function replyOnWhisper(issueId: string, replyTo: string | undefine
 /** A removed issue stays removed for its publication day, including after a reload or new term. */
 export async function dismissWhisper(issueId: string, active: () => boolean): Promise<void> {
   await operation(active, async commit => {
-    const state = useGameStore.getState().exVenusWhisper
-    await commit({ ...state, issues: state.issues.filter(i => i.id !== issueId), dismissed: [...state.dismissed, issueId] })
+    await commit(state => ({ ...state, issues: state.issues.filter(i => i.id !== issueId), dismissed: [...new Set([...state.dismissed, issueId])] }))
   })
 }
 
@@ -141,6 +158,9 @@ export async function markWhisperRead(issueId: string, active: () => boolean): P
     const state = useGameStore.getState().exVenusWhisper
     const issue = state.issues.find(i => i.id === issueId)
     if (!issue || issue.read !== false) return
-    await commit(withWhisperIssue(state, { ...issue, read: true }))
+    await commit(latest => {
+      const held = latest.issues.find(i => i.id === issueId)
+      return held ? withWhisperIssue(latest, { ...held, read: true }) : latest
+    })
   })
 }
