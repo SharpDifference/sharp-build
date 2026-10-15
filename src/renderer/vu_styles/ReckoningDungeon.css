@@ -3,6 +3,7 @@
 .vu-dungeon-shade{background:linear-gradient(180deg,rgba(24,16,32,.5),transparent 45%,rgba(24,16,32,.8))}
 .vu-dungeon>header{position:absolute;top:3%;left:4%;max-width:65%;text-shadow:0 2px 12px #17101d}
 .vu-dungeon h1{font-family:'Young Serif',serif;font-size:clamp(24px,3vw,52px);margin:.2em 0}
+.vu-dungeon .vu-dungeon-options{position:absolute;top:3%;right:4%;z-index:4}
 .vu-dungeon header small{color:#ecd389;letter-spacing:.12em;text-transform:uppercase}
 .vu-dungeon-character,.vu-dungeon-fragments{display:block;position:relative;height:100%;width:auto;max-width:none;pointer-events:none}
 .vu-dungeon-echo{position:absolute;inset:0;pointer-events:none}
@@ -23,7 +24,7 @@
 .vu-dungeon-fragment-base{display:block;height:100%;width:auto;max-width:none;visibility:hidden}
 @keyframes dungeon-arrival{from{opacity:0}to{opacity:1}}
 .vu-dungeon-pin{position:relative;display:flex;align-items:center;gap:16px;flex:none;width:100%;box-sizing:border-box;padding:14px 20px;color:var(--vu-text);background:var(--vu-recessed);border:1px solid var(--vu-text-muted);border-radius:8px 24px 8px 8px;text-align:left}.vu-dungeon-pin>span{flex:none;font-size:34px;color:var(--vu-text-muted)}.vu-dungeon-pin section{flex:1;min-width:0}.vu-dungeon-pin strong{display:block;font-family:'Young Serif',serif;font-size:22px}.vu-dungeon-pin small{font-size:11px;color:var(--vu-text-muted);letter-spacing:.06em;text-transform:uppercase}.vu-dungeon-pin p{margin:4px 0 0;font-size:13px}.vu-dungeon-map-action{flex:none}.vu-dungeon-pin .vu-btn{font-size:14px;white-space:nowrap}.vu-map:has(.vu-dungeon-pin){--map-h:min(580px,calc(100dvh - 300px))}@media(max-width:700px){.vu-dungeon-pin{flex-wrap:wrap;padding:12px}.vu-dungeon-map-action{margin-left:auto}.vu-dungeon-pin strong{font-size:19px}}
-@media(max-width:700px){.vu-dungeon-dialogue{left:2%;right:2%;padding:14px;max-height:65%}.vu-dungeon-actions{flex-wrap:wrap}.vu-dungeon-actions small{width:100%}.vu-dungeon>header{max-width:94%}}
+@media(max-width:700px){.vu-dungeon-dialogue{left:2%;right:2%;padding:14px;max-height:65%}.vu-dungeon-actions{flex-wrap:wrap}.vu-dungeon-actions small{width:100%}.vu-dungeon>header{max-width:calc(92% - 110px)}}
 @media(prefers-reduced-motion:reduce){.vu-dungeon-fragments img:not(.vu-dungeon-fragment-base){animation:none;opacity:0}.vu-dungeon-character{animation:none!important}}
 
 /* Two-row choice menu; the existing questions remain a separate, unchanged overlay. */

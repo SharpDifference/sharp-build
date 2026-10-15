@@ -18,6 +18,8 @@ Each of the 22 original aspects has its own named dark inner world and bundled b
 
 ## Four choices before the questions
 
+The Options button opens the normal game menu from the dungeon and the question screen, including Settings and Mods. Escape also opens it from the dungeon. Closing a menu returns to the same encounter and keeps an unsent Talk reply or question answer. The encounter remains mounted beneath menus, with its controls and whisper effects suspended; opening Options neither spends a reply nor starts generation. Options waits while a Talk, hint or answer request is in flight. Escape from the question screen still pauses the questions as before.
+
 The floating four-button menu uses native Venus styling. Hover glitches have no decorative scan lines. Choosing the questions removes this menu and keeps the established three-round question interface.
 
 | Choice | Behavior |

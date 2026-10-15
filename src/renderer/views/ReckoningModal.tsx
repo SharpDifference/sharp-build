@@ -53,7 +53,7 @@ export function ReckoningEntry({charId,blocked,onOpen}:{charId:string;blocked:bo
 export const RECKONING_CRACKS=['M0 90 180 170 310 120 470 270 510 430 720 520 1000 450 M310 120 345 0 M470 270 240 450 0 420',
   'M1000 100 810 230 620 190 510 430 390 590 320 800 M810 230 850 400 1000 610 M620 190 520 0',
   'M0 690 240 450 510 430 720 520 800 800 M240 450 100 230 0 200 M720 520 820 650 1000 700']
-export function ReckoningModal({charId,onClose}:{charId:string;onClose:()=>void}):JSX.Element|null {
+export function ReckoningModal({charId,onClose,onOptions,covered=false}:{charId:string;onClose:()=>void;onOptions?:()=>void;covered?:boolean}):JSX.Element|null {
   const game=useGameStore(s=>s),on=useModOn(RECKONING_MOD),breakthroughOn=useModOn('breakthrough')
   const echoOn=useModOn('echo'),playerEcho=echoOn?game.exEcho.player:null
   const girlEcho=echoOn?game.exEcho.girls[charId]:null
@@ -121,8 +121,8 @@ export function ReckoningModal({charId,onClose}:{charId:string;onClose:()=>void}
   if(!host||!character)return null
   const cleared=terminal?.tag?3:session?.answers.length??0
   const name=fullNameOf(character),active=!!session||!!terminal
-  const glitching=glitchEffects&&!!session&&!terminal&&!resolved&&!busy&&!error
-  return createPortal(<div className="vu-reckoning-veil" data-glitching={glitching||undefined} {...overlayProps}>
+  const glitching=glitchEffects&&!!session&&!terminal&&!resolved&&!busy&&!error&&!covered
+  return createPortal(<div className="vu-reckoning-veil" data-glitching={glitching||undefined} data-covered={covered||undefined} {...overlayProps} inert={overlayProps.inert||covered} aria-hidden={covered||undefined}>
     {glitching&&<div className="vu-reckoning-interference" aria-hidden="true">{Array.from({length:8},(_,i)=><i key={i}/>)}</div>}
     {active&&girlEcho&&game.exEcho.visible&&!terminal&&<div className="vu-reckoning-echo vu-reckoning-echo--girl echo-reflection-stage" aria-hidden="true"><StagedEcho identity={girlEcho} placement={resolveEchoStage(playerEcho?.stage,true)} opacity={game.exEcho.opacity} player preview owner={charId}/></div>}
     {active&&playerEcho&&game.exEcho.visible&&<div className="vu-reckoning-echo echo-reflection-stage" aria-hidden="true"><StagedEcho identity={playerEcho} opacity={game.exEcho.opacity} player preview owner="player"/></div>}
@@ -131,7 +131,7 @@ export function ReckoningModal({charId,onClose}:{charId:string;onClose:()=>void}
       {terminal?.tag&&<div className="vu-reckoning-victory" aria-hidden="true"><div className="vu-reckoning-dawn"/><FallingGlass/></div>}
       <div className="vu-reckoning-light" aria-hidden="true"/>
       <svg className="vu-reckoning-glass" viewBox="0 0 1000 800" preserveAspectRatio="none" aria-hidden="true">{RECKONING_CRACKS.slice(0,cleared).map((d,i)=><g key={i}><path d={d}/><path className="vu-reckoning-glint" d={d}/></g>)}</svg>
-      <header><div><small>{name}{!restored&&' · Unheard Soul'}</small><h1>Breaking Through the Silence</h1>{active&&playerEcho&&<p className="vu-reckoning-private">Inwardly, you call to {session?.echoName||playerEcho.name}.</p>}</div><button type="button" className="vu-reckoning-close" aria-label="Close the encounter" onClick={close}>×</button></header>
+      <header><div><small>{name}{!restored&&' · Unheard Soul'}</small><h1>Breaking Through the Silence</h1>{active&&playerEcho&&<p className="vu-reckoning-private">Inwardly, you call to {session?.echoName||playerEcho.name}.</p>}</div><div className="vu-reckoning-header-actions">{onOptions&&<button type="button" className="vu-reckoning-secondary" disabled={busy} onClick={onOptions}>Options</button>}<button type="button" className="vu-reckoning-close" aria-label="Close the encounter" onClick={close}>×</button></div></header>
       <ol className="vu-reckoning-rounds" aria-label="Thoughts resolved">{[0,1,2].map(i=><li key={i} data-done={i<cleared} aria-current={!terminal&&i===(resolved?cleared-1:cleared)?'step':undefined}>{i<cleared?'✦':'◇'}<span>{i+1}</span></li>)}</ol>
       <main ref={textArea} aria-live="polite" tabIndex={0} aria-label="Unspoken thought">
         {terminal?<div className="vu-reckoning-outcome"><small>{terminal.failed?'Her Unheard Soul stands':'Three fractures. A different way forward.'}</small><h2>{terminal.failed?'The voice holds its ground.':'The light gets through.'}</h2><p className="vu-reckoning-challenge">{terminal.reaction}</p><p>{terminal.feedback}</p>{terminal.tag?<div className="vu-reckoning-earned"><small>Character Dynamics · earned growth</small><h3>{terminal.tag.name}</h3><p>{terminal.tag.description}</p><p>Her personality remains her own. These old beliefs have less hold on her.</p></div>:<p>No growth tag was earned. The connection remains; rebuild 100 spirit with her before trying again.</p>}</div>:

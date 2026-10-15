@@ -31,11 +31,15 @@ export function ReckoningDungeonMapPin({onEnter,canTravel}:{onEnter:()=>void;can
  </div>
 }
 
-export function ReckoningDungeonView():JSX.Element|null {
- const visible=useGameStore(dungeonVisible)
- return visible?<DungeonVisit/>:null
+interface DungeonOptions {
+ onOptions: () => void
+ covered: boolean
 }
-function DungeonVisit():JSX.Element|null {
+export function ReckoningDungeonView(props: DungeonOptions):JSX.Element|null {
+ const visible=useGameStore(dungeonVisible)
+ return visible?<DungeonVisit {...props}/>:null
+}
+function DungeonVisit({onOptions,covered}: DungeonOptions):JSX.Element|null {
  const game=useGameStore(s=>s),d=game.exReckoning.dungeon,busy=useDungeonRequest(s=>s.busy),on=useModOn('reckoning')
  const glitches=useModOption('reckoning','glitch-effects')
  const echoOn=useModOn('echo')
@@ -46,8 +50,9 @@ function DungeonVisit():JSX.Element|null {
  const stage=useReflectionStage(id),placement={transform:reflectionStageTransform(stage),transformOrigin:'50% 100%'}
  const act=async(action:()=>Promise<void>):Promise<void>=>{try{setError('');await action();setReply('')}catch(e){setError(e instanceof Error?e.message:'The encounter could not be saved.')}}
  const close=():void=>{if(!busy&&!reflection)void act(leaveReckoningDungeon)}
- // This is a location, not a dismissible panel. Only the explicit leave button exits it.
- const {host,overlayProps}=useModalShell(()=>{},'none')
+ // Escape opens the normal menu without leaving the location or losing the current draft.
+ const openOptions=():void=>{if(!busy&&!covered)onOptions()}
+ const {host,overlayProps}=useModalShell(openOptions,'none')
  const visible=dungeonVisible(game)
  useEffect(()=>{useAudioStore.getState().setDungeonActive(visible);return()=>useAudioStore.getState().setDungeonActive(false)},[visible])
  useEffect(()=>{setReply('');setError('');setReflection(false);setShattered(false);setPanel('choices')},[d?.id,game.loads])
@@ -57,18 +62,19 @@ function DungeonVisit():JSX.Element|null {
  const enabled=on&&dungeonVisitAllowed(game)
  const prep=reckoningPreparationStatus(game,id),preparing=!game.exReckoning.active&&(prep.status==='queued'||prep.status==='preparing')
  const portrait=spriteUrl(id,'neutral',version),altered=reflectionArt||portrait
- const glitching=glitches&&!farewell&&!busy&&!reflection&&!error,cleared=victory?3:game.exReckoning.active?.answers.length??0
+ const glitching=glitches&&!farewell&&!busy&&!reflection&&!error&&!covered,cleared=victory?3:game.exReckoning.active?.answers.length??0
  const active=!!game.exReckoning.active,abilityAspect=d.insight?.aspect??game.exEcho.player?.aspect,ability=abilityAspect?ECHO_BREAKTHROUGH_ABILITIES[abilityAspect]:null
  const spoken=d.lines.filter(l=>l.who==='reflection').at(-1)?.text
  const openTalk=():void=>{setPanel('talk');void act(openDungeonConversation)}
  const openInsight=():void=>{setPanel('insight');if(!d.insight)void act(useDungeonInsight)}
- return <>{createPortal(<div className="vu-dungeon" data-theme="night" data-phase={d.phase} data-glitching={glitching||undefined} role="dialog" aria-modal="true" aria-label={THE_UNSPOKEN.name} {...overlayProps}>
+ return <>{createPortal(<div className="vu-dungeon" data-theme="night" data-phase={d.phase} data-glitching={glitching||undefined} role="dialog" aria-modal="true" aria-label={THE_UNSPOKEN.name} {...overlayProps} onClick={()=>{}} inert={overlayProps.inert||covered||reflection} aria-hidden={covered||reflection||undefined}>
   <img className="vu-dungeon-background" src={`./echo-dungeons/${d.aspect}.webp`} alt=""/>
   <div className="vu-dungeon-shade"/>
   {!farewell&&!reflection&&<div className="vu-dungeon-echo" aria-hidden="true"><EchoAura charId={id}/></div>}
   {glitching&&<div className="vu-reckoning-interference" aria-hidden="true">{Array.from({length:8},(_,i)=><i key={i}/>)}</div>}
   <svg className="vu-reckoning-glass vu-dungeon-cracks" viewBox="0 0 1000 800" preserveAspectRatio="none" aria-hidden="true">{RECKONING_CRACKS.slice(0,cleared).map((d,i)=><g key={i}><path d={d}/><path className="vu-reckoning-glint" d={d}/></g>)}</svg>
   <header><small>{aspectOf(d.aspect).name} · {place.name}</small><h1>{THE_UNSPOKEN.name}</h1><p>{farewell?'The encounter is over.':`${d.context.name} · Unheard Soul`}</p></header>
+  <button type="button" className="vu-btn vu-btn--outline vu-paper vu-dungeon-options" disabled={busy} onClick={openOptions}>Options</button>
   <div className="vu-reflection-scene-anchor" style={{'--reflection-height':game.characters[id]?.height??1} as CSSProperties}>
   {victory&&!reflection&&!shattered?<div className="vu-dungeon-fragments" style={{...placement,'--reflection-filter':reflectionArt?'none':'invert(1) hue-rotate(190deg) saturate(.7)'} as CSSProperties} aria-hidden="true"><img className="vu-dungeon-fragment-base" src={altered} alt=""/>{GLASS_SHARDS.map((shard,i)=><img key={i} src={altered} alt="" style={{...shard.style,clipPath:shard.clip}}/>)}</div>:
    !farewell&&<img className={`vu-dungeon-character${reflectionArt?'':' vu-dungeon-altered'}`} style={placement} src={altered} alt={`Unheard Soul of ${d.context.name}`}/>}
@@ -99,8 +105,8 @@ function DungeonVisit():JSX.Element|null {
      <div className="vu-dungeon-actions"><button className="vu-btn vu-btn--outline vu-paper" disabled={busy} onClick={()=>{setPanel('choices');setError('')}}>Back to choices</button>{!d.insight&&!busy&&<button className="vu-btn vu-btn--primary vu-paper" disabled={!enabled||!echoOn||!ability} onClick={openInsight}>Try the hint again</button>}</div>
     </>}
   </section>}
-  <UnspokenVoice surface="dungeon" hidden={reflection||busy||!!error||panel==='insight'}/>
- </div>,host)}{reflection&&<ReckoningModal charId={id} onClose={()=>setReflection(false)}/>}</>
+  <UnspokenVoice surface="dungeon" hidden={covered||reflection||busy||!!error||panel==='insight'}/>
+ </div>,host)}{reflection&&<ReckoningModal charId={id} onClose={()=>setReflection(false)} onOptions={onOptions} covered={covered}/>}</>
 }
 function ChoiceIcon({kind}:{kind:'talk'|'silence'|'aspect'|'leave'}):JSX.Element {
  return <svg viewBox="0 0 28 28" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">{kind==='talk'?<><path d="M4 5h20v14H12l-6 5v-5H4z"/><path d="M9 10h10M9 14h7"/></>:kind==='silence'?<path d="m14 2 2.5 9.5L26 14l-9.5 2.5L14 26l-2.5-9.5L2 14l9.5-2.5z"/>:kind==='aspect'?<path d="M14 2 25 14 14 26 3 14zM14 7v6l4 3M9 18l3-3"/>:<><path d="M2 14s4-7 12-7 12 7 12 7-4 7-12 7S2 14 2 14z"/><circle cx="14" cy="14" r="3.5"/></>}</svg>

@@ -2700,7 +2700,11 @@ export function GameView(): JSX.Element {
         <ReckoningPreparation key="reckoning-preparation"/>
         <UnspokenVoice key="unspoken-voice" hidden={blocked||covered||uiHidden||cinematic}/>
         <UnspokenLinkGlitch key="unspoken-link-glitch" hidden={blocked||covered||uiHidden||cinematic}/>
-        <ReckoningDungeonView key="reckoning-dungeon-view"/>
+        <ReckoningDungeonView
+          key="reckoning-dungeon-view"
+          onOptions={() => setPanel({ kind: 'settings' })}
+          covered={panel !== null || covered}
+        />
         <ReckoningContinuation key="reckoning-continuation" blocked={blocked||covered}/>
         {panel?.kind === 'reckoning' && <ReckoningModal key={`reckoning-${panel.charId}`} charId={panel.charId} onClose={closePanel} />}
         {panel?.kind === 'echo' && (
