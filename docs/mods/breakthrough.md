@@ -77,7 +77,7 @@ advance the scene. This presentation does not change scoring, activation, or sav
   meters: { [charId]: number },
   settled: { ["date:time"]: true },
   pending: null | { id, charId, direction, date, time, playthroughId },
-  moments: { [charId]: [{ id, date, time, outcome, transcriptStart, transcriptCount }] }
+  moments: { [charId]: [{ id, date, time, outcome, transcriptStart, transcriptCount, spent? }] }
 }
 ```
 
@@ -95,8 +95,25 @@ dialogue claims from objective truth and grants no continuing success bonus.
 The stored transcript range is reconciled when a line is edited, an unread or preview tail
 is cut, or a scene is restored. A leave autosave projected onto an older decision point
 also projects this archive onto that transcript. Discarded words cannot persist through
-the separate continuity block. A successfully completed activation remains spent if its
-output is subsequently edited or cut; only unfinished/failed attempts are refunded.
+the separate continuity block. New successful activations also record the actual charge
+(`spent`: 100 for Normal Breakthrough, or 25/50/75 for an Echo ability). Rewinding to reread
+does not change the meter. Submitting a new reply before an activation cuts its entire
+response and refunds that recorded charge once, capped at 100. Going back several replies
+works the same way. Keeping any of its response or editing dialogue in place leaves it
+spent; a later cut before the whole activation can still refund it.
+
+Refunds require a real prefix cut in the same scene slot, with the removed response
+matching the recorded outcome. The receipt disappears with that outcome, preventing a
+second refund. Pending requests keep their separate failure/refund/retry ownership. An
+older decision-point autosave projects both the removed outcome and its refund together,
+without changing the live branch. Receipts survive save/load and work even if the mod is
+subsequently disabled; replays and Scene Creator cannot issue these refunds. Semester
+carry keeps historical outcomes without their scene-local receipts.
+
+Completed activations saved before this change lack a recorded price. They remain spent
+when cut: the code cannot safely distinguish an old ordinary use from a cheaper Echo use.
+Missing or malformed prices never imply a 100-spirit refund. Pending-load recovery keeps
+its existing behavior.
 
 ## Code map
 
@@ -118,6 +135,7 @@ output is subsequently edited or cut; only unfinished/failed attempts are refund
 | `src/renderer/views/BreakthroughPanel.tsx`, `GameView.tsx` | Character selector, bar, action card, flourish, native scene gates. |
 | `src/renderer/views/motion.ts`, `vu_styles/Breakthrough.css` | Motion vocabulary and day/night layout. |
 | `test/breakthrough.test.ts` | Scoring, repeat settlement, failure/retry/refund, load recovery, native turn commits, edits, privacy, context budgets. |
+| `test/breakthroughRewind.test.ts` | Multi-reply branching, all recorded prices, save/load and decision-point projections, partial cuts, duplicates and retry isolation. |
 
 ## Integration with other feature ports and future SQLite
 

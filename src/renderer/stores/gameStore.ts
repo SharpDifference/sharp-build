@@ -1729,7 +1729,8 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
 
   restoreScene: (scene) =>
     set((state) => ({
-      exBreakthrough: reconcileBreakthrough(state.exBreakthrough, scene?.transcript ?? [], state.date, state.time),
+      exBreakthrough: reconcileBreakthrough(state.exBreakthrough, scene?.transcript ?? [], state.date, state.time,
+        scene && !state.replaying && !state.createdScene ? state.currentSceneTranscript : undefined),
       pendingLines: scene ? [...scene.pendingLines] : [],
       cast: scene ? [...scene.cast] : [],
       ...sceneKindFields(scene),
@@ -1844,7 +1845,8 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
   truncateUnread: () =>
     set((state) => {
       const kept = cutLengthOf(state)
-      const breakthrough = reconcileBreakthrough(state.exBreakthrough, state.currentSceneTranscript.slice(0, kept), state.date, state.time)
+      const breakthrough = reconcileBreakthrough(state.exBreakthrough, state.currentSceneTranscript.slice(0, kept), state.date, state.time,
+        !state.replaying && !state.createdScene ? state.currentSceneTranscript : undefined)
       return {
         exBreakthrough: breakthrough,
         ...rewindReckoning({...state,exBreakthrough:breakthrough},kept),
