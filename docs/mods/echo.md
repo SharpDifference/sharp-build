@@ -16,6 +16,8 @@ Save all settings, beside Generate all missing in the footer, commits the select
 
 The manager uses the game's typography, paper-shadow buttons and day/night palette. New-game setup always uses a plain light background. The artwork gallery has a separate Echoes section.
 
+Every aspect selector shows the highlighted aspect's ability name, short explanation, spirit cost and affected characters directly underneath. This preview updates before saving, both for the reader and girls during setup and for the reader's one later change, including the gallery entry point. Browsing these previews does not save a choice or use the reader's one change.
+
 ## Artwork providers and transparency
 
 Gemini or the configured image API is the default. Mods → Echo → Local Megaten artwork selects an optional Echo-only ComfyUI workflow. A LoRA cannot be attached to the Gemini API: it is used only by that local workflow. Other image features keep their own provider settings. Only the reader's missing artwork gets an automatic first-menu attempt; student generation is explicit. Upload accepts existing artwork and Download exports the finished PNG.
