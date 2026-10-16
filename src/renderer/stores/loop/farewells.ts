@@ -63,12 +63,13 @@ export function partsForAWhile(charId: string): boolean {
 }
 
 /**
- * The first names of everyone graduating, in roster order — who the reader watches cross the
- * stage.
+ * The first names of everyone graduating whose name the reader knows, in roster order — who he
+ * watches cross the stage.
  */
 export function graduatingNames(): string[] {
   const game = useGameStore.getState()
   return game.graduating
+    .filter((charId) => game.charInfo[charId]?.nameKnown)
     .map((charId) => game.characters[charId]?.firstName)
     .filter((name): name is string => Boolean(name))
 }

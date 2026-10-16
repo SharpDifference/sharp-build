@@ -1,4 +1,4 @@
-import type { JSX } from 'react'
+import type { JSX, ReactNode } from 'react'
 import { motion } from 'motion/react'
 import {
   COMFY_MODEL_SLOTS,
@@ -60,20 +60,85 @@ export function missingModelLines(
   return lines
 }
 
-/** A slot's options: None for the LoRA, every listed file, and the pick wherever the list lacks it. */
-function optionsOf(
-  slot: ComfyModelSlot,
+/**
+ * A model select's options: None where the slot may be left empty, every listed file, and the
+ * pick wherever the list lacks it, marked missing once a list has arrived.
+ */
+export function modelOptionsOf(
+  list: readonly string[],
   pick: string,
-  models: ComfyModelLists,
-  listed: boolean
+  listed: boolean,
+  withNone: boolean
 ): { value: string; label: string }[] {
-  const list = models[slot.role]
-  const options = slot.optional ? [{ value: '', label: 'None' }] : []
+  const options = withNone ? [{ value: '', label: 'None' }] : []
   options.push(...list.map((name) => ({ value: name, label: name })))
   if (pick !== '' && !list.includes(pick)) {
     options.push({ value: pick, label: listed ? `${pick} (missing)` : pick })
   }
   return options
+}
+
+export interface ComfyModelRowProps {
+  id: string
+  label: string
+  hint?: ReactNode
+  value: string
+  options: readonly { value: string; label: string }[]
+  onPick: (value: string) => void
+  /** A LoRA's weight as typed, shown blank and dead while the pick is None. */
+  weight?: { text: string; onText: (text: string) => void; onBlur: () => void }
+  /** Opens the folder the slot's files go in; absent where the app cannot open it. */
+  onOpenFolder?: () => void
+}
+
+/** One model's select, its weight where it is a LoRA, and the folder its files go in. */
+export function ComfyModelRow({
+  id,
+  label,
+  hint,
+  value,
+  options,
+  onPick,
+  weight,
+  onOpenFolder
+}: ComfyModelRowProps): JSX.Element {
+  return (
+    <div className="vu-comfy-model">
+      <SelectField
+        id={id}
+        label={label}
+        value={value}
+        onChange={onPick}
+        options={options}
+        hint={hint}
+      />
+      {weight && (
+        <div className="vu-comfy-weight">
+          <TextField
+            id={`${id}-weight`}
+            label="Weight"
+            value={value === '' ? '' : weight.text}
+            onChange={weight.onText}
+            onBlur={weight.onBlur}
+            maxLength={8}
+            disabled={value === ''}
+          />
+        </div>
+      )}
+      {onOpenFolder && (
+        <motion.button
+          id={`${id}-folder`}
+          className="vu-square"
+          type="button"
+          aria-label="Open folder"
+          {...gestures(false, quietLift, quietPress)}
+          onClick={onOpenFolder}
+        >
+          <FolderIcon />
+        </motion.button>
+      )}
+    </div>
+  )
 }
 
 /**
@@ -99,55 +164,35 @@ export function ComfyModelPicker({
       {COMFY_MODEL_SLOTS.map((slot) => {
         const pick = resolvedPickOf(slot, picks, models, source)
         return (
-          <div className="vu-comfy-model" key={slot.role}>
-            <SelectField
-              id={`${idPrefix}-${slot.role}`}
-              label={slot.label}
-              value={pick}
-              onChange={(value) => onPick(slot.role, value)}
-              options={optionsOf(slot, pick, models, listed)}
-              hint={
-                <>
-                  Recommended:{' '}
-                  <motion.a
-                    className="vu-link"
-                    href={slot.pin.url}
-                    target="_blank"
-                    rel="noreferrer"
-                    whileHover={linkLift}
-                    whileFocus={linkLift}
-                  >
-                    {slot.pin.label}
-                  </motion.a>
-                </>
-              }
-            />
-            {slot.optional && (
-              <div className="vu-comfy-weight">
-                <TextField
-                  id={`${idPrefix}-${slot.role}-weight`}
-                  label="Weight"
-                  value={pick === '' ? '' : weightText}
-                  onChange={onWeightText}
-                  onBlur={onWeightBlur}
-                  maxLength={8}
-                  disabled={pick === ''}
-                />
-              </div>
-            )}
-            {folders[slot.role] && (
-              <motion.button
-                id={`${idPrefix}-${slot.role}-folder`}
-                className="vu-square"
-                type="button"
-                aria-label="Open folder"
-                {...gestures(false, quietLift, quietPress)}
-                onClick={() => onOpenFolder(slot.role)}
-              >
-                <FolderIcon />
-              </motion.button>
-            )}
-          </div>
+          <ComfyModelRow
+            key={slot.role}
+            id={`${idPrefix}-${slot.role}`}
+            label={slot.label}
+            value={pick}
+            options={modelOptionsOf(models[slot.role], pick, listed, slot.optional)}
+            onPick={(value) => onPick(slot.role, value)}
+            hint={
+              <>
+                Recommended:{' '}
+                <motion.a
+                  className="vu-link"
+                  href={slot.pin.url}
+                  target="_blank"
+                  rel="noreferrer"
+                  whileHover={linkLift}
+                  whileFocus={linkLift}
+                >
+                  {slot.pin.label}
+                </motion.a>
+              </>
+            }
+            weight={
+              slot.optional
+                ? { text: weightText, onText: onWeightText, onBlur: onWeightBlur }
+                : undefined
+            }
+            onOpenFolder={folders[slot.role] ? () => onOpenFolder(slot.role) : undefined}
+          />
         )
       })}
     </div>

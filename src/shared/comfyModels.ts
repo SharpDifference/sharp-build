@@ -1,7 +1,7 @@
 import { endpointProblem } from './endpoint'
 import { PLAIN_NUMBER } from './settingsRules'
 import { PINNED_MODELS, PINNED_NODES, type PinnedModel } from './setupManifest'
-import type { Settings } from './types'
+import type { Character, CharacterLora, Settings } from './types'
 
 /**
  * The models a render is drawn with, as slots the player fills: which loader input each one is,
@@ -279,7 +279,7 @@ const LORA_WEIGHT_MIN = -100
 const LORA_WEIGHT_MAX = 100
 
 /** Whether a number is a weight `LoraLoader` takes. */
-function isLoraWeight(value: unknown): value is number {
+export function isLoraWeight(value: unknown): value is number {
   return (
     typeof value === 'number' &&
     Number.isFinite(value) &&
@@ -316,6 +316,26 @@ export function loraWeightText(weight: number): string {
 /** A weight as a save writes it: the default stored absent, so a later default reaches it. */
 export function loraWeightToStore(weight: number): number | undefined {
   return weight === DEFAULT_LORA_WEIGHT ? undefined : weight
+}
+
+/** A character's LoRA as her record carries it, the weight left out at the default. */
+export function characterLoraToStore(name: string, weight: number): CharacterLora {
+  const stored = loraWeightToStore(weight)
+  return stored === undefined ? { name } : { name, weight: stored }
+}
+
+/**
+ * The LoRA a character is drawn through and its weight, or null where she has none. Her record
+ * is hand-editable, so a name that is not one is none and a weight the loader would refuse is
+ * the default.
+ */
+export function characterLoraOf(
+  character: Pick<Character, 'lora'>
+): { name: string; weight: number } | null {
+  const lora = character.lora as Partial<CharacterLora> | undefined
+  if (!lora || typeof lora !== 'object') return null
+  if (typeof lora.name !== 'string' || lora.name.trim() === '') return null
+  return { name: lora.name, weight: isLoraWeight(lora.weight) ? lora.weight : DEFAULT_LORA_WEIGHT }
 }
 
 /**

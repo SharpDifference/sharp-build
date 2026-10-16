@@ -319,8 +319,8 @@ function withoutActionPrompt(lines: readonly SceneLine[]): SceneLine[] {
 }
 
 /**
- * A later semester's first morning's word on what the break cost, off its semester of the record,
- * naming only the girls whose names he knows; nothing on any other slot.
+ * A later semester's first morning's word on what the break cost, where its semester of the
+ * record says a stat fell or a girl whose name he knows cooled; nothing on any other slot.
  */
 function breakDecayLines(): SceneLine[] {
   const game = useGameStore.getState()
@@ -328,12 +328,10 @@ function breakDecayLines(): SceneLine[] {
   if (game.semesterId === null) return []
   const decay = loopState.record?.semesters?.[game.semesterId]?.breakDecay
   if (!decay) return []
-  const names = decay.girls.flatMap((charId) => {
-    const character = game.characters[charId]
-    return character && game.charInfo[charId]?.nameKnown ? [character.firstName] : []
-  })
-  const line = breakDecayLine(decay.stats, game.stats, names)
-  return line ? [markStatusLine(line)] : []
+  const cooled = decay.girls.some(
+    (charId) => game.characters[charId] && game.charInfo[charId]?.nameKnown
+  )
+  return decay.stats.length > 0 || cooled ? [breakDecayLine()] : []
 }
 
 /** Opens a slot: the transition, the narration, and the action prompt. */

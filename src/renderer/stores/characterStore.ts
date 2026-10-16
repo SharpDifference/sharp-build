@@ -1,7 +1,7 @@
 import { create } from 'zustand'
 import { bytesToBase64 } from '@shared/base64'
 import { profileRel, roomRel, spriteRel } from '@shared/characterFiles'
-import { blankSheet, isWritten } from '@shared/characterRules'
+import { blankSheet, isWritten, withCharacterLora } from '@shared/characterRules'
 import { customCgAfterEdit, withCustomCg, withoutCustomCg } from '@shared/customCgs'
 import { EMOTIONS } from '@shared/emotions'
 import { appError, isAppError, messageOf, toAppError } from '@shared/errors'
@@ -33,6 +33,7 @@ import type {
   AppError,
   Character,
   CharacterBrief,
+  CharacterLoraBrief,
   CgTarget,
   CustomCg,
   CustomCgSlot,
@@ -285,28 +286,36 @@ interface CharacterStoreState {
     prompt: string,
     namesAreSuggestions?: boolean,
     options?: GenerateOptions,
-    reference?: ReferenceImage
+    reference?: ReferenceImage,
+    lora?: CharacterLoraBrief
   ) => Promise<void>
   /**
    * Creates a character straight from the New Character modal's fields, with no LLM call:
-   * her sheet is the player's own words, ready to fill in by hand.
+   * her sheet is the player's own words, and her LoRA's, ready to fill in by hand.
    */
-  createBlank: (firstName: string, lastName: string, personality: string) => Promise<void>
+  createBlank: (
+    firstName: string,
+    lastName: string,
+    personality: string,
+    lora?: CharacterLoraBrief
+  ) => Promise<void>
   /**
    * Re-runs a character write that failed or was interrupted, from the brief this session
-   * still holds or, failing that, the one on her record.
+   * still holds or, failing that, the one on her record; `withoutLora` renders her without the
+   * LoRA the player was told is missing.
    */
-  retryGeneration: (charId: string) => Promise<void>
+  retryGeneration: (charId: string, withoutLora?: boolean) => Promise<void>
   /**
    * Renders one set: `fill` queues only the images missing from disk; `regenerate` renders the
    * set whole into staging and commits it at the end, under the regenerate modal's edit where
-   * it came from one.
+   * it came from one. `withoutLora` renders it without her LoRA, which stays on her record.
    */
   generateSet: (
     charId: string,
     target: RenderTarget,
     mode: RenderMode,
-    edit?: RenderEdit
+    edit?: RenderEdit,
+    withoutLora?: boolean
   ) => Promise<void>
   /** Aborts one set's outstanding jobs, leaving the rest of the run alone. */
   cancelSet: (charId: string, target: RenderTarget) => Promise<void>
@@ -350,8 +359,11 @@ interface CharacterStoreState {
   duplicateCharacter: (charId: string) => Promise<boolean>
   /** Opens one character's folder in the OS file manager. */
   openFolder: (charId: string) => Promise<void>
-  /** Queues a fill for every incomplete optional set of every character; returns how many. */
-  generateAllMissing: (gates: MissingContentGates) => number
+  /**
+   * Queues a fill for every incomplete optional set of every character, those in `withoutLora`
+   * rendered without their LoRA; returns how many.
+   */
+  generateAllMissing: (gates: MissingContentGates, withoutLora?: ReadonlySet<string>) => number
   /**
    * Writes one wardrobe's repaired sprites over the set, plus the paint layer they were made
    * with, kept as the file `kind` names. `paintLayer` is `null` where the repair keeps
@@ -422,6 +434,8 @@ interface GenerateRequest {
   options: GenerateOptions
   /** The reference image the modal attached, if any; read back off her folder on a resume. */
   reference?: ReferenceImage
+  /** Her LoRA and the tags that came with it, where one was picked. */
+  lora?: CharacterLoraBrief
 }
 
 /**
@@ -431,13 +445,14 @@ interface GenerateRequest {
  */
 export function briefRequestOf(character: Character): GenerateRequest | undefined {
   if (isWritten(character) || !character.brief) return undefined
-  const { prompt, namesAreSuggestions, options } = character.brief
+  const { prompt, namesAreSuggestions, options, lora } = character.brief
   return {
     firstName: character.firstName,
     lastName: character.lastName,
     prompt,
     namesAreSuggestions,
-    options
+    options,
+    ...(lora ? { lora } : {})
   }
 }
 
@@ -554,7 +569,8 @@ export const useCharacterStore = create<CharacterStoreState>((set, get) => ({
     prompt,
     namesAreSuggestions = false,
     options = {},
-    reference
+    reference,
+    lora
   ) => {
     // The folder is created before the LLM call, carrying the brief and the picture it was
     // submitted with: a write cut short is resumed from her folder alone.
@@ -562,7 +578,8 @@ export const useCharacterStore = create<CharacterStoreState>((set, get) => ({
       prompt,
       namesAreSuggestions,
       options,
-      reference: reference !== undefined
+      reference: reference !== undefined,
+      ...(lora ? { lora } : {})
     }
     const created = await window.api.chars.create(
       firstName.trim(),
@@ -583,7 +600,8 @@ export const useCharacterStore = create<CharacterStoreState>((set, get) => ({
       prompt,
       namesAreSuggestions,
       options,
-      reference
+      reference,
+      ...(lora ? { lora } : {})
     }
     set((state) => ({
       characters: { ...state.characters, [charId]: character },
@@ -594,7 +612,7 @@ export const useCharacterStore = create<CharacterStoreState>((set, get) => ({
     await runWritePipeline(charId, request, set, get)
   },
 
-  createBlank: async (firstName, lastName, personality) => {
+  createBlank: async (firstName, lastName, personality, lora) => {
     const pose = poseKeysOf(useAssetStore.getState().poses)[0]
     if (pose === undefined) {
       useUiStore.getState().showError(NO_POSES)
@@ -608,7 +626,8 @@ export const useCharacterStore = create<CharacterStoreState>((set, get) => ({
       return
     }
 
-    const saved = await window.api.chars.update(blankSheet(created.data, personality, pose))
+    const sheet = blankSheet(created.data, personality, pose)
+    const saved = await window.api.chars.update(lora ? withCharacterLora(sheet, lora) : sheet)
     if (!saved.ok) {
       useUiStore.getState().showError(saved.error)
       // Nothing was ever written to her folder that a player could open, so it does not stay.
@@ -623,7 +642,7 @@ export const useCharacterStore = create<CharacterStoreState>((set, get) => ({
     }))
   },
 
-  retryGeneration: async (charId) => {
+  retryGeneration: async (charId, withoutLora = false) => {
     const character = get().characters[charId]
     if (!character) return
     // The in-session brief where the run failed in front of the player, her record's where
@@ -641,16 +660,16 @@ export const useCharacterStore = create<CharacterStoreState>((set, get) => ({
     }
 
     set((state) => ({ progress: { ...state.progress, [charId]: { phase: 'queued', request } } }))
-    await runWritePipeline(charId, request, set, get)
+    await runWritePipeline(charId, request, set, get, withoutLora)
   },
 
-  generateSet: async (charId, target, mode, edit) => {
+  generateSet: async (charId, target, mode, edit, withoutLora = false) => {
     if (!get().characters[charId]) return
 
     // A run already holding this character takes the set.
     const run = activeRuns.get(charId)
     if (run) {
-      queueOnRun(charId, run, target, mode, edit, set, get)
+      queueOnRun(charId, run, target, mode, edit, withoutLora, set, get)
       return
     }
 
@@ -658,7 +677,7 @@ export const useCharacterStore = create<CharacterStoreState>((set, get) => ({
     const started: ActiveRun = { pending: [] }
     activeRuns.set(charId, started)
 
-    const spec = await prepareSpec(charId, target, mode, edit, set, get)
+    const spec = await prepareSpec(charId, target, mode, edit, withoutLora, set, get)
     const specs = spec && specKeys(spec).length > 0 ? [spec] : []
     const character = get().characters[charId]
     if (!character || (specs.length === 0 && started.pending.length === 0)) {
@@ -863,11 +882,19 @@ export const useCharacterStore = create<CharacterStoreState>((set, get) => ({
     if (!result.ok) useUiStore.getState().showError(result.error)
   },
 
-  generateAllMissing: (gates) => {
+  generateAllMissing: (gates, withoutLora = new Set()) => {
     // Recomputed, not taken from the caller: a bucket may have landed since the confirm opened.
     const plan = missingContentPlan(get(), gates)
     // Never awaited: a `generateSet` resolves only once its whole run drains.
-    for (const entry of plan) void get().generateSet(entry.charId, entry.target, 'fill')
+    for (const entry of plan) {
+      void get().generateSet(
+        entry.charId,
+        entry.target,
+        'fill',
+        undefined,
+        withoutLora.has(entry.charId)
+      )
+    }
     return plan.length
   },
 
@@ -1112,7 +1139,7 @@ async function adoptCharacter(character: Character, set: SetState): Promise<void
  * What a run was asked to render; one entry per {@link RenderTask} bucket. The key list is the
  * subset being rendered; completeness is still judged over the whole set, off disk.
  */
-type RenderTaskSpec =
+type RenderTaskSpec = (
   | ({ kind: 'expressions'; emotions: Emotion[] } & Staging & Edited)
   | ({ kind: 'cgs'; positions: StockPosition[] } & SetPlan & Staging & Edited)
   // No SetPlan: a CG re-roll's seed is never recorded.
@@ -1124,10 +1151,23 @@ type RenderTaskSpec =
   | ({ kind: 'customCg'; slot: CustomCgSlot; positions: Position[] } & SetPlan & Staging & Edited)
   // No SetPlan: the room is a cloud render with no seed to record.
   | ({ kind: 'room'; variants: RoomVariant[] } & Staging)
+) &
+  LoraChoice
 
 /** Whether a bucket renders into the staging tree instead of over the live set. */
 interface Staging {
   staged: boolean
+}
+
+/** Whether a bucket renders her without the LoRA the player was told is missing. */
+interface LoraChoice {
+  withoutLora?: boolean
+}
+
+/** Her record as a render sends it without her LoRA, which her record itself keeps. */
+function withoutLoraOf(character: Character): Character {
+  const { lora: _lora, ...rest } = character
+  return rest
 }
 
 /**
@@ -1295,6 +1335,8 @@ interface PendingSet {
   taskId: number
   /** What the regenerate modal settled, held until the run reaches this set and plans it. */
   edit?: RenderEdit
+  /** Whether the player answered to render it without her missing LoRA. */
+  withoutLora?: boolean
 }
 
 interface ActiveRun {
@@ -1320,6 +1362,7 @@ function queueOnRun(
   target: RenderTarget,
   mode: RenderMode,
   edit: RenderEdit | undefined,
+  withoutLora: boolean,
   set: SetState,
   get: () => CharacterStoreState
 ): void {
@@ -1330,7 +1373,13 @@ function queueOnRun(
   if (total === 0) return
 
   cancelledBuckets.get(charId)?.delete(bucketIdFor(target))
-  const pending: PendingSet = { target, mode, taskId: nextTaskId++, ...(edit ? { edit } : {}) }
+  const pending: PendingSet = {
+    target,
+    mode,
+    taskId: nextTaskId++,
+    ...(edit ? { edit } : {}),
+    ...(withoutLora ? { withoutLora } : {})
+  }
   run.pending.push(pending)
   set((state) => {
     const entry = state.progress[charId]
@@ -1526,8 +1575,25 @@ export function missingContentPlan(
   return plan
 }
 
-/** What rendering one set now means: which images, which seed, whether staged. */
+/**
+ * What rendering one set now means: which images, which seed, whether staged, and whether
+ * without her LoRA.
+ */
 async function prepareSpec(
+  charId: string,
+  target: RenderTarget,
+  mode: RenderMode,
+  edit: RenderEdit | undefined,
+  withoutLora: boolean,
+  set: SetState,
+  get: () => CharacterStoreState
+): Promise<RenderTaskSpec | null> {
+  const spec = await planSpec(charId, target, mode, edit, set, get)
+  return spec && withoutLora ? { ...spec, withoutLora } : spec
+}
+
+/** {@link prepareSpec} short of the LoRA, which every kind of set carries alike. */
+async function planSpec(
   charId: string,
   target: RenderTarget,
   mode: RenderMode,
@@ -1780,7 +1846,8 @@ async function runWritePipeline(
   charId: string,
   request: GenerateRequest,
   set: SetState,
-  get: () => CharacterStoreState
+  get: () => CharacterStoreState,
+  withoutLora = false
 ): Promise<void> {
   // The brief rides on every pre-render failure and is dropped once rendering starts.
   const fail = (error: AppError): void => {
@@ -1824,7 +1891,8 @@ async function runWritePipeline(
   const character = get().characters[charId]
   if (!character) return
 
-  const filled = draftToCharacter(character, drafted.data, poses)
+  const written = draftToCharacter(character, drafted.data, poses)
+  const filled = request.lora ? withCharacterLora(written, request.lora) : written
   const missing = missingRequiredFields(filled)
   if (missing.length > 0) {
     // An empty required field is a job failure.
@@ -1849,13 +1917,14 @@ async function runWritePipeline(
 
   set((state) => ({ characters: { ...state.characters, [charId]: saved.data } }))
   // Expressions lead: a display order, not a correctness one — no bucket depends on another.
+  const specs: RenderTaskSpec[] = [
+    // The one bucket that is never staged.
+    { kind: 'expressions', emotions: [...EMOTIONS], staged: false },
+    ...optionalSpecs(saved.data, request.options, noNsfwImagesOf(useSettingsStore.getState()))
+  ]
   await renderImages(
     saved.data,
-    [
-      // The one bucket that is never staged.
-      { kind: 'expressions', emotions: [...EMOTIONS], staged: false },
-      ...optionalSpecs(saved.data, request.options, noNsfwImagesOf(useSettingsStore.getState()))
-    ],
+    withoutLora ? specs.map((spec) => ({ ...spec, withoutLora })) : specs,
     set,
     get
   )
@@ -2040,7 +2109,15 @@ async function runBuckets(
       if (!next) return
       const spec = isBucketCancelled(charId, bucketIdFor(next.target))
         ? null
-        : await prepareSpec(charId, next.target, next.mode, next.edit, set, get)
+        : await prepareSpec(
+            charId,
+            next.target,
+            next.mode,
+            next.edit,
+            next.withoutLora ?? false,
+            set,
+            get
+          )
       if (!spec || specKeys(spec).length === 0) {
         dropTask(next.taskId)
         continue
@@ -2252,8 +2329,10 @@ async function runBuckets(
     const bucketId = bucketIdFor(target)
     /** Read fresh on every check — a cancel can land at any point in a bucket. */
     const cancelled = (): boolean => isBucketCancelled(charId, bucketId)
-    // The character as the store holds it now, not as the run captured it.
-    const current = get().characters[charId] ?? character
+    // The character as the store holds it now, not as the run captured it, her LoRA left off
+    // where the player answered to render without it.
+    const held = get().characters[charId] ?? character
+    const current = spec.withoutLora ? withoutLoraOf(held) : held
 
     // Cancelled before it started: no jobs to abort, and the run carries on to the next set.
     if (cancelled()) {

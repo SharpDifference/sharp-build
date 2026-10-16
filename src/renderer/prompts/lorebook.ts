@@ -10,7 +10,7 @@ import { jobDefOf } from '@shared/jobs'
 import { npcBestFriendOf, type NpcRelationshipMap } from '@shared/npcRelationships'
 import { affectionFor } from '@shared/relationship'
 import { andList, escapeRegExp, splitSentences } from '@shared/sentences'
-import { eyeColorOf, hairColorOf, skinToneOf } from '@shared/tags'
+import { eyeColorOf, hairColorOf, skinTonesOf } from '@shared/tags'
 import { fullNameOf, type CharInfo, type Character, type ClassEntry } from '@shared/types'
 import { HOMECOMING_VISIT_SENTENCE } from './homecoming'
 import { npcStandingLine } from './npcRelationship'
@@ -338,11 +338,11 @@ function appearanceSentence(character: Character): string {
   const tags = character.baseAppearance
   const hair = hairColorOf(tags)
   const eyes = eyeColorOf(tags)
-  const skin = skinToneOf(tags)
+  const skin = skinTonesOf(tags)
   const parts = [
     hair && `${hair} hair`,
     eyes && `${eyes} eyes`,
-    skin && `${skin} skin`
+    skin.length > 0 && `${skin.join(', ')} skin`
   ].filter((part): part is string => Boolean(part))
   if (parts.length === 0) return ''
   const list =

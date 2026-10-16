@@ -12,6 +12,7 @@ import {
 } from '@shared/imagePrompt'
 import { COMFY_HOST } from '@shared/setupManifest'
 import {
+  characterLoraOf,
   COMFY_MODEL_SLOTS,
   comfyPicksOf,
   emptyModelLists,
@@ -117,9 +118,13 @@ function keyOf(target: Pick<ComfyTarget, 'source' | 'baseUrl'>): string {
 /** The managed server's key, the one a spawn or a kill clears. */
 const MANAGED_KEY = keyOf({ source: 'managed', baseUrl: MANAGED_URL })
 
+/** The loader every sampling graph draws her own LoRA through, chained after the style LoRA. */
+const CHARACTER_LORA_NODE = '100'
+
 /** Node ids overwritten in `assets/workflows/characterBase.json`. */
 const BASE_NODE = {
   seed: '14',
+  characterLora: CHARACTER_LORA_NODE,
   positivePrompt: '4',
   negativePrompt: '5',
   poseImage: '39',
@@ -141,6 +146,7 @@ const CUTOUT_NODE = {
  */
 const EXPRESSION_NODE = {
   seed: '14',
+  characterLora: CHARACTER_LORA_NODE,
   positivePrompt: '4',
   negativePrompt: '5',
   sourceImage: '10',
@@ -153,6 +159,7 @@ const EXPRESSION_NODE = {
 /** Node ids overwritten in `assets/workflows/characterCg.json`. */
 const CG_NODE = {
   seed: '14',
+  characterLora: CHARACTER_LORA_NODE,
   positivePrompt: '4',
   detailerPositivePrompt: '50',
   negativePrompt: '5',
@@ -166,6 +173,7 @@ const CG_NODE = {
  */
 const HANDS_NODE = {
   seed: '14',
+  characterLora: CHARACTER_LORA_NODE,
   positivePrompt: '4',
   negativePrompt: '5',
   sourceImage: '10',
@@ -591,12 +599,12 @@ function bypassLoraLoader(workflow: ComfyWorkflow, id: string): void {
   }
 }
 
-/** The first model a graph names that the listing does not offer, with the slot it fills. */
+/** The first model a graph names that the listing does not offer, and the slot and node it is. */
 function missingModel(
   workflow: ComfyWorkflow,
   objectInfo: Record<string, unknown>
-): { label: string; value: string } | null {
-  for (const node of Object.values(workflow)) {
+): { label: string; value: string; node: string } | null {
+  for (const [id, node] of Object.entries(workflow)) {
     const slots = COMFY_MODEL_SLOTS.filter((slot) => slot.nodeClass === node.class_type)
     if (slots.length === 0) continue
     const value = node.inputs[slots[0].input]
@@ -604,7 +612,7 @@ function missingModel(
     // The detector loader fills two slots; its value carries the prefix of the one it is.
     const slot = slots.find((s) => s.prefix !== '' && value.startsWith(s.prefix)) ?? slots[0]
     if (!nodeOptions(objectInfo, slot.nodeClass, slot.input).includes(value)) {
-      return { label: slot.label, value }
+      return { label: slot.label, value, node: id }
     }
   }
   return null
@@ -612,14 +620,26 @@ function missingModel(
 
 /**
  * Refuses a graph naming a model the server does not list, asking the server again once first,
- * since the player may have added the file since the listing was kept.
+ * since the player may have added the file since the listing was kept. Her own LoRA's loader,
+ * where the graph keeps one, is named as hers.
  */
-async function assertGraphModels(target: ComfyTarget, workflow: ComfyWorkflow): Promise<void> {
+async function assertGraphModels(
+  target: ComfyTarget,
+  workflow: ComfyWorkflow,
+  characterLoraNode?: string
+): Promise<void> {
   let missing = missingModel(workflow, await listingFor(target))
   if (missing) {
     const fresh = await fetchObjectInfo(target.baseUrl)
     verified.set(keyOf(target), fresh)
     missing = missingModel(workflow, fresh)
+  }
+  if (missing && missing.node === characterLoraNode) {
+    throw appError(
+      'COMFY_MODEL_MISSING',
+      `ComfyUI does not have her LoRA, ${missing.value}.`,
+      "Add it to ComfyUI's LoRA folder, or pick another under her Generation settings."
+    )
   }
   if (missing) {
     throw appError(
@@ -1085,6 +1105,8 @@ interface GenerationNodes {
   sourceImage?: string
   /** The painted-strokes `LoadImage`; the hands graph only. */
   paintImage?: string
+  /** Her own LoRA's loader; every graph that samples. */
+  characterLora?: string
   /** The face mask's sink; the expression graph only. */
   faceSaveImage?: string
   /** The changed region's sink; the hands graph only, and required where it is named. */
@@ -1104,6 +1126,8 @@ interface GenerationSpec {
   detailerPositive?: string
   /** What `nodes.seed` is set to, where the graph names one. */
   seed?: number
+  /** Her own LoRA for `nodes.characterLora`, or null to take that loader out of the graph. */
+  lora?: { name: string; weight: number } | null
   /** Staged filename for `nodes.poseImage`, if the graph has one. */
   poseImageName?: string
   /** Staged filename for `nodes.sourceImage`, if the graph has one. */
@@ -1227,7 +1251,18 @@ async function runGraph(spec: GenerationSpec, options: RunOptions): Promise<stri
   // The models go in once the graph is final, and what it then names is checked against the
   // server's own lists, so a missing file is named rather than turned down as a whole graph.
   applyModelPicks(workflow, resolvedPicks(target, await listingFor(target)), target.loraWeight)
-  await assertGraphModels(target, workflow)
+  // Hers after the picks, so a file of hers named as the style LoRA ships is never taken for it.
+  if (nodes.characterLora) {
+    const lora = node(nodes.characterLora)
+    if (spec.lora) {
+      lora.inputs.lora_name = spec.lora.name
+      lora.inputs.strength_model = spec.lora.weight
+      lora.inputs.strength_clip = spec.lora.weight
+    } else {
+      bypassLoraLoader(workflow, nodes.characterLora)
+    }
+  }
+  await assertGraphModels(target, workflow, nodes.characterLora)
 
   throwIfCancelled(signal)
   logJob(spec)
@@ -1270,6 +1305,15 @@ async function runGraph(spec: GenerationSpec, options: RunOptions): Promise<stri
   }
 
   return destPath
+}
+
+/** Her own LoRA as a job draws it, and the log suffix naming it; nothing where she has none. */
+function loraOfJob(character: Character): {
+  lora: { name: string; weight: number } | null
+  logged: string
+} {
+  const lora = characterLoraOf(character)
+  return { lora, logged: lora ? `, lora=${lora.name}@${lora.weight}` : '' }
 }
 
 /** The pose's tags, or a permanent failure if the pose is not installed. */
@@ -1482,6 +1526,8 @@ export async function generateSprite(
   // Staged once: the base pass and the face pass read the same skeleton.
   const { poseTags, skeletonName } = await stagePose(character, options.target)
 
+  const { lora, logged } = loraOfJob(character)
+
   // The portrait is cut from the default wardrobe's `neutral` and nothing else.
   const cutsProfile = emotion === 'neutral' && set === null
 
@@ -1502,11 +1548,13 @@ export async function generateSprite(
           ? buildOutfitBasePrompt(character, poseTags, set, edit)
           : buildBasePrompt(character, poseTags, edit),
         seed,
+        lora,
         poseImageName: skeletonName,
         destPath: staged ? stagedPath : livePath,
         format: 'lossless',
         label: `${charId} / base${suffix}`,
-        logContext: `pose=${character.pose}, seed=${seed}${edit !== undefined ? ', edited' : ''}`
+        logContext:
+          `pose=${character.pose}, seed=${seed}${logged}` + (edit !== undefined ? ', edited' : '')
       },
       options
     )
@@ -1530,6 +1578,7 @@ export async function generateSprite(
       nodes: EXPRESSION_NODE,
       prompts: buildImagePrompt(character, poseTags, emotion, edit),
       seed,
+      lora,
       sourceImageName: sourceName,
       poseImageName: skeletonName,
       destPath,
@@ -1541,7 +1590,7 @@ export async function generateSprite(
           : getCharacterFacePath(charId)
         : undefined,
       label: `${charId} / ${emotion}${suffix}`,
-      logContext: `face-pass, seed=${seed}${edit !== undefined ? ', edited' : ''}`
+      logContext: `face-pass, seed=${seed}${logged}${edit !== undefined ? ', edited' : ''}`
     },
     options
   )
@@ -1578,6 +1627,7 @@ export async function generateCg(
   const options = await runOptionsOf(jobOptions)
 
   const seed = seedOverride ?? character.generationSeed
+  const { lora, logged } = loraOfJob(character)
   const { poseTags, skeletonName } = await stagePose(character, options.target)
   const { positive, negative, detailerPositive } = buildCgPrompt(
     character,
@@ -1593,13 +1643,14 @@ export async function generateCg(
       prompts: { positive, negative },
       detailerPositive,
       seed,
+      lora,
       poseImageName: skeletonName,
       destPath: staged
         ? getStagedPath(character.charId, cgRel(position))
         : getCharacterCgPath(character.charId, position),
       format: 'lossy',
       label: `${character.charId} / cg:${position}`,
-      logContext: `seed=${seed}${edit !== undefined ? ', edited' : ''}`
+      logContext: `seed=${seed}${logged}${edit !== undefined ? ', edited' : ''}`
     },
     options
   )
@@ -1630,6 +1681,7 @@ export async function fixHands(
   const suffix = set ? `_${set}` : ''
   const basePath = set ? getOutfitBasePath(charId, set) : getExpressionBasePath(charId)
 
+  const { lora, logged } = loraOfJob(character)
   const { poseTags, skeletonName } = await stagePose(character, target)
   // Live only: a fix repairs the set on disk, and a staged run is a different set of images.
   const { sourceName } = await stageBase(charId, basePath, basePath, false, scope, target)
@@ -1649,6 +1701,7 @@ export async function fixHands(
           ? buildOutfitBasePrompt(character, poseTags, set)
           : buildBasePrompt(character, poseTags),
         seed,
+        lora,
         poseImageName: skeletonName,
         sourceImageName: sourceName,
         paintImageName: paintName,
@@ -1656,7 +1709,7 @@ export async function fixHands(
         regionDestPath: join(scratch, 'region.png'),
         format: 'raw',
         label: `${charId} / hands${suffix}`,
-        logContext: `pose=${character.pose}, seed=${seed}`
+        logContext: `pose=${character.pose}, seed=${seed}${logged}`
       },
       options
     )

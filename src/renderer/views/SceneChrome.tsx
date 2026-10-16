@@ -640,7 +640,7 @@ type DividerWord = 'hover' | 'locked' | 'gift' | 'ending'
 const DIVIDER_WORDS: Record<DividerWord, string> = {
   hover: 'HOVER TO SHOW ACTION BOX',
   locked: 'CLASS IN SESSION',
-  gift: 'WAIT FOR IT',
+  gift: 'ACTION UNAVAILABLE',
   ending: 'SCENE IS ENDING'
 }
 

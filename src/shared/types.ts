@@ -290,6 +290,25 @@ export interface GenerateOptions {
   room?: boolean
 }
 
+/**
+ * Her own LoRA, drawn through every ComfyUI render of her after the style LoRA: the file as
+ * the server lists it, and the weight, absent at `DEFAULT_LORA_WEIGHT`.
+ */
+export interface CharacterLora {
+  name: string
+  weight?: number
+}
+
+/** What the New Character modal said about her LoRA, kept in her brief until her sheet lands. */
+export interface CharacterLoraBrief extends CharacterLora {
+  /** The LoRA's trigger word, put first in her appearance; empty where it has none. */
+  trigger: string
+  appearance: string[]
+  outfit: string[]
+  /** Whether a group the player filled stands in for the LLM's rather than joining it. */
+  replace: boolean
+}
+
 /** What the New Character modal was told, kept on her record until her sheet lands. */
 export interface CharacterBrief {
   prompt: string
@@ -297,6 +316,8 @@ export interface CharacterBrief {
   options: GenerateOptions
   /** True when a reference picture sits beside the record as `reference`. */
   reference: boolean
+  /** Her LoRA and the tags that came with it; omitted where none was picked. */
+  lora?: CharacterLoraBrief
 }
 
 /** On-disk character definition — `/data/characters/{charId}/character.json`. */
@@ -379,6 +400,8 @@ export interface Character {
    * character — sprites, wardrobes and CGs alike.
    */
   negativeTags?: string[]
+  /** Her own LoRA; omitted where she has none. */
+  lora?: CharacterLora
   /**
    * Every group each regenerate button last sent, whole, keyed by what it renders; the modal
    * reopens on it. Omitted where no button has sent any.

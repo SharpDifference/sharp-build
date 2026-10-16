@@ -24,6 +24,16 @@ export interface GameOverScene {
 const CREDITS_OFFER =
   "If an ending CG was generated for you, I'd love it if you would email me it! I'll take it as proof you finished the game and will add you to the credits as a special thank you."
 
+/** The winning ending's way out of Veridan, looking back over `span`, up to its last line. */
+function departureLines(span: string): string[] {
+  return [
+    'You finally finish stuffing everything into your backpack and suitcase and head for the Loop.',
+    'From the tram window, you take one last look back down the road at the gates, where the stone statue of Jupiter is waving your farewell.',
+    `As your flight takes off, you pick out the familiar buildings of Downtown, Stanchion, and the Promenade, thinking about all the memories you made ${span}.`,
+    'You smile as you realize how when you first arrived, you were a stranger to all the friends you made. Now, you\'ll never forget them.'
+  ]
+}
+
 export const GAME_OVER_SCENES: Record<GameOverReason, GameOverScene> = {
   debt: {
     lines: [
@@ -55,13 +65,7 @@ export const GAME_OVER_SCENES: Record<GameOverReason, GameOverScene> = {
     ]
   },
   gameComplete: {
-    lines: [
-      'You finally finish stuffing everything into your backpack and suitcase and head for the Loop.',
-      'From the tram window, you take one last look back down the road at the gates, where the stone statue of Jupiter is waving your farewell.',
-      'As your flight takes off, you pick out the familiar buildings of Downtown, Stanchion, and the Promenade, thinking about all the memories you made this semester.',
-      'You smile as you realize how when you first arrived, you were a stranger to all the friends you made. Now, you\'ll never forget them.',
-      'You can\'t wait until next semester.'
-    ],
+    lines: [...departureLines('this semester'), 'You can\'t wait until next semester.'],
     title: 'Thanks for playing!',
     message: [
       `Your university life is over... until next semester. Congratulations on making it to the end of the game! ${CREDITS_OFFER}`,
@@ -98,7 +102,10 @@ export function gameCompleteSceneOf(semesterIndex: number): GameOverScene {
   if (semesterIndex === 0) return first
   if (!canContinueAfter(semesterIndex)) {
     return {
-      lines: [...first.lines.slice(0, -1), 'Wherever you go next, a part of you will always be at Venus University.'],
+      lines: [
+        ...departureLines('these last four years'),
+        'Wherever you go next, a part of you will always be at Venus University.'
+      ],
       title: first.title,
       message: [
         `Your university life is over. Congratulations on graduating from Venus University! ${CREDITS_OFFER}`

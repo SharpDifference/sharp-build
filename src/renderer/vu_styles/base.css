@@ -710,6 +710,36 @@ body {
   pointer-events: none;
 }
 
+/* The fade is drawn only while its scroller has more below: the scroller just before it lends it
+   a scroll timeline, which is inactive where nothing scrolls, and the fade clears over the
+   scroll's last stretch so the last row is not left under it. A browser without scroll
+   timelines keeps it drawn. */
+@supports (animation-timeline: scroll()) and (timeline-scope: none) {
+  :has(> .vu-scroll-fade) {
+    timeline-scope: --vu-scroll-fade;
+  }
+
+  :has(+ .vu-scroll-fade) {
+    scroll-timeline: --vu-scroll-fade block;
+  }
+
+  .vu-scroll-fade {
+    opacity: 0;
+    animation: vu-scroll-fade linear both;
+    animation-timeline: --vu-scroll-fade;
+    animation-range: calc(100% - 34px) 100%;
+  }
+}
+
+@keyframes vu-scroll-fade {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+
 /* A screen's name, on its own tint blob. The blob rotates, the word never does;
    `isolation` keeps the negative-z pseudo above the screen's ground instead of behind it. */
 .vu-title {

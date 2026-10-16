@@ -1,7 +1,14 @@
 import { create } from 'zustand'
-import type { ComfyModelLists, ComfyModelRole, ComfyProbe } from '@shared/comfyModels'
+import {
+  comfySourceOf,
+  comfyUrlOf,
+  type ComfyModelLists,
+  type ComfyModelRole,
+  type ComfyProbe
+} from '@shared/comfyModels'
 import type { AppError, ComfyRuntimeState, Result } from '@shared/types'
 import { isWebBuild, DESKTOP_ONLY_NOTE } from '../platform'
+import { useSettingsStore } from './settingsStore'
 import { useUiStore } from './uiStore'
 
 interface ComfyStoreState {
@@ -17,6 +24,11 @@ interface ComfyStoreState {
   probe: (url: string) => Promise<Result<ComfyProbe>>
   /** Opens one slot's model folder, the app's own install's where `url` is null. */
   openModelFolder: (role: ComfyModelRole, url: string | null) => Promise<void>
+  /**
+   * The LoRAs the ComfyUI the settings name can draw with, asked afresh: the app's own install's
+   * folder, or the player's own server's list. Null where that cannot be told.
+   */
+  listLoras: () => Promise<string[] | null>
 }
 
 /** What the browser answers a ComfyUI question with: there is no ComfyUI there to ask. */
@@ -29,7 +41,7 @@ function desktopOnly<T>(): Result<T> {
  * one answers "is the server up", the other "are the files on disk". Main owns the answer
  * and broadcasts it, so nothing here sets the state from what a call returned.
  */
-export const useComfyStore = create<ComfyStoreState>(() => ({
+export const useComfyStore = create<ComfyStoreState>((_set, get) => ({
   state: 'idle',
 
   ensureStarted: async () => {
@@ -51,6 +63,22 @@ export const useComfyStore = create<ComfyStoreState>(() => ({
     if (isWebBuild()) return
     const result = await window.api.comfy.openModelFolder(role, url)
     if (!result.ok) useUiStore.getState().showError(result.error)
+  },
+
+  listLoras: async () => {
+    const settings = useSettingsStore.getState().settings
+    if (isWebBuild() || !settings) return null
+    const result =
+      comfySourceOf(settings) === 'external'
+        ? await get()
+            .probe(comfyUrlOf(settings))
+            .then((probed) => (probed.ok ? { ok: true as const, data: probed.data.models } : probed))
+        : await get().listLocalModels()
+    if (!result.ok) {
+      console.warn(`[comfy] could not list the LoRAs: ${result.error.message}`)
+      return null
+    }
+    return result.data.lora
   }
 }))
 

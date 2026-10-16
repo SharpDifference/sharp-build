@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom'
 import { AnimatePresence, motion } from 'motion/react'
 import { CheckField } from '../components/CheckField'
 import { ChipListInput } from '../components/ChipListInput'
+import { ComfyModelRow } from '../components/ComfyModelPicker'
 import { ConfirmModal } from '../components/ConfirmModal'
 import { DeadNote } from '../components/DeadNote'
 import { LandscapeTile } from '../components/LandscapeTile'
@@ -27,6 +28,13 @@ import {
   customCgSlotNumber,
   customCgVoiceOf
 } from '@shared/customCgs'
+import {
+  characterLoraOf,
+  characterLoraToStore,
+  DEFAULT_LORA_WEIGHT,
+  loraWeightText,
+  parseLoraWeight
+} from '@shared/comfyModels'
 import { EMOTIONS } from '@shared/emotions'
 import {
   cgDraft,
@@ -98,11 +106,13 @@ import { renameMentions } from '../stores/renameMentions'
 import { noNsfwImagesOf, useSettingsStore } from '../stores/settingsStore'
 import { comfyAvailable, useSetupStore } from '../stores/setupStore'
 import {
+  APPEARANCE_COLOR_HINT,
   BEHAVIOR_FIELDS,
   CG_INSTRUCTIONS_HINT,
   CG_NAME_HINT,
   GIFT_CATEGORY_OPTIONS,
   listText,
+  loraMissingCopy,
   outfitInstructionsHint,
   OUTFIT_NAME_HINT,
   PREFERRED_STAT_OPTIONS,
@@ -122,6 +132,7 @@ import { ProfilePictureModal } from './ProfilePictureModal'
 import { RegenerateModal, type CgSounds, type SeedPrefill } from './RegenerateModal'
 import { SetHeightModal } from './SetHeightModal'
 import { FingerFixModal } from './FingerFixModal'
+import { committedWeightText, useCharacterLora, weightTextAfterPick } from './useCharacterLora'
 import { TransparencyFixModal } from './TransparencyFixModal'
 import {
   chipPress,
@@ -190,6 +201,8 @@ interface RegenerateRequest {
   requireGroup?: PromptGroup
   /** The primary's words, where the render is not a replacement. */
   submitLabel?: string
+  /** Whether the player answered to render it without her missing LoRA. */
+  withoutLora?: boolean
 }
 
 /** What a caller builds a request from: the draft in place of the two tag states derived from it. */
@@ -237,6 +250,9 @@ interface Form {
   voicePitch: number
   /** The pose every sprite render stands in. */
   pose: string
+  /** Her own LoRA, '' for None, and its weight as typed. */
+  loraName: string
+  loraWeight: string
 }
 
 function formOf(character: Character): Form {
@@ -264,7 +280,9 @@ function formOf(character: Character): Form {
     roomPrompt: character.roomPrompt,
     height: character.height,
     voicePitch: character.voicePitch ?? VOICE_PITCH_DEFAULT,
-    pose: character.pose
+    pose: character.pose,
+    loraName: characterLoraOf(character)?.name ?? '',
+    loraWeight: loraWeightText(characterLoraOf(character)?.weight ?? DEFAULT_LORA_WEIGHT)
   }
 }
 
@@ -305,7 +323,11 @@ export function EditCharacterModal({
   const [framing, setFraming] = useState(false)
   // Whether the portrait is being pointed at, which is what raises the mark over it.
   const [overPortrait, setOverPortrait] = useState(false)
-  const [confirmSet, setConfirmSet] = useState<{ target: SetTarget; mode: RenderMode } | null>(null)
+  const [confirmSet, setConfirmSet] = useState<{
+    target: SetTarget
+    mode: RenderMode
+    withoutLora: boolean
+  } | null>(null)
   const [regen, setRegen] = useState<RegenerateRequest | null>(null)
   const [saved, setSaved] = useState(false)
   const [pending, setPending] = useState<PendingAction | null>(null)
@@ -317,6 +339,8 @@ export function EditCharacterModal({
   const [closing, setClosing] = useState(false)
   const [confirmingReset, setConfirmingReset] = useState(false)
   const [resetting, setResetting] = useState(false)
+  // A render whose LoRA ComfyUI does not list, waiting on the player's answer.
+  const [loraMissing, setLoraMissing] = useState<{ file: string; run: () => void } | null>(null)
 
   const setField =
     <K extends keyof Form>(key: K) =>
@@ -385,6 +409,9 @@ export function EditCharacterModal({
 
   /** Whether the local renderer is out of reach, which every ComfyUI job in here waits on. */
   const comfyMissing = !renderable
+
+  // The LoRAs her own may be picked from, asked for only where there is a ComfyUI to ask.
+  const loras = useCharacterLora(!webBuild && !comfyMissing)
 
   /* What a hover raises over a control these are holding dead: the one thing the player would
      have to go and get, and nothing the moment he has it. A control dead for anything else —
@@ -499,6 +526,14 @@ export function EditCharacterModal({
     if (next.negativeTags?.length === 0) delete next.negativeTags
     // Likewise absent and centre, so a voice nobody moved is left out too.
     if (next.voicePitch === 0) delete next.voicePitch
+    // Her LoRA as the record holds it where the form left it alone, so a hand-written one never
+    // reads as an edit; text that is not a weight keeps the one she has.
+    const held = characterLoraOf(character)
+    const weight = parseLoraWeight(form.loraWeight) ?? held?.weight ?? DEFAULT_LORA_WEIGHT
+    if (form.loraName === '') delete next.lora
+    else if (held?.name !== form.loraName || held.weight !== weight) {
+      next.lora = characterLoraToStore(form.loraName, weight)
+    }
     return next
   }
 
@@ -598,6 +633,7 @@ export function EditCharacterModal({
       setRegen(null)
       setConfirmSet(null)
       setPending(null)
+      setLoraMissing(null)
     })
   }
 
@@ -667,7 +703,8 @@ export function EditCharacterModal({
    * built from the character as the store holds her now.
    */
   const openRegenerate = (
-    build: (character: Character, poseTags: readonly string[]) => RegenerateOpening
+    build: (character: Character, poseTags: readonly string[]) => RegenerateOpening,
+    withoutLora = false
   ): void => {
     // Read fresh out of the store, never off `character`: the dirty gate may have just saved,
     // and the closure this runs from still holds the character as she was typed over.
@@ -684,11 +721,29 @@ export function EditCharacterModal({
         : customCgOfTarget(request.target) && kept.kind === 'cg' && draft.kind === 'cg'
           ? { ...kept, position: draft.position }
           : kept
-    setRegen({ ...request, defaults: draft, edit })
+    setRegen({ ...request, defaults: draft, edit, withoutLora })
+  }
+
+  /**
+   * Runs one of her renders past the LoRA check: straight on where the render is the cloud
+   * room, she has no LoRA or ComfyUI lists hers; behind the confirm where it does not, whose
+   * answer runs it without. Read fresh, as the dirty gate in front of it may have just saved.
+   */
+  const guardLora = (target: RenderTarget, run: (withoutLora: boolean) => void): void => {
+    const current = useCharacterStore.getState().characters[charId]
+    const lora = target === 'room' || !current ? null : characterLoraOf(current)
+    if (!lora) {
+      run(false)
+      return
+    }
+    void loras.isListed(lora.name).then((listed) => {
+      if (listed === false) setLoraMissing({ file: lora.name, run: () => run(true) })
+      else run(false)
+    })
   }
 
   /** What a set's control runs: a fill goes straight out, a regenerate opens on its tags first. */
-  const runSet = (target: SetTarget, mode: RenderMode): void => {
+  const runSet = (target: SetTarget, mode: RenderMode, withoutLora = false): void => {
     /* A player-authored wardrobe or CG pair with nothing in it is written before it is
        rendered: there are no stored tags for a fill to draw from, so its first run opens the
        modal too. */
@@ -699,95 +754,123 @@ export function EditCharacterModal({
     // neither has a set of groups for the modal to open on.
     if (!fresh && (mode === 'fill' || target === 'room')) {
       cancelSingles(target)
-      void generateSet(charId, target, mode)
+      void generateSet(charId, target, mode, undefined, withoutLora)
       return
     }
     if (isCustomOutfitSlot(target)) {
       const slot = target
-      openRegenerate((current, poseTags) => ({
-        target: slot,
-        title: fresh ? 'Generate custom outfit' : `Regenerate ${outfitLabelOf(current, slot)}`,
-        draft: spriteDraft(current, poseTags, slot),
-        seed: seedPrefillFor(current, slot),
-        // A wardrobe with no clothes in it is the one render the tags are the whole point of.
-        requireGroup: 'outfit',
-        ...(fresh
-          ? {
-              name: {
-                value: customOutfitName(current.customOutfits?.[slot]?.name),
-                placeholder: `Custom outfit ${customSlotNumber(slot)}`,
-                maxLength: CUSTOM_OUTFIT_NAME_MAX,
-                hint: OUTFIT_NAME_HINT
-              },
-              instructions: {
-                value: customOutfitInstructions(current.customOutfits?.[slot]?.instructions),
-                maxLength: CUSTOM_OUTFIT_INSTRUCTIONS_MAX,
-                // Named as the writer will read it: a blank name is offered under the slot id.
-                hint: (typed: string) => outfitInstructionsHint(customOutfitName(typed) || slot)
-              },
-              submitLabel: 'Generate'
-            }
-          : {})
-      }))
+      openRegenerate(
+        (current, poseTags) => ({
+          target: slot,
+          title: fresh ? 'Generate custom outfit' : `Regenerate ${outfitLabelOf(current, slot)}`,
+          draft: spriteDraft(current, poseTags, slot),
+          seed: seedPrefillFor(current, slot),
+          // A wardrobe with no clothes in it is the one render the tags are the whole point of.
+          requireGroup: 'outfit',
+          ...(fresh
+            ? {
+                name: {
+                  value: customOutfitName(current.customOutfits?.[slot]?.name),
+                  placeholder: `Custom outfit ${customSlotNumber(slot)}`,
+                  maxLength: CUSTOM_OUTFIT_NAME_MAX,
+                  hint: OUTFIT_NAME_HINT
+                },
+                instructions: {
+                  value: customOutfitInstructions(current.customOutfits?.[slot]?.instructions),
+                  maxLength: CUSTOM_OUTFIT_INSTRUCTIONS_MAX,
+                  // Named as the writer will read it: a blank name is offered under the slot id.
+                  hint: (typed: string) => outfitInstructionsHint(customOutfitName(typed) || slot)
+                },
+                submitLabel: 'Generate'
+              }
+            : {})
+        }),
+        withoutLora
+      )
       return
     }
     if (isCustomCgSlot(target)) {
       const slot = target
-      openRegenerate((current) => ({
-        target: slot,
-        title: fresh ? 'Generate custom CG' : `Regenerate ${customCgLabelOf(current, slot)}`,
-        draft: cgDraft(current, slot),
-        seed: seedPrefillFor(current, slot),
-        // A CG with no position in it is the one render the tags are the whole point of.
-        requireGroup: 'position',
-        ...(fresh
-          ? {
-              name: {
-                value: customOutfitName(current.customCgs?.[slot]?.name),
-                placeholder: `Custom CG ${customCgSlotNumber(slot)}`,
-                maxLength: CUSTOM_OUTFIT_NAME_MAX,
-                hint: CG_NAME_HINT
-              },
-              instructions: {
-                value: customOutfitInstructions(current.customCgs?.[slot]?.instructions),
-                maxLength: CUSTOM_OUTFIT_INSTRUCTIONS_MAX,
-                hint: () => CG_INSTRUCTIONS_HINT
-              },
-              sounds: { voice: customCgVoiceOf(current, slot), sfx: customCgSfxOf(current, slot) },
-              submitLabel: 'Generate'
-            }
-          : {})
-      }))
+      openRegenerate(
+        (current) => ({
+          target: slot,
+          title: fresh ? 'Generate custom CG' : `Regenerate ${customCgLabelOf(current, slot)}`,
+          draft: cgDraft(current, slot),
+          seed: seedPrefillFor(current, slot),
+          // A CG with no position in it is the one render the tags are the whole point of.
+          requireGroup: 'position',
+          ...(fresh
+            ? {
+                name: {
+                  value: customOutfitName(current.customCgs?.[slot]?.name),
+                  placeholder: `Custom CG ${customCgSlotNumber(slot)}`,
+                  maxLength: CUSTOM_OUTFIT_NAME_MAX,
+                  hint: CG_NAME_HINT
+                },
+                instructions: {
+                  value: customOutfitInstructions(current.customCgs?.[slot]?.instructions),
+                  maxLength: CUSTOM_OUTFIT_INSTRUCTIONS_MAX,
+                  hint: () => CG_INSTRUCTIONS_HINT
+                },
+                sounds: {
+                  voice: customCgVoiceOf(current, slot),
+                  sfx: customCgSfxOf(current, slot)
+                },
+                submitLabel: 'Generate'
+              }
+            : {})
+        }),
+        withoutLora
+      )
       return
     }
     if (target === 'cgs') {
-      openRegenerate((current) => ({
-        target: 'cgs',
-        title: 'Regenerate NSFW CG',
-        draft: cgSetDraft(current),
-        seed: seedPrefillFor(current, 'cgs')
-      }))
+      openRegenerate(
+        (current) => ({
+          target: 'cgs',
+          title: 'Regenerate NSFW CG',
+          draft: cgSetDraft(current),
+          seed: seedPrefillFor(current, 'cgs')
+        }),
+        withoutLora
+      )
       return
     }
     const wardrobe = wardrobeOf(target)
     if (!wardrobe) return
     const spriteTarget = target
-    openRegenerate((current, poseTags) => ({
-      target: spriteTarget,
-      title: `Regenerate ${wardrobe.title}`,
-      draft: spriteDraft(current, poseTags, wardrobe.set),
-      seed: seedPrefillFor(current, spriteTarget)
-    }))
+    openRegenerate(
+      (current, poseTags) => ({
+        target: spriteTarget,
+        title: `Regenerate ${wardrobe.title}`,
+        draft: spriteDraft(current, poseTags, wardrobe.set),
+        seed: seedPrefillFor(current, spriteTarget)
+      }),
+      withoutLora
+    )
   }
 
   /** Starts a set's render, behind the confirm where it would cancel single re-rolls inside it. */
-  const startSet = (target: SetTarget, mode: RenderMode): void => {
+  const startSet = (target: SetTarget, mode: RenderMode, withoutLora = false): void => {
     if (liveSinglesOf(target).length > 0) {
-      setConfirmSet({ target, mode })
+      setConfirmSet({ target, mode, withoutLora })
       return
     }
-    runSet(target, mode)
+    runSet(target, mode, withoutLora)
   }
+
+  /** A set's render behind every gate in front of it: the dirty gate, then the LoRA check. */
+  const requestSet = (verb: PendingVerb, target: SetTarget, mode: RenderMode): void =>
+    guardDirty(verb, () => guardLora(target, (withoutLora) => startSet(target, mode, withoutLora)))
+
+  /** A single re-roll's tag modal behind the same two gates. */
+  const requestSingle = (
+    target: RenderTarget,
+    build: (character: Character, poseTags: readonly string[]) => RegenerateOpening
+  ): void =>
+    guardDirty('regenerate', () =>
+      guardLora(target, (withoutLora) => openRegenerate(build, withoutLora))
+    )
 
   const control = (target: SetTarget, onDisk: number, total: number): SetControlProps => {
     const blocked = setBlocked(target)
@@ -804,9 +887,7 @@ export function EditCharacterModal({
       // Generate fills the gaps, Regenerate replaces the set. Behind the
       // dirty gate, with the confirm over the single re-rolls inside it.
       onGenerate: () =>
-        guardDirty(complete ? 'regenerate' : 'generate', () =>
-          startSet(target, complete ? 'regenerate' : 'fill')
-        ),
+        requestSet(complete ? 'regenerate' : 'generate', target, complete ? 'regenerate' : 'fill'),
       // Cancelling consumes nothing the player has written, so it skips the dirty gate.
       onCancel: () => void cancelSet(charId, target)
     }
@@ -845,7 +926,7 @@ export function EditCharacterModal({
     // Kept whether or not it lands: a failed write is reported, and the render goes out regardless.
     void writeRegenTags(charId, target, edit)
     if (isSetTarget(target)) cancelSingles(target)
-    await generateSet(charId, target, 'regenerate', { prompt: edit, seed })
+    await generateSet(charId, target, 'regenerate', { prompt: edit, seed }, request.withoutLora)
   }
 
   /** Everything one wardrobe column is handed, stock or player-authored. */
@@ -869,14 +950,12 @@ export function EditCharacterModal({
               comfyMissing || taskOf(target)
                 ? undefined
                 : (emotion: Emotion) =>
-                    guardDirty('regenerate', () =>
-                      openRegenerate((current) => ({
-                        target: expressionTargetFor(emotion, set),
-                        title: 'Regenerate expression',
-                        draft: expressionDraft(current, emotion),
-                        seed: seedPrefillFor(current, expressionTargetFor(emotion, set))
-                      }))
-                    ),
+                    requestSingle(expressionTargetFor(emotion, set), (current) => ({
+                      target: expressionTargetFor(emotion, set),
+                      title: 'Regenerate expression',
+                      draft: expressionDraft(current, emotion),
+                      seed: seedPrefillFor(current, expressionTargetFor(emotion, set))
+                    })),
             onCancelExpression: (emotion: Emotion) =>
               void cancelSet(charId, expressionTargetFor(emotion, set)),
             liveExpressions: new Set(singleExpressions(set)),
@@ -1431,9 +1510,41 @@ export function EditCharacterModal({
                           hint={poses[form.pose]?.description}
                         />
 
+                        {/* Her own LoRA, drawn through every render of her after the style
+                            LoRA; its trigger word is one of her appearance tags below. */}
+                        <ComfyModelRow
+                          id="edit-lora"
+                          label="Character LoRA"
+                          value={form.loraName}
+                          options={loras.optionsFor(form.loraName)}
+                          onPick={(value) =>
+                            setForm((prev) => ({
+                              ...prev,
+                              loraName: value,
+                              loraWeight: weightTextAfterPick(prev.loraName, value, prev.loraWeight)
+                            }))
+                          }
+                          weight={{
+                            text: form.loraWeight,
+                            onText: setField('loraWeight'),
+                            onBlur: () =>
+                              setForm((prev) => ({
+                                ...prev,
+                                loraWeight: committedWeightText(
+                                  prev.loraWeight,
+                                  characterLoraOf(character)?.weight ?? DEFAULT_LORA_WEIGHT
+                                )
+                              }))
+                          }}
+                          onOpenFolder={loras.onOpenFolder}
+                        />
+
                         {TAG_FIELDS.map(({ key, id, label }) => (
                           <label key={key} className="vu-field" htmlFor={id}>
                             <span className="vu-field-label">{label}</span>
+                            {key === 'baseAppearance' && (
+                              <span className="vu-field-hint">{APPEARANCE_COLOR_HINT}</span>
+                            )}
                             <ChipListInput
                               id={id}
                               values={form[key]}
@@ -1542,14 +1653,12 @@ export function EditCharacterModal({
             regenEnabled={!setBlocked('cgs') && !sfwWithholds('cgs', noNsfwImages)}
             // A single CG re-roll goes through the dirty gate as a set does.
             onRegenerate={(position) =>
-              guardDirty('regenerate', () =>
-                openRegenerate((current) => ({
-                  target: cgTargetFor(position),
-                  title: 'Regenerate CG',
-                  draft: cgDraft(current, position),
-                  seed: seedPrefillFor(current, cgTargetFor(position))
-                }))
-              )
+              requestSingle(cgTargetFor(position), (current) => ({
+                target: cgTargetFor(position),
+                title: 'Regenerate CG',
+                draft: cgDraft(current, position),
+                seed: seedPrefillFor(current, cgTargetFor(position))
+              }))
             }
             onCustomCgs={() => setCustomCgs(true)}
             onClose={() => setGallery(false)}
@@ -1583,20 +1692,16 @@ export function EditCharacterModal({
             charId={charId}
             theme={theme}
             renderable={cgPairsRenderable}
-            onCreate={(slot) => guardDirty('generate', () => startSet(slot, 'fill'))}
-            onFill={(slot) => guardDirty('generate', () => startSet(slot, 'fill'))}
-            onRegeneratePair={(slot) =>
-              guardDirty('regenerate', () => startSet(slot, 'regenerate'))
-            }
+            onCreate={(slot) => requestSet('generate', slot, 'fill')}
+            onFill={(slot) => requestSet('generate', slot, 'fill')}
+            onRegeneratePair={(slot) => requestSet('regenerate', slot, 'regenerate')}
             onRegenerateAfter={(slot) =>
-              guardDirty('regenerate', () =>
-                openRegenerate((current) => ({
-                  target: cgTargetFor(afterOf(slot)),
-                  title: 'Regenerate CG',
-                  draft: cgDraft(current, afterOf(slot)),
-                  seed: seedPrefillFor(current, cgTargetFor(afterOf(slot)))
-                }))
-              )
+              requestSingle(cgTargetFor(afterOf(slot)), (current) => ({
+                target: cgTargetFor(afterOf(slot)),
+                title: 'Regenerate CG',
+                draft: cgDraft(current, afterOf(slot)),
+                seed: seedPrefillFor(current, cgTargetFor(afterOf(slot)))
+              }))
             }
             onEdit={setEditingCg}
             onDelete={setDeletingCg}
@@ -1735,6 +1840,21 @@ export function EditCharacterModal({
           inside it, because a presence that is always rendered inside another is rendered
           twice when the parent leaves, and the parent then never finishes leaving. */}
       <AnimatePresence propagate mode="wait">
+        {loraMissing !== null && (
+          <ConfirmModal
+            key="lora-missing"
+            id="lora-missing"
+            theme={theme}
+            {...loraMissingCopy(fullNameOf(character), loraMissing.file)}
+            onConfirm={() => {
+              const answered = loraMissing
+              setLoraMissing(null)
+              answered.run()
+            }}
+            onCancel={() => setLoraMissing(null)}
+          />
+        )}
+
         {confirmSet !== null && (
           <ConfirmModal
             key="confirm-set"
@@ -1746,7 +1866,7 @@ export function EditCharacterModal({
             onConfirm={() => {
               const request = confirmSet
               setConfirmSet(null)
-              runSet(request.target, request.mode)
+              runSet(request.target, request.mode, request.withoutLora)
             }}
             onCancel={() => setConfirmSet(null)}
           />

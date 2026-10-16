@@ -5,7 +5,6 @@ import {
   pointsForTier,
   STAT_KEYS,
   STAT_LABELS,
-  tierName,
   tierNameOf,
   tierOf,
   type PlayerStats,
@@ -13,8 +12,7 @@ import {
   type StatTier
 } from './playerStats'
 import { secondPerson } from './readerVoice'
-import { andList } from './sentences'
-import { markedLine } from './statusMark'
+import { markedLine, markedRuns } from './statusMark'
 import { hasTrait } from './traits'
 import type {
   Character,
@@ -958,30 +956,16 @@ export function withBreakPenaltiesStepped(
   return next ?? after
 }
 
-/**
- * The first morning's word on what the break cost: each stat that fell a tier with the tier it
- * fell to, and the girls it cooled by first name; null when it cost nothing.
- */
-export function breakDecayLine(
-  decayed: readonly StatKey[],
-  stats: PlayerStats,
-  names: readonly string[]
-): string | null {
-  const parts: string[] = []
-  if (decayed.length > 0) {
-    parts.push(
-      andList(
-        decayed.map((key, i) =>
-          i === 0
-            ? `your ${STAT_LABELS[key]} slipped to ${tierName(stats[key])}`
-            : `your ${STAT_LABELS[key]} to ${tierName(stats[key])}`
-        )
-      )
-    )
-  }
-  if (names.length > 0) {
-    parts.push(`${andList(names)} ${names.length === 1 ? 'feels' : 'feel'} a little more distant`)
-  }
-  if (parts.length === 0) return null
-  return `Over the break, ${parts.join(', and ')}.`
+/** The first morning's word that the break cost something, both losses in the loss colour. */
+export function breakDecayLine(): SceneLine {
+  return markedRuns(
+    [
+      'Over the break, ',
+      'your skills got a bit rusty',
+      ' and you may have ',
+      'grown a bit distant from some of your old friends',
+      '.'
+    ],
+    'loss'
+  )
 }

@@ -186,7 +186,7 @@
 - A scroller pads for whatever lives outside a row's own box — the paper shadow, a hover's swell, a sticker's overhang — and the box that holds it takes that back with a matching negative margin, so the first row still lines up and the fade at its foot lands on the scroller's own edge.
 - `.vu-scroll-box` is that holding box, one rule for every scroller that pads.
 - A screen's header is its forward layer wherever a scroller reaches up toward it; a screen's own layers count from 1 and a panel's tab is 10.
-- The scrollbar is `base.css`'s, one trio for the whole app; the fade at the foot of a scroller is `.vu-scroll-fade`, one rule for every scroller.
+- The scrollbar is `base.css`'s, one trio for the whole app; the fade at the foot of a scroller is `.vu-scroll-fade`, one rule for every scroller, standing right after the scroller it ends and drawn only while there is more to scroll to.
 - A grid that scrolls clips in both axes, so it owes padding on every side something can grow into.
 - A header row that holds one control for the thing beside it puts that control at the end of the row.
 - The chat log's row is a stack beside a tool column at the row's end, kept on every row so the words line up: a pencil on a line that can be rewritten, swapped for a check over a cross while it is, and the words swapped for a box at their own size and inset.
@@ -387,6 +387,7 @@
 ## 20. Deliberate exceptions
 
 - The Reschedule grid is Monday-first, because what it prints is a forward run of dates rather than a week.
+- The scroll fade keeps a `@keyframes` in `base.css`: it runs on its scroller's position rather than a clock, so it has no duration for the motion vocabulary to own, and a browser without scroll timelines draws it always.
 - The game stage keeps `@keyframes` and one `transition`: each starts during render on a keyed mount and ends on `animationend`, and that completion is load-bearing state — except the background's fade, which starts once its mounted picture has loaded and does not run at all under the cover.
 - The Bunnyboard's phone tilts clockwise, its shadow is larger than its face rather than offset from it, and its ears carry no paper layer — it is the app's mark at stage scale, and a mark wants all four sides.
 - The day-change splash leans −7°, being a card thrown down rather than a panel.

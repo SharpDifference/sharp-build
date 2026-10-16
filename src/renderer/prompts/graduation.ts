@@ -78,7 +78,7 @@ export function graduationScrollLines(
     {
       bg: 'quad',
       text: fall
-        ? `You follow the Gold road to the quad, where a heated white tent has gone up overnight over rows of folding chairs.`
+        ? `You follow the Gold road to the quad, where heaters have been set up near the rows of folding chairs to combat the colder weather.`
         : `You follow the Gold road to the quad, which has been turned into a makeshift amphitheater overnight, filled with white folding chairs shaded by trees.`
     },
     {

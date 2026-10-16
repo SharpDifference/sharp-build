@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState, type JSX } from 'react'
 import { AnimatePresence, motion } from 'motion/react'
+import { characterLoraOf } from '@shared/comfyModels'
 import { pictureKeySet } from '@shared/settingsRules'
 import { fullNameOf, type Character } from '@shared/types'
 import { CharacterJobCard } from '../components/CharacterJobCard'
@@ -20,6 +21,7 @@ import { useComfyStore } from '../stores/comfyStore'
 import { noNsfwImagesOf, useSettingsStore } from '../stores/settingsStore'
 import { comfyAvailable, useSetupStore } from '../stores/setupStore'
 import { useUiStore } from '../stores/uiStore'
+import { loraMissingCopy } from './characterFields'
 import { EditCharacterModal } from './EditCharacterModal'
 import { GenerateCharacterModal } from './GenerateCharacterModal'
 import { heldScreenTheme } from './clockTheme'
@@ -60,6 +62,20 @@ const COMFY_PILL = {
 /** What a confirm calls her, for a character who may have neither name filled in. */
 function nameOf(character: Character): string {
   return fullNameOf(character) || 'This character'
+}
+
+/** Names as one phrase: "A", "A and B", "A, B and C". */
+function namesPhrase(names: readonly string[]): string {
+  return names.length < 2
+    ? (names[0] ?? '')
+    : `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}`
+}
+
+/** What the fill confirm adds where some of its characters' LoRAs are missing. */
+function missingLorasLine(names: readonly string[]): string {
+  return names.length === 1
+    ? `${names[0]}'s LoRA is missing, so her sets will be generated without it.`
+    : `The LoRAs of ${namesPhrase(names)} are missing, so their sets will be generated without them.`
 }
 
 /**
@@ -115,6 +131,12 @@ export function ManageCharactersView(): JSX.Element {
   const [filling, setFilling] = useState(false)
   const [restoring, setRestoring] = useState(false)
   const [stopping, setStopping] = useState(false)
+  // Which of the fill's characters will render without their missing LoRA, asked as it opens.
+  const [fillWithoutLora, setFillWithoutLora] = useState<string[]>([])
+  const [checkingLoras, setCheckingLoras] = useState(false)
+  // A resumed write whose LoRA is missing, waiting on the player's answer.
+  const [retryLora, setRetryLora] = useState<{ charId: string; file: string } | null>(null)
+  const listLoras = useComfyStore((s) => s.listLoras)
 
   // Drawn once per visit, from the dev switch or the machine clock.
   const [theme] = useState(heldScreenTheme)
@@ -182,6 +204,45 @@ export function ManageCharactersView(): JSX.Element {
     gates
   )
   const missingImages = missing.reduce((total, entry) => total + entry.missing, 0)
+
+  /** Which of these characters carry a LoRA the ComfyUI the settings name does not list. */
+  const missingLoraIds = async (charIds: readonly string[]): Promise<string[]> => {
+    const withLora = charIds.filter(
+      (charId) => characters[charId] && characterLoraOf(characters[charId])
+    )
+    if (withLora.length === 0) return []
+    const listed = await listLoras()
+    // A list that cannot be had says nothing: the jobs then say for themselves.
+    if (listed === null) return []
+    return withLora.filter(
+      (charId) => !listed.includes(characterLoraOf(characters[charId])?.name ?? '')
+    )
+  }
+
+  /** Opens the fill confirm once it knows whose LoRA is missing. */
+  const openFill = (): void => {
+    setCheckingLoras(true)
+    void missingLoraIds([...new Set(missing.map((entry) => entry.charId))])
+      .then((ids) => {
+        setFillWithoutLora(ids)
+        setFilling(true)
+      })
+      .finally(() => setCheckingLoras(false))
+  }
+
+  /** Resumes a write, asking first where the LoRA it was picked with has gone missing. */
+  const retry = (charId: string): void => {
+    const lora = progress[charId]?.request?.lora ?? characters[charId]?.brief?.lora
+    if (!lora) {
+      // Not awaited, for the same reason the first submission is not.
+      void retryGeneration(charId)
+      return
+    }
+    void listLoras().then((listed) => {
+      if (listed !== null && !listed.includes(lora.name)) setRetryLora({ charId, file: lora.name })
+      else void retryGeneration(charId)
+    })
+  }
   const missingChars = new Set(missing.map((entry) => entry.charId)).size
 
   // The chip's tint, for the two settled states that carry a tone; starting reports itself by
@@ -271,9 +332,9 @@ export function ManageCharactersView(): JSX.Element {
           <motion.button
             id="manage-fill-missing"
             className="vu-pill"
-            {...gestures(missing.length === 0, quietLift, quietPress)}
-            disabled={missing.length === 0}
-            onClick={() => setFilling(true)}
+            {...gestures(missing.length === 0 || checkingLoras, quietLift, quietPress)}
+            disabled={missing.length === 0 || checkingLoras}
+            onClick={openFill}
           >
             ✦ Generate missing content
           </motion.button>
@@ -366,8 +427,7 @@ export function ManageCharactersView(): JSX.Element {
                 shipped={isPregenOf({ pregenIds }, charId)}
                 onClick={() => setEditing(charId)}
                 onDelete={() => setDeleting(charId)}
-                // Not awaited, for the same reason the first submission is not.
-                onRetry={() => void retryGeneration(charId)}
+                onRetry={() => retry(charId)}
               />
             ))
           )}
@@ -381,14 +441,30 @@ export function ManageCharactersView(): JSX.Element {
             key="generate"
             theme={theme}
             onClose={() => setGenerating(false)}
-            onSubmit={(firstName, lastName, prompt, namesAreSuggestions, options, reference) => {
+            onSubmit={(
+              firstName,
+              lastName,
+              prompt,
+              namesAreSuggestions,
+              options,
+              reference,
+              lora
+            ) => {
               setGenerating(false)
               // Not awaited: the pipeline takes minutes and reports itself through the card.
-              void generate(firstName, lastName, prompt, namesAreSuggestions, options, reference)
+              void generate(
+                firstName,
+                lastName,
+                prompt,
+                namesAreSuggestions,
+                options,
+                reference,
+                lora
+              )
             }}
-            onCreateBlank={(firstName, lastName, personality) => {
+            onCreateBlank={(firstName, lastName, personality, lora) => {
               setGenerating(false)
-              void createBlank(firstName, lastName, personality)
+              void createBlank(firstName, lastName, personality, lora)
             }}
           />
         )}
@@ -464,13 +540,42 @@ export function ManageCharactersView(): JSX.Element {
             id="fill-missing"
             theme={theme}
             title="Generate missing content?"
-            message={`${missing.length === 1 ? 'One set is' : `${missing.length} sets are`} incomplete across ${missingChars === 1 ? 'one character' : `${missingChars} characters`}, totalling ${missingImages === 1 ? 'one image' : `${missingImages} images`}. Only what is missing will be generated. Anything already generated or still generating won't be affected.`}
+            message={[
+              `${missing.length === 1 ? 'One set is' : `${missing.length} sets are`} incomplete across ${missingChars === 1 ? 'one character' : `${missingChars} characters`}, totalling ${missingImages === 1 ? 'one image' : `${missingImages} images`}. Only what is missing will be generated. Anything already generated or still generating won't be affected.`,
+              ...(fillWithoutLora.length > 0
+                ? [
+                    missingLorasLine(
+                      fillWithoutLora.map((charId) =>
+                        characters[charId] ? nameOf(characters[charId]) : 'This character'
+                      )
+                    )
+                  ]
+                : [])
+            ]}
             confirmText="Generate"
             onCancel={() => setFilling(false)}
             onConfirm={() => {
               setFilling(false)
               // The store recomputes the list: a bucket may have landed while the modal was open.
-              generateAllMissing(gates)
+              generateAllMissing(gates, new Set(fillWithoutLora))
+            }}
+          />
+        )}
+
+        {retryLora && (
+          <ConfirmModal
+            key="retry-without-lora"
+            id="retry-without-lora"
+            theme={theme}
+            {...loraMissingCopy(
+              characters[retryLora.charId] ? fullNameOf(characters[retryLora.charId]) : '',
+              retryLora.file
+            )}
+            onCancel={() => setRetryLora(null)}
+            onConfirm={() => {
+              const { charId } = retryLora
+              setRetryLora(null)
+              void retryGeneration(charId, true)
             }}
           />
         )}
