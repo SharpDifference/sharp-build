@@ -45,7 +45,10 @@ export interface LocationDef {
   onCampus?: true
   /** Emptied on a day an occasion closes campus, like `JobDef.closesWithUniversity`. */
   closesWithUniversity?: true
-  /** The place is open-air, so nobody invites the reader to it under rain. */
+  /**
+   * The place is open-air, so under rain nobody keeps a haunt there, goes on an outing to it,
+   * runs into anybody there or invites the reader to it. Read through `isRainedOut`.
+   */
   outdoors?: true
   /**
    * The shift-week slots the place is open (`weekday * 2 + time`, Monday 0, nights odd); absent,

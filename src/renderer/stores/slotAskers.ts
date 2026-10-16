@@ -19,7 +19,7 @@ import {
 import { FINALS_WEEK, midtermWeekOf } from '../prompts/occasions'
 import { weekendSaturdayOf } from '../prompts/gameDate'
 import {
-  REACH_OUT_TOPICS,
+  ROLLED_REACH_OUT_TOPICS,
   type HangoutInvite,
   type ReachOutTopic
 } from '../prompts/slotIntroPrompt'
@@ -151,8 +151,9 @@ export function reachOutGapSlots(unanswered: number): number {
 
 /** What she reaches out about, drawn evenly. */
 export function rollReachOutTopic(rand: () => number = Math.random): ReachOutTopic {
-  const index = Math.min(REACH_OUT_TOPICS.length - 1, Math.floor(rand() * REACH_OUT_TOPICS.length))
-  return REACH_OUT_TOPICS[index]
+  const topics = ROLLED_REACH_OUT_TOPICS
+  const index = Math.min(topics.length - 1, Math.floor(rand() * topics.length))
+  return topics[index]
 }
 
 /** How long she waits before asking again, doubling for every invitation he let stand. */

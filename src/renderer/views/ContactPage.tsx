@@ -147,7 +147,7 @@ export function ContactPage({
     untoldSecrets.some((secret) => secret.tier === tier)
   )
   const nextSecretLock = pendingSecretOf(info)
-    ? '??? — Unlocked alone with her'
+    ? '??? — Spend more time with her to unlock.'
     : nextSecretTier
       ? `??? — Unlocked at ${SECRET_TIER_LABELS[nextSecretTier]}`
       : null

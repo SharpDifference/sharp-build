@@ -128,6 +128,13 @@ export interface ItemDef {
   categories: [GiftCategory] | [GiftCategory, GiftCategory]
   /** A present a girl may give the reader: nothing made for a woman alone. */
   unisex?: true
+  /** A dose of cold medicine: taken from the inventory, or given to a girl to take. */
+  medicine?: true
+}
+
+/** Whether `itemId` is a dose of cold medicine. */
+export function isMedicine(itemId: string): boolean {
+  return itemDefOf(itemId)?.medicine === true
 }
 
 const SHOP_CATALOG: readonly ItemDef[] = [
@@ -460,6 +467,16 @@ const SHOP_CATALOG: readonly ItemDef[] = [
     description: `The classic SpringMart slippers that have been a local favorite since their 1990 release. Still Sherpa-lined with grippy rubber soles, one size fits most. Machine washable.`,
     categories: ['cozy', 'practical'],
     unisex: true
+  },
+  {
+    id: 'springmart_coldstop',
+    shopId: 'veridan_delivery',
+    name: 'SpringMart ColdStop Lozenges',
+    emoji: '💊',
+    price: 12,
+    description: `Kick a cold fast with SpringMart's honey-lemon zinc lozenges, a Veridan favorite every flu season. Soothes a sore throat and shortens a cold. One dose.`,
+    categories: ['practical'],
+    medicine: true
   },
   {
     id: 'green_hill_stargazing_blanket',
@@ -1298,19 +1315,22 @@ export function withGiftMemory(
 /**
  * The action the Gift button submits on the player's behalf. It says her name only where the
  * reader knows it (null otherwise): a turn saying a stranger's name is refused. `returnedOn`, the
- * day she gave it to him, is set only when it is her own present going back to her.
+ * day she gave it to him, is set only when it is her own present going back to her; `dose` when
+ * it is cold medicine she takes for the cold she has.
  */
 export function giftActionLine(
   firstName: string | null,
   item: ItemDef,
   reaction: GiftReaction,
-  returnedOn?: string
+  returnedOn?: string,
+  dose = false
 ): string {
   // Her own present handed back is said as what it is; a regift to anybody else reads as bought.
   if (returnedOn) {
     return `I give ${firstName ?? 'her'} back the ${item.name} she gave me on ${returnedOn}. ${giftReactionLine(firstName, reaction)}`
   }
-  return `I give ${firstName ?? 'her'} the ${item.name} that I bought for ${formatMoney(item.price)} before this scene. ${giftReactionLine(firstName, reaction)}`
+  const taken = dose ? ` ${firstName ?? 'She'} takes a dose for her cold.` : ''
+  return `I give ${firstName ?? 'her'} the ${item.name} that I bought for ${formatMoney(item.price)} before this scene. ${giftReactionLine(firstName, reaction)}${taken}`
 }
 
 /**
@@ -1322,7 +1342,8 @@ export function giftLoreNote(
   item: ItemDef,
   repeat: boolean,
   reaction: GiftReaction,
-  returnedOn?: string
+  returnedOn?: string,
+  dose = false
 ): string {
   const parts = [
     returnedOn
@@ -1330,6 +1351,7 @@ export function giftLoreNote(
       : `The reader has just given ${firstName} a gift: the ${item.name}. ${item.description}`,
     giftReactionLine(firstName, reaction)
   ]
+  if (dose) parts.push(`${firstName} takes a dose for her cold, and it will help her get over it sooner.`)
   if (repeat) parts.push(`The reader has already given ${firstName} this item before.`)
   return parts.join(' ')
 }

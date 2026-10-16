@@ -100,6 +100,56 @@ export const RECEIVED_GIFT_CHANCE = { herRoom: 0.05, hisRoom: 0.1 } as const
 /** What closeness multiplies the present's odds by: her tier, plus a lover's bonus on top. */
 export const RECEIVED_GIFT_CLOSENESS = { trusted: 1.5, devoted: 2, lover: 0.5 } as const
 
+// ─── Colds ─────────────────────────────────────────────────────────────────────
+
+/** Odds a new strain reaches campus; rolled at every scene ending once the cooldown is over. */
+export const COLD_SEED_CHANCE = 0.03
+
+/** Days after a strain reaches campus before another can. */
+export const COLD_SEED_COOLDOWN_DAYS = 14
+
+/**
+ * Odds one contact passes a cold on, by what it was; rolled at every scene ending for each pair
+ * of a sick spreader and somebody who can catch it, a pair's contacts combined.
+ */
+export const COLD_CONTACT_CHANCE = {
+  /** Sleeping together. */
+  sex: 0.9,
+  /** A kiss, on top of the scene it was in. */
+  kiss: 0.15,
+  /** A private scene together. */
+  private: 0.6,
+  /** A public scene together. */
+  public: 0.24,
+  /** A slot spent in the same group, off-screen. */
+  hangout: 0.24,
+  /** A lecture sat in together. */
+  lecture: 0.09,
+  /** Running into each other in a dorm's shared rooms or out on campus. */
+  runIn: 0.06
+} as const
+
+/** What a spreader's stage multiplies every contact's odds by; a stage absent here passes nothing on. */
+export const COLD_CONTAGION = {
+  /** The last slot of incubating, the day before it shows. */
+  lastIncubating: 0.5,
+  comingDown: 1,
+  worst: 1,
+  gettingBetter: 0.5
+} as const
+
+/** How many slots a cold incubates, drawn evenly as it is caught. */
+export const COLD_INCUBATION_SLOTS: readonly number[] = [2, 3, 4]
+
+/** Odds a cold is mild and never reaches the worst of it; rolled as it is caught. */
+export const COLD_MILD_CHANCE = 0.3
+
+/** What the reader's Body tier, 0 to 5, multiplies his odds of catching a cold by. */
+export const COLD_BODY_CATCH: readonly number[] = [1.4, 1, 0.85, 0.7, 0.55, 0.4]
+
+/** What the reader's Body tier, 0 to 5, adds to his odds of a cold being mild. */
+export const COLD_BODY_MILD: readonly number[] = [0, 0, 0.1, 0.2, 0.3, 0.4]
+
 // ─── Invitations ───────────────────────────────────────────────────────────────
 
 /** Her base odds of asking him out, by what she is to him; rolled per girl as a slot opens. */

@@ -68,6 +68,8 @@ const SAVE_REQUIRED: Record<
     | 'transcript'
     | 'homecomingVisitor'
     | 'sceneEventsFired'
+    | 'readerCold'
+    | 'readerColdsHad'
   >,
   true
 > = {

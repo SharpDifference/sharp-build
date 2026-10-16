@@ -1,6 +1,7 @@
 import type { GameOverReason } from '@shared/gameOver'
 import {
   READER_SPEAKER,
+  type ClassEntry,
   type QuizState,
   type ReceivedGift,
   type SceneEvent,
@@ -25,6 +26,7 @@ export interface PlaybackSlice {
   sceneLog: readonly SceneLine[]
   cast: readonly string[]
   sceneClass: string | null
+  classes: Readonly<Record<string, ClassEntry>>
   sceneEvent: SceneEvent | null
   sceneReceivedGift: ReceivedGift | null
   sceneQuiz: QuizState | null
@@ -106,13 +108,19 @@ export function forwardOpenOf(s: PlaybackSlice): boolean {
 export type InterjectOffer = 'none' | 'open' | 'locked'
 
 /**
- * What holds the scene's opening reply shut, or null: a class in session, one the professor has
- * not called off, or a girl with a present still to hand him.
+ * What holds the scene's opening reply shut, or null: a course in session, one the professor has
+ * not called off, or a girl with a present still to hand him. PE never holds it.
  */
 export function openingLockOf(
-  s: Pick<PlaybackSlice, 'sceneClass' | 'sceneEvent' | 'sceneReceivedGift'>
+  s: Pick<PlaybackSlice, 'sceneClass' | 'classes' | 'sceneEvent' | 'sceneReceivedGift'>
 ): 'class' | 'gift' | null {
-  if (s.sceneClass !== null && s.sceneEvent?.id !== 'classCancelled') return 'class'
+  if (
+    s.sceneClass !== null &&
+    s.classes[s.sceneClass]?.category !== 'pe' &&
+    s.sceneEvent?.id !== 'classCancelled'
+  ) {
+    return 'class'
+  }
   return s.sceneReceivedGift !== null ? 'gift' : null
 }
 

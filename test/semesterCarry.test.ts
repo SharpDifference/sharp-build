@@ -242,6 +242,8 @@ describe('what a carried entry keeps', () => {
             metSlots: [3],
             ignoredInvitation: true,
             suspicions: [{ subject: 'b', slot: 200 }],
+            cold: { strain: 190, since: 200, incubation: 2 },
+            coldsHad: [190],
             romanceScenes: 1,
             breakPenalty: { points: 12, halved: true }
           })
@@ -254,7 +256,7 @@ describe('what a carried entry keeps', () => {
     for (const key of ['year', 'dorm', 'major', 'schedule', 'hiddenSchedule', 'moodCycleOffset', 'handle', 'springBreakPlans', 'intake', 'pursuing']) {
       expect(carried).not.toHaveProperty(key)
     }
-    for (const key of ['job', 'metSlots', 'ignoredInvitation', 'suspicions']) {
+    for (const key of ['job', 'metSlots', 'ignoredInvitation', 'suspicions', 'cold', 'coldsHad']) {
       expect(carried).not.toHaveProperty(key)
     }
     expect(carried).toMatchObject({

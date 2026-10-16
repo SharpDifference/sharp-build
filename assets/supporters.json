@@ -17,7 +17,8 @@
     "Maboy",
     "newlife1999",
     "Evigan",
-    "Stridley"
+    "Stridley",
+    "dfshawke"
   ],
   "handles": [
     {
@@ -27,6 +28,10 @@
     {
       "name": "cilantro",
       "marbles": 3
+    },
+    {
+      "name": "dfshawke",
+      "marbles": 2
     },
     {
       "name": "Elitetaco",

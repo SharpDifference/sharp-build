@@ -1,5 +1,7 @@
 import { affectionFor, dedupedMemoriesFor, emptyFlags } from '@shared/relationship'
 import { ROOM_LOCATION } from '@shared/locations'
+import { worstInSlot } from '@shared/colds'
+import { globalSlotOf } from '@shared/jobs'
 import type { NpcRelationshipMap } from '@shared/npcRelationships'
 import type { SemesterCalendar } from '@shared/semesters'
 import {
@@ -54,6 +56,7 @@ import {
   type NpcCompanions
 } from './npcRelationship'
 import { relationshipLines } from './relationship'
+import { herColdLine } from './colds'
 import { weatherLines } from './weather'
 
 /**
@@ -398,6 +401,10 @@ export function buildTextingPrompt(
     )
   ])
 
+  // How her cold stands this slot, where she has one that shows.
+  const slot = globalSlotOf(state.date, state.time)
+  const coldLine = herColdLine(name, info?.cold, slot, true)
+
   const characterBlock = [
     'CHARACTER',
     `${name} ${character.lastName}.`,
@@ -405,6 +412,7 @@ export function buildTextingPrompt(
     ...graduateLines(name, info, visiting),
     // The phone takes the one-character budget.
     ...profileLines(character, info?.flags ?? emptyFlags()),
+    ...(coldLine ? [coldLine] : []),
     ...relationshipLines(
       character,
       info?.flags ?? emptyFlags(),
@@ -415,8 +423,8 @@ export function buildTextingPrompt(
       state.stats ?? DEFAULT_PLAYER_STATS,
       // The stored thread only: the pending text is not yet something they have said.
       { texting: true, texted: hasTexted(conversation) },
-      // Where she is in her cycle, for a Promiscuous girl's DTF days.
-      { date: state.date, offset: info?.moodCycleOffset ?? 0 }
+      // Where she is in her cycle, for a Promiscuous girl's DTF days, which a cold calls off.
+      { date: state.date, offset: info?.moodCycleOffset ?? 0, sick: worstInSlot(info?.cold, slot) }
     ),
     // Her closest friend; the roster handed in is everybody but her.
     ...bestFriendLines(character, state.roster, state.npcRelationships),

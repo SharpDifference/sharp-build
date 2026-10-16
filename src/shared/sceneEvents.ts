@@ -71,8 +71,11 @@ export type EventInvite = 'herRoom' | 'hisRoom' | 'meal'
 export interface SceneEventContext {
   date: number
   time: TimeSlot
-  /** The cast in stage order, each with whether she is on the first two days of her cycle. */
-  cast: readonly { charId: string; onPeriod: boolean }[]
+  /**
+   * The cast in stage order, each with whether she is on the first two days of her cycle and
+   * whether she is visibly sick with a cold, which no event happens to.
+   */
+  cast: readonly { charId: string; onPeriod: boolean; sick?: boolean }[]
   /** The girl whose invitation this scene answers and what she asked; absent for any other. */
   invite?: { charId: string; kind: EventInvite }
   /** People could see them. */
@@ -161,17 +164,19 @@ const RULES: Record<SceneEventId, EventRule> = {
 
 /** Who an event could happen to in this scene; one empty entry for an event nobody carries. */
 function targetsOf(rule: EventRule, ctx: SceneEventContext): (string | null)[] {
+  // A cold is curveball enough: nothing else happens to a girl who has one.
+  const well = ctx.cast.filter((entry) => !entry.sick)
   switch (rule.target) {
     case 'none':
       return [null]
     case 'host':
-      return ctx.invite && ctx.cast.some((entry) => entry.charId === ctx.invite?.charId)
+      return ctx.invite && well.some((entry) => entry.charId === ctx.invite?.charId)
         ? [ctx.invite.charId]
         : []
     case 'girl':
-      return ctx.cast.map((entry) => entry.charId)
+      return well.map((entry) => entry.charId)
     case 'periodGirl':
-      return ctx.cast.filter((entry) => entry.onPeriod).map((entry) => entry.charId)
+      return well.filter((entry) => entry.onPeriod).map((entry) => entry.charId)
   }
 }
 

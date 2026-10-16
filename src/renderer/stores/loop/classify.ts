@@ -14,6 +14,7 @@ import {
   charHiddenLocationNow,
   charJobNow,
   charRoomDormNow,
+  charSickAtHomeNow,
   playerClassNow
 } from '../timetable'
 import { classesNow, studentsHere } from './cast'
@@ -248,7 +249,14 @@ export function castForClass(
   const students = studentsHere(entry)
   const absent = mentionedIds.find((charId) => !students.includes(charId))
   if (absent) {
-    return { error: rejection(`${firstNameOf(absent)} isn't in that class.`) }
+    // Enrolled but in bed with a cold, she is missing it rather than not in it.
+    return {
+      error: rejection(
+        charSickAtHomeNow(absent)
+          ? `${firstNameOf(absent)} is home sick today.`
+          : `${firstNameOf(absent)} isn't in that class.`
+      )
+    }
   }
 
   return { cast: students, classCode: entry.code }

@@ -10,6 +10,7 @@ import {
   type JobMessageKind,
   type JobShift
 } from '@shared/jobs'
+import { sickInSlot } from '@shared/colds'
 import type { StatKey } from '@shared/playerStats'
 import type { ClassEntry, JobState, TimeSlot } from '@shared/types'
 import {
@@ -182,7 +183,10 @@ export function settleShifts(): void {
       const { date, time } = slotFromId(slotId)
       return shiftSlotOf(shiftWeekdayOf(date), time)
     },
-    (slotId) => jobClosedOn(job.jobId, slotFromId(slotId).date, game.calendar)
+    // A closure, or a shift his cold kept him off: neither is his to answer for.
+    (slotId) =>
+      jobClosedOn(job.jobId, slotFromId(slotId).date, game.calendar) ||
+      sickInSlot(game.readerCold ?? undefined, slotId)
   )
 
   for (const judgement of result.judgements) {

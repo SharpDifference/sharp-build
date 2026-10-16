@@ -17,6 +17,7 @@ import {
   charOverlayGroupNow,
   charRoomDormNow,
   castableIds,
+  charSickAtHomeNow,
   charStandingHauntAt,
   charUnavailableNow
 } from '../timetable'
@@ -39,7 +40,8 @@ import { hauntActivity } from '../../prompts/npcRelationship'
 function freeCharacters(location?: string | null): string[] {
   const game = useGameStore.getState()
   return game.chars.filter((charId) => {
-    if (charUnavailableNow(charId)) return false
+    // In bed with a cold, she is reached only by name or by a plan.
+    if (charUnavailableNow(charId) || charSickAtHomeNow(charId)) return false
     const haunt = charHiddenLocationNow(charId)
     if (haunt === null) return true
     return haunt === ROOM_LOCATION && atRoomBuilding(charId, location)
@@ -307,7 +309,7 @@ export function localsAtLocation(location: string): string[] {
   if (!resolved || resolved === ROOM_LOCATION) return []
 
   return useGameStore.getState().chars.filter((charId) => {
-    if (charUnavailableNow(charId)) return false
+    if (charUnavailableNow(charId) || charSickAtHomeNow(charId)) return false
     const haunt = charHiddenLocationNow(charId)
     if (haunt === null) return false
     return haunt === resolved || (haunt === ROOM_LOCATION && atRoomBuilding(charId, resolved))

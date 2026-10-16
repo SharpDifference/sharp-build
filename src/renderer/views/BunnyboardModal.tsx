@@ -22,6 +22,7 @@ import {
 } from '@shared/types'
 import type { NpcFriendship } from '@shared/npcRelationships'
 import { gpaOf, gradedCourses } from '@shared/academics'
+import { sickInSlot } from '@shared/colds'
 import { globalSlotOf, jobDefForChat, shiftSlotOf } from '@shared/jobs'
 import { locationLabel, ROOM_LOCATION } from '@shared/locations'
 import { formatMoney } from '@shared/money'
@@ -539,7 +540,7 @@ function presenceOf(
   if (!placed || placed.source !== 'told' || placed.kind === 'unknown') {
     return { busy: false, text: 'Online' }
   }
-  if (placed.kind === 'away') return { busy: false, text: placed.placeLabel }
+  if (placed.kind === 'away' || placed.kind === 'sick') return { busy: false, text: placed.placeLabel }
   if (placed.kind === 'class') {
     // The class's own name, not the code the map files it under: this is a sentence about her.
     const named = placed.classCode ? useGameStore.getState().classes[placed.classCode]?.name : null
@@ -691,6 +692,7 @@ function BossActions({
   const job = useGameStore((s) => s.job)
   const date = useGameStore((s) => s.date)
   const time = useGameStore((s) => s.time)
+  const readerCold = useGameStore((s) => s.readerCold)
   const sceneActive = useGameStore(sceneActiveOf)
   const epilogue = useGameStore(epilogueOf)
   const [quitting, setQuitting] = useState(false)
@@ -700,8 +702,14 @@ function BossActions({
   const live = job?.jobId === jobId ? job : null
   const slotId = globalSlotOf(date, time)
   const onShift = Boolean(live && live.shifts.includes(shiftSlotOf(shiftWeekdayOf(date), time)))
+  // A cold he really has keeps him off work already, with nothing to call in about.
+  const reallySick = sickInSlot(readerCold ?? undefined, slotId)
   const canCallIn = Boolean(
-    live && onShift && live.excusedSlot !== slotId && live.sickTextedSlot !== slotId
+    live &&
+      onShift &&
+      !reallySick &&
+      live.excusedSlot !== slotId &&
+      live.sickTextedSlot !== slotId
   )
 
   function callInSick(): void {

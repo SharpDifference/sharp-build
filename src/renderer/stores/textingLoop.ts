@@ -22,7 +22,7 @@ import {
   NARRATIVE_LOCATIONS
 } from '@shared/locations'
 import { hasTrait } from '@shared/traits'
-import { isWet, weatherAt } from '@shared/weather'
+import { isRainedOut, weatherAt } from '@shared/weather'
 import { affectionFor, dispositionOf, emptyFlags, isPositive } from '@shared/relationship'
 import { requestAcceptChance } from '@shared/feed'
 import {
@@ -99,10 +99,11 @@ import {
   charStandingHauntNow,
   charUnavailableNow,
   homecomingVisitorNow,
+  isHomebound,
   playerClassNow,
   shiftNow
 } from './timetable'
-import { isMoodHomebound, isMoodLustful } from '../prompts/moods'
+import { isMoodLustful } from '../prompts/moods'
 import { sendsSpringBreakNotice } from '../prompts/springBreak'
 import { outingOccasionAt, placeClosedOn } from '../prompts/occasions'
 import type { HangoutInvite } from '../prompts/slotIntroPrompt'
@@ -1179,7 +1180,7 @@ export function pickOccasionAsker(
 
   const candidates: OccasionAskCandidate[] = []
   for (const charId of game.chars) {
-    if (askChanceFor(charId, day, view, 1) <= 0) continue
+    if (askChanceFor(charId, day, half, view, 1) <= 0) continue
     if (charUnavailableNow(charId, day, half)) continue
     // She is already asking him something else.
     if (conversations[charId]?.pendingHangout) continue
@@ -1204,6 +1205,7 @@ export function pickOccasionAsker(
 function askChanceFor(
   charId: string,
   date: number,
+  time: TimeSlot,
   view: SlotAskerView,
   slotMultiplier: number
 ): number {
@@ -1212,8 +1214,9 @@ function askChanceFor(
   const flags = info?.flags ?? emptyFlags()
   // Blocked settles this ahead of any disposition band.
   if (!info || !flags.gaveContactInfo || flags.blocked) return 0
-  // One of the days she stays in: a plan already made still stands, but she starts nothing.
-  if (isMoodHomebound(date, info.moodCycleOffset ?? 0)) return 0
+  // One of the days she stays in, or the worst of a cold: a plan already made still stands, but
+  // she starts nothing.
+  if (isHomebound(info, date, time)) return 0
 
   return askChanceOf(
     {
@@ -1289,7 +1292,7 @@ export function pickSlotAskers(
     // She does not ask twice in a row, and waits longer each time he does not come.
     const gap = declineCooldownSlots(conversations[charId]?.declined ?? 0)
     if (!askCooldownOver(lastInviteSlotOf(conversations[charId]), target, gap)) continue
-    const chance = askChanceFor(charId, day, view, modulation)
+    const chance = askChanceFor(charId, day, half, view, modulation)
     if (chance > 0) candidates.push({ charId, chance })
   }
   for (const charId of rollSlotAskers(candidates)) take(charId)
@@ -1410,7 +1413,7 @@ function sharedExamAhead(info: CharInfo, date: number, time: TimeSlot): StudyExa
 function outingsFor(info: CharInfo, date: number, time: TimeSlot, intimate: boolean): string[] {
   const game = useGameStore.getState()
   const slot = shiftSlotOf(shiftWeekdayOf(date), time)
-  const wet = isWet(weatherAt(game.weather, date, time))
+  const sky = weatherAt(game.weather, date, time)
   const haunts = new Set(Object.values(info.hiddenSchedule ?? {}).map(({ location }) => location))
   const workplace = info.job ? jobDefOf(info.job.jobId)?.locationId : undefined
   return [...LOCATIONS, ...NARRATIVE_LOCATIONS]
@@ -1420,7 +1423,7 @@ function outingsFor(info: CharInfo, date: number, time: TimeSlot, intimate: bool
         def.id !== workplace &&
         !haunts.has(def.id) &&
         (intimate || def.id !== HOTEL_LOCATION) &&
-        !(wet && def.outdoors) &&
+        !isRainedOut(def.id, sky) &&
         isLocationOpen(def.id, slot) &&
         !placeClosedOn(def.id, date, game.calendar)
     )

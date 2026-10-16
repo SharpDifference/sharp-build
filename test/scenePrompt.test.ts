@@ -139,7 +139,7 @@ describe('buildLedgerPrompt — STATS', () => {
       transcript(),
       { ...promptState(), ...state },
       'READER',
-      { date: 0, time: 0 as TimeSlot, season: 'spring', threads: [], characters: roster, graduates: [], planned: [] }
+      { date: 0, time: 0 as TimeSlot, season: 'spring', threads: [], characters: roster, graduates: [], planned: [], timetable: {} }
     )
     return {
       user,
@@ -192,7 +192,8 @@ describe('ledgerStoryFallback', () => {
       threads: [],
       characters: roster,
       graduates: [],
-      planned: []
+      planned: [],
+      timetable: {}
     })
   }
 
@@ -316,7 +317,8 @@ describe('ledgerTranscriptOf', () => {
         threads: [],
         characters: charactersById(sarah),
         graduates: [],
-        planned: []
+        planned: [],
+        timetable: {}
       }
     )
     expect(user).not.toContain('What would you like to do?')

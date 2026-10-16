@@ -1,5 +1,6 @@
-import { slotFullLabel } from '@shared/classes'
-import { globalSlotOf, slotFromId } from '@shared/jobs'
+import { kindOf } from '@shared/academics'
+import { slotFullLabel, studentsOf } from '@shared/classes'
+import { globalSlotOf, jobDefOf, slotFromId } from '@shared/jobs'
 import type { PlayerStats } from '@shared/playerStats'
 import { STOCK_POSITIONS } from '@shared/positions'
 import { ROOM_VARIANTS } from '@shared/room'
@@ -11,6 +12,7 @@ import {
   charKeyOf,
   type CharInfo,
   type Character,
+  type ClassEntry,
   type CustomCgSlot,
   type MemoryBudgets,
   type OutfitSet,
@@ -21,12 +23,17 @@ import {
 import {
   classRostersOf,
   classSceneContextOf,
+  examOn,
   projectSceneContextOf,
   recapOf
 } from '../../prompts/classProgress'
 import { formatChatDivider, formatGameDate } from '../../prompts/gameDate'
 import { firstMeetingAfter, meetingsBefore } from '../../prompts/occasions'
-import type { SchedulePromptInput } from '../../prompts/schedulePrompt'
+import {
+  slotOptions,
+  type SchedulePromptInput,
+  type SlotDuty
+} from '../../prompts/schedulePrompt'
 import type {
   AddedNotice,
   ClassSceneContext,
@@ -47,7 +54,12 @@ import { readyCustomCgs, readyOutfitSets } from '../characterStore'
 import { useGameStore, type SceneKind } from '../gameStore'
 import { stageAsWritten } from '../sceneSanitizer'
 import { cancelAllTexts, expireHangoutInvitations } from '../textingLoop'
-import { homecomingVisitorNow } from '../timetable'
+import {
+  charSickAtHomeNow,
+  homecomingVisitorNow,
+  playerClassNow,
+  shiftNow
+} from '../timetable'
 import { presentCastOf } from './cast'
 import { partsForAWhile } from './farewells'
 import { prefetchTextLedger } from './hooks'
@@ -100,8 +112,42 @@ export function scheduleInput(date: number, time: TimeSlot): SchedulePromptInput
     // Only the plans still ahead.
     planned: game.events.filter(
       (event) => globalSlotOf(event.date, event.time) > globalSlotOf(date, time)
-    )
+    ),
+    timetable: timetableAhead(date, time)
   }
+}
+
+/** His class and shift in every slot the plans reader offers after `date`/`time`, where he has one. */
+function timetableAhead(date: number, time: TimeSlot): Record<number, SlotDuty> {
+  const game = useGameStore.getState()
+  const rosters = classRostersOf(
+    game.classes,
+    game.chars,
+    game.characters,
+    game.charInfo,
+    game.classRecords
+  )
+  const employer = game.job ? jobDefOf(game.job.jobId)?.employer : undefined
+
+  const timetable: Record<number, SlotDuty> = {}
+  for (const option of slotOptions(date, time)) {
+    const duty: SlotDuty = {}
+    const code = playerClassNow(option.date, option.time)
+    const entry = code ? game.classes[code] : undefined
+    if (entry) {
+      duty.className = entry.name
+      const exam = examOn(entry, option.date, game.calendar)
+      if (exam) {
+        duty.exam = exam
+        duty.project = kindOf(entry) === 'project'
+      }
+      const classmates = (rosters[entry.code]?.known ?? []).map((classmate) => classmate.firstName)
+      if (classmates.length > 0) duty.classmates = classmates
+    }
+    if (employer && shiftNow(option.date, option.time) !== null) duty.employer = employer
+    if (duty.className || duty.employer) timetable[option.id] = duty
+  }
+  return timetable
 }
 
 /** How many finished slots the opening narration is told about. */
@@ -215,13 +261,30 @@ export async function stageCast(cast: string[], scene?: SceneKind): Promise<void
 }
 
 /**
- * The `READER` block for this playthrough, named after the player's own choice.
+ * The classmates the reader knows who are in bed with a cold instead of in `entry`, by first name,
+ * as the prompt state carries them; nothing when the scene sits in no class or nobody is missing.
  */
-export function reader(view?: {
-  stats: PlayerStats
-  charInfo: Readonly<Record<string, CharInfo>>
-}): string {
-  return readerBlockOf(useGameStore.getState(), view)
+function outSickOf(entry: ClassEntry | undefined): { outSick?: string[] } {
+  if (!entry) return {}
+  const game = useGameStore.getState()
+  const outSick = studentsOf(entry, game.chars, game.charInfo)
+    .filter((charId) => game.charInfo[charId]?.nameKnown && charSickAtHomeNow(charId))
+    .flatMap((charId) => game.characters[charId]?.firstName ?? [])
+  return outSick.length > 0 ? { outSick } : {}
+}
+
+/**
+ * The `READER` block for this playthrough, named after the player's own choice; `at` is the slot
+ * it is written for where that is not the clock's.
+ */
+export function reader(
+  view?: {
+    stats: PlayerStats
+    charInfo: Readonly<Record<string, CharInfo>>
+  },
+  at?: { date: number; time: TimeSlot }
+): string {
+  return readerBlockOf(useGameStore.getState(), view, at)
 }
 
 /**
@@ -400,6 +463,7 @@ export function promptState(): PromptState {
     weather: game.weather,
     bg: stage.bg,
     classCode: game.sceneClass,
+    ...outSickOf(classEntry),
     projectClass: game.sceneProject,
     jobId: game.sceneJob,
     visitJobId: game.sceneVisitJob,
@@ -457,7 +521,9 @@ export function promptState(): PromptState {
       // Her own present going back to her says when she gave it.
       const returnedOn =
         gift.returned && gift.from ? formatGameDate(gift.from.date, game.calendar.season) : undefined
-      return [giftLoreNote(character.firstName, item, gift.repeat, gift.reaction, returnedOn)]
+      return [
+        giftLoreNote(character.firstName, item, gift.repeat, gift.reaction, returnedOn, gift.dose)
+      ]
     }),
     emotions: stage.emotions,
     // The same stage as charIds; a key the roster no longer knows is dropped.

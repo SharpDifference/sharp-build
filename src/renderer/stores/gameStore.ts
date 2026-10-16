@@ -60,16 +60,19 @@ import {
   giftMemoryCapFor,
   giftMemoryDesc,
   giftReactionOf,
+  isMedicine,
   itemDefOf,
+  sameLine,
   withGiftMemory,
   withItem,
   withoutItem,
   type GiftReaction,
   type ItemPick
 } from '@shared/shop'
+import { canDose, withColdCaught, withDose } from '@shared/colds'
 import type { GameOverReason } from '@shared/gameOver'
 import type { Weather } from '@shared/weather'
-import { MAX_RAISES, newJobState, RAISE_EVERY } from '@shared/jobs'
+import { globalSlotOf, MAX_RAISES, newJobState, RAISE_EVERY } from '@shared/jobs'
 import type { ExamPeriod } from '@shared/academics'
 import type { DatingPassOutcome } from '@shared/dating'
 import type {
@@ -87,6 +90,8 @@ import {
   type BunnyboardState,
   type CalendarEvent,
   type CharMemory,
+  type ColdCase,
+  type ColdPass,
   type CrushHint,
   type ChatMessage,
   type ReceivedGift,
@@ -452,6 +457,10 @@ interface GameStoreState {
   sceneReceivedGift: ReceivedGift | null
   /** When each scene event last fired this semester. Persisted. */
   sceneEventsFired: SceneEventsFired
+  /** The reader's last cold this semester, kept once it is over; null before any. Persisted. */
+  readerCold: ColdCase | null
+  /** Every strain the reader has caught this semester. Persisted. */
+  readerColdsHad: number[]
   /** The gifts given so far in this scene, oldest first. */
   sceneGifts: SceneGift[]
   /** The exam being sat this slot, or null when the slot is an ordinary scene. */
@@ -835,6 +844,15 @@ interface GameStoreState {
   commitSceneEvent: () => void
   /** Folds this scene's gifts into `charInfo` — run once at the boundary. */
   recordGifts: () => void
+  /** Files the colds a finished slot passed on — run once at the boundary, and idempotent. */
+  applyColdPass: (pass: ColdPass) => void
+  /**
+   * The reader takes a dose of medicine off `pick`'s line, which ends his cold's stage from the
+   * next slot. False, changing nothing, while he has no symptoms or has already had one this slot.
+   */
+  takeMedicine: (pick: ItemPick) => boolean
+  /** Marks his boss as having texted him about this cold. */
+  markReaderBossTold: () => void
   /** Empties the scene's gift list at a scene boundary or a slot opening. */
   clearSceneGifts: () => void
   recordMemory: (charId: string, entry: CharMemory) => void
@@ -1469,6 +1487,8 @@ const initialState = {
   sceneEvent: null as SceneEvent | null,
   sceneReceivedGift: null as ReceivedGift | null,
   sceneEventsFired: {} as SceneEventsFired,
+  readerCold: null as ColdCase | null,
+  readerColdsHad: [] as number[],
   sceneGifts: [] as SceneGift[],
   sceneQuiz: null as QuizState | null,
   currentSceneTranscript: [] as SceneLine[],
@@ -1587,6 +1607,8 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
       springBreakAway: save.springBreakAway,
       homecomingVisitor: save.homecomingVisitor ?? null,
       sceneEventsFired: save.sceneEventsFired ?? {},
+      readerCold: save.readerCold ?? null,
+      readerColdsHad: save.readerColdsHad ?? [],
       feedExtras: save.feedExtras,
       graduationSeen: save.graduationSeen,
       farewellsDone: save.farewellsDone,
@@ -2141,18 +2163,31 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
     const { itemId } = pick
     // Her own present going back to her lands badly, whatever she thinks of it.
     const returned = pick.from?.charId === charId
+    const medicine = isMedicine(itemId)
+    // Medicine she can take for the cold she has, a dose the boundary files; one a slot at most.
+    const dose =
+      medicine &&
+      !state.sceneGifts.some((gift) => gift.charId === charId && gift.dose) &&
+      canDose(state.charInfo[charId]?.cold, globalSlotOf(state.date, state.time))
     // Stamped now: once the boundary has folded this gift into `charInfo`, the same question
-    // would answer yes about the gift itself.
+    // would answer yes about the gift itself. Medicine is never a repeat: a cold is new each time.
     const repeat =
-      (state.charInfo[charId]?.gifts ?? []).includes(itemId) ||
-      state.sceneGifts.some((gift) => gift.charId === charId && gift.itemId === itemId)
+      !medicine &&
+      ((state.charInfo[charId]?.gifts ?? []).includes(itemId) ||
+        state.sceneGifts.some((gift) => gift.charId === charId && gift.itemId === itemId))
     // The verdict is stamped here and nowhere else: the action line says it out loud.
     const item = itemDefOf(itemId)
+    const tasted: GiftReaction = item ? giftReactionOf(item, state.characters[charId], repeat) : 'neutral'
+    // Medicine pleases a girl who is sick, whatever her taste, and nobody else.
     const reaction: GiftReaction = returned
       ? 'unimpressed'
-      : item
-        ? giftReactionOf(item, state.characters[charId], repeat)
-        : 'neutral'
+      : medicine
+        ? dose
+          ? tasted === 'loved'
+            ? 'loved'
+            : 'liked'
+          : 'neutral'
+        : tasted
     set({
       inventory: withoutItem(state.inventory, pick),
       // The action that hands it over is the next line the transcript takes.
@@ -2165,7 +2200,8 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
           reaction,
           at: state.currentSceneTranscript.length,
           ...(pick.from ? { from: { ...pick.from } } : {}),
-          ...(returned ? { returned: true as const } : {})
+          ...(returned ? { returned: true as const } : {}),
+          ...(dose ? { dose: true as const } : {})
         }
       ]
     })
@@ -2206,6 +2242,7 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
     set((state) => {
       if (state.sceneGifts.length === 0) return {}
       const charInfo = { ...state.charInfo }
+      const slot = globalSlotOf(state.date, state.time)
       for (const gift of state.sceneGifts) {
         const existing = charInfo[gift.charId] ?? blankCharInfo()
         const item = itemDefOf(gift.itemId)
@@ -2215,19 +2252,54 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
           ...existing,
           // Uncapped: the list never forgets a present.
           gifts: [...(existing.gifts ?? []), gift.itemId],
-          // Only what she was glad to get; a present that missed is not a grievance.
+          // Only what she was glad to get; a present that missed is not a grievance, and a dose of
+          // medicine is not a keepsake.
           giftMemories:
-            item && (reaction === 'loved' || reaction === 'liked')
+            item && !item.medicine && (reaction === 'loved' || reaction === 'liked')
               ? withGiftMemory(
                   existing.giftMemories ?? [],
                   { date: state.date, type: reaction, desc: giftMemoryDesc(item) },
                   giftMemoryCapFor(character)
                 )
-              : existing.giftMemories
+              : existing.giftMemories,
+          // The dose she took, which ends her cold's stage from the next slot.
+          ...(gift.dose && existing.cold ? { cold: withDose(existing.cold, slot) } : {})
         }
       }
       return { charInfo }
     }),
+
+  applyColdPass: (pass) =>
+    set((state) => {
+      const caught = Object.entries(pass.caught)
+      const charInfo = caught.length > 0 ? { ...state.charInfo } : state.charInfo
+      for (const [charId, cold] of caught) {
+        charInfo[charId] = withColdCaught(charInfo[charId] ?? blankCharInfo(), cold)
+      }
+      if (!pass.reader) return caught.length > 0 ? { charInfo } : {}
+      const reader = withColdCaught(
+        { cold: state.readerCold ?? undefined, coldsHad: state.readerColdsHad },
+        pass.reader
+      )
+      return { charInfo, readerCold: pass.reader, readerColdsHad: [...(reader.coldsHad ?? [])] }
+    }),
+
+  takeMedicine: (pick) => {
+    const state = get()
+    const slot = globalSlotOf(state.date, state.time)
+    const cold = state.readerCold
+    if (!cold || !isMedicine(pick.itemId) || !canDose(cold, slot)) return false
+    if (!state.inventory.some((entry) => sameLine(entry, pick))) return false
+    set({ inventory: withoutItem(state.inventory, pick), readerCold: withDose(cold, slot) })
+    return true
+  },
+
+  markReaderBossTold: () =>
+    set((state) =>
+      state.readerCold && !state.readerCold.bossTold
+        ? { readerCold: { ...state.readerCold, bossTold: true } }
+        : {}
+    ),
 
   clearSceneGifts: () => set({ sceneGifts: [] }),
 
@@ -3020,6 +3092,8 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
       ...(Object.keys(state.sceneEventsFired).length > 0
         ? { sceneEventsFired: state.sceneEventsFired }
         : {}),
+      ...(state.readerCold ? { readerCold: state.readerCold } : {}),
+      ...(state.readerColdsHad.length > 0 ? { readerColdsHad: state.readerColdsHad } : {}),
       feedExtras: state.feedExtras,
       graduationSeen: state.graduationSeen,
       farewellsDone: state.farewellsDone,

@@ -1,4 +1,5 @@
-import { jobDefOf } from '@shared/jobs'
+import { coldStageAt, isSickWindow } from '@shared/colds'
+import { globalSlotOf, jobDefOf } from '@shared/jobs'
 import { locationDefOf, type LocationDef } from '@shared/locations'
 import { affectionFor, dispositionOf } from '@shared/relationship'
 import {
@@ -115,7 +116,10 @@ function rollFor(cast: readonly string[], scene: SceneKind, host?: string): Scen
     time: game.time,
     cast: cast.map((charId) => ({
       charId,
-      onPeriod: moodIndexOf(game.date, game.charInfo[charId]?.moodCycleOffset ?? 0) < PERIOD_DAYS
+      onPeriod: moodIndexOf(game.date, game.charInfo[charId]?.moodCycleOffset ?? 0) < PERIOD_DAYS,
+      sick: isSickWindow(
+        coldStageAt(game.charInfo[charId]?.cold, globalSlotOf(game.date, game.time))
+      )
     })),
     ...(host && invite ? { invite: { charId: host, kind: invite } } : {}),
     // Absent is public, as the classifier defaults it.

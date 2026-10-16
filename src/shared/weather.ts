@@ -1,4 +1,5 @@
 import { FINAL_DATE } from './classes'
+import { locationDefOf } from './locations'
 import {
   STORM_HALF_FACTOR,
   STORM_OF_WET_FROM_CLEAR,
@@ -42,6 +43,11 @@ export function weatherAt(table: readonly Weather[], date: number, time: TimeSlo
 /** Whether a reading is rain or a storm. */
 export function isWet(weather: Weather): boolean {
   return weather !== 'clear'
+}
+
+/** Whether a place is open-air under a wet sky, which keeps everybody away from it. */
+export function isRainedOut(locationId: string, weather: Weather): boolean {
+  return isWet(weather) && locationDefOf(locationId)?.outdoors === true
 }
 
 /* ---- the roll ------------------------------------------------------------ */

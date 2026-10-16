@@ -118,7 +118,7 @@ export function openingEventLines(
   const who = event?.charId ? keyOf(event.charId) : ''
   if (event && who !== null) {
     lines.push(
-      `${eventSentence(event.id, who, at)}`
+      `Extra scene info: ${eventSentence(event.id, who, at)}`
     )
   }
   const giver = gift ? keyOf(gift.charId) : null

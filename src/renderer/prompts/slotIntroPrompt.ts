@@ -1,5 +1,7 @@
 import type { ExamPeriod } from '@shared/academics'
 import { yearLabel } from '@shared/classes'
+import { worstInSlot } from '@shared/colds'
+import { globalSlotOf } from '@shared/jobs'
 import { locationDefOf, locationLabel } from '@shared/locations'
 import { affectionFor, dedupedMemoriesFor, emptyFlags } from '@shared/relationship'
 import { DEFAULT_PLAYER_STATS, type PlayerStats } from '@shared/playerStats'
@@ -17,6 +19,7 @@ import {
   type TimeSlot
 } from '@shared/types'
 import type { Weather } from '@shared/weather'
+import { herColdLine } from './colds'
 import { formatRelativeSlot } from './gameDate'
 import type { LoreEntry } from './lorebook'
 import { examLookaheadLine } from './occasions'
@@ -144,18 +147,30 @@ export interface IntroVisitor {
   texted: boolean
 }
 
-/** What a girl reaching out just to talk texts the reader about, rolled by the app. */
-export const REACH_OUT_TOPICS = ['wellbeing', 'goodNews', 'badNews', 'question'] as const
+/**
+ * What a girl reaching out just to talk texts the reader about: the first four rolled by the app,
+ * and `sick` for a girl in the worst of a cold, whatever the roll.
+ */
+export const REACH_OUT_TOPICS = ['wellbeing', 'goodNews', 'badNews', 'question', 'sick'] as const
 
 /** One of {@link REACH_OUT_TOPICS}. */
 export type ReachOutTopic = (typeof REACH_OUT_TOPICS)[number]
+
+/** The topics a reach-out is rolled from. */
+export const ROLLED_REACH_OUT_TOPICS: readonly ReachOutTopic[] = [
+  'wellbeing',
+  'goodNews',
+  'badNews',
+  'question'
+]
 
 /** Each reach-out topic as the prompt names it beside her key. */
 const REACH_OUT_TOPIC_PHRASE: Record<ReachOutTopic, string> = {
   wellbeing: 'checking in on how he is doing',
   goodNews: 'telling him some good news of hers',
   badNews: 'telling him some bad news of hers',
-  question: 'asking him a question'
+  question: 'asking him a question',
+  sick: 'telling him she is stuck in bed with a cold'
 }
 
 /** A contact this slot rolled in to text the reader just to talk, about one rolled topic. */
@@ -531,9 +546,13 @@ function characterBlock(input: SlotIntroInput): string[] {
     const whereabouts = 'whereabouts' in entry ? entry.whereabouts : undefined
     if (named.has(charKey)) continue
     named.add(charKey)
+    // How her cold stands in the slot opening, where she has one that shows.
+    const slot = globalSlotOf(input.date, input.time)
+    const coldLine = herColdLine(character.firstName, info.cold, slot, true)
     entries.push([
       `${fullNameOf(character)} — "char": "${charKey}"`,
       ...profileLines(character, info.flags ?? emptyFlags()),
+      ...(coldLine ? [coldLine] : []),
       // A graduate posting or ending it from out of town, or back for Homecoming.
       ...graduateLines(
         character.firstName,
@@ -568,8 +587,8 @@ function characterBlock(input: SlotIntroInput): string[] {
         input.stats ?? DEFAULT_PLAYER_STATS,
         // Everybody here reaches the reader by phone: a first contact is a conversation, not a meeting.
         { texting: true, texted },
-        // Where she is in her cycle, for a Promiscuous girl's DTF days.
-        { date: input.date, offset: info.moodCycleOffset ?? 0 }
+        // Where she is in her cycle, for a Promiscuous girl's DTF days, which a cold calls off.
+        { date: input.date, offset: info.moodCycleOffset ?? 0, sick: worstInSlot(info.cold, slot) }
       ),
       ...memoryLines(character, dedupedMemoriesFor(info).slice(-2), info.textMemory, input.season),
       ...secretLines(info.toldSecrets, input.secretBudget),

@@ -30,6 +30,7 @@ import {
   charHiddenLocationNow,
   charJobNow,
   charRoomDormNow,
+  charSickAtHomeNow,
   charStandingHauntAt
 } from './timetable'
 
@@ -43,7 +44,7 @@ import {
 type WhereaboutsSource = 'told' | 'remembered'
 
 /** What kind of answer a row is, which is what the view's furniture branches on. */
-type WhereaboutsKind = 'place' | 'room' | 'class' | 'away' | 'unknown'
+type WhereaboutsKind = 'place' | 'room' | 'class' | 'away' | 'sick' | 'unknown'
 
 /** The section every class fills — one bucket, not one per class. */
 export const CLASS_PLACE_KEY = 'class'
@@ -53,6 +54,9 @@ export const UNKNOWN_PLACE_KEY = 'unknown'
 
 /** The section a contact who has left the city for the week falls into. */
 export const AWAY_PLACE_KEY = 'away'
+
+/** The section a contact in bed with a cold falls into, which nobody can be sent to. */
+export const SICK_PLACE_KEY = 'sick'
 
 /** The glyph over the out-of-town line. */
 const AWAY_ICON = '✈️'
@@ -99,6 +103,7 @@ const PLACE_ORDER: readonly string[] = [
   ...NARRATIVE_LOCATIONS.map((def) => def.id),
   dormPlaceKey(FALLBACK_DORM),
   dormPlaceKey('elysium'),
+  SICK_PLACE_KEY,
   AWAY_PLACE_KEY,
   UNKNOWN_PLACE_KEY
 ]
@@ -153,6 +158,19 @@ function toldWhereabouts(charId: string, date: number, time: TimeSlot): Whereabo
 
   // First of everything, on `charHiddenLocationNow`'s own ordering.
   if (charAwayNow(charId, date)) return awayWhereabouts(charId)
+  // In bed with a cold: home, but nowhere a Go can find her.
+  if (charSickAtHomeNow(charId, date, time)) {
+    return {
+      ...base,
+      kind: 'sick',
+      location: null,
+      placeKey: SICK_PLACE_KEY,
+      placeLabel: 'Home sick',
+      placeIcon: '',
+      placeBlurb: '',
+      onCampus: true
+    }
+  }
 
   const classCode = charClassNow(charId, date, time)
   if (classCode !== null) {

@@ -192,7 +192,8 @@ export function createSceneSanitizer(options: SanitizerOptions = {}): {
           console.warn(`[scene] unknown speaker "${raw.speaker}" — treating the line as narration.`)
       }
 
-      if (raw?.bg !== undefined) {
+      // "" is the schema's "no change".
+      if (raw?.bg) {
         if (backgrounds.has(raw.bg)) line.bg = raw.bg
         else console.warn(`[scene] unknown background "${raw.bg}" — keeping the current one.`)
       }

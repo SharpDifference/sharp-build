@@ -39,6 +39,7 @@ import {
   type TimeSlot
 } from '@shared/types'
 import { withSecretTold } from '@shared/secrets'
+import { sickInSlot, withGiftDoses, worstInSlot } from '@shared/colds'
 import { LAST_SEMESTER, semesterOf } from '@shared/semesters'
 import type { SavedScene, SceneSetup } from '@shared/sceneCreator'
 import type { SlotReplay } from '@shared/replays'
@@ -134,7 +135,12 @@ import {
   revealSceneOpening,
   revealSlot
 } from './slotCrossing'
-import { charCommitmentAt, charStandingHauntAt, homecomingVisitorNow } from './timetable'
+import {
+  charCommitmentAt,
+  charStandingHauntAt,
+  homecomingVisitorNow,
+  readerSickNow
+} from './timetable'
 import { useBunnyboardStore } from './bunnyboardStore'
 import {
   addPlanContacts,
@@ -219,6 +225,7 @@ import {
   rollSlotEncounterGroups
 } from './loop/npc'
 import { applyRumorPass, rollRumorPass } from './loop/rumors'
+import { rollColdPass } from './loop/colds'
 import {
   endingGameOver,
   endingSave,
@@ -987,7 +994,8 @@ async function fetchSlotIntro(
       character,
       info,
       texted: hasTexted(conversation),
-      topic: rollReachOutTopic(),
+      // A girl in bed with a cold texts about that, whatever the roll would have had her say.
+      topic: worstInSlot(info.cold, globalSlotOf(date, time)) ? 'sick' : rollReachOutTopic(),
       // Her thread as a scene in the slot about to open would read it.
       thread: composeTextingSummary(
         conversation,
@@ -1078,7 +1086,8 @@ async function fetchSlotIntro(
       ...(backgroundLore.length > 0 ? { backgroundLore } : {})
     },
     SETTING,
-    reader(view)
+    // His cold as it stands in the slot opening, not the one ending.
+    reader(view, { date, time })
   )
 
   let silentSpent = 0
@@ -1372,7 +1381,8 @@ export function submitGift(charId: string, pick: ItemPick, message: string): boo
     nameIsKnown(charId) ? character.firstName : null,
     item,
     reaction,
-    returnedOn
+    returnedOn,
+    useGameStore.getState().sceneGifts.at(-1)?.dose === true
   )
   void submitAction(said ? `"${said}" ${line}` : line, true)
   return true
@@ -1881,7 +1891,7 @@ async function fetchEndingOpening(
   // The run-ins the affinity settle counts, which are dice and so are rolled once.
   const groups = rollSlotEncounterGroups()
 
-  // The finished slot's three settles, banked below for the boundary to apply.
+  // The finished slot's settles, banked below for the boundary to apply.
   const rumor = rollRumorPass(ledger, projected.charInfo)
   const seen = withRumorPass(projected.charInfo, rumor)
   // Safe on the exam prefetch too: a texting-only ledger carries no `stats`, and every other
@@ -1891,16 +1901,24 @@ async function fetchEndingOpening(
   // what the boundary's fallback would see too.
   const crushes = rollCrushSettle(ledger, seen, stats)
   const npcRelationships = rollNpcRelationshipSettle(bondedCharIds(ledger), groups)
-  // The scene counts, break penalties and told secret stepped as the boundary will step them, so
-  // a crush rolled tonight reads as new in the morning too, a penalty halved tonight reads halved
-  // and a secret told tonight is one she has told.
-  const charInfo = withSecretTold(
-    withBreakPenaltiesStepped(
-      withRomanceScenes(game.charInfo, withCrushes(seen, crushes), game.cast),
-      game.cast
+  // Who caught a cold in the finished slot, off the same run-ins; a cold caught tonight is still
+  // incubating in the slot about to open, so the projection below has nothing of it to step.
+  const coldPass = rollColdPass(ledger, groups, stats)
+  // The scene counts, break penalties, told secret and medicine given stepped as the boundary
+  // will step them, so a crush rolled tonight reads as new in the morning too, a penalty halved
+  // tonight reads halved, a secret told tonight is one she has told and a dose she took tonight
+  // has moved her cold on.
+  const charInfo = withGiftDoses(
+    withSecretTold(
+      withBreakPenaltiesStepped(
+        withRomanceScenes(game.charInfo, withCrushes(seen, crushes), game.cast),
+        game.cast
+      ),
+      game.cast,
+      game.sceneSecret
     ),
-    game.cast,
-    game.sceneSecret
+    game.sceneGifts,
+    globalSlotOf(game.date, game.time)
   )
 
   // Who leaves for spring break, when the slot about to open is the one that settles it: picked
@@ -1942,7 +1960,8 @@ async function fetchEndingOpening(
       ...(homecomingPick ? { homecomingVisitor: homecomingPick } : {}),
       rumorPass: rumor,
       crushes,
-      npcRelationships
+      npcRelationships,
+      coldPass
     }
   }
 
@@ -1969,7 +1988,8 @@ async function fetchEndingOpening(
         ...(homecomingPick ? { homecomingVisitor: homecomingPick } : {}),
         rumorPass: rumor,
         crushes,
-        npcRelationships
+        npcRelationships,
+        coldPass
       }
     : null
 }
@@ -2257,7 +2277,9 @@ function resolveScene(): { deltas: PlayerStats; lines: StatusText[] } {
     // On a worked shift, replaces every other source, the ledger's award included.
     jobOutcome: loopState.jobShift ? { gain: loopState.jobShift.gain } : null,
     // Additive, unlike `jobOutcome`.
-    gradeOutcome: gradeOutcomeNow()
+    gradeOutcome: gradeOutcomeNow(),
+    // Read at the scene's own slot, which a dose taken during it never moves.
+    sick: readerSickNow()
   })
 }
 
@@ -2792,7 +2814,7 @@ async function crossSlotBoundary(): Promise<void> {
   }
   // Independent of the ledger too, and here so it lands once, on the boundary's write.
   useGameStore.getState().recordGifts()
-  // The finished slot's three settles, banked by the ending; null only on
+  // The finished slot's settles, banked by the ending; null only on
   // the game-over path, which banks nothing.
   const banked = loopState.bankedOpening
   if (banked) {
@@ -2801,6 +2823,8 @@ async function crossSlotBoundary(): Promise<void> {
     // Before the map is stored: what is recorded is the difference between the two.
     applyNewFriendships(useGameStore.getState().npcRelationships, banked.npcRelationships)
     useGameStore.getState().setNpcRelationships(banked.npcRelationships)
+    // Absent only on an opening banked before colds existed.
+    if (banked.coldPass) useGameStore.getState().applyColdPass(banked.coldPass)
 
     // The one warning that what gets seen gets told, owed the first time anybody sees him with
     // a girl whose name he knows. Left unsent before BunnyBot has introduced itself, or over a
@@ -2818,6 +2842,20 @@ async function crossSlotBoundary(): Promise<void> {
       useGameStore.getState().markBunnybotSeenTipSent()
       owedTexts.push(() => deliverBunnybotNow([bunnybotSeenTipText(seenWith.firstName)]))
     }
+  }
+  // His boss tells him once a cold to stay home, as it first keeps him off work: marked on the
+  // cold itself, so the boundary save carries it and a reload does not send it twice.
+  const ahead = nextSlot(game.date, game.time)
+  const readerCold = useGameStore.getState().readerCold
+  const bossJob = useGameStore.getState().job?.jobId
+  if (
+    bossJob &&
+    readerCold &&
+    !readerCold.bossTold &&
+    sickInSlot(readerCold, globalSlotOf(ahead.date, ahead.time))
+  ) {
+    useGameStore.getState().markReaderBossTold()
+    owedTexts.push(() => deliverBossMessage(bossJob, 'coldNotice'))
   }
   // After every pass that can make her a lover or give her a crush, off the entries the boundary
   // started from: the step the ending projected for the opening.

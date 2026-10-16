@@ -336,12 +336,22 @@ export function manualSaveOffer(): ManualSaveOffer {
   return unsettled ? 'waiting' : 'open'
 }
 
+/** What the calendar's Replay offers: Save Game's offers, or dead for as long as a scene is on. */
+export type ReplayOffer = ManualSaveOffer | 'scene'
+
 /**
- * What the calendar's Replay offers, given the Save Game offer and whether a call is still out
- * that the replay's round trip would cancel and the game's return would send again: Replay
- * waits for that call as it waits for whatever Save Game waits for.
+ * What the calendar's Replay offers, given the Save Game offer, whether a scene is on and whether
+ * a call is still out that the replay's round trip would cancel and the game's return would send
+ * again: Replay is left from the landing alone, and there waits for that call as it waits for
+ * whatever Save Game waits for.
  */
-export function replayOfferOf(saveOffer: ManualSaveOffer, callsOut: boolean): ManualSaveOffer {
+export function replayOfferOf(
+  saveOffer: ManualSaveOffer,
+  inScene: boolean,
+  callsOut: boolean
+): ReplayOffer {
+  if (saveOffer === 'none') return 'none'
+  if (inScene) return 'scene'
   if (saveOffer !== 'open') return saveOffer
   return callsOut ? 'waiting' : 'open'
 }

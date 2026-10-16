@@ -13,13 +13,14 @@ import {
   type TimeSlot
 } from '@shared/types'
 import { useGameStore, type ReplayStayFields } from '../gameStore'
+import { sceneActiveOf } from '../textingLoop'
 import { useUiStore } from '../uiStore'
 import {
   manualSaveDraft,
   manualSaveOffer,
   openingScene,
   replayOfferOf,
-  type ManualSaveOffer
+  type ReplayOffer
 } from './saves'
 import { currentRun, loopState, runStale } from './state'
 
@@ -83,11 +84,12 @@ export function replaySettleCount(): number {
 }
 
 /**
- * What the calendar's Replay offers right now: Save Game's offer, waiting as well while a call is
- * out that leaving the game would cancel and entering it again would pay for again — the slot's
- * texting ledger not yet banked, an exam's ledger and opening, the graduation picture and posts.
+ * What the calendar's Replay offers right now: dead through a scene, and otherwise Save Game's
+ * offer, waiting as well while a call is out that leaving the game would cancel and entering it
+ * again would pay for again — the slot's texting ledger not yet banked, an exam's ledger and
+ * opening, the graduation picture and posts.
  */
-export function replayOffer(): ManualSaveOffer {
+export function replayOffer(): ReplayOffer {
   const game = useGameStore.getState()
   // Every call is watched, so whichever settles last still wakes the view.
   const calls = [
@@ -97,7 +99,7 @@ export function replayOffer(): ManualSaveOffer {
     loopState.endingPostsCall
   ].map(settledOf)
   const callsOut = calls.includes(false) || game.endingArtPending
-  return replayOfferOf(manualSaveOffer(), callsOut)
+  return replayOfferOf(manualSaveOffer(), sceneActiveOf(game), callsOut)
 }
 
 /**

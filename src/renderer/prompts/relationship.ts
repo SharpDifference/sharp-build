@@ -168,7 +168,8 @@ export function readerStandingLine(
 
 /**
  * Third-person prose, ready to inject verbatim under the personality. `mood`, when given,
- * lets a Promiscuous girl's attraction line give way to a DTF one on her lustful days;
+ * lets a Promiscuous girl's attraction line give way to a DTF one on her lustful days, unless she
+ * is in the worst of a cold (`sick`);
  * `attractionGate` false drops the line saying his stats are under her bar.
  */
 export function relationshipLines(
@@ -179,7 +180,7 @@ export function relationshipLines(
   progress: RelationshipProgress | undefined,
   stats: PlayerStats = DEFAULT_PLAYER_STATS,
   medium: RelationshipMedium = IN_PERSON,
-  mood?: { date: number; offset: number },
+  mood?: { date: number; offset: number; sick?: boolean },
   attractionGate = true
 ): string[] {
   const name = character.firstName
@@ -210,6 +211,7 @@ export function relationshipLines(
     const missingStat = missingCrushStatOf(character, stats)
     const lustful =
       mood !== undefined &&
+      !mood.sick &&
       hasTrait(character, 'Promiscuous') &&
       isMoodLustful(mood.date, mood.offset, hasTrait(character, 'Mood-swings'))
     // A Promiscuous girl on a lustful day is DTF whether or not he has cleared her bar; otherwise the

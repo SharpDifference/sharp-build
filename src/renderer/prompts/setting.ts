@@ -9,15 +9,19 @@ import {
   semesterOrdinal,
   type SemesterCalendar
 } from '@shared/semesters'
+import { globalSlotOf } from '@shared/jobs'
 import type {
   CharInfo,
   Character,
   ClassEntry,
   ClassRecord,
+  ColdCase,
   Season,
+  TimeSlot,
   Transcript
 } from '@shared/types'
 import { handedBackAcedCount } from './classProgress'
+import { readerColdLine } from './colds'
 import { formatShortGameDate } from './gameDate'
 
 /**
@@ -113,12 +117,15 @@ export function readerText(
     standing?: 'good' | 'bad' | null
     lovers?: ReaderStanding['lovers']
     exes?: ReaderStanding['exes']
+    /** How his cold stands, where he has one that shows. */
+    cold?: string
   }
 ): string {
   const bio = bioLine(reputation.bio ?? '')
   return [
     readerYearLine(`${firstName} ${lastName}`, reputation.semesterIndex),
     describePlayer(stats),
+    ...(reputation.cold ? [reputation.cold] : []),
     ...(bio ? [bio] : []),
     ...(reputation.aced && reputation.aced > 0 ? [acedExamsLine(reputation.aced)] : []),
     ...(reputation.standing === 'good' ? [GRADES_GOOD_LINE] : []),
@@ -138,6 +145,7 @@ export interface ReaderView {
   classes: Readonly<Record<string, ClassEntry>>
   calendar: SemesterCalendar
   date: number
+  time: TimeSlot
   finalsScoresShown: boolean
   gradesStanding: 'good' | 'bad' | null
   semesterIndex: number
@@ -147,6 +155,7 @@ export interface ReaderView {
   alumni: readonly string[]
   charInfo: Readonly<Record<string, CharInfo>>
   characters: Readonly<Record<string, Character>>
+  readerCold: ColdCase | null
 }
 
 /** The roster and the graduates: a girl he is dating, or used to, may be either. */
@@ -164,17 +173,24 @@ function firstNamesOf(view: ReaderView): Record<string, string> {
   return firstNames
 }
 
-/** The `READER` block for a playthrough; `override` is the ending's projection of stats and charInfo. */
+/**
+ * The `READER` block for a playthrough; `override` is the ending's projection of stats and
+ * charInfo, and `at` the slot the block is written for where that is not the clock's, which his
+ * cold is read at.
+ */
 export function readerBlockOf(
   view: ReaderView,
-  override?: { stats: PlayerStats; charInfo: Readonly<Record<string, CharInfo>> }
+  override?: { stats: PlayerStats; charInfo: Readonly<Record<string, CharInfo>> },
+  at: { date: number; time: TimeSlot } = view
 ): string {
+  const cold = readerColdLine(view.readerCold, globalSlotOf(at.date, at.time))
   return readerText(view.playerFirstName, view.playerLastName, override?.stats ?? view.stats, {
     semesterIndex: view.semesterIndex,
     bio: view.bio,
     aced: acedOf(view),
     standing: view.gradesStanding,
     season: view.calendar.season,
+    ...(cold ? { cold } : {}),
     ...readerStandingOf(everyoneOf(view), override?.charInfo ?? view.charInfo, firstNamesOf(view))
   })
 }

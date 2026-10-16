@@ -1,10 +1,18 @@
 import { kindOf, type ExamPeriod } from '@shared/academics'
-import { jobDefOf, rollShiftGain, NO_JOB_MESSAGE, NO_SHIFT_MESSAGE, type JobDef } from '@shared/jobs'
+import { studentsOf } from '@shared/classes'
+import {
+  jobDefOf,
+  rollShiftGain,
+  NO_JOB_MESSAGE,
+  NO_SHIFT_MESSAGE,
+  NO_SHIFT_SICK_MESSAGE,
+  type JobDef
+} from '@shared/jobs'
 import type { ClassEntry, JobState } from '@shared/types'
 import { examOn } from '../../prompts/classProgress'
 import { ordinal } from '../../prompts/gameDate'
 import { PORTRAIT_SLOTS, useGameStore, type SceneKind } from '../gameStore'
-import { charJobNow, shiftNow } from '../timetable'
+import { charJobNow, readerSickNow, shiftNow } from '../timetable'
 import { studentsHere } from './cast'
 import {
   admitLocals,
@@ -57,7 +65,9 @@ export function sceneKindOf(actionType: string): SceneKindVerdict {
 
   if (actionType === 'job') {
     if (!game.job) return { kind: 'none', reason: NO_JOB_MESSAGE }
-    if (shiftNow() === null) return { kind: 'none', reason: NO_SHIFT_MESSAGE }
+    if (shiftNow() === null) {
+      return { kind: 'none', reason: readerSickNow() ? NO_SHIFT_SICK_MESSAGE : NO_SHIFT_MESSAGE }
+    }
     const jobId = game.job.jobId
     return {
       kind: 'shift',
@@ -232,7 +242,10 @@ function composeClass(
     if (own.includes(charId)) continue
     if (students.includes(charId) || attendance.cast.includes(charId)) own.push(charId)
   }
-  const sittingIn = own.filter((charId) => !students.includes(charId))
+  // Off the enrollment, not the room: a student the plan got out of her sickbed takes the class.
+  const game = useGameStore.getState()
+  const enrolled = studentsOf(entry, game.chars, game.charInfo)
+  const sittingIn = own.filter((charId) => !enrolled.includes(charId))
 
   return {
     cast: [...own, ...students.filter((charId) => !own.includes(charId))],

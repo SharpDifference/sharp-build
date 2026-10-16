@@ -133,6 +133,8 @@ export interface LandingChromeProps {
   /* What he has. */
   money: number
   stats: PlayerStats
+  /** How his cold stands, said under the date where it shows; null where it does not. */
+  cold: string | null
 
   /* What he may do about it. */
   actions: readonly LandingRow[]
@@ -350,7 +352,9 @@ export function LandingChrome(props: LandingChromeProps): JSX.Element {
             <div className="vu-landing-meta">
               {props.epilogue
                 ? `WEEK ${weekOf(date) + 2} · ${season === 'fall' ? 'WINTER' : 'SUMMER'} VACATION`
-                : `WEEK ${weekOf(date) + 1} · ${season === 'fall' ? 'FALL' : 'SPRING'} SEMESTER`}
+                : `WEEK ${weekOf(date) + 1} · ${season === 'fall' ? 'FALL' : 'SPRING'} SEMESTER${
+                    props.cold ? ` · ${props.cold.toUpperCase()}` : ''
+                  }`}
             </div>
           </div>
         </motion.div>

@@ -30,7 +30,7 @@ import { classSlotOf, jobClosedOn, occasionsOn } from '../prompts/occasions'
 import { profileUrl, useSpriteVersion } from '../stores/characterStore'
 import { useGameStore } from '../stores/gameStore'
 import { earlierSemesters, keptReplayIds } from '../stores/loop/replay'
-import type { ManualSaveOffer } from '../stores/loop/saves'
+import type { ReplayOffer } from '../stores/loop/saves'
 import { dayOfMonth, gridCellsOf, monthIndexOf, monthName, monthsOf } from './calendarMonths'
 import type { ScreenTheme } from './clockTheme'
 import {
@@ -255,7 +255,7 @@ export interface CalendarModalProps {
   /** Drawn by the screen that opened this — a portal inherits no palette. */
   theme: ScreenTheme
   /** Whether a past half's replay may be played now, has to wait for the loop, or never can. */
-  replayOffer: ManualSaveOffer
+  replayOffer: ReplayOffer
   /** Plays one past half's replay, of this semester or the earlier one `semesterIndex` names. */
   onReplay: (date: number, time: TimeSlot, semesterIndex?: number) => void
   /** Deletes one past half's replay; false where the delete was refused. */
@@ -539,19 +539,25 @@ export function CalendarModal({
   }
 
   /**
-   * A past half's replay under its summary: Replay where the game can be left for it, dead while
-   * a call it would cancel is out, and Delete beside it in the semester being played — an earlier
-   * one's replays are its record's, kept for the playthrough's life. Nothing where no replay of
-   * it is kept.
+   * A past half's replay under its summary: Replay where the game can be left for it, dead through
+   * a scene and while a call it would cancel is out, and Delete beside it in the semester being
+   * played — an earlier one's replays are its record's, kept for the playthrough's life. Nothing
+   * where no replay of it is kept.
    */
   function replayRow(time: TimeSlot): JSX.Element | null {
     const id = day.replays[selected]?.[time]
     if (!id || !kept?.has(id)) return null
-    const dead = replayOffer === 'waiting'
+    const note =
+      replayOffer === 'scene'
+        ? 'Unavailable in scenes'
+        : replayOffer === 'waiting'
+          ? 'Waiting for LLM response'
+          : null
+    const dead = note !== null
     return (
       <motion.div className="vu-cal-replay" variants={slideInQuick}>
         {replayOffer !== 'none' && (
-          <DeadNote note={dead ? 'Waiting for LLM response' : null}>
+          <DeadNote note={note}>
             <motion.button
               id={`calendar-replay-${time}`}
               className="vu-pill"

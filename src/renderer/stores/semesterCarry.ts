@@ -144,6 +144,9 @@ function carriedState(
   delete state.metSlots
   delete state.ignoredInvitation
   delete state.suspicions
+  // Everybody comes back from the break well, and the next semester's strains are new ones.
+  delete state.cold
+  delete state.coldsHad
   // A graduate is never cast again, so her romance count and break penalty have nothing left to
   // settle.
   if (graduate) {

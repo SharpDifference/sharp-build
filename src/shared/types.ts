@@ -838,6 +838,13 @@ export interface CharState {
   secrets?: CharSecret[]
   /** The secrets she has told the reader, oldest first; absent until she has told one. */
   toldSecrets?: string[]
+  /**
+   * The last cold she caught this semester, kept once it is over until another replaces it;
+   * absent before she has caught one.
+   */
+  cold?: ColdCase
+  /** Every strain she has caught this semester, by its id, ascending; absent before any. */
+  coldsHad?: number[]
 }
 
 /**
@@ -1109,6 +1116,8 @@ export interface SceneGift {
   from?: ReceivedFrom
   /** It went back to the girl who gave it to him. */
   returned?: true
+  /** Cold medicine she took for the cold she had when it was given, filed as a dose. */
+  dose?: true
 }
 
 /** The curveball a scene opened on, and the girl it happens to where it names one. */
@@ -1128,6 +1137,35 @@ export interface ReceivedGift {
 
 /** When each scene event last fired this semester, by event id: its cooldown's record. */
 export type SceneEventsFired = Record<string, number>
+
+/**
+ * One cold somebody caught: its strain, the slot it was passed on in, and what the dice and the
+ * medicine made of it. Its stage at any slot is derived from these, never stored.
+ */
+export interface ColdCase {
+  /** The global slot the strain reached campus in: its id, and what immunity is kept against. */
+  strain: number
+  /** The global slot it was passed on in; it incubates from the slot after. */
+  since: number
+  /** How many slots it incubates, unseen. */
+  incubation: number
+  /** A mild cold, which never reaches the worst of it. */
+  mild?: true
+  /** The global slots a dose was taken in, ascending: each ends the stage it falls in. */
+  doseSlots?: number[]
+  /** Caught off the reader while he was sick, so she has a fair idea where it came from. */
+  fromReader?: true
+  /** His boss has texted him about this one; the reader's own case only. */
+  bossTold?: true
+}
+
+/** What one finished slot passed on: every cold caught in it, assigned at its boundary. */
+export interface ColdPass {
+  /** Each girl who caught one, by charId. */
+  caught: Record<string, ColdCase>
+  /** The reader's, when he caught one. */
+  reader?: ColdCase
+}
 
 /** A running summary a scene reply came with, and the transcript length it covers up to. */
 export interface SceneSummaryMark {
@@ -1357,6 +1395,11 @@ export interface SlotOpening {
    * pass, so the narration above describes her as she now feels.
    */
   crushes?: string[]
+  /**
+   * The colds that same slot passed on, and a strain that reached campus in it. Absent on an
+   * opening banked before colds existed, which passes on none.
+   */
+  coldPass?: ColdPass
 }
 
 /** A {@link SlotOpening} an ending banked: the three settles it rolled are always on it. */
@@ -1454,6 +1497,10 @@ export interface GameSave {
   inventory: OwnedItem[]
   /** When each scene event last fired this semester; absent before any has. */
   sceneEventsFired?: SceneEventsFired
+  /** The reader's last cold this semester, as a girl's `cold` is kept; absent before any. */
+  readerCold?: ColdCase
+  /** Every strain the reader has caught this semester, by its id, ascending; absent before any. */
+  readerColdsHad?: number[]
   /**
    * What each of the reader's classes has accumulated — meetings, exams, projects and scores —
    * keyed by class code.

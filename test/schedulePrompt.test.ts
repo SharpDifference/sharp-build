@@ -127,7 +127,8 @@ describe('the PLANS half of the ledger request', () => {
       threads,
       characters: roster,
       graduates: [],
-      planned: []
+      planned: [],
+      timetable: {}
     })
   }
 

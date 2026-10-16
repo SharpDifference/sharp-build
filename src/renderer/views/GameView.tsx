@@ -27,6 +27,8 @@ import {
   type TimeSlot
 } from '@shared/types'
 import { isWet } from '@shared/weather'
+import { coldStageAt, COLD_STAGE_LABELS } from '@shared/colds'
+import { globalSlotOf } from '@shared/jobs'
 import type { GiftReaction, ItemPick } from '@shared/shop'
 import { Burst } from '../components/Burst'
 import { CheckField } from '../components/CheckField'
@@ -621,6 +623,7 @@ export function GameView(): JSX.Element {
   // The two the landing reads out.
   const money = useGameStore((s) => s.money)
   const stats = useGameStore((s) => s.stats)
+  const readerCold = useGameStore((s) => s.readerCold)
   // Whether BunnyBot has handed the two granted apps over yet.
   const bunnymapUnlocked = useGameStore((s) => s.bunnymapUnlocked)
   const bunnyshopUnlocked = useGameStore((s) => s.bunnyshopUnlocked)
@@ -1005,6 +1008,10 @@ export function GameView(): JSX.Element {
   // The sky over this slot, which picks the background's render and the mark the chromes wear.
   const slotSky = slotWeather(weather, date, time, graduationSeen)
   const wet = isWet(slotSky)
+  // How the reader's cold stands this slot, where it shows.
+  const coldStage = coldStageAt(readerCold ?? undefined, globalSlotOf(date, time))
+  const readerColdLabel =
+    coldStage && coldStage !== 'incubating' ? COLD_STAGE_LABELS[coldStage] : null
 
   /**
    * Every face the screens off this landing list — the map's crops, the phone's chats, the feed's
@@ -2099,6 +2106,7 @@ export function GameView(): JSX.Element {
           onAdvance={boxAdvances ? onAdvance : undefined}
           money={money}
           stats={stats}
+          cold={readerColdLabel}
           actions={epilogue ? epilogueActions : slotActions}
           onSlotAction={onSlotAction}
           action={action}
