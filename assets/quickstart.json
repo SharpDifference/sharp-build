@@ -680,7 +680,7 @@
       ],
       "activity": {
         "location": "thorne_auditorium",
-        "doing": "recording guitar tracks at the basement studio in the music_hall at Thorne Auditorium"
+        "doing": "recording guitar tracks at the basement studio in the music hall at Thorne Auditorium"
       },
       "meal": "bobbys_diner"
     },
@@ -727,7 +727,7 @@
       ],
       "activity": {
         "location": "freights_books",
-        "doing": "browsing vintage occult paperbacks at the freights"
+        "doing": "browsing vintage occult paperbacks at Freights"
       },
       "meal": "bobbys_diner"
     },
@@ -749,7 +749,7 @@
       ],
       "activity": {
         "location": "freights_books",
-        "doing": "digging for rare fantasy sourcebooks at the freights"
+        "doing": "digging for rare fantasy sourcebooks at Freights"
       },
       "meal": "fast_eats"
     },
@@ -1074,169 +1074,169 @@
   "secrets": {
     "f5139e6e-9f8d-4f29-89f8-e93dee2ee8b6": [
       {
-        "text": "Ami spends late nights playing competitive online mahjong and has earned a regional ranking under an anonymous username.",
+        "text": "Ami knows how to knit complicated cable-knit beanies but only works on them late at night when nobody is looking.",
         "tier": "friendly"
       },
       {
-        "text": "Ami secretly hoards voice memos where she hums lullabies, terrified that she will someday lose her hearing entirely.",
+        "text": "Ami still keeps the pawn ticket from the day she sold her mother's heirloom silver flute to afford her first bass guitar.",
         "tier": "trusted"
       },
       {
-        "text": "When Ami ran away at seventeen, she slept in a subway terminal for four nights and had her favorite acoustic guitar stolen from right under her hands while she dozed off.",
+        "text": "Ami lived out of a rusted station wagon in a warehouse district for six freezing weeks after running away from her home at sixteen.",
         "tier": "devoted"
       }
     ],
     "d215de4d-7f92-4f59-954f-1f2461144f2c": [
       {
-        "text": "Lili is obsessed with miniature clay crafting and keeps an entire tiny plastic village hidden away in her closet.",
+        "text": "Lili has an encyclopedic memory for nineties boy band trivia and listens to karaoke tracks to fall asleep.",
         "tier": "friendly"
       },
       {
-        "text": "Lili once paid half a month's rent to a bot farm to artificially inflate her follower count because her engagement had plummeted.",
+        "text": "Lili bought tens of thousands of fake bot followers using money saved for her college textbooks during her freshman year.",
         "tier": "trusted"
       },
       {
-        "text": "In middle school, Lili held a meet-up at an ice cream shop after getting her first five hundred subscribers, but sat by herself for three hours and had to throw away two dozen cupcakes when nobody showed up.",
+        "text": "Lili sat alone in an empty banquet hall on her sixteenth birthday after every single classmate she invited failed to show up.",
         "tier": "devoted"
       }
     ],
     "89ff5e67-3917-4027-ac77-46683ef94a8e": [
       {
-        "text": "April enters local amateur crossword puzzle tournaments and regularly finishes them in under ten minutes.",
+        "text": "April builds intricate, miniature wooden birdhouses in her closet using discarded takeout chopsticks.",
         "tier": "friendly"
       },
       {
-        "text": "April keeps a meticulously detailed spreadsheet calculating every cent of student loan debt she has accrued, fully expecting to drown in it before she turns thirty.",
+        "text": "April hid a severe academic probation notice in the lining of her winter coat so her family would not find it.",
         "tier": "trusted"
       },
       {
-        "text": "When April was fourteen, she called an ambulance for her older sister who had passed out during an extreme diet, and their parents blamed April for making an embarrassing public scene.",
+        "text": "April was abandoned at an interstate truck stop at age fifteen after getting into a screaming match with her father during a family vacation.",
         "tier": "devoted"
       }
     ],
     "3b1ac596-c4a4-43a7-8ad8-b6b2c4c3a55f": [
       {
-        "text": "Livvie secretly builds and paints war miniatures in her closet and knows all the obscure lore by heart.",
+        "text": "Livvie runs an anonymous blog where she reviews children's fantasy picture books for their botanical accuracy.",
         "tier": "friendly"
       },
       {
-        "text": "Livvie deliberately flunked her first driver's test three times because she was terrified that being able to drive would make her family rely on her even more.",
+        "text": "Livvie once let her driver's license expire for two full years because she was terrified of parallel parking during the renewal test.",
         "tier": "trusted"
       },
       {
-        "text": "When Livvie was ten, she spent her entire savings on a rare orchid for her grandfather's birthday, only for her siblings to crush it during a rowdy game of tag while she watched helplessly.",
+        "text": "Livvie accidentally locked her toddler brother in a garden shed during a storm when she was eight, an incident that hospitalised him with severe hypothermia.",
         "tier": "devoted"
       }
     ],
     "c27e108a-8a18-4649-a239-e8438af4109f": [
       {
-        "text": "Morgana loves watching retro claymation Christmas specials every December and knows all the songs by heart.",
+        "text": "Morgana bakes elaborate pastel-frosted sugar cookies shaped like cute cartoon animals whenever she gets anxious.",
         "tier": "friendly"
       },
       {
-        "text": "Morgana is genuinely terrified of the dark and cannot fall asleep without a tiny, dim nightlight plugged behind her nightstand.",
+        "text": "Morgana's parents divorced after she graduated high school, and she phones each of them every week to make sure they don't get lonely.",
         "tier": "trusted"
       },
       {
-        "text": "When Morgana was twelve, her parents threw away her personal diary and replaced her entire wardrobe with bright floral sundresses overnight to force her out of her quiet phase.",
+        "text": "Morgana endured an impromptu backyard exorcism staged by her family's church community when her parents discovered her occult books at age fifteen.",
         "tier": "devoted"
       }
     ],
     "f4a99abb-66c4-4040-ac21-ab7249a142af": [
       {
-        "text": "Marina is an elite player on a mobile trivia app, holding an undefeated streak in world geography for eight consecutive months.",
+        "text": "Marina maintains a private binder of restaurant menus where she corrects spelling errors and rates their typography.",
         "tier": "friendly"
       },
       {
-        "text": "Marina checks her ex-boyfriend's sister's public social media page every single Friday to make sure she never accidentally runs into him back home.",
+        "text": "Marina stole an entire set of expensive copper sauté pans from her high school culinary lab and never returned them.",
         "tier": "trusted"
       },
       {
-        "text": "When Marina was sixteen, she prepared a four-course anniversary dinner from scratch for her high school boyfriend, only to find him hooking up with her childhood friend in the driveway when she walked out to greet him.",
+        "text": "Marina was left standing on the curb for seven hours in the rain when her first boyfriend drove off with another girl on prom night.",
         "tier": "devoted"
       }
     ],
     "33fd5ab3-bc59-4e58-9f25-f6899e5a75d3": [
       {
-        "text": "Ingrid is an avid collector of novelty keychains and currently owns over two hundred of them organized by color in shoe boxes.",
+        "text": "Ingrid secretly watches competitive speedrunning videos of cozy farming games while brushing her teeth every night.",
         "tier": "friendly"
       },
       {
-        "text": "Ingrid secretly writes high-fantasy fanfiction online and worries constantly that someone from campus will recognize her distinct prose style.",
+        "text": "Ingrid still sleeps with the worn felt pennant from her middle school chess club hidden beneath her mattress.",
         "tier": "trusted"
       },
       {
-        "text": "On her sixteenth birthday, Ingrid planned an elaborate tabletop game night and baked themed treats, but spent the entire evening alone in her basement when not a single invited guest showed up.",
+        "text": "Ingrid watched her parents throw away her entire collection of fantasy sketchbooks when she was fourteen after deciding her hobbies were socially stunted.",
         "tier": "devoted"
       }
     ],
     "4b994943-17e0-4853-b67e-4754d5e698e5": [
       {
-        "text": "Gwen secretly watches cheesy competitive baking shows to wind down and takes meticulous notes on frosting techniques.",
+        "text": "Gwen keeps a meticulously cataloged scrapbook of dog breeds she spots during her dawn running routes.",
         "tier": "friendly"
       },
       {
-        "text": "Gwen regularly sleeps in her running shoes on meet nights because she has recurring nightmares that she will arrive barefoot and miss her starting gun.",
+        "text": "Gwen threw away her first-place state championship ribbon into a drainage ditch because she felt her split times were disgraceful.",
         "tier": "trusted"
       },
       {
-        "text": "When Gwen's high school relay team turned on her, her former best friend locked her running spikes in an empty equipment locker right before finals, forcing Gwen to race in borrowed, ill-fitting trainers.",
+        "text": "Gwen dislocated her shoulder in middle school after being violently shoved down concrete bleachers by teammates she thought were her friends.",
         "tier": "devoted"
       }
     ],
     "79dd2743-3541-4172-9ac9-c42c485aa5cc": [
       {
-        "text": "Celest has an entire private scrapbook filled with candy bar wrappers she collected from American vending machines because she loves their loud logos.",
+        "text": "Celest maintains a hidden stash of inexpensive neon gel pens and uses them to annotate classic Russian literature.",
         "tier": "friendly"
       },
       {
-        "text": "Celest keeps a pocket dictionary in her designer bag with phonetic spellings of common slang so she does not mispronounce them in front of classmates.",
+        "text": "Celest failed her private high school entrance exam twice and only got admitted after her family made a massive donation.",
         "tier": "trusted"
       },
       {
-        "text": "When Celest was eleven, her father abruptly fired her favorite live-in nanny without letting Celest say goodbye, suspecting the woman of being an informant for an oil rival.",
+        "text": "Celest was trapped inside an armored limousine during a violent botched kidnapping attempt outside her home when she was nine years old.",
         "tier": "devoted"
       }
     ],
     "c01eae18-ac0d-4234-bd7f-dd07a7dfaf4b": [
       {
-        "text": "Winter has secretly mastered every single arcade claw machine within a ten-mile radius and gives away the stuffed prizes anonymously.",
+        "text": "Winter collects brightly colored character band-aids and wears them hidden beneath her socks even when uninjured.",
         "tier": "friendly"
       },
       {
-        "text": "Winter refuses to sleep without a weighted blanket pressed firmly to her chest because the sensation of an empty room triggers sudden asthma-like panic.",
+        "text": "Winter forged her parent's signature on medical school scholarship paperwork to keep them from discovering her chosen specialty.",
         "tier": "trusted"
       },
       {
-        "text": "The afternoon her childhood friend died, Winter spent twenty minutes frantically giving chest compressions until the paramedics pulled her away, bruised her wrists, and told her it was already far too late.",
+        "text": "Winter went temporarily mute for three months following her best friend's funeral, communicating solely by scribbling on a dry-erase slate.",
         "tier": "devoted"
       }
     ],
     "ad254d3c-1118-4763-aaac-7640a5172639": [
       {
-        "text": "Florentine eats cheap boxed instant macaroni and cheese straight from the pot in her room using vintage silver forks.",
+        "text": "Florentine eats instant ramen directly out of the plastic pot while sitting on the floor of her wardrobe.",
         "tier": "friendly"
       },
       {
-        "text": "Florentine repairs her own designer boots using superglue and black marker ink because she cannot afford professional cobblers.",
+        "text": "Florentine pawns her designer accessories each semester to cover rent and buys counterfeit duplicates to maintain appearances.",
         "tier": "trusted"
       },
       {
-        "text": "When Florentine was twelve, bailiffs entered their Paris flat during her birthday dinner to catalog and seize her antique canopy bed right in front of her.",
+        "text": "Florentine stood quietly outside her family apartment at age twelve while bailiffs seized every piece of furniture, leaving her sleeping on bare floorboards.",
         "tier": "devoted"
       }
     ],
     "d28276a0-b509-4f82-9a13-4d1158436074": [
       {
-        "text": "Isabelle has a guilty obsession with cheap gas-station beef jerky and eats it with metal chopsticks so her hands stay pristine.",
+        "text": "Isabelle secretly hoards cheap supermarket romance paperbacks inside hollowed-out vintage art history encyclopedias.",
         "tier": "friendly"
       },
       {
-        "text": "Isabelle keeps a burner social media account where she anonymously reviews and critiques amateur erotic web fiction.",
+        "text": "Isabelle deliberately slashed one of her own high school oil paintings so her instructors would not enter it into a regional exhibition.",
         "tier": "trusted"
       },
       {
-        "text": "When Isabelle was fifteen, her mother found her personal collection of risqué sketches and coldly auctioned them off to family friends at a cocktail party, claiming they were done by an anonymous local artist.",
+        "text": "Isabelle discovered at age thirteen that her father had installed hidden security cameras throughout her bedroom to monitor her daily habits.",
         "tier": "devoted"
       }
     ]

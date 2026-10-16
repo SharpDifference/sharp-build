@@ -45,6 +45,7 @@ import {
 } from '@shared/jobs'
 import {
   isVenusChat,
+  venusColdTipTexts,
   venusJobIntroTexts,
   venusMessagesDue,
   VENUS_CHAT_ID,
@@ -66,6 +67,7 @@ import {
 } from '../prompts/bunnybot'
 import { isGraduationSlot } from '../prompts/graduation'
 import { isTutorialSlot } from '../prompts/introScript'
+import { coldStageAt, isSymptomatic } from '@shared/colds'
 import {
   buildHangoutClassifierPrompt,
   normalizeHangout,
@@ -372,6 +374,28 @@ export function deliverVenusJobIntro(): void {
   for (const text of venusJobIntroTexts(game.playerFirstName)) {
     deliver(VENUS_CHAT_ID, chatMessage('contact', text))
   }
+}
+
+/**
+ * Venus's health notice: sent once a playthrough, the first slot anybody on the roster or the
+ * reader shows a cold, once the shop selling the medicine it points to is open. What it has
+ * already said is the record of whether it has said this.
+ */
+export function deliverVenusColdTip(): void {
+  const game = useGameStore.getState()
+  if (!game.bunnyshopUnlocked) return
+
+  const slot = globalSlotOf(game.date, game.time)
+  const colds = [
+    game.readerCold ?? undefined,
+    ...game.chars.map((charId) => game.charInfo[charId]?.cold)
+  ]
+  if (!colds.some((cold) => isSymptomatic(coldStageAt(cold, slot)))) return
+
+  const texts = venusColdTipTexts(game.playerFirstName)
+  const spoken = game.bunnyboard.conversations[VENUS_CHAT_ID]?.messages ?? []
+  if (spoken.some((message) => texts.includes(message.text))) return
+  for (const text of texts) deliver(VENUS_CHAT_ID, chatMessage('contact', text))
 }
 
 /**

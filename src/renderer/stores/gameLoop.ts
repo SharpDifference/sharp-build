@@ -155,6 +155,7 @@ import {
   deliverSlotReachOuts,
   deliverSpringBreakTexts,
   deliverHomecomingTexts,
+  deliverVenusColdTip,
   deliverVenusJobIntro,
   deliverVenusMessages,
   everydayRoundNow,
@@ -425,6 +426,7 @@ async function beginSlot(): Promise<void> {
 
   // BunnyBot's half of the same window.
   deliverVenusJobIntro()
+  deliverVenusColdTip()
   deliverBunnybotMessages()
   deliverBunnybotTwoTimingTip()
 
