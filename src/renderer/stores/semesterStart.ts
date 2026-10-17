@@ -1,3 +1,4 @@
+import { carriedModFields } from '@shared/modCarry'
 import { rollPostLikes } from '@shared/feed'
 import { placeNpcShifts, rollFreshmanJobStart, rollJobClosures } from '@shared/jobs'
 import { npcFriendsOf } from '@shared/npcRelationships'
@@ -294,6 +295,8 @@ export function continuedStartOf(
   }
 
   const save: SaveDraft = {
+    // The mods' own fields first, each as its mod carried it, so none can stand in for the game's.
+    ...carriedModFields(carry.mods ?? {}),
     schemaVersion: SAVE_SCHEMA_VERSION,
     semester: continued.id,
     stats,

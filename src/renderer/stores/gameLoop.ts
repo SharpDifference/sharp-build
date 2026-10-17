@@ -128,6 +128,7 @@ import {
 import { retrySilently as silentRetry } from './silentRetry'
 import { sanitizeSlotIntro } from './slotIntroReply'
 import { postsWithModFields } from './slotPostsForMods'
+import { modFieldsLeaving } from './semesterModCarry'
 import { boxFits } from '../views/boxRows'
 import { answerCrossing, cancelCrossing, endCrossing, markCrossingWait } from './crossingStore'
 import {
@@ -3084,6 +3085,14 @@ export async function leaveForNextSemester(): Promise<boolean> {
     const view = semesterOf(record, game.semesterId ?? undefined)
     // Read off the store before the teardown resets it: purchases since the goodbyes included.
     const handoff = carryOf(game, view)
+    // What the mods carry, read off the same ending, rides beside the game's own carry.
+    const mods = modFieldsLeaving(game.toGameSave(), {
+      playthroughId,
+      index: game.semesterIndex,
+      season: view.season,
+      characters: useCharacterStore.getState().characters
+    })
+    if (Object.keys(mods).length > 0) handoff.carry.mods = mods
     stageContinuation({ playthroughId, record, from: view.id, handoff })
   }
   await leaveToMenu({ keepCrossing: true })

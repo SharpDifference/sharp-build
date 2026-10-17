@@ -5,6 +5,7 @@ import type { ProviderApi, ServiceTier, ThinkingLevel } from './providers'
 import type { LedgerStats, PlayerStats, StatKey, StatTier } from './playerStats'
 import type { ClassDifficulty, ClassKind, ExamPeriod, Professor } from './academics'
 import type { CharacterTrait } from './traits'
+import type { ModCarryFields } from './modCarry'
 import type { GiftPreferences, GiftReaction } from './shop'
 import type { NpcFriendship, NpcRelationshipMap, NpcSlotOverlay } from './npcRelationships'
 import type { PromptKind } from './promptKinds'
@@ -1942,6 +1943,11 @@ export type SemesterCarry = Pick<
   charInfo: Record<string, CharState>
   /** The semester that just ended, for the calendar. */
   before: SemesterLog
+  /**
+   * The fields mods registered with `registerTermCarry`, as each mod's adapter carried them
+   * (`semesterModCarry.ts`); the next semester's opening save takes them back in.
+   */
+  mods?: Partial<ModCarryFields>
 }
 
 /** The record as New Game hands it over; `saveService` stamps the version. */
