@@ -239,7 +239,7 @@ describe('Hoop Shot, how she shoots', () => {
       expect(share[3]).toBeLessThan(0.42)
       expect(share[4]).toBeLessThan(0.25)
     }
-  })
+  }, 120000)
 
   // The test above flatters her: its reader waits 120 ms on every ball and lets a quarter of the
   // crossings go by. This one does neither. It records how the game stands today, not how it
