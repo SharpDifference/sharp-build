@@ -108,15 +108,17 @@ export function forwardOpenOf(s: PlaybackSlice): boolean {
 export type InterjectOffer = 'none' | 'open' | 'locked'
 
 /**
- * What holds the scene's opening reply shut, or null: a course in session, one the professor has
- * not called off, or a girl with a present still to hand him. PE never holds it.
+ * What holds the scene's opening reply shut, or null: a lecture in session, one the professor has
+ * not called off, or a girl with a present still to hand him.
  */
 export function openingLockOf(
   s: Pick<PlaybackSlice, 'sceneClass' | 'classes' | 'sceneEvent' | 'sceneReceivedGift'>
 ): 'class' | 'gift' | null {
+  const entry = s.sceneClass !== null ? s.classes[s.sceneClass] : undefined
   if (
-    s.sceneClass !== null &&
-    s.classes[s.sceneClass]?.category !== 'pe' &&
+    entry !== undefined &&
+    entry.category !== 'pe' &&
+    entry.kind === 'lecture' &&
     s.sceneEvent?.id !== 'classCancelled'
   ) {
     return 'class'
