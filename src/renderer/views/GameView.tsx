@@ -112,6 +112,7 @@ import {
   leaveToMenu,
   manualSaveOffer,
   quitToDesktop,
+  relax,
   retryClassify,
   retryEndingCall,
   retryEndingCallWithPrompt,
@@ -176,7 +177,13 @@ import {
   subscribeReplaySettles
 } from '../stores/loop/replay'
 import { menuCrossing, revealSceneOpening, slotStampOf } from '../stores/slotCrossing'
-import { goToText, goToVerdict, slotActionsNow } from '../stores/slotActions'
+import {
+  goToText,
+  goToVerdict,
+  RELAX_KEY,
+  relaxAction,
+  slotActionsNow
+} from '../stores/slotActions'
 import { isWebBuild } from '../platform'
 import { noNsfwImagesOf, useSettingsStore } from '../stores/settingsStore'
 import { useUiStore } from '../stores/uiStore'
@@ -1729,7 +1736,7 @@ export function GameView(): JSX.Element {
    */
   const slotActions = useMemo(
     // A created scene and a replay have no slot, and their landing is never drawn.
-    () => (created || replaying ? [] : slotActionsNow()),
+    () => (created || replaying ? [] : [...slotActionsNow(), relaxAction(time)]),
     [date, time, events, classes, job, playerSchedule, classRecords, calendar]
   )
 
@@ -1791,6 +1798,13 @@ export function GameView(): JSX.Element {
     if (busy || blocked || !awaitingInput) return
     const chosen = slotActions[index]
     setAction('')
+    // Relax spends the hour on nothing: no classifier and no scene, and its wait is reported the
+    // same way, the landing standing with Go turning until its line is up.
+    if (chosen.key === RELAX_KEY) {
+      setSending(true)
+      void relax()
+      return
+    }
     // A button spends the turn exactly as the box does, so the wait is reported the same —
     // the landing stands with Go turning, rather than handing the screen back to the narration
     // box for the length of a call. It is the gift's own argument, one control along.

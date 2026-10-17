@@ -155,6 +155,7 @@ import {
 import { useBunnyboardStore } from './bunnyboardStore'
 import {
   addPlanContacts,
+  answerPlanReminders,
   askOccasionFor,
   deliverBossMessage,
   deliverBunnybotMessages,
@@ -1300,7 +1301,8 @@ function dispatchTurn(snapshot: TurnSnapshot): void {
       snapshot.gift,
       snapshot.preset,
       snapshot.planId,
-      snapshot.sceneEvents
+      snapshot.sceneEvents,
+      snapshot.answeredReminder
     )
   }
 }
@@ -1419,7 +1421,9 @@ export async function submitAction(
   /** The plan whose landing button this is; its attendees are cast whatever the words name. */
   planId?: string,
   /** What a failed attempt at this turn rolled, so its retry opens on the same. */
-  sceneEvents?: TurnSnapshot['sceneEvents']
+  sceneEvents?: TurnSnapshot['sceneEvents'],
+  /** Whose reminder a failed attempt at this plan answered, so its retry skips her thread too. */
+  answeredReminder?: string
 ): Promise<void> {
   const run = currentRun()
   const raw = action.trim()
@@ -1446,7 +1450,8 @@ export async function submitAction(
     ...(gift ? { gift } : {}),
     ...(preset ? { preset } : {}),
     ...(planId ? { planId } : {}),
-    ...(sceneEvents ? { sceneEvents } : {})
+    ...(sceneEvents ? { sceneEvents } : {}),
+    ...(answeredReminder ? { answeredReminder } : {})
   }
   const snapshot = loopState.lastTurn
 
@@ -1506,6 +1511,19 @@ export async function submitAction(
     if (!cast) return
     if (runStale(run)) return
     plan = cast
+    // A plan's own button is his yes to her reminder about it, so those texts only arranged the
+    // meeting and the ledger skips her thread, as it does a hangout begun from it. Before the
+    // cast is applied, which would clear the reminder unanswered; backfilled onto the snapshot,
+    // since a retry finds the reminder already answered.
+    const event = planOf(snapshot)
+    if (event && !snapshot.answeredReminder) {
+      const attendees = planAttendees(event).filter((charId) => cast.cast.includes(charId))
+      const [answered] = answerPlanReminders(attendees)
+      if (answered) snapshot.answeredReminder = answered
+    }
+    if (snapshot.answeredReminder) {
+      plan.scene = { ...plan.scene, textLedgerSkip: snapshot.answeredReminder }
+    }
     // The curveball and the present, once the cast is final; the first night stays as authored.
     if (!isTutorialSlot(game.date, game.time, game.semesterIndex)) {
       plan.scene = { ...plan.scene, ...sceneEventsFor(snapshot, plan.cast, plan.scene) }
@@ -1566,6 +1584,15 @@ interface CastPlan {
   passerby: string | null
 }
 
+/** The plan this turn's landing button starts, while the clock is still on its slot. */
+function planOf(snapshot: TurnSnapshot): CalendarEvent | undefined {
+  if (!snapshot.planId) return undefined
+  const game = useGameStore.getState()
+  return game.events.find(
+    (entry) => entry.id === snapshot.planId && entry.date === game.date && entry.time === game.time
+  )
+}
+
 /** Classifies a fresh turn and casts it. */
 async function castTurn(
   trimmed: string,
@@ -1591,13 +1618,7 @@ async function castTurn(
 
   // A plan's own button is a meeting with its attendees whatever the words sound like, as the
   // same plan begun from her reminder is, and also whatever kind of scene the words are.
-  const game = useGameStore.getState()
-  const event = snapshot.planId
-    ? game.events.find(
-        (entry) =>
-          entry.id === snapshot.planId && entry.date === game.date && entry.time === game.time
-      )
-    : undefined
+  const event = planOf(snapshot)
   const attendees = event ? planAttendees(event) : []
   const meeting = event ? meetingKindOf(actionType) : null
 
@@ -3272,5 +3293,6 @@ export async function switchGame(playthroughId: string, saveId: string): Promise
 export { speakerNameOf }
 export { abandonClassify, retryClassify } from './loop/classify'
 export { submitQuizAnswer } from './loop/exams'
+export { relax } from './loop/relax'
 export { manualSaveOffer, writeManualSave } from './loop/saves'
 export type { ManualSaveOffer } from './loop/saves'

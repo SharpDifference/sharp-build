@@ -158,7 +158,7 @@ export function venusColdTipTexts(playerFirstName: string): readonly string[] {
   return [
     `Hi ${playerFirstName}, administration has confirmed that a cold is going around campus. If someone you know is sick, please give them some space until they've recovered.`,
     `Staying in shape helps too. The better your Body, the less likely you are to catch a cold, and the milder it'll be if you do.`,
-    `If you do catch it, you won't be able to improve your stats until you're feeling better. If you do get sick, we recommend taking SpringMart ColdStop lozenges daily.`,
+    `If you do catch it, you won't be able to improve your stats until you're feeling better. If you do get sick, we recommend taking SpringMart ColdStop lozenges twice a day.`,
     `You can buy ColdStop lozenges from Veridan Delivery and take them from the "My stuff" menu.`,
     `Stay healthy! Concordia et Prosperitas.`
   ]

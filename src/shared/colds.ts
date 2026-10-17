@@ -53,10 +53,10 @@ export function coldStageAt(cold: ColdCase | undefined, slot: number): ColdStage
 
 /** What the landing says of the reader's cold at each stage that shows. */
 export const COLD_STAGE_LABELS: Readonly<Record<Exclude<ColdStage, 'incubating'>, string>> = {
-  comingDown: 'Catching a cold',
-  worst: 'Sick with a cold',
-  gettingBetter: 'Getting better',
-  cough: 'Still coughing'
+  comingDown: 'Sick',
+  worst: 'Sick',
+  gettingBetter: 'Recovering',
+  cough: 'Recovering'
 }
 
 /** Whether a stage shows: anything past incubating, the lingering cough included. */

@@ -45,6 +45,8 @@ export interface TurnSnapshot {
   preset?: Verdict
   /** The plan whose landing button this turn is, so a retry casts its attendees again. */
   planId?: string
+  /** The attendee whose reminder this plan's button answered, so a retry skips her thread too. */
+  answeredReminder?: string
   /** This turn is a Scene Creator scene's opening, so a retry sends it again. */
   created?: boolean
   /** The curveball and present this turn's scene rolled, so a retry opens on the same. */

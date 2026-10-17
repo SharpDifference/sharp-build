@@ -474,7 +474,7 @@ const SHOP_CATALOG: readonly ItemDef[] = [
     name: 'SpringMart ColdStop Lozenges',
     emoji: '💊',
     price: 20,
-    description: `Kick a cold fast with SpringMart's honey-lemon zinc lozenges, a Veridan favorite every flu season. Soothes a sore throat and shortens a cold. Take one dose daily.`,
+    description: `Kick a cold fast with SpringMart's honey-lemon zinc lozenges, a Veridan favorite every flu season. Soothes a sore throat and shortens a cold. Take two doses daily.`,
     categories: ['practical'],
     unisex: true,
     medicine: true

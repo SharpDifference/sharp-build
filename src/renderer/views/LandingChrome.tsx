@@ -97,7 +97,7 @@ export type LandingRow = SlotAction & { faceUrl?: string; word?: string; apart?:
 
 /**
  * How long a column has to be before it stops growing upward and starts scrolling. The goodbye
- * menu can be thirteen rows; an ordinary slot is never more than six.
+ * menu can be thirteen rows; an ordinary slot is never more than seven.
  */
 const LONG_ASK = 8
 
