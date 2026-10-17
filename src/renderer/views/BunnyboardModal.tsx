@@ -24,6 +24,7 @@ import {
 } from '@shared/types'
 import type { NpcFriendship } from '@shared/npcRelationships'
 import { gpaOf, gradedCourses } from '@shared/academics'
+import { sickInSlot } from '@shared/colds'
 import { globalSlotOf, jobDefForChat, shiftSlotOf } from '@shared/jobs'
 import { locationLabel, ROOM_LOCATION } from '@shared/locations'
 import { formatMoney } from '@shared/money'
@@ -31,6 +32,7 @@ import { PROFILE_PICTURE_TYPES } from '@shared/profilePicture'
 import { formatTokens } from '@shared/tallies'
 import { affectionFor, emptyFlags, relationshipTagOf } from '@shared/relationship'
 import { ConfirmModal } from '../components/ConfirmModal'
+import { promptEditable } from '../components/LlmFailureModal'
 import { TextField } from '../components/TextField'
 import { useModalShell } from '../components/useModalShell'
 import { yearLabel } from '@shared/classes'
@@ -42,15 +44,16 @@ import {
   slotHalf
 } from '../prompts/gameDate'
 import { handedBackAcedCount } from '../prompts/classProgress'
+import { isHomecomingVisit } from '../prompts/homecoming'
 import { ADD_DROP_DATE } from '../prompts/occasions'
-import { profileDescriptionOf } from '../prompts/setting'
+import { profileDescriptionOf, readerYearLine } from '../prompts/setting'
 import { isVenusChat, VENUS_EMOJI, VENUS_NAME, VENUS_TITLE } from '../prompts/venus'
 import { isBunnybotChat, BUNNYBOT_EMOJI, BUNNYBOT_NAME, BUNNYBOT_TITLE } from '../prompts/bunnybot'
 import { useBunnyboardStore, type BunnyboardTab } from '../stores/bunnyboardStore'
 import { profileUrl, useSpriteVersion } from '../stores/characterStore'
 import { postsLocationUpdate } from '../stores/feedRolls'
 import { FEED_PAGE, isFeedContact, updatesFeed, type FeedEntry } from '../stores/feedView'
-import { knownWhereabouts, type Whereabouts } from '../stores/whereabouts'
+import { awayWhereabouts, knownWhereabouts, type Whereabouts } from '../stores/whereabouts'
 import { useGameStore } from '../stores/gameStore'
 import { pickProfilePicture, removeProfilePicture } from '../stores/loop/profilePicture'
 import { useSettingsStore } from '../stores/settingsStore'
@@ -61,6 +64,8 @@ import {
   blockedThreadHidden,
   dismissFailedMessage,
   epilogueOf,
+  failedTextingCode,
+  failedTextingPrompt,
   plannedWith,
   replyFromBoss,
   retryFailedMessage,
@@ -78,6 +83,7 @@ import {
 } from '../stores/timetable'
 import { ContactPage } from './ContactPage'
 import { PhotosPage } from './PhotosPage'
+import { EditPromptModal } from './EditPromptModal'
 import { RescheduleModal } from './RescheduleModal'
 import {
   cancelLift,
@@ -544,7 +550,7 @@ function presenceOf(
   if (!placed || placed.source !== 'told' || placed.kind === 'unknown') {
     return { busy: false, text: 'Online' }
   }
-  if (placed.kind === 'away') return { busy: false, text: placed.placeLabel }
+  if (placed.kind === 'away' || placed.kind === 'sick') return { busy: false, text: placed.placeLabel }
   if (placed.kind === 'class') {
     // The class's own name, not the code the map files it under: this is a sentence about her.
     const named = placed.classCode ? useGameStore.getState().classes[placed.classCode]?.name : null
@@ -568,6 +574,7 @@ function ChatList(): JSX.Element {
   const characters = useGameStore((s) => s.characters)
   const date = useGameStore((s) => s.date)
   const time = useGameStore((s) => s.time)
+  const season = useGameStore((s) => s.calendar.season)
   const viewingCharId = useBunnyboardStore((s) => s.viewingCharId)
   const viewChar = useBunnyboardStore((s) => s.viewChar)
   const openPage = useBunnyboardStore((s) => s.openPage)
@@ -655,7 +662,7 @@ function ChatList(): JSX.Element {
                           <span className="vu-bb-stamp">
                             {last.date === date && last.time === time
                               ? 'NOW'
-                              : formatNumericGameDate(last.date)}
+                              : formatNumericGameDate(last.date, season)}
                           </span>
                         )
                       )}
@@ -695,6 +702,7 @@ function BossActions({
   const job = useGameStore((s) => s.job)
   const date = useGameStore((s) => s.date)
   const time = useGameStore((s) => s.time)
+  const readerCold = useGameStore((s) => s.readerCold)
   const sceneActive = useGameStore(sceneActiveOf)
   const epilogue = useGameStore(epilogueOf)
   const [quitting, setQuitting] = useState(false)
@@ -704,8 +712,14 @@ function BossActions({
   const live = job?.jobId === jobId ? job : null
   const slotId = globalSlotOf(date, time)
   const onShift = Boolean(live && live.shifts.includes(shiftSlotOf(shiftWeekdayOf(date), time)))
+  // A cold he really has keeps him off work already, with nothing to call in about.
+  const reallySick = sickInSlot(readerCold ?? undefined, slotId)
   const canCallIn = Boolean(
-    live && onShift && live.excusedSlot !== slotId && live.sickTextedSlot !== slotId
+    live &&
+      onShift &&
+      !reallySick &&
+      live.excusedSlot !== slotId &&
+      live.sickTextedSlot !== slotId
   )
 
   function callInSick(): void {
@@ -729,7 +743,7 @@ function BossActions({
     sendBossMessage(jobId, 'I need to quit the job.')
     void replyFromBoss(jobId, 'quit')
     // The job ends on the click, not on his answer.
-    useGameStore.getState().endJob()
+    useGameStore.getState().endJob('quit')
   }
 
   // A scene takes the buttons off, exactly as it does the ordinary composer, and the goodbye
@@ -897,7 +911,11 @@ function ConversationView({
   const character = useGameStore((s) => s.characters[charId])
   const info = useGameStore((s) => s.charInfo[charId])
   const date = useGameStore((s) => s.date)
+  const visiting = useGameStore(
+    (s) => isHomecomingVisit(s.calendar.season, s.date) && s.homecomingVisitor === charId
+  )
   const time = useGameStore((s) => s.time)
+  const season = useGameStore((s) => s.calendar.season)
   // A subscribed read, so the footer redraws the moment a rescheduled plan leaves this slot.
   const events = useGameStore((s) => s.events)
   const armed = useBunnyboardStore((s) => s.armedHangout)
@@ -921,6 +939,10 @@ function ConversationView({
   const typing = useBunnyboardStore((s) => s.typingCharIds.includes(charId))
   // Her last turn failed and is parked on Retry.
   const failed = useBunnyboardStore((s) => s.failedCharIds.includes(charId))
+  // Edit prompt stands beside Retry unless the failure is one the prompt cannot answer.
+  const editable = failed && promptEditable(failedTextingCode(charId) ?? '')
+  // The prompt editor over that failed turn.
+  const [editing, setEditing] = useState(false)
   // Her ask-out, only while it is still asking: a No dismisses it, invitation still standing.
   const pendingHangout = conversation?.pendingHangout
   const askingOut = Boolean(pendingHangout && !pendingHangout.dismissed)
@@ -932,6 +954,8 @@ function ConversationView({
   const [rescheduling, setRescheduling] = useState(false)
   // She has him blocked: readable to the end of the slot, nothing sendable.
   const blocked = useGameStore((s) => s.charInfo[charId]?.flags?.blocked === true)
+  // Retrying is sending; the composer's own reasons to be shut apply, the editor's included.
+  const retryDead = sceneActive || unavailable || blocked
 
   // Opening the thread, and any message landing while it is open, is reading it.
   useEffect(() => {
@@ -971,7 +995,12 @@ function ConversationView({
   // willing to say about her hour — never a relationship tag, which belongs on the page
   // that is about her.
   const handle = bot ? null : info?.handle
-  const placed = bot ? undefined : knownWhereabouts(date, time).find((row) => row.charId === charId)
+  // A graduate is on no map: she is out of town, but for the Homecoming she is back for.
+  const placed = bot
+    ? undefined
+    : info?.pursuing !== undefined && !visiting
+      ? awayWhereabouts(charId)
+      : knownWhereabouts(date, time).find((row) => row.charId === charId)
   // A blocked thread says nothing about where she is: the map has dropped her to what he
   // remembers, and the composer under it already says she blocked him. Neither does a screen
   // set sometime after graduation, which pins nobody to an hour.
@@ -1010,15 +1039,16 @@ function ConversationView({
         {messages.map((message, index) => {
           // A divider opens the thread and repeats whenever the slot changes.
           const previous = messages[index - 1]
-          const stamp = formatChatDivider(message.date, message.time)
-          const divider = !previous || formatChatDivider(previous.date, previous.time) !== stamp
+          const stamp = formatChatDivider(message.date, message.time, season)
+          const divider =
+            !previous || formatChatDivider(previous.date, previous.time, season) !== stamp
           return (
             <Fragment key={message.id}>
               {divider && (
                 // The same two readings `formatChatDivider` is built from, glued differently:
                 // that function stays the one thing deciding where a divider goes.
                 <div className="vu-bb-divider">
-                  <span>{formatShortGameDate(message.date)}</span>
+                  <span>{formatShortGameDate(message.date, season)}</span>
                   <span className="vu-bb-thread-dot">·</span>
                   <span>{slotHalf(message.time)}</span>
                 </div>
@@ -1076,10 +1106,21 @@ function ConversationView({
               <CancelButton id="bb-retry-dismiss" onClick={() => dismissFailedMessage(charId)}>
                 Dismiss
               </CancelButton>
+              {editable && (
+                <motion.button
+                  id="bb-retry-edit"
+                  className="vu-btn vu-btn--outline vu-btn--panel vu-paper"
+                  type="button"
+                  disabled={retryDead}
+                  {...gestures(retryDead, lift, press)}
+                  onClick={() => setEditing(true)}
+                >
+                  Edit prompt
+                </motion.button>
+              )}
               <PrimaryButton
                 id="bb-retry"
-                // Retrying is sending; the composer's own reasons to be shut apply.
-                dead={sceneActive || unavailable || blocked}
+                dead={retryDead}
                 onClick={() => void retryFailedMessage(charId)}
               >
                 Retry
@@ -1153,6 +1194,31 @@ function ConversationView({
             charId={charId}
             theme={theme}
             onClose={() => setRescheduling(false)}
+          />
+        )}
+        {/* Held to the failure still being parked and still retryable: a scene starting or a
+            leave clears the turn, and the editor goes with it. */}
+        {editing && editable && !epilogue && !retryDead && (
+          <EditPromptModal
+            key="edit-prompt"
+            id="bb-edit-prompt"
+            theme={theme}
+            hint={
+              <>
+                If the model is refusing to reply due to prohibited content, try rewording the
+                reader&apos;s newest text, the last line of RECENT MESSAGES, first. Avoid any
+                explicit sexual words, replacing them with vague descriptions.
+                <br /> If that doesn&apos;t work, start rewriting or removing words from TEXTING
+                SO FAR or the earlier RECENT MESSAGES.
+                <br /> Only what is sent changes: the thread keeps your text as you typed it.
+              </>
+            }
+            initialPrompt={failedTextingPrompt(charId) ?? ''}
+            onSubmit={(prompt) => {
+              setEditing(false)
+              void retryFailedMessage(charId, prompt)
+            }}
+            onCancel={() => setEditing(false)}
           />
         )}
       </AnimatePresence>
@@ -1251,20 +1317,28 @@ function FriendsList(): JSX.Element {
   const characters = useGameStore((s) => s.characters)
   const charInfo = useGameStore((s) => s.charInfo)
   const chars = useGameStore((s) => s.chars)
+  const alumni = useGameStore((s) => s.alumni)
   const date = useGameStore((s) => s.date)
   const time = useGameStore((s) => s.time)
+  const visitor = useGameStore((s) =>
+    isHomecomingVisit(s.calendar.season, s.date) ? s.homecomingVisitor : null
+  )
   const epilogue = useGameStore(epilogueOf)
   const openPage = useBunnyboardStore((s) => s.openPage)
 
-  // Every card's status off one reading of the map, rather than one walk of the roster apiece.
-  // None on the goodbye menu, which pins nobody to an hour.
+  // Every card's status off one reading of the map, rather than one walk of the roster apiece,
+  // and every graduate out of town but the one back for Homecoming, whom the map carries. None
+  // on the goodbye menu, which pins nobody to an hour.
+  const away = alumni.filter((charId) => charId !== visitor).map(awayWhereabouts)
   const placed = new Map(
-    epilogue ? [] : knownWhereabouts(date, time).map((row) => [row.charId, row] as const)
+    epilogue
+      ? []
+      : [...knownWhereabouts(date, time), ...away].map((row) => [row.charId, row] as const)
   )
 
-  // A blocked contact is off the list while the block stands. Closest first; a tie keeps
-  // roster order.
-  const contacts = chars
+  // A blocked contact is off the list while the block stands, a graduate kept on it. Closest
+  // first; a tie keeps roster order.
+  const contacts = [...chars, ...alumni]
     .filter(
       (charId) => charInfo[charId]?.flags?.gaveContactInfo && !charInfo[charId]?.flags?.blocked
     )
@@ -1389,11 +1463,14 @@ function ProfilePage(): JSX.Element {
   const classRecords = useGameStore((s) => s.classRecords)
   const classes = useGameStore((s) => s.classes)
   const playerSchedule = useGameStore((s) => s.playerSchedule)
-  const occasions = useGameStore((s) => s.occasions)
+  const calendar = useGameStore((s) => s.calendar)
   const date = useGameStore((s) => s.date)
   const finalsScoresShown = useGameStore((s) => s.finalsScoresShown)
   const chars = useGameStore((s) => s.chars)
+  const alumni = useGameStore((s) => s.alumni)
   const charInfo = useGameStore((s) => s.charInfo)
+  const transcript = useGameStore((s) => s.transcript)
+  const semesterIndex = useGameStore((s) => s.semesterIndex)
   const conversations = useGameStore((s) => s.bunnyboard.conversations)
   const lessNsfwText = useSettingsStore((s) => s.settings?.lessNsfwText === true)
   const fileInput = useRef<HTMLInputElement>(null)
@@ -1406,32 +1483,41 @@ function ProfilePage(): JSX.Element {
   }
 
   // One walk of the roster, the records and the threads for the whole grid, rather than one
-  // apiece: every tile below is a count of something the save is already keeping.
+  // apiece: every tile below is a count of something the save is already keeping. The girls
+  // are every semester's, graduates included, and the academics add up what earlier ones left.
   const readings = useMemo(() => {
-    let attended = 0
-    let recorded = 0
+    const everyone = [...chars, ...alumni]
+    let attended = transcript?.attended ?? 0
+    let recorded = transcript?.held ?? 0
     for (const record of Object.values(classRecords)) {
       for (const meeting of record.meetings) {
         recorded += 1
         if (meeting.attended) attended += 1
       }
     }
-    const met = chars.filter((charId) => charInfo[charId]?.flags?.hasMet).length
-    const contacts = chars.filter(
+    const met = everyone.filter((charId) => charInfo[charId]?.flags?.hasMet).length
+    const contacts = everyone.filter(
       (charId) => charInfo[charId]?.flags?.gaveContactInfo && !charInfo[charId]?.flags?.blocked
     ).length
-    const gifts = chars.reduce((total, charId) => total + (charInfo[charId]?.gifts ?? []).length, 0)
+    const gifts = everyone.reduce(
+      (total, charId) => total + (charInfo[charId]?.gifts ?? []).length,
+      0
+    )
     const texts = Object.values(conversations).reduce(
       (total, conversation) =>
         total + conversation.messages.filter((message) => message.sender === 'player').length,
       0
     )
     return [
-      { id: 'bb-tally-girls', label: 'GIRLS MET', value: `${met} / ${chars.length}` },
+      { id: 'bb-tally-girls', label: 'GIRLS MET', value: `${met} / ${everyone.length}` },
       {
         id: 'bb-tally-gpa',
         label: 'GPA',
-        value: gpaOf(classRecords, gradedCourses(playerSchedule, classes)).toFixed(2)
+        value: gpaOf(
+          classRecords,
+          gradedCourses(playerSchedule, classes),
+          transcript?.gradePoints
+        ).toFixed(2)
       },
       { id: 'bb-tally-money', label: 'MONEY EARNED', value: formatMoney(counts.moneyEarned) },
       { id: 'bb-tally-contacts', label: 'CONTACTS', value: String(contacts) },
@@ -1445,7 +1531,10 @@ function ProfilePage(): JSX.Element {
       {
         id: 'bb-tally-exams',
         label: 'EXAMS ACED',
-        value: String(handedBackAcedCount(classRecords, classes, occasions, date, finalsScoresShown))
+        value: String(
+          (transcript?.aced ?? 0) +
+            handedBackAcedCount(classRecords, classes, calendar, date, finalsScoresShown)
+        )
       },
       { id: 'bb-tally-shifts', label: 'SHIFTS WORKED', value: String(counts.shiftsWorked) },
       {
@@ -1455,6 +1544,7 @@ function ProfilePage(): JSX.Element {
       }
     ]
   }, [
+    alumni,
     charInfo,
     chars,
     classRecords,
@@ -1464,8 +1554,9 @@ function ProfilePage(): JSX.Element {
     date,
     finalsScoresShown,
     lessNsfwText,
-    occasions,
-    playerSchedule
+    calendar,
+    playerSchedule,
+    transcript
   ])
 
   return (
@@ -1536,7 +1627,7 @@ function ProfilePage(): JSX.Element {
             multiline
             rows={3}
             placeholder="Optional. Can be left blank."
-            hint="This is put in every prompt so try to keep it short and sweet. Use third-person past tense and continue this paragraph: The reader is a freshman named <Name>, a male who has a single dorm in Lowrise 4. The reader is <description based on current stats>. The reader is..."
+            hint={`This is put in every prompt so try to keep it short and sweet. Use third-person past tense and continue this paragraph: ${readerYearLine(firstName + ' ' + lastName, semesterIndex)} The reader is <description based on current stats>. The reader is...`}
           />
         </div>
 
@@ -1685,6 +1776,7 @@ const FeedPost = memo(function FeedPost({
   /** The day's own student, whose like is the slot's rather than a post on somebody's feed. */
   random?: boolean
 }): JSX.Element {
+  const season = useGameStore((s) => s.calendar.season)
   // Her page, her like and the request for her number, each addressed to the store from here
   // rather than handed down, so nothing but the post itself changes under the row.
   const open = charId ? () => useBunnyboardStore.getState().openPage(charId) : undefined
@@ -1725,7 +1817,7 @@ const FeedPost = memo(function FeedPost({
             {handle && <span>@{handle}</span>}
             {handle && <span className="vu-bb-thread-dot">·</span>}
             <span className="vu-bb-post-when">
-              {formatShortGameDate(post.date)} · {slotHalf(post.time)}
+              {formatShortGameDate(post.date, season)} · {slotHalf(post.time)}
             </span>
           </div>
         </div>
@@ -1875,6 +1967,7 @@ const FeedPage = memo(function FeedPage({
 /** The feed: every contact's posts, plus the things the day surfaces from outside that list. */
 function UpdatesFeed(): JSX.Element {
   const chars = useGameStore((s) => s.chars)
+  const alumni = useGameStore((s) => s.alumni)
   const characters = useGameStore((s) => s.characters)
   const charInfo = useGameStore((s) => s.charInfo)
   const feedExtras = useGameStore((s) => s.feedExtras)
@@ -1885,7 +1978,7 @@ function UpdatesFeed(): JSX.Element {
   const epilogue = useGameStore(epilogueOf)
   // The layered read behind a check-in goes to the store itself, so the three things it can
   // move a girl by are selected here to redraw the feed when one of them does.
-  const occasions = useGameStore((s) => s.occasions)
+  const calendar = useGameStore((s) => s.calendar)
   const springBreakAway = useGameStore((s) => s.springBreakAway)
   const npcOverlay = useGameStore((s) => s.npcOverlay)
 
@@ -1918,8 +2011,9 @@ function UpdatesFeed(): JSX.Element {
       }
       return [{ charId, name: character.firstName, label: locationLabel(location as string) }]
     })
+    // Graduates post on, but check in nowhere he could find them.
     return updatesFeed({
-      chars,
+      chars: [...chars, ...alumni],
       characters,
       charInfo,
       npcFriendships,
@@ -1929,6 +2023,7 @@ function UpdatesFeed(): JSX.Element {
       time
     })
   }, [
+    alumni,
     chars,
     characters,
     charInfo,
@@ -1937,7 +2032,7 @@ function UpdatesFeed(): JSX.Element {
     date,
     time,
     epilogue,
-    occasions,
+    calendar,
     springBreakAway,
     npcOverlay
   ])

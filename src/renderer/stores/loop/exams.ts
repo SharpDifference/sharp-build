@@ -37,7 +37,7 @@ function skippedNow(code: string): number {
   const game = useGameStore.getState()
   const entry = game.classes[code]
   if (!entry) return 0
-  return skippedFactMeetings(entry, game.date, game.classRecords[code], game.occasions)
+  return skippedFactMeetings(entry, game.date, game.classRecords[code], game.calendar)
 }
 
 /** Opens an exam in place of a scene. */
