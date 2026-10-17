@@ -1,5 +1,6 @@
 import { fewestWith, listed, settledOptions, type MiniGameDef } from '@shared/minigames'
 import type { StructuredRequest } from '@shared/types'
+import { hereLine } from './place'
 
 /** How a proposed game rides on a scene request, and how her answer is read off the reply. */
 
@@ -22,7 +23,9 @@ export interface Asked {
 export function withProposal(
   request: StructuredRequest,
   game: MiniGameDef,
-  asked: readonly Asked[]
+  asked: readonly Asked[],
+  /** Where the scene is, so the game is played there; null where it cannot be told. */
+  place: string | null = null
 ): StructuredRequest {
   const schema = request.schema.schema as {
     required?: string[]
@@ -84,6 +87,7 @@ export function withProposal(
       '',
       'MINI-GAME',
       `The reader has just asked ${name} to play ${game.name}: ${game.blurb}.`,
+      ...hereLine(place).map((line) => line.replace('Every game listed is', 'It is')),
       `How it is played: ${game.format}`,
       ...(options.length > 0
         ? [

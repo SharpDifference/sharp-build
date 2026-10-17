@@ -6,6 +6,7 @@ import {
   type SuggestRate
 } from '@shared/minigames'
 import { charKeyOf, type Character, type StructuredRequest } from '@shared/types'
+import { hereLine } from './place'
 
 /**
  * The standing offer: on every turn of a scene where a game can be played with a girl, the model
@@ -133,6 +134,7 @@ export function withOffer(
       '',
       'MINI-GAMES',
       'These games are real here. They are played at a table the reader actually plays at, by their own rules, and you are told afterwards how they went. Never play one out in your lines: do not deal, turn a card, take a shot or say who wins.',
+      ...hereLine(location),
       ...described,
       'A girl suggests a game only as its note above allows, only when it suits her and the moment, and in her own words. When she does, your lines end on her asking, so the reader can answer.',
       `THE "${FIELD}" FIELD`,
