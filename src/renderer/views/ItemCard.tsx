@@ -22,6 +22,8 @@ export interface ItemCardProps {
   word: string
   /** **Absent says the card offers nothing**, which is what a shelf read without a turn is. */
   onAnswer?: () => void
+  /** The answer is drawn but cannot be pressed now. */
+  dead?: boolean
   /** The shop's second step: this is the card being asked about, so the foot is the question. */
   asking?: boolean
   onCancel?: () => void
@@ -34,6 +36,7 @@ export function ItemCard({
   from,
   word,
   onAnswer,
+  dead = false,
   asking = false,
   onCancel,
   onConfirm
@@ -109,7 +112,8 @@ export function ItemCard({
                   <motion.button
                     className="vu-btn vu-btn--primary vu-paper vu-item-btn"
                     type="button"
-                    {...gestures(false, chipLift, chipPress)}
+                    disabled={dead}
+                    {...gestures(dead, chipLift, chipPress)}
                     onClick={onAnswer}
                   >
                     {word}

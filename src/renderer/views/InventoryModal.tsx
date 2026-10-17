@@ -8,7 +8,7 @@ import { useMemo, type JSX } from 'react'
 import { createPortal } from 'react-dom'
 import { motion } from 'motion/react'
 
-import { canDose } from '@shared/colds'
+import { canDose, coldStageAt, isSymptomatic } from '@shared/colds'
 import { globalSlotOf } from '@shared/jobs'
 import { itemDefOf, type ItemPick } from '@shared/shop'
 import { useModalShell } from '../components/useModalShell'
@@ -44,18 +44,20 @@ export function InventoryModal({
   const characters = useGameStore((s) => s.characters)
   const charInfo = useGameStore((s) => s.charInfo)
   const season = useGameStore((s) => s.calendar.season)
-  // A dose is his to take while his cold shows and he has had none this slot — never while a
-  // scene's ending is being paid for, which has already written the next slot's opening, nor on
-  // a replay, the goodbye menu or a created scene, none of which keeps the slot it is in.
-  const canDoseNow = useGameStore(
-    (s) =>
-      !s.sceneEnding &&
-      !s.endingInFlight &&
-      s.replaying === null &&
-      s.createdScene === null &&
-      !epilogueOf(s) &&
-      canDose(s.readerCold ?? undefined, globalSlotOf(s.date, s.time))
-  )
+  // A dose's Use is live while his cold shows and he has had none this slot, and dead through the
+  // rest of a slot he has had one in while it still shows. It is absent with no cold showing, and
+  // while a scene's ending is being paid for, which has already written the next slot's opening,
+  // or on a replay, the goodbye menu or a created scene, none of which keeps the slot it is in.
+  const dosing = useGameStore((s): 'live' | 'dead' | null => {
+    if (s.sceneEnding || s.endingInFlight || s.replaying !== null || s.createdScene !== null) {
+      return null
+    }
+    if (epilogueOf(s)) return null
+    const cold = s.readerCold ?? undefined
+    const slot = globalSlotOf(s.date, s.time)
+    if (canDose(cold, slot)) return 'live'
+    return isSymptomatic(coldStageAt(cold, slot)) ? 'dead' : null
+  })
   const { host, overlayProps } = useModalShell(onClose)
 
   // An item id the catalog does not know is dropped: the def owns everything a card shows. A
@@ -121,14 +123,15 @@ export function InventoryModal({
                   from={fromLine}
                   word={gifting ? 'Gift' : 'Use'}
                   // In gift mode every card is a gift; looking at what he has, only a dose of
-                  // medicine he can take now offers anything.
+                  // medicine offers anything, dead once he has had one this slot.
                   onAnswer={
                     gifting
                       ? onGift && (() => onGift(pick))
-                      : item.medicine && canDoseNow
+                      : item.medicine && dosing !== null
                         ? () => useGameStore.getState().takeMedicine(pick)
                         : undefined
                   }
+                  dead={!gifting && dosing === 'dead'}
                 />
               ))}
             </motion.div>
