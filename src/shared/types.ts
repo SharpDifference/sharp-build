@@ -2064,6 +2064,8 @@ export type EnrollmentDraft = QuickstartBundle & {
   exCharacterDynamics?: import('./characterDynamics').CharacterDynamics
   /** The setup switch is fixed once this enrollment starts, even when choices are empty. */
   exCharacterDynamicsEnabled?: boolean
+  /** Accepted Echo setup, retained if the next semester's opening save needs a retry. */
+  exEcho?: EchoState
   playerFirstName: string
   playerLastName: string
   stats: PlayerStats
