@@ -878,6 +878,15 @@ function deliverAwayNotice(charId: string): void {
   )
 }
 
+/** What a Yes says and settles: her ask answered with "Sure", and none of it held against him. */
+function sayYes(charId: string): void {
+  const game = useGameStore.getState()
+  game.setPendingHangout(charId, null)
+  game.setIgnoredInvitation(charId, false)
+  game.resetDeclined(charId)
+  game.appendChatMessage(charId, chatMessage('player', 'Sure'), 0)
+}
+
 /** The Yes/No footer under her pending ask-out. */
 export function answerHangout(charId: string, yes: boolean): void {
   const game = useGameStore.getState()
@@ -885,10 +894,7 @@ export function answerHangout(charId: string, yes: boolean): void {
   if (!pending) return
 
   if (yes) {
-    game.setPendingHangout(charId, null)
-    game.setIgnoredInvitation(charId, false)
-    game.resetDeclined(charId)
-    game.appendChatMessage(charId, chatMessage('player', 'Sure'), 0)
+    sayYes(charId)
     // An invitation raised before she left and accepted after it.
     if (charAwayNow(charId)) {
       deliverAwayNotice(charId)
@@ -901,6 +907,22 @@ export function answerHangout(charId: string, yes: boolean): void {
 
   // No writes nothing back: the footer comes down and the invitation stands underneath.
   game.setPendingHangout(charId, { ...pending, dismissed: true })
+}
+
+/**
+ * A plan begun from the landing, answering the reminder each of `charIds` still has standing —
+ * one put away with No too — as her Yes would, read and with no reply asked for. Returns whose
+ * reminders it answered.
+ */
+export function answerPlanReminders(charIds: readonly string[]): string[] {
+  const answered = charIds.filter(
+    (charId) => useGameStore.getState().bunnyboard.conversations[charId]?.pendingHangout
+  )
+  for (const charId of answered) {
+    sayYes(charId)
+    useGameStore.getState().markConversationRead(charId)
+  }
+  return answered
 }
 
 /**
