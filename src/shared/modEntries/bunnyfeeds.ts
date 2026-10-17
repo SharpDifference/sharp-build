@@ -10,6 +10,14 @@ const mod: ModDef = {
   defaultOn: false,
   blurb:
     "Comment on your contacts' posts and reply in their threads. The poster answers you in her own voice, her friends and other students join in, and she remembers what you said. Roster girls also comment on each other's posts. Uses one extra AI call each time you close the phone after commenting, roughly 2,000 to 4,000 tokens; browsing costs nothing. Works on its own; with Photo Feature on too, photo posts get comments the same way.",
+  options: [
+    {
+      id: 'announce',
+      label: 'Announce feed memories',
+      hint: 'Off, the closing no longer says what she made of your comments; she still remembers it.',
+      default: true
+    }
+  ],
   offNote:
     'Off, you cannot comment and posts show only Photo Feature\'s plain comments, if it is on. Threads and what she remembered are kept, and come back when it is on again.'
 }
