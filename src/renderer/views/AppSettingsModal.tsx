@@ -812,17 +812,20 @@ export function AppSettingsModal({ theme, onClose }: AppSettingsModalProps): JSX
                       ))}
                     </div>
 
+                    {/* In a row of its own, as the backup buttons are, so it sizes to its words. */}
                     {customSoundtracks && (
-                      <motion.button
-                        id="settings-soundtracks"
-                        className="vu-pill"
-                        type="button"
-                        disabled={backingUp || restoring}
-                        {...gestures(backingUp || restoring, quietLift, quietPress)}
-                        onClick={() => setSoundtracks(true)}
-                      >
-                        Custom soundtracks
-                      </motion.button>
+                      <div className="vu-settings-data-actions">
+                        <motion.button
+                          id="settings-soundtracks"
+                          className="vu-pill"
+                          type="button"
+                          disabled={backingUp || restoring}
+                          {...gestures(backingUp || restoring, quietLift, quietPress)}
+                          onClick={() => setSoundtracks(true)}
+                        >
+                          Custom soundtracks
+                        </motion.button>
+                      </div>
                     )}
                   </>
                 )}
