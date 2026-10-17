@@ -203,7 +203,8 @@ const api: VenusUniversityApi = {
     stop: () => ipcRenderer.invoke('comfy:stop'),
     listLocalModels: () => ipcRenderer.invoke('comfy:listLocalModels'),
     probe: (url) => ipcRenderer.invoke('comfy:probe', url),
-    openModelFolder: (role, url) => ipcRenderer.invoke('comfy:openModelFolder', role, url),
+    openModelFolder: (role, url, pick) =>
+      ipcRenderer.invoke('comfy:openModelFolder', role, url, pick),
     onState: (listener) => {
       const wrapped = (_event: unknown, status: Parameters<typeof listener>[0]): void =>
         listener(status)

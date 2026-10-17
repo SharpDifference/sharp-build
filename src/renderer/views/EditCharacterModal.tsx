@@ -1821,7 +1821,7 @@ export function EditCharacterModal({
             id="edit-reset-confirm"
             theme={theme}
             title="Reset to default?"
-            message={`${fullNameOf(character) || 'This character'}'s edits and all generated sprites will be permanently deleted, and she will go back to how the game ships her.`}
+            message={`${fullNameOf(character) || 'This character'}'s edits and all generated sprites will be permanently deleted.`}
             confirmText="Reset"
             busy={resetting}
             busyText="Resetting…"

@@ -2,7 +2,7 @@ import { spawn, type ChildProcess } from 'child_process'
 import { randomUUID } from 'crypto'
 import { closeSync, openSync } from 'fs'
 import { mkdir, readdir, readFile, rename, rm, stat, writeFile } from 'fs/promises'
-import { dirname, extname, join, relative } from 'path'
+import { basename, dirname, extname, join, relative } from 'path'
 import {
   buildBasePrompt,
   buildCgPrompt,
@@ -29,6 +29,7 @@ import {
   type ComfyModelLists,
   type ComfyModelPicks,
   type ComfyModelRole,
+  type ComfyModelSlot,
   type ComfyProbe,
   type ComfySource
 } from '@shared/comfyModels'
@@ -1829,15 +1830,14 @@ async function isDirectory(path: string): Promise<boolean> {
 }
 
 /**
- * The folder on this machine a player's own server keeps each slot's models in, or null where it
- * keeps none here: asked of `/internal/folder_paths`, and only where the server is this machine.
- * The paths themselves never leave main: they are neither logged nor answered to the renderer.
+ * The folders on this machine a player's own server keeps each slot's models in, in the server's
+ * order, none where it keeps none here: asked of `/internal/folder_paths`, and only where the
+ * server is this machine. The paths themselves never leave main: they are neither logged nor
+ * answered to the renderer.
  */
-async function externalModelFolders(
-  baseUrl: string
-): Promise<Record<ComfyModelRole, string | null>> {
-  const folders = {} as Record<ComfyModelRole, string | null>
-  for (const slot of COMFY_MODEL_SLOTS) folders[slot.role] = null
+async function externalModelFolders(baseUrl: string): Promise<Record<ComfyModelRole, string[]>> {
+  const folders = {} as Record<ComfyModelRole, string[]>
+  for (const slot of COMFY_MODEL_SLOTS) folders[slot.role] = []
   if (!isLoopbackUrl(baseUrl)) return folders
 
   let listed: Record<string, unknown>
@@ -1855,13 +1855,37 @@ async function externalModelFolders(
     const paths = listed[slot.folderKey]
     if (!Array.isArray(paths)) continue
     for (const path of paths) {
-      if (isLocalDrivePath(path) && (await isDirectory(path))) {
-        folders[slot.role] = path
-        break
-      }
+      if (isLocalDrivePath(path) && (await isDirectory(path))) folders[slot.role].push(path)
     }
   }
   return folders
+}
+
+/**
+ * Which of a slot's folders on a player's own server to open: the first holding the file the
+ * player sees picked, else the first holding any model, else the first named as the slot's own
+ * folder is, else the first. The pick is only compared against what the folders hold.
+ */
+async function folderHoldingModels(
+  slot: ComfyModelSlot,
+  folders: readonly string[],
+  pick: string | undefined
+): Promise<string> {
+  const slash = (path: string): string => path.replace(/\\/g, '/')
+  const wanted =
+    pick !== undefined && pick.startsWith(slot.prefix) && pick.length > slot.prefix.length
+      ? slash(pick.slice(slot.prefix.length))
+      : null
+  const listings: string[][] = []
+  for (const folder of folders) {
+    const names = (await listModelFolder(folder)).map(slash)
+    if (wanted !== null && names.includes(wanted)) return folder
+    listings.push(names)
+  }
+  const stocked = folders.find((_, i) => listings[i].length > 0)
+  if (stocked !== undefined) return stocked
+  const own = basename(MANAGED_MODEL_DIRS[slot.role][0]).toLowerCase()
+  return folders.find((folder) => basename(folder).toLowerCase() === own) ?? folders[0]
 }
 
 /**
@@ -1890,7 +1914,7 @@ export async function probe(url: string): Promise<ComfyProbe> {
   const objectInfo = await fetchObjectInfo(url)
   const located = await externalModelFolders(url)
   const folders = {} as Record<ComfyModelRole, boolean>
-  for (const slot of COMFY_MODEL_SLOTS) folders[slot.role] = located[slot.role] !== null
+  for (const slot of COMFY_MODEL_SLOTS) folders[slot.role] = located[slot.role].length > 0
   return {
     version,
     missingNodes: groupMissingNodes(await missingClasses(objectInfo)),
@@ -1901,11 +1925,16 @@ export async function probe(url: string): Promise<ComfyProbe> {
 
 /**
  * The folder one slot's models are dropped into: the app's own install's, created where the
- * portable build ships without it, or the one a player's own server at `url` keeps on this
- * machine — asked again here, never taken from the renderer.
+ * portable build ships without it, or the one of a player's own server at `url` that holds the
+ * slot's models, `pick` among them first — asked again here, never taken from the renderer.
  */
-export async function modelFolderOf(role: ComfyModelRole, url: string | null): Promise<string> {
-  if (!COMFY_MODEL_SLOTS.some((slot) => slot.role === role)) {
+export async function modelFolderOf(
+  role: ComfyModelRole,
+  url: string | null,
+  pick?: string
+): Promise<string> {
+  const slot = COMFY_MODEL_SLOTS.find((s) => s.role === role)
+  if (!slot) {
     throw appError('MODEL_UNKNOWN', 'That is not one of the model slots.', String(role))
   }
   if (url === null) {
@@ -1914,13 +1943,13 @@ export async function modelFolderOf(role: ComfyModelRole, url: string | null): P
     return dir
   }
   assertComfyUrl(url)
-  const folder = (await externalModelFolders(url))[role]
-  if (folder === null) {
+  const folders = (await externalModelFolders(url))[role]
+  if (folders.length === 0) {
     throw appError(
       'OPEN_FOLDER_FAILED',
       'Could not find that model folder on this computer.',
       `ComfyUI at ${redactUrl(url)} named no folder here for ${role}.`
     )
   }
-  return folder
+  return folderHoldingModels(slot, folders, pick)
 }
