@@ -1,6 +1,7 @@
 import { useCallback, useRef, useState, type JSX } from 'react'
 import { createPortal } from 'react-dom'
 import { AnimatePresence, motion } from 'motion/react'
+import { LAST_SEMESTER } from '@shared/semesters'
 import { READER_SPEAKER } from '@shared/types'
 import { CheckField } from '../components/CheckField'
 import { ConfirmModal } from '../components/ConfirmModal'
@@ -9,7 +10,7 @@ import { TitleTab } from '../components/TitleTab'
 import { useFitToText } from '../components/useFitToText'
 import { graduationScrollLines, isEpilogueNight } from '../prompts/graduation'
 import { rewriteLine, speakerNameOf } from '../stores/gameLoop'
-import { seniorNames } from '../stores/loop/farewells'
+import { graduatingNames } from '../stores/loop/farewells'
 import { interjectOfferOf } from '../stores/loop/playback'
 import { useGameStore } from '../stores/gameStore'
 import { useSettingsStore } from '../stores/settingsStore'
@@ -40,6 +41,8 @@ export function ChatLogModal({ theme, onClose }: ChatLogModalProps): JSX.Element
   const farewellLog = useGameStore((s) => s.farewellLog)
   const date = useGameStore((s) => s.date)
   const time = useGameStore((s) => s.time)
+  const season = useGameStore((s) => s.calendar.season)
+  const semesterIndex = useGameStore((s) => s.semesterIndex)
   const graduationSeen = useGameStore((s) => s.graduationSeen)
   const sceneEnding = useGameStore((s) => s.sceneEnding)
   // A created scene keeps no books, so an edit during its ending costs nothing worth a warning.
@@ -75,7 +78,7 @@ export function ChatLogModal({ theme, onClose }: ChatLogModalProps): JSX.Element
   const visible = menu
     ? farewellLog.length > 0
       ? farewellLog
-      : graduationScrollLines(seniorNames())
+      : graduationScrollLines(graduatingNames(), season, semesterIndex === LAST_SEMESTER)
     : sceneLog.slice(start)
   /** Each row with its own place in `sceneLog`; a replay passes the reader's own over, as it plays. */
   const rows = visible
