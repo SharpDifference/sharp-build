@@ -63,7 +63,8 @@ describe('spirit accounting',()=>{
     const lines=[{speaker:READER_SPEAKER,text:'Hello'},...sceneLines('One','Two')]
     useGameStore.setState({awaitingInput:false,busy:true,streaming:true,currentSceneTranscript:lines,pendingLines:[lines[2]]})
     expect(canBreakthrough(game(),'a')).toBe(true)
-    useGameStore.setState({sceneClass:'ART101'})
+    // A lecture in session holds the reply shut; since 0.5.0 a project class and PE do not.
+    useGameStore.setState({sceneClass:'ART101',classes:{ART101:{category:'art',kind:'lecture'} as never}})
     expect(canBreakthrough(game(),'a')).toBe(false)
     useGameStore.setState({sceneClass:null,departed:['a']})
     expect(canBreakthrough(game(),'a')).toBe(false)
