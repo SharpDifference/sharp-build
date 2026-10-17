@@ -288,6 +288,22 @@ export function takeGo(pile: readonly Toy[], stop: Stop, rand: () => number): Go
   return { ...base, kind: 'miss', aimed, off: aimed ? offOf(aimed) : 0, pile: [...pile] }
 }
 
+/**
+ * The toy a drop at `stop` would close on, as {@link takeGo} decides it: the free toy whose
+ * middle is nearest, within its reach, or failing that one held down under another; null where
+ * the claw would come up empty or only knock something. What the cabinet lights up while he steers.
+ */
+export function aimOf(pile: readonly Toy[], stop: Stop): Toy | null {
+  const offOf = (toy: Toy): number => apart(toy, stop) / reachOf(toy)
+  const nearest = (toys: readonly Toy[]): Toy | null =>
+    toys.reduce<Toy | null>((best, toy) => (!best || offOf(toy) < offOf(best) ? toy : best), null)
+  const inReach = pile.filter((toy) => offOf(toy) <= 1)
+  return (
+    nearest(inReach.filter((toy) => !pinnedBy(pile, toy))) ??
+    nearest(inReach.filter((toy) => pinnedBy(pile, toy)))
+  )
+}
+
 /** What the goes so far have won, in the order they came out of the chute. */
 export function wonIn(goes: readonly Go[]): Toy[] {
   return goes.flatMap((go) => (go.kind === 'catch' && go.aimed ? [go.aimed] : []))

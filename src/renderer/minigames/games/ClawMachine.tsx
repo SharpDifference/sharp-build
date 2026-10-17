@@ -7,6 +7,7 @@ import {
   LIMIT,
   WIDTH,
   accountOf,
+  aimOf,
   carryPoint,
   choicesOf,
   cueOf,
@@ -69,7 +70,12 @@ const BRISK = 5
 
 /** The cabinet from the front, as it is drawn: deeper is higher up the floor and smaller. */
 const FRONT = { width: WIDTH, height: 72, floor: 66 } as const
-const floorY = (z: number): number => FRONT.floor - z * 0.3
+/**
+ * How far up the front a deeper spot on the floor is drawn. Steep enough that a toy at the back
+ * shows over the ones in front of it: the grab is decided on the floor plan, so what is behind
+ * has to be seen.
+ */
+const floorY = (z: number): number => FRONT.floor - z * 0.55
 const scaleAt = (z: number): number => 1 - (0.3 * z) / DEPTH
 const railY = (z: number): number => 9 - z * 0.08
 /** How far under the claw's hub a toy hangs, and how low a toy's middle lies off the floor. */
@@ -293,6 +299,12 @@ export function ClawMachine({ play }: { play: GamePlay }): JSX.Element {
   const cable = useRef<SVGLineElement>(null)
   const rail = useRef<SVGLineElement>(null)
   const shadow = useRef<SVGEllipseElement>(null)
+  // The spot on the floor the claw is over, drawn over the toys, and the line down to it.
+  const mark = useRef<SVGEllipseElement>(null)
+  const plumb = useRef<SVGLineElement>(null)
+  // Each toy as drawn in both views, by id, so the one the claw would take can be lit up.
+  const toyFront = useRef(new Map<string, SVGGElement>())
+  const toyTop = useRef(new Map<string, SVGGElement>())
   const clawTop = useRef<SVGGElement>(null)
   const heldFront = useRef<SVGGElement>(null)
   const heldTop = useRef<SVGGElement>(null)
@@ -578,6 +590,24 @@ export function ClawMachine({ play }: { play: GamePlay }): JSX.Element {
       shadow.current?.setAttribute('rx', String(4.4 * scale * (1.25 - 0.45 * (1 - at.up))))
       shadow.current?.setAttribute('ry', String(1.3 * scale * (1.25 - 0.45 * (1 - at.up))))
       clawTop.current?.setAttribute('transform', `translate(${at.x} ${DEPTH - at.z})`)
+      // While he steers, the spot under the claw is marked over the pile, and, where the aid is
+      // on, the toy it would close on is lit in both views.
+      const steering = live.phase !== 'drop' && live.phase !== 'over' && live.phase !== 'picking'
+      const clawY = railY(at.z) + 7 * scale
+      mark.current?.setAttribute('cx', String(at.x))
+      mark.current?.setAttribute('cy', String(floorY(at.z)))
+      mark.current?.setAttribute('rx', String(4.4 * scale))
+      mark.current?.setAttribute('ry', String(1.3 * scale))
+      mark.current?.toggleAttribute('data-hidden', !steering)
+      plumb.current?.setAttribute('x1', String(at.x))
+      plumb.current?.setAttribute('x2', String(at.x))
+      plumb.current?.setAttribute('y1', String(clawY + 6 * scale))
+      plumb.current?.setAttribute('y2', String(floorY(at.z)))
+      plumb.current?.toggleAttribute('data-hidden', !steering)
+      const aim = steering && latest.current.aids.target ? aimOf(live.pile, at) : null
+      for (const views of [toyFront.current, toyTop.current]) {
+        for (const [id, element] of views) element.toggleAttribute('data-aimed', id === aim?.id)
+      }
       const shown = toy ?? pushed
       if (shown && kept) {
         heldFront.current?.setAttribute(
@@ -709,6 +739,10 @@ export function ClawMachine({ play }: { play: GamePlay }): JSX.Element {
           .map((toy) => (
             <g
               key={toy.id}
+              ref={(element) => {
+                if (element) toyFront.current.set(toy.id, element)
+                else toyFront.current.delete(toy.id)
+              }}
               className={toyClass(toy)}
               transform={`translate(${toy.x} ${restY(toy, toy.z)}) scale(${toy.size * scaleAt(toy.z)})`}
             >
@@ -738,6 +772,9 @@ export function ClawMachine({ play }: { play: GamePlay }): JSX.Element {
             </g>
           )
         })}
+        {/* Where the claw would come down, over the pile so a toy in front never hides it. */}
+        <line ref={plumb} className="vu-claw-plumb" x1={HOME.x} x2={HOME.x} y1={railY(0) + 13} y2={floorY(0)} />
+        <ellipse ref={mark} className="vu-claw-mark" cx={HOME.x} cy={floorY(0)} rx="4.4" ry="1.3" />
         <line ref={rail} className="vu-claw-rail" x1="1" x2="99" y1={railY(0)} y2={railY(0)} />
         <line ref={cable} className="vu-claw-cable" x1={HOME.x} x2={HOME.x} y1={railY(0)} y2={railY(0) + 7} />
         <g ref={clawFront} className="vu-claw-claw" transform={`translate(${HOME.x} ${railY(0) + 7})`}>
@@ -761,6 +798,10 @@ export function ClawMachine({ play }: { play: GamePlay }): JSX.Element {
             {fromAbove.map((toy) => (
               <g
                 key={toy.id}
+                ref={(element) => {
+                  if (element) toyTop.current.set(toy.id, element)
+                  else toyTop.current.delete(toy.id)
+                }}
                 className={toyClass(toy)}
                 transform={`translate(${toy.x} ${DEPTH - toy.z}) scale(${toy.size})`}
               >

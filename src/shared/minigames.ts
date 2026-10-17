@@ -134,6 +134,12 @@ export interface MiniGameDef {
    * have it the other way on the game's page.
    */
   playByPlay?: boolean
+  /**
+   * Help the game can give the reader that he may turn off on its page: a target lit up, a line
+   * drawn. Each is on or off as the game has it until he says otherwise; the game reads it off
+   * {@link GamePlay.aids} while it is played.
+   */
+  aids?: readonly GameAid[]
   /** How it is played, for the player: the keys or the pointer, in a sentence. Shown on its page. */
   controls?: string
   /** What makes someone good at it, in a sentence, for judging how well a girl plays. */
@@ -276,6 +282,22 @@ export function gamesNamed(games: readonly MiniGameDef[], action: string): MiniG
   )
 }
 
+/** One piece of help a game gives, on or off. */
+export interface GameAid {
+  id: string
+  /** Its name on the game's page. */
+  label: string
+  /** What it does, in a sentence, under its name. */
+  describe: string
+  /** Whether it is on until the player says otherwise. */
+  on: boolean
+}
+
+/** Which of a game's aids are on, by id: the game's own word, or the player's where he gave one. */
+export function aidsOf(game: MiniGameDef): Record<string, boolean> {
+  return Object.fromEntries((game.aids ?? []).map((aid) => [aid.id, aid.on]))
+}
+
 /** What a player has set for one game on its page: his own usual options, and how often it comes up. */
 export interface GamePrefs {
   /** The value he would rather an option started at, by option id. */
@@ -286,6 +308,8 @@ export interface GamePrefs {
   stepped?: boolean
   /** Whether its moves are narrated in the dialogue box, in place of its usual way. */
   playByPlay?: boolean
+  /** Which of its aids he has turned on or off, by id, in place of how the game has them. */
+  aids?: Readonly<Record<string, boolean>>
 }
 
 /**
@@ -307,7 +331,14 @@ export function tuned(game: MiniGameDef, prefs: GamePrefs | undefined): MiniGame
     ...(prefs.stepped !== undefined && game.stepped !== undefined
       ? { stepped: prefs.stepped }
       : {}),
-    ...(prefs.playByPlay !== undefined ? { playByPlay: prefs.playByPlay } : {})
+    ...(prefs.playByPlay !== undefined ? { playByPlay: prefs.playByPlay } : {}),
+    ...(game.aids && prefs.aids
+      ? {
+          aids: game.aids.map((aid) =>
+            typeof prefs.aids?.[aid.id] === 'boolean' ? { ...aid, on: prefs.aids[aid.id] } : aid
+          )
+        }
+      : {})
   }
 }
 

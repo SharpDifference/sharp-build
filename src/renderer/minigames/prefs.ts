@@ -33,6 +33,7 @@ export const usePrefsStore = create<PrefsState>((set) => ({
         !prefs.suggest &&
         prefs.stepped === undefined &&
         prefs.playByPlay === undefined &&
+        Object.keys(prefs.aids ?? {}).length === 0 &&
         Object.keys(prefs.options ?? {}).length === 0
       if (empty) delete byGame[gameId]
       else byGame[gameId] = prefs
