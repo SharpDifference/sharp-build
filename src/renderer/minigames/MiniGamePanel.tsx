@@ -59,6 +59,7 @@ import {
 import { noteFault } from './faults'
 import { GameGuard } from './GameGuard'
 import { ReportButton } from './ReportButton'
+import { useScenePlace } from './place'
 import '../vu_styles/MiniGames.css'
 
 /** One thing the table can be opened for: a game alone, or one a girl or several are asked to play. */
@@ -119,7 +120,7 @@ export function MiniGamePanel({ theme, onClose }: ScenePanelProps): JSX.Element 
   const quiet = useModOption(MINI_GAMES, CHAT_OPTIONS.quiet)
   const lots = useModOption(MINI_GAMES, CHAT_OPTIONS.lots)
   const chattiness: Chattiness = quiet ? 'quiet' : lots ? 'lots' : 'some'
-  const location = useGameStore((s) => s.sceneLocation ?? null)
+  const location = useScenePlace()
   // Who is standing where on the stage: left, middle, right.
   const slots = useGameStore((s) => s.slots)
   // The game she agreed to, taken off the table's own state as the panel opens on it.
