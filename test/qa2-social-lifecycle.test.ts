@@ -134,7 +134,7 @@ describe('QA2 background Hare & Quill reply lifecycle', () => {
     const save = { ...game().toGameSave(), playthroughId: 'qa-social', saveId: 'graduated', saveDate: 0 } as GameSave
     expect(save.charInfo.a.nameKnown).toBe(true)
     const carried = carryModFields(save, { term: 0, back: 120, characters: game().characters }).exVenusWhisper!
-    const after = { ...game(), date: 0, termIndex: 1, chars: [], characters: {}, charInfo: {}, exVenusWhisper: carried }
+    const after = { ...game(), date: 0, semesterIndex: 1, chars: [], characters: {}, charInfo: {}, exVenusWhisper: carried }
     expect(whisperPeople(after).map(p => p.id)).toContain('a')
   })
 })

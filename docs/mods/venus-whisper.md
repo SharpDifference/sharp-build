@@ -33,6 +33,9 @@ character profiles, Bunnyboard Updates, and Meanwhile's spectator conversations.
   unanswered comment. A successful batch is not generated twice.
 - Weekly discussions stay open until the following Wednesday (or the semester ends).
   Older issues remain readable archives. Existing daily editions keep their old two-day window.
+- In 0.5.0, editions, witness observations and private discoveries use the native semester index.
+  A new semester can publish its own Wednesday issues even when an earlier semester has the
+  same day number. Previous-semester issues remain archived rather than reopening for comments.
 - **Delete issue**, followed by **Confirm delete issue**, deletes that issue and discussion
   from the active save. It will not be generated again that week. Earlier game saves retain
   their own copies, following the normal save/rewind rules.

@@ -2,7 +2,7 @@
 
 Echoes gives the reader and each student a named symbolic creature and one of 22 original aspects. Matching aspects increase new positive relationship progress by 25%; competing aspects reduce it by 25%. Existing memories and negative gains are unchanged. Aspect assignment is a local profile-cue classifier, not an AI personality assessment. Ability prices and narrative effects remain experimental.
 
-Echo ships off by default (version 0.14.1). Enable it explicitly in Mods; saved switch choices are not reset.
+Echo ships off by default (version 0.14.2). Enable it explicitly in Mods; saved switch choices are not reset.
 
 ## Setup and customization
 
@@ -30,7 +30,9 @@ Generation reserves its cancellable job before reading settings, on desktop and 
 
 Whole-game backups include all retained finished Echo artwork, including images used by historical saves. There is no separate 4,096-image manifest cutoff; combined collections can be exported and restored subject to the existing whole-archive import limits (16,384 entries, 8 GiB) and per-image validation. This change does not delete old images or recovery originals. Recovery originals remain local and outside backups.
 
-The optional local workflow uses ComfyUI with novaAnimeXL_ilV190.safetensors and Megaten_Style.safetensors. Set up local artwork → Install local art models explicitly downloads missing originals (about 6.9 GB and 218 MB), checks pinned sizes and hashes, reuses matching files and refuses to overwrite a different version. Downloads can be cancelled; manual installation remains available. LoRA strength is 0.7 with the workflow's SDXL encoder configuration. Weights are not bundled in Git. See the [separate asset notices](echo-asset-licenses.md).
+The optional local workflow uses the ComfyUI server and checkpoint selected in Settings, plus Megaten_Style.safetensors on that server. It supports both game-managed ComfyUI and the player's external server in 0.5.0. Choose an SDXL checkpoint compatible with the LoRA; Nova Anime XL is the shipped default. The server and model choices are captured once for each job. External generation does not require a separate game-managed Python or checkpoint installation.
+
+For game-managed ComfyUI, Set up local artwork → Install local art models explicitly downloads missing originals (Nova Anime XL, about 6.9 GB, and Megaten Style, 218 MB), checks pinned sizes and hashes, reuses matching files and refuses to overwrite a different version. Downloads can be cancelled; manual installation remains available. For an external server, install the LoRA in that server's models/loras directory yourself; the managed installer is hidden and its service rejects external-server requests. ComfyUI still validates the game's required nodes and model selections. LoRA strength is 0.7 with the workflow's SDXL encoder configuration. Weights are not bundled in Git. See the [separate asset notices](echo-asset-licenses.md).
 
 ## Staging and abilities
 
