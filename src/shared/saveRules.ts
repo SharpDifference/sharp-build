@@ -151,6 +151,7 @@ const ENROLLMENT_REQUIRED: Record<
     | 'tokensGenerated'
     | 'exCharacterDynamics'
     | 'exCharacterDynamicsEnabled'
+    | 'exEcho'
     | 'mods'
     | 'continued'
     | 'secrets'
