@@ -82,7 +82,7 @@ export interface PreviewSink {
 
 /**
  * What one scene call comes back with, resolved; `at` is the transcript length the call was
- * made at, which is what the reply's summary covers up to.
+ * made at, which is what the reply's summary covers up to (Breakthrough reads it).
  */
 export type SceneCall = Promise<
   | {
@@ -110,6 +110,9 @@ export function sceneInProgress(): boolean {
   return game.currentSceneTranscript.length > 0 || game.sceneSummary !== null
 }
 
+/** How many scene calls this session has made, which names each one's deltas. */
+let streamCount = 0
+
 /**
  * Runs one scene request for an action or wrap-up turn. Streams sanitized preview
  * lines behind the reply floor, then reconciles with the resolved response. It becomes the one
@@ -125,7 +128,11 @@ export async function streamScene(
   // abandons it from that moment.
   const mine = {}
   loopState.sceneCall = mine
+  // The transcript this call answers, which its summary covers up to.
   const at = useGameStore.getState().currentSceneTranscript.length
+  // What this call's deltas are tagged with: an abandoned call's still in flight reach every
+  // listener, the next call's included.
+  const stream = `scene-${++streamCount}`
   /** The run was left, or another scene call or an interjection has taken this one's place. */
   const abandoned = (): boolean => runStale(run) || loopState.sceneCall !== mine
 
@@ -194,9 +201,9 @@ export async function streamScene(
           }, owedFloor(startedAt))
         })
 
-  const unsubscribe = window.api.llm.onSceneDelta((delta) => {
+  const unsubscribe = window.api.llm.onSceneDelta((deltaStream, delta) => {
     // The broadcast outlives the run, and the call.
-    if (abandoned()) return
+    if (deltaStream !== stream || abandoned()) return
 
     const fresh = extractor
       .feed(delta)
@@ -215,7 +222,7 @@ export async function streamScene(
 
   let result: Awaited<ReturnType<typeof window.api.llm.completeScene>>
   try {
-    result = await window.api.llm.completeScene(request, SCENE_LLM_GROUP)
+    result = await window.api.llm.completeScene(request, SCENE_LLM_GROUP, stream)
     // Inside the `try`, so the flag below falls on the far side of the floor and a drained
     // queue cannot read as the end of a scene still owed lines.
     if (floor && !abandoned()) await floor

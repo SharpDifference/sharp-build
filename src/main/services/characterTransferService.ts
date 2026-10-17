@@ -1,6 +1,6 @@
 import { mkdir, rename, rm, unlink, writeFile } from 'fs/promises'
 import { join } from 'path'
-import { CHARACTER_FILE_NAME, STAGING_DIR } from '@shared/characterFiles'
+import { CHARACTER_FILE_NAME, isStaleTwinRel, STAGING_DIR } from '@shared/characterFiles'
 import { assertSafeCharId } from '@shared/characterRules'
 import {
   adoptStamp,
@@ -34,6 +34,7 @@ import {
 import { getCharacter, readCharacterFile } from './characterService'
 import { sniffImageFile } from './imageFiles'
 import { readJsonFile, writeAtomicJson } from './jsonFile'
+import { convertFolderImages } from './legacyImageService'
 
 import { readPortableReflection, writePortableReflection, removePortableReflection, validatePortableReflection, type PortableReflection } from './reflectionStorage'
 
@@ -144,6 +145,8 @@ export async function duplicateCharacter(charId: string): Promise<Character> {
 
   try {
     await copyImages(getCharacterPath(charId), tempDir)
+    // A folder still holding older pictures becomes a copy that holds none.
+    await convertFolderImages(tempDir)
 
     // The id is minted here, never read off the copied file.
     const copy: Character = { ...character, charId: randomId() }
@@ -156,13 +159,17 @@ export async function duplicateCharacter(charId: string): Promise<Character> {
 
 /**
  * Copies her record and every one of her pictures out of `from`, leaving behind a staged run,
- * the loose reference, a half-written file and anything else the folder has collected.
+ * the loose reference, a half-written file, a PNG its WebP twin replaced and anything else the
+ * folder has collected.
  */
 async function copyImages(from: string, to: string): Promise<void> {
   await mkdir(to, { recursive: true })
-  for (const rel of await relPathsUnder(from)) {
+  const rels = await relPathsUnder(from)
+  const present = new Set(rels.map((rel) => rel.toLowerCase()))
+  for (const rel of rels) {
     const role = classifyImportEntry(rel)
     if (role !== 'record' && role !== 'image') continue
+    if (role === 'image' && isStaleTwinRel(rel, present)) continue
     if (role === 'image' && !(await sniffImageFile(join(from, rel)))) {
       console.warn(`[transfer] left out ${rel}: not an image`)
       continue
@@ -222,6 +229,8 @@ export async function importCharacter(archivePath: string): Promise<Character> {
     // Neither is hers: staging is a dead run's images, the manifest describes the archive.
     await discard(join(tempDir, STAGING_DIR))
     await rm(join(tempDir, MANIFEST_NAME), { force: true })
+    // An older package's pictures arrive as PNG and are kept as WebP, before she is the player's.
+    await convertFolderImages(tempDir)
 
     return await adoptFolder(tempDir, character, 'IMPORT_FAILED', 'imported', reflection)
   } catch (err) {

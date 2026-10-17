@@ -81,7 +81,9 @@ export const CITY_LIFE_JOBS: readonly JobDef[] = [
       "shiftApproved": "Your schedule change is approved. It starts Sunday morning; cover your existing shifts until then.",
       "shiftChange": "Your new schedule is active now. Please check your updated shifts.",
       "sick1": "Rest up. I will arrange coverage for this shift.",
-      "sick2": "We cannot cover another absence right now. Missing this shift will count as a strike."
+      "sick2": "We cannot cover another absence right now. Missing this shift will count as a strike.",
+      "welcomeBack": "Good to have you back! Your old pay rate stands and your record starts clean. Your shifts are on the schedule.",
+      "coldNotice": "There is a flu going around and a few of the staff are already out sick. If you are feeling unwell, stay home and I will cover your shifts. No strikes."
     }
   },
   {
@@ -143,7 +145,9 @@ export const CITY_LIFE_JOBS: readonly JobDef[] = [
       "shiftApproved": "Your schedule change is approved. It starts Sunday morning; cover your existing shifts until then.",
       "shiftChange": "Your new schedule is active now. Please check your updated shifts.",
       "sick1": "Rest up. I will arrange coverage for this shift.",
-      "sick2": "We cannot cover another absence right now. Missing this shift will count as a strike."
+      "sick2": "We cannot cover another absence right now. Missing this shift will count as a strike.",
+      "welcomeBack": "Good to have you back! Your old pay rate stands and your record starts clean. Your shifts are on the schedule.",
+      "coldNotice": "There is a flu going around and a few of the staff are already out sick. If you are feeling unwell, stay home and I will cover your shifts. No strikes."
     }
   },
   {
@@ -205,7 +209,9 @@ export const CITY_LIFE_JOBS: readonly JobDef[] = [
       "shiftApproved": "Your schedule change is approved. It starts Sunday morning; cover your existing shifts until then.",
       "shiftChange": "Your new schedule is active now. Please check your updated shifts.",
       "sick1": "Rest up. I will arrange coverage for this shift.",
-      "sick2": "We cannot cover another absence right now. Missing this shift will count as a strike."
+      "sick2": "We cannot cover another absence right now. Missing this shift will count as a strike.",
+      "welcomeBack": "Good to have you back! Your old pay rate stands and your record starts clean. Your shifts are on the schedule.",
+      "coldNotice": "There is a flu going around and a few of the staff are already out sick. If you are feeling unwell, stay home and I will cover your shifts. No strikes."
     }
   }
 ]

@@ -2,13 +2,19 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { Conversation, GameSave, Result, SaveDraft, TextingResponse } from '@shared/types'
 import { meanwhileEvents, normalizeMeanwhile } from '@shared/meanwhile'
 import { normalizeStoryMemory, storySnapshot, type StoryFact } from '@shared/storyMemory'
-import { normalizeWhisper, whisperSources } from '@shared/venusWhisper'
+import { normalizeWhisper, whisperRecall, whisperSources } from '@shared/venusWhisper'
+import { carriedModFields } from '@shared/modCarry'
+import { semesterOf, semesterShiftOf } from '@shared/semesters'
+import { FINAL_DATE } from '@shared/classes'
 import { useGameStore } from '../src/renderer/stores/gameStore'
+import { modFieldsLeaving } from '../src/renderer/stores/semesterModCarry'
+import { carryOf } from '../src/renderer/stores/semesterCarry'
+import { currentStorySnapshot } from '../src/renderer/stores/storyMemory'
 import { useModsStore } from '../src/renderer/stores/modsStore'
 import { useBunnyboardStore } from '../src/renderer/stores/bunnyboardStore'
 import { generateMeanwhile } from '../src/renderer/stores/meanwhile'
 import { commentOnWhisper, useWhisperActivity } from '../src/renderer/stores/venusWhisper'
-import { regenerateTextReply, resetTextingLoop } from '../src/renderer/stores/textingLoop'
+import { regenerateTextReply, resetTextingLoop, textRegenerationTarget } from '../src/renderer/stores/textingLoop'
 import { persistRegeneratedConversation, writeStoryMemory, writesSettled } from '../src/renderer/stores/loop/saves'
 import { resetLoopState } from '../src/renderer/stores/loop/state'
 import '../src/renderer/modEntries/story-memory'
@@ -124,6 +130,45 @@ describe('fifth-pass social save and carry integration controls', () => {
     expect(saved.at(-1)?.exNpcWatch?.scenes).toEqual([])
     expect(game().exStoryMemory.facts.at(-1)?.id).toBe('manual:new')
     expect(saved.at(-1)?.exStoryMemory?.facts.at(-1)?.id).toBe('manual:new')
+  })
+
+  it('keeps the social archives separate through disabled save/load and the New Game+ carry', async () => {
+    await watch()
+    await regenerateTextReply('a', persistRegeneratedConversation)
+    useModsStore.setState({ switches: { on: { 'story-memory': false, 'meanwhile-conversations': false,
+      'venus-whisper': false, 'text-regeneration': false }, options: {} } })
+    useGameStore.setState({ date: FINAL_DATE, time: 0, graduationSeen: true })
+    const old = snapshot()
+    game().loadSave(old, record, cast)
+    expect(currentStorySnapshot()).toBeUndefined()
+    // What Continue hands the next semester: the game's own carry, and the mods' beside it.
+    const { carry } = carryOf(game(), semesterOf(record))
+    const mods = modFieldsLeaving(snapshot(), { playthroughId: '123', index: 0, season: 'spring', characters: cast })
+    const roundTrip = JSON.parse(JSON.stringify(mods)) as typeof mods
+    game().reset()
+    useGameStore.setState({ playthroughId: '456', date: 0, time: 0, chars: ['a'], characters: { a: cast.a }, charInfo: { a: charInfo() } })
+    // The opening save as New Game+ composes it: the mods' fields, and the threads its own carry moved.
+    const opening = { ...game().toGameSave(), ...carriedModFields(roundTrip), bunnyboard: carry.bunnyboard }
+    game().loadSave({ ...opening, playthroughId: '456', saveId: 'opening', saveDate: 0 },
+      playthroughRecord({ chars: ['a'] }), { a: cast.a })
+    const archive = meanwhileEvents(game())
+    expect(archive).toHaveLength(1)
+    expect(archive[0]).toMatchObject({ date: 8 - semesterShiftOf('spring'), origin: { term: 0, day: 8 }, participantNames: { b: 'Mina Rose' } })
+    expect(archive[0].lines).toEqual(lines)
+    expect(game().exVenusWhisper.discovery).toEqual(old.exVenusWhisper?.discovery)
+    expect(game().exVenusWhisper.issues).toEqual(old.exVenusWhisper?.issues)
+    expect(whisperRecall(game().exVenusWhisper, 1, 0, ['a'])).toEqual([])
+    expect(game().exStoryMemory.encounterEdits['term:0:encounter:4:1']).toEqual({ hidden: true })
+    expect(game().bunnyboard.conversations.a.summary).toBe('Replacement summary')
+    expect(game().bunnyboard.conversations.a.messages.at(-1)?.exReplyTo).toBe('sent')
+    expect(game().bunnyboard.conversations.a.messages.at(-1)?.date).toBe(9 - semesterShiftOf('spring'))
+    useModsStore.setState({ switches: { on: {}, options: {} } })
+    expect(textRegenerationTarget('a')).toBeNull()
+    const recall = storySnapshot(game())!
+    expect(recall.records.some(r => r.id === 'term:0:manual:old')).toBe(true)
+    expect(recall.records.some(r => r.id === 'term:0:encounter:4:1')).toBe(false)
+    expect(JSON.stringify(recall)).not.toContain('SPECTATOR_ONLY_QA5')
+    expect(JSON.stringify(recall)).not.toContain('PUBLIC_GOSSIP_QA5')
   })
 
   it('does not promote generated spectator dialogue or private corrections into newsletter sources or canonical recall', async () => {

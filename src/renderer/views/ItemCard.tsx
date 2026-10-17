@@ -16,6 +16,8 @@ export interface ItemCardProps {
   item: ItemDef
   /** How many he is carrying, in the price's seat: the inventory's reading rather than a price. */
   count?: number
+  /** A present's giver and day, in the count's seat; the count stands beside it only past one. */
+  from?: string
   /** The word on the one answer — `Buy` on a shelf, `Gift` in the inventory — and the question. */
   word: string
   /** **Absent says the card offers nothing**, which is what a shelf read without a turn is. */
@@ -29,6 +31,7 @@ export interface ItemCardProps {
 export function ItemCard({
   item,
   count,
+  from,
   word,
   onAnswer,
   asking = false,
@@ -94,8 +97,13 @@ export function ItemCard({
               >
                 {count === undefined ? (
                   <span className="vu-item-price">{formatMoney(item.price)}</span>
-                ) : (
+                ) : from === undefined ? (
                   <span className="vu-item-count">&times;{count}</span>
+                ) : (
+                  <>
+                    <span className="vu-item-from">{from}</span>
+                    {count > 1 && <span className="vu-item-count">&times;{count}</span>}
+                  </>
                 )}
                 {onAnswer && (
                   <motion.button

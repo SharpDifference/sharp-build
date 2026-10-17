@@ -4,7 +4,9 @@ import type {
   Character,
   LedgerResponse,
   PlaythroughRecord,
+  ReceivedGift,
   SaveDraft,
+  SceneEvent,
   SceneLine,
   SceneState
 } from '@shared/types'
@@ -45,6 +47,8 @@ export interface TurnSnapshot {
   planId?: string
   /** This turn is a Scene Creator scene's opening, so a retry sends it again. */
   created?: boolean
+  /** The curveball and present this turn's scene rolled, so a retry opens on the same. */
+  sceneEvents?: { event: SceneEvent | null; gift: ReceivedGift | null }
 }
 
 /**
@@ -174,6 +178,12 @@ export const loopState = {
    */
   promptOverride: null as string | null,
 
+  /**
+   * The failed turn on screen failed in its scene call, so its modal can offer the editor; a
+   * failure before that call, such as an exam's questions, has no scene prompt of its own.
+   */
+  turnPromptEditable: false,
+
   /** This attempt has spent its one silent resend on a content block; `failTurn` clears it. */
   blockedRetrySpent: false,
 
@@ -233,6 +243,7 @@ export function resetTurnSlice(): void {
   loopState.turnStartedAt = null
   loopState.lastScenePrompt = null
   loopState.promptOverride = null
+  loopState.turnPromptEditable = false
   loopState.blockedRetrySpent = false
   loopState.authoredRetrySpent = 0
   loopState.decisionSave = null

@@ -3,16 +3,20 @@ import type { BreakthroughState } from '@shared/breakthrough'
 import type { CharacterDynamics } from '@shared/characterDynamics'
 import { affectionFor, dedupedMemoriesFor, emptyFlags } from '@shared/relationship'
 import { ROOM_LOCATION } from '@shared/locations'
+import { worstInSlot } from '@shared/colds'
+import { globalSlotOf } from '@shared/jobs'
 import type { NpcRelationshipMap } from '@shared/npcRelationships'
+import type { SemesterCalendar } from '@shared/semesters'
 import {
   type Character,
   type CharInfo,
   type ClassEntry,
   type ChatMessage,
   type Conversation,
+  type GameHistory,
   type Haunt,
   type JobState,
-  type Occasion,
+  type Season,
   type StructuredRequest,
   type TimeSlot
 } from '@shared/types'
@@ -28,12 +32,25 @@ import {
   ambientLoreCharacters,
   characterLore,
   characterLoreForIds,
+  classLore,
+  type ClassRoster,
   keyPattern,
   lorebookBlock
 } from './lorebook'
 import { occasionLoreLines } from './occasions'
+import { recapLore } from './recaps'
 import { objectSchema } from './schema'
-import { memoryLines, notesLines, profileLines, scheduleLines, yearMajorLine } from './scenePrompt'
+import {
+  graduateLines,
+  herClassmates,
+  memoryLines,
+  secretLines,
+  notesLines,
+  profileLines,
+  readerClassmates,
+  scheduleLines,
+  yearMajorLine
+} from './scenePrompt'
 import { isAwayForSpringBreak, springBreakLines } from './springBreak'
 import {
   bestFriendLines,
@@ -43,6 +60,7 @@ import {
 } from './npcRelationship'
 import { modRequest, dmHistoryNotes, promptFields, promptLines, promptRequired } from '../mods/hooks'
 import { relationshipLines } from './relationship'
+import { herColdLine } from './colds'
 import { weatherLines } from './weather'
 
 /**
@@ -94,10 +112,12 @@ export interface TextingPromptState {
   classes: Record<string, ClassEntry>
   /** The reader's own timetable, sparse slot → class code. */
   playerSchedule: Record<number, string>
+  /** Who sits in each class of the catalog, by class code. */
+  classRosters: Readonly<Record<string, ClassRoster>>
   /** The part-time job the reader holds, or null — the rest of his week. */
   playerJob: JobState | null
-  /** The save's generated occasions; the fixed calendar is merged in on read. */
-  occasions: readonly Occasion[]
+  /** The semester's season and the occasions the save invented; the fixed calendar is merged in on read. */
+  calendar: SemesterCalendar
   /**
    * The whole semester's sky, one reading per slot — the NOW line walks back through it for how
    * long the weather has held. Absent means nothing is said about it.
@@ -120,6 +140,8 @@ export interface TextingPromptState {
    * open through an absence, so this is what says she is texting from somewhere else.
    */
   springBreakAway?: readonly string[] | null
+  /** The graduate back in town for Homecoming, as a charId; absent on every other slot. */
+  homecomingVisitor?: string
   /**
    * Each character's plans with the reader from this slot on, one sentence apiece, by charId —
    * hers and the lorebook's people's.
@@ -127,6 +149,10 @@ export interface TextingPromptState {
   upcomingPlans?: Record<string, string[]>
   /** How many of her memories the thread carries: the one-character budget, the thread being the two of them. */
   memoryBudget: number
+  /** How many of her told secrets the thread carries; absent is the default. */
+  secretBudget?: number
+  /** The playthrough log, read for the lorebook's dated recaps. */
+  history: GameHistory
 }
 
 /** A text's line breaks folded to spaces, so a message stays one prompt line. */
@@ -145,11 +171,15 @@ function messageStub(message: ChatMessage, firstName: string): string {
  * A window of messages rendered for injection, newest last; system lines ride along as
  * context the character plausibly has.
  */
-export function stampedStubs(window: readonly ChatMessage[], firstName: string): string[] {
+export function stampedStubs(
+  window: readonly ChatMessage[],
+  firstName: string,
+  season: Season
+): string[] {
   const lines: string[] = []
   let stamped: string | null = null
   for (const message of window) {
-    const stamp = formatChatDivider(message.date, message.time)
+    const stamp = formatChatDivider(message.date, message.time, season)
     if (stamp !== stamped) {
       lines.push(`[${stamp}]`)
       stamped = stamp
@@ -172,9 +202,22 @@ export function hasTexted(conversation: Conversation | undefined): boolean {
 }
 
 /**
- * Her hangout ask when it ends the thread, with his "Sure" when that answered it. A reminder
- * about a plan already made is not flagged as an invite but stands behind `pendingHangout`
- * just the same.
+ * Her reach-outs the reader has sent nothing since, oldest first, each as its first text. A
+ * system line is no answer.
+ */
+export function unansweredReachOuts(messages: readonly ChatMessage[]): ChatMessage[] {
+  const unanswered: ChatMessage[] = []
+  for (const message of messages) {
+    if (message.sender === 'player') unanswered.length = 0
+    else if (message.sender === 'contact' && message.reachOut) unanswered.push(message)
+  }
+  return unanswered
+}
+
+/**
+ * Her hangout ask when it ends the thread, with his "Sure" when that answered it, or her
+ * unanswered reach-out, every text of it from the first. A reminder about a plan already made
+ * is not flagged as an invite but stands behind `pendingHangout` just the same.
  */
 function hangoutTail(
   conversation: Conversation
@@ -183,7 +226,17 @@ function hangoutTail(
   const last = messages[messages.length - 1]
   if (!last) return null
   if (last.sender === 'contact') {
-    return last.invite || conversation.pendingHangout ? { ask: last } : null
+    if (last.invite || conversation.pendingHangout) return { ask: last }
+    const reachOut = unansweredReachOuts(messages).at(-1)
+    if (!reachOut || reachOut.date !== last.date || reachOut.time !== last.time) return null
+    // Her texts from the reach-out's first to the end of its slot, nothing of his among them.
+    const from = messages.indexOf(reachOut)
+    const text = messages
+      .slice(from)
+      .filter((message) => message.sender === 'contact')
+      .map((message) => flatText(message.text))
+      .join(' ')
+    return { ask: { ...last, text } }
   }
   const before = messages[messages.length - 2]
   if (last.sender === 'player' && last.text === 'Sure' && before?.sender === 'contact') {
@@ -292,7 +345,21 @@ export function buildTextingPrompt(
   incomingDirection?: string
 ): StructuredRequest {
   const name = character.firstName
-  const away = isAwayForSpringBreak(state.springBreakAway, character.charId, state.date)
+  // Off campus: away for the break, or graduated and gone from Veridan but for Homecoming.
+  const visiting = state.homecomingVisitor === character.charId
+  const away =
+    (info?.pursuing !== undefined && !visiting) ||
+    isAwayForSpringBreak(state.springBreakAway, character.charId, state.date)
+  const thread: ChatMessage[] = [
+    ...(conversation?.messages ?? []).slice(-TEXTING_HISTORY_CAP),
+    {
+      id: 'pending',
+      sender: 'player',
+      text: newMessage,
+      date: state.date,
+      time: state.time
+    }
+  ]
   // The new text is the last line of the log, so it gets its own stamp when it lands in a new slot.
   const history = stampedStubs(
     [
@@ -305,14 +372,15 @@ export function buildTextingPrompt(
         time: state.time
       }] : [])
     ],
-    name
+    name,
+    state.calendar.season
   )
   const summary = conversation?.summary ?? null
 
   // The scan covers the whole thread the model reads, not just the new message.
   const scan = [summary ?? '', ...history].join('\n')
   // Today's occasions are always-on.
-  const today = occasionLoreLines(state.date, state.time, state.occasions)
+  const today = occasionLoreLines(state.date, state.time, state.calendar)
 
   // An entry's standings are measured against the one girl on the thread.
   const relations = { relationships: state.npcRelationships, present: [character] }
@@ -321,38 +389,77 @@ export function buildTextingPrompt(
     (other) => !new RegExp(keyPattern(other.firstName, false), 'iu').test(scan)
   )
   const lore = lorebookBlock(scan, today, [
+    ...classLore(scan, {
+      classes: state.classes,
+      rosters: state.classRosters,
+      playerSchedule: state.playerSchedule,
+      skip: []
+    }),
     ...characterLore(
       scan,
       state.roster,
       state.charInfo,
       state.date,
       relations,
-      state.upcomingPlans
+      state.upcomingPlans,
+      state.homecomingVisitor
     ),
-    ...characterLoreForIds(ambient, state.charInfo, state.date, relations, state.upcomingPlans)
+    ...characterLoreForIds(
+      ambient,
+      state.charInfo,
+      state.date,
+      relations,
+      state.upcomingPlans,
+      state.homecomingVisitor
+    ),
+    // Only this slot's texts: an older one's "last night" was a different night.
+    ...recapLore(
+      thread
+        .filter((message) => message.date === state.date && message.time === state.time)
+        .map((message) => message.text)
+        .join('\n'),
+      state.date,
+      state.time,
+      state.history,
+      state.calendar.season
+    )
   ])
+
+  // How her cold stands this slot, where she has one that shows.
+  const slot = globalSlotOf(state.date, state.time)
+  const coldLine = herColdLine(name, info?.cold, slot, true)
 
   const characterBlock = [
     'CHARACTER',
     `${name} ${character.lastName}.`,
     ...(info?.major ? [yearMajorLine(info)] : []),
+    ...graduateLines(name, info, visiting),
     // The phone takes the one-character budget.
     ...profileLines(character, info?.flags ?? emptyFlags()),
+    ...(coldLine ? [coldLine] : []),
     ...relationshipLines(
       character,
       info?.flags ?? emptyFlags(),
       // Texting requires a completed contact, so her name is known by then.
       info?.nameKnown ?? true,
       affectionFor(info, state.date, character),
+      info,
       state.stats ?? DEFAULT_PLAYER_STATS,
       // The stored thread only: the pending text is not yet something they have said.
       { texting: true, texted: hasTexted(conversation) },
-      // Where she is in her cycle, for a Promiscuous girl's DTF days.
-      { date: state.date, offset: info?.moodCycleOffset ?? 0 }
+      // Where she is in her cycle, for a Promiscuous girl's DTF days, which a cold calls off.
+      { date: state.date, offset: info?.moodCycleOffset ?? 0, sick: worstInSlot(info?.cold, slot) }
     ),
     // Her closest friend; the roster handed in is everybody but her.
     ...bestFriendLines(character, state.roster, state.npcRelationships),
-    ...scheduleLines(`${name}'s Schedule:`, info?.schedule ?? {}, state.classes, info?.job, state.date),
+    ...scheduleLines(
+      `${name}'s Schedule:`,
+      info?.schedule ?? {},
+      state.classes,
+      info?.job,
+      state.date,
+      herClassmates(character.charId, state.classRosters, state.playerSchedule)
+    ),
     // What she and the reader have planned, this slot's included.
     ...(state.upcomingPlans?.[character.charId] ?? []),
     // Where she is spending the break: on a thread, the only thing saying she has left campus.
@@ -366,8 +473,10 @@ export function buildTextingPrompt(
     ...memoryLines(
       character,
       dedupedMemoriesFor(info).slice(-state.memoryBudget),
-      info?.textMemory
+      info?.textMemory,
+      state.calendar.season
     ),
+    ...secretLines(info?.toldSecrets, state.secretBudget),
     ...notesLines(name, info?.notes)
   ]
 
@@ -379,13 +488,14 @@ export function buildTextingPrompt(
       state.playerSchedule,
       state.classes,
       state.playerJob,
-      state.date
+      state.date,
+      readerClassmates(state.classRosters)
     ),
     '',
     ...characterBlock,
     '',
     'NOW',
-    `It is ${formatDateBanner(state.date, state.time)}`,
+    `It is ${formatDateBanner(state.date, state.time, state.calendar.season)}`,
     formatSemesterProgress(state.date),
     // Texting happens before the slot's scene; without this she treats the day as over.
     state.time === 0 ? 'Morning classes are starting soon.' : 'Night classes are starting soon.',

@@ -2,7 +2,8 @@ import { kindOf } from '@shared/academics'
 import { jobDefOf } from '@shared/jobs'
 import { LOWRISE_LOCATION } from '@shared/locations'
 import { statsLowestFirst, type StatKey } from '@shared/playerStats'
-import type { ClassEntry, Occasion } from '@shared/types'
+import type { SemesterCalendar } from '@shared/semesters'
+import type { ClassEntry } from '@shared/types'
 import { examOn } from '../prompts/classProgress'
 import { STAT_ACTIONS, statActionBag } from '../prompts/statActions'
 import { useGameStore } from './gameStore'
@@ -62,8 +63,8 @@ export function goToVerdict(locationId: string): Verdict {
 }
 
 /** What the class button says. */
-function classActionText(entry: ClassEntry, date: number, occasions: readonly Occasion[]): string {
-  const exam = examOn(entry, date, occasions)
+function classActionText(entry: ClassEntry, date: number, calendar: SemesterCalendar): string {
+  const exam = examOn(entry, date, calendar)
   if (!exam) return `Attend ${entry.name}`
   return kindOf(entry) === 'project'
     ? `Go to ${entry.code} ${exam} showcase`
@@ -95,7 +96,7 @@ function commitments(): SlotAction[] {
   if (classCode && entry) {
     actions.push({
       key: `class:${classCode}`,
-      text: classActionText(entry, game.date, game.occasions),
+      text: classActionText(entry, game.date, game.calendar),
       tone: 'class',
       // The blank code is what `castForClass` resolves against the reader's own schedule.
       verdict: knownVerdict('goto_class:')

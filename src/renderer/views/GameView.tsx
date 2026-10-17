@@ -22,9 +22,10 @@ import {
 import { AnimatePresence, motion } from 'motion/react'
 import { AUDIO_FILES, pitchSemitonesOf, VOICE_PITCH_DEFAULT } from '@shared/audio'
 import { isPermanent } from '@shared/errors'
-import { GAME_OVER_SCENES } from '@shared/gameOver'
+import { canContinueAfter, GAME_OVER_SCENES, gameCompleteSceneOf } from '@shared/gameOver'
 import { hashString } from '@shared/hash'
 import { isGameOver } from '@shared/money'
+import { calendarOf } from '@shared/semesters'
 import { quizAnswers, type QuizAnswer } from '@shared/academics'
 import {
   allBackgrounds,
@@ -35,7 +36,9 @@ import {
   type TimeSlot
 } from '@shared/types'
 import { isWet } from '@shared/weather'
-import type { GiftReaction } from '@shared/shop'
+import { coldStageAt, COLD_STAGE_LABELS } from '@shared/colds'
+import { globalSlotOf } from '@shared/jobs'
+import type { GiftReaction, ItemPick } from '@shared/shop'
 import { Burst } from '../components/Burst'
 import { CheckField } from '../components/CheckField'
 import { ConfirmModal } from '../components/ConfirmModal'
@@ -105,6 +108,7 @@ import {
   lastScenePromptText,
   lastTurnAuthored,
   leaveCreatedScene,
+  leaveForNextSemester,
   leaveToMenu,
   manualSaveOffer,
   quitToDesktop,
@@ -122,7 +126,8 @@ import {
   startFarewellScene,
   submitAction,
   submitQuizAnswer,
-  submitGift
+  submitGift,
+  turnPromptEditable
 } from '../stores/gameLoop'
 import {
   abandonHangoutClassify,
@@ -135,7 +140,12 @@ import { useAssetStore } from '../stores/assetStore'
 import { useAudioStore } from '../stores/audioStore'
 import { useBunnyboardStore } from '../stores/bunnyboardStore'
 import { giftGivenOf, useGameStore } from '../stores/gameStore'
-import { forwardOpenOf, replyRowOfferOf, rewindOpenOf } from '../stores/loop/playback'
+import {
+  forwardOpenOf,
+  openingLockOf,
+  replyRowOfferOf,
+  rewindOpenOf
+} from '../stores/loop/playback'
 import { firstPhotoFailure, usePhotoStore } from '../stores/photoStore'
 import {
   displayedCgOf,
@@ -158,6 +168,7 @@ import {
 } from '../stores/loop/createdScene'
 import {
   deleteReplay,
+  earlierSemesters,
   heldGame,
   readReplay,
   replayOffer,
@@ -259,8 +270,8 @@ type OpenPanel =
   | { kind: 'chatLog' }
   | { kind: 'shop' }
   | { kind: 'gift' }
-  | { kind: 'giftTarget'; itemId: string }
-  | { kind: 'giftMessage'; itemId: string; charId: string }
+  | { kind: 'giftTarget'; pick: ItemPick }
+  | { kind: 'giftMessage'; pick: ItemPick; charId: string }
   | { kind: 'editPrompt'; source: 'turn' | 'closing' | 'ledger' | 'textLedger' | 'intro' }
   | { kind: 'settings' }
   | { kind: 'saveGame' }
@@ -286,7 +297,7 @@ type OpenPanel =
 /** What an interjection sends: the reader's words, or a present handed over with his line. */
 type Interjection =
   | { kind: 'words'; action: string }
-  | { kind: 'gift'; charId: string; itemId: string; message: string }
+  | { kind: 'gift'; charId: string; pick: ItemPick; message: string }
 
 /** Which of the two horizontal offsets a sprite layer sits at. */
 function sideClass(side: 1 | -1): string {
@@ -424,7 +435,7 @@ function PortraitSlot({
   const light = dim ? (cut ? spriteDimCut : spriteDim) : cut ? spriteLitCut : spriteLit
 
   return (
-    /** How tall she stands, as a share of the maximum, and where she stands. */
+    /** How tall she stands, as a share of full size, and where she stands. */
     <div
       className={leaving ? 'vu-stage-slot vu-stage-slot--leaving' : 'vu-stage-slot'}
       style={{ '--stage-char-scale': scale, '--stage-slot-x': x } as CSSProperties}
@@ -568,6 +579,8 @@ export function GameView(): JSX.Element {
   const bg = useGameStore((s) => s.bg)
   const time = useGameStore((s) => s.time)
   const date = useGameStore((s) => s.date)
+  const season = useGameStore((s) => s.calendar.season)
+  const semesterIndex = useGameStore((s) => s.semesterIndex)
   const playthroughId = useGameStore((s) => s.playthroughId)
   const echoLoads = useGameStore((s) => s.loads)
   useEffect(() => { if (echoOn && playthroughId) ensureEchoes() }, [echoOn, playthroughId, echoLoads])
@@ -590,6 +603,7 @@ export function GameView(): JSX.Element {
   const activeGameOver = useGameStore((s) => s.activeGameOver)
   const endingArt = useGameStore((s) => s.endingArt)
   const endingArtPending = useGameStore((s) => s.endingArtPending)
+  const endingPostsPending = useGameStore((s) => s.endingPostsPending)
   const awaitingInput = useGameStore((s) => s.awaitingInput)
   const busy = useGameStore((s) => s.busy)
   const waitingForLine = useGameStore((s) => s.waitingForLine)
@@ -635,6 +649,7 @@ export function GameView(): JSX.Element {
   // The two the landing reads out.
   const money = useGameStore((s) => s.money)
   const stats = useGameStore((s) => s.stats)
+  const readerCold = useGameStore((s) => s.readerCold)
   // Whether BunnyBot has handed the two granted apps over yet.
   const bunnymapUnlocked = useGameStore((s) => s.bunnymapUnlocked)
   const bunnyshopUnlocked = useGameStore((s) => s.bunnyshopUnlocked)
@@ -777,10 +792,34 @@ export function GameView(): JSX.Element {
   const job = useGameStore((s) => s.job)
   const playerSchedule = useGameStore((s) => s.playerSchedule)
   const classRecords = useGameStore((s) => s.classRecords)
-  const occasions = useGameStore((s) => s.occasions)
+  const calendar = useGameStore((s) => s.calendar)
 
-  /** The playthrough ended badly, and which way (`shared/gameOver.ts`). */
-  const gameOver = activeGameOver ? GAME_OVER_SCENES[activeGameOver] : null
+  /** How the playthrough ended (`shared/gameOver.ts`): a winning ending's words are its semester's. */
+  const gameOver = activeGameOver
+    ? activeGameOver === 'gameComplete'
+      ? gameCompleteSceneOf(semesterIndex)
+      : GAME_OVER_SCENES[activeGameOver]
+    : null
+  /** A winning ending the next semester follows, which is every one but the reader's own graduation. */
+  const continuable = activeGameOver === 'gameComplete' && canContinueAfter(semesterIndex)
+
+  /**
+   * Continue from the ending: the game leaves under a cover keeping the hour at both ends, as
+   * the way to the menu does, and the next semester's roster screen is raised under it.
+   */
+  function toNextSemester(): void {
+    const leftIn = half
+    cancelCrossing()
+    beginCrossing(undefined, menuCrossing(leftIn))
+    coverSwap(() => {
+      void (async () => {
+        const staged = await leaveForNextSemester()
+        setMenuTheme(leftIn)
+        setView(staged ? 'nextSemester' : 'mainMenu')
+        endCrossing()
+      })()
+    })
+  }
 
   // A mod's way on from the ending being prepared: the ending's buttons are locked until it is.
   const [preparingWayOn, setPreparingWayOn] = useState(false)
@@ -929,19 +968,30 @@ export function GameView(): JSX.Element {
   }, [createdOver])
 
   /**
-   * Plays one past half's replay: read first, so a replay that cannot be read changes nothing,
-   * then the game is left for it under a curtain announcing the slot being replayed. The well's
-   * words are held with the game.
+   * Plays one past half's replay, of this semester or the earlier one `semesterIndex` names:
+   * read first, so a replay that cannot be read changes nothing, then the game is left for it
+   * under a curtain announcing the slot being replayed, in its own semester's dates and sky. The
+   * well's words are held with the game.
    */
-  function startReplay(date: number, time: TimeSlot): void {
+  function startReplay(date: number, time: TimeSlot, semesterIndex?: number): void {
     closePanel()
     const words = action
+    const from =
+      semesterIndex === undefined
+        ? undefined
+        : earlierSemesters().find(({ view }) => view.index === semesterIndex)?.view
+    const earlier = from && {
+      calendar: calendarOf(from.season, from.occasions),
+      weather: from.weather,
+      semesterIndex: from.index
+    }
     void (async () => {
-      const replay = await readReplay(date, time)
+      const replay = await readReplay(date, time, semesterIndex)
       if (!replay) return
-      const splash = slotStampOf(date, time, occasions, slotWeather(weather, date, time, false))
+      const sky = slotWeather(earlier?.weather ?? weather, date, time, false)
+      const splash = slotStampOf(date, time, earlier?.calendar ?? calendar, sky)
       if (!beginCrossing(undefined, { from: half, to: slotHalf(time), splash })) return
-      coverSwap(() => void enterReplay(replay, words))
+      coverSwap(() => void enterReplay(replay, words, earlier))
     })()
   }
 
@@ -1031,6 +1081,10 @@ export function GameView(): JSX.Element {
   // The sky over this slot, which picks the background's render and the mark the chromes wear.
   const slotSky = slotWeather(weather, date, time, graduationSeen)
   const wet = isWet(slotSky)
+  // How the reader's cold stands this slot, where it shows.
+  const coldStage = coldStageAt(readerCold ?? undefined, globalSlotOf(date, time))
+  const readerColdLabel =
+    coldStage && coldStage !== 'incubating' ? COLD_STAGE_LABELS[coldStage] : null
 
   /**
    * Every face the screens off this landing list — the map's crops, the phone's chats, the feed's
@@ -1213,8 +1267,8 @@ export function GameView(): JSX.Element {
 
   const text = currentLine?.text ?? ''
 
-  // Who the stage lights are on, if anyone: a narrator line (`''`) and the reader's
-  // (`READER_SPEAKER`) both resolve to nobody, and nothing dims.
+  // Who the stage lights are on, if anyone: a narrator line (`''`) resolves to nobody, and
+  // nothing dims.
   const speakingCharId = currentLine?.speaker ? charKeyToId[currentLine.speaker] : undefined
   // The name the box wears: hers; a key that resolves to nobody wears none, as narration does.
   const speaker = speakingCharId ? speakerNameOf(currentLine) : ''
@@ -1278,7 +1332,7 @@ export function GameView(): JSX.Element {
 
   /**
    * The voice under the typewriter: a blip on every third letter or digit, at the pitch of
-   * whoever is speaking, or the narrator's for narration and the reader's own lines.
+   * whoever is speaking, or the narrator's for narration.
    */
   const revealedBefore = useRef(0)
   useEffect(() => {
@@ -1440,7 +1494,7 @@ export function GameView(): JSX.Element {
    * The playthrough's opening owns the screen: nothing on it but the dialogue box,
    * `BASE_REVEAL` and, once the turn is handed back, the input.
    */
-  const cinematic = isOrientationSlot(date, time)
+  const cinematic = isOrientationSlot(date, time, semesterIndex)
   /** The graduation epilogue: an authored screen the reader still reads and types on. */
   const epilogue = isGraduationSlot(date, time) && !gameOver
   /** A screen the game wrote end to end; each leaves at most `BASE_REVEAL` standing. */
@@ -1485,6 +1539,8 @@ export function GameView(): JSX.Element {
    * is the turn's own, or down.
    */
   const interjectRow = offer !== 'none' && !inputShown && !sending ? offer : null
+  /** What holds the opening reply shut, which the locked row's word names. */
+  const openingLock = useGameStore(openingLockOf)
 
   /**
    * The scene's row is up: for the turn, through the wait for its reply, and over the reply for
@@ -1621,9 +1677,9 @@ export function GameView(): JSX.Element {
    * Hands a present over, on the turn or over the lines still to come. The wait is reported as a
    * turn's is, and a gift that could not go out spends nothing and reports nothing.
    */
-  function sendGift(charId: string, itemId: string, message: string): void {
+  function sendGift(charId: string, pick: ItemPick, message: string): void {
     setSending(true)
-    if (!submitGift(charId, itemId, message)) {
+    if (!submitGift(charId, pick, message)) {
       setSending(false)
       return
     }
@@ -1672,7 +1728,7 @@ export function GameView(): JSX.Element {
   const slotActions = useMemo(
     // A created scene and a replay have no slot, and their landing is never drawn.
     () => (created || replaying ? [] : slotActionsNow()),
-    [date, time, events, classes, job, playerSchedule, classRecords, occasions]
+    [date, time, events, classes, job, playerSchedule, classRecords, calendar]
   )
 
   /** The epilogue's own row, in the slot actions' place: a button per goodbye still owed. */
@@ -2042,6 +2098,7 @@ export function GameView(): JSX.Element {
         <SceneChrome
           theme={half}
           date={date}
+          season={season}
           night={half === 'night'}
           weather={slotSky}
           covered={covered}
@@ -2064,6 +2121,7 @@ export function GameView(): JSX.Element {
           skips={arrivalSkips}
           rowShown={rowShown}
           interject={interjectRow}
+          lockedBy={openingLock ?? 'class'}
           ending={sceneEnding}
           onAdvance={boxAdvances ? onAdvanceClick : undefined}
           onRewind={rewindOpen && !covered && !blocked ? onRewind : undefined}
@@ -2106,6 +2164,7 @@ export function GameView(): JSX.Element {
         <LandingChrome
           theme={half}
           date={date}
+          season={season}
           night={half === 'night'}
           weather={slotSky}
           epilogue={epilogue}
@@ -2125,6 +2184,7 @@ export function GameView(): JSX.Element {
           onAdvance={boxAdvances ? onAdvance : undefined}
           money={money}
           stats={stats}
+          cold={readerColdLabel}
           actions={epilogue ? epilogueActions : slotActions}
           onSlotAction={onSlotAction}
           action={action}
@@ -2276,10 +2336,10 @@ export function GameView(): JSX.Element {
             mode="gift"
             theme={half}
             onClose={closePanel}
-            onGift={(itemId) => {
+            onGift={(pick) => {
               if (giftTargets.length === 1) {
-                setPanel({ kind: 'giftMessage', itemId, charId: giftTargets[0] })
-              } else setPanel({ kind: 'giftTarget', itemId })
+                setPanel({ kind: 'giftMessage', pick, charId: giftTargets[0] })
+              } else setPanel({ kind: 'giftTarget', pick })
             }}
           />
         )}
@@ -2291,8 +2351,8 @@ export function GameView(): JSX.Element {
             charIds={giftTargets}
             onClose={closePanel}
             onPick={(charId) => {
-              const { itemId } = panel
-              setPanel({ kind: 'giftMessage', itemId, charId })
+              const { pick } = panel
+              setPanel({ kind: 'giftMessage', pick, charId })
             }}
           />
         )}
@@ -2309,18 +2369,18 @@ export function GameView(): JSX.Element {
             }
             onClose={closePanel}
             onSend={(message) => {
-              const { itemId, charId } = panel
+              const { pick, charId } = panel
               closePanel()
               // Over an ending under way, a gift asks first as words do.
               const warns = useSettingsStore.getState().settings?.warnEndingInterrupt !== false
               if (useGameStore.getState().sceneEnding && warns && !created) {
                 setPanel({
                   kind: 'interruptEnding',
-                  turn: { kind: 'gift', charId, itemId, message }
+                  turn: { kind: 'gift', charId, pick, message }
                 })
                 return
               }
-              sendGift(charId, itemId, message)
+              sendGift(charId, pick, message)
             }}
           />
         )}
@@ -2433,9 +2493,10 @@ export function GameView(): JSX.Element {
               retryMessage="You can send that again."
               cancelText={turnDismissLabel(turnError)}
               // A refused request shows why, and the reader rewords from it. A connection
-              // failure offers Settings beside Retry. Nothing else is his to reword.
+              // failure offers Settings beside Retry. The editor stands on any other failure of
+              // the scene call, which may be a refusal under a code the app does not know.
               permanentDetail
-              extraText="Manually edit prompt"
+              extraText={turnPromptEditable() ? 'Edit prompt' : undefined}
               onExtra={() => setPanel({ kind: 'editPrompt', source: 'turn' })}
               onSettings={() => {
                 abandonTurn()
@@ -2465,6 +2526,14 @@ export function GameView(): JSX.Element {
               key="edit-prompt"
               id="edit-prompt"
               theme={modalTheme}
+              // The scene has already been cut back once, so the advice starts there.
+              hint={
+                <>
+                  If the model is refusing to write due to prohibited content, try rewording "The reader's action:" first. Avoid any explicit sexual words, replacing them with vague descriptions: "make love" instead of "fuck", "use her mouth" instead of "blowjob".
+                  <br/> If rewording the action doesn't work, start rewriting or removing words from THE SCENE SO FAR or the STORY SO FAR.
+                  <br/> Replacing specific sexual details with a vague "They shared an intimate encounter" usually unblocks the scene and allows you to continue.
+                </>
+              }
               initialPrompt={
                 (panel.source === 'ledger'
                   ? lastLedgerPromptText()
@@ -2516,15 +2585,14 @@ export function GameView(): JSX.Element {
             title="Couldn't end the scene"
             retryMessage={`You can try again or exit. ${ABANDON_HINT}`}
             permanentMessage={ABANDON_HINT}
-            extraText="Manually edit prompt"
+            extraText="Edit prompt"
             onExtra={() => setPanel({ kind: 'editPrompt', source: 'closing' })}
             onRetry={retryEndingCall}
             onAbandon={onAbandonScene}
           />
         )}
 
-        {/* The bookkeeping call failed: the wrap-up modal's shape, with the editor on
-            a content block alone. */}
+        {/* The bookkeeping call failed: the wrap-up modal's shape. */}
         {ledgerError && (
           <LlmFailureModal
             key="ledger-failed"
@@ -2534,7 +2602,7 @@ export function GameView(): JSX.Element {
             title="Couldn't record what happened"
             retryMessage={`You can try again or exit. ${ABANDON_HINT}`}
             permanentMessage={ABANDON_HINT}
-            extraText="Manually edit prompt"
+            extraText="Edit prompt"
             onExtra={() => setPanel({ kind: 'editPrompt', source: 'ledger' })}
             onRetry={retryEndingCall}
             onAbandon={onAbandonScene}
@@ -2552,7 +2620,7 @@ export function GameView(): JSX.Element {
             title="Couldn't record the texting"
             retryMessage={`You can try again, or exit. ${ABANDON_HINT}`}
             permanentMessage={ABANDON_HINT}
-            extraText="Manually edit prompt"
+            extraText="Edit prompt"
             onExtra={() => setPanel({ kind: 'editPrompt', source: 'textLedger' })}
             onRetry={retryEndingCall}
             onAbandon={onAbandonScene}
@@ -2569,7 +2637,7 @@ export function GameView(): JSX.Element {
             title="Couldn't open the next part of the day"
             retryMessage={`You can try again, or exit. ${ABANDON_HINT}`}
             permanentMessage={ABANDON_HINT}
-            extraText="Manually edit prompt"
+            extraText="Edit prompt"
             onExtra={() => setPanel({ kind: 'editPrompt', source: 'intro' })}
             onRetry={retryEndingCall}
             onAbandon={onAbandonScene}
@@ -2588,15 +2656,30 @@ export function GameView(): JSX.Element {
             message={gameOver.message}
             extraText={activeGameOver === 'gameComplete' ? 'Download ending CG' : undefined}
             extraDisabled={!endingArt || savingArt}
+            extraFirst
             onExtra={() => {
               setSavingArt(true)
               void exportEndingArt().finally(() => setSavingArt(false))
             }}
-            // A mod's way on, where one offers it, comes first, and the menu stays beside it.
-            confirmText={endingOffer ? endingOffer.label : 'Return to the main menu'}
-            onConfirm={() => (endingOffer ? toModChoice(endingOffer) : toMenu())}
-            cancelText={endingOffer ? 'Return to the main menu' : undefined}
-            onCancel={endingOffer ? () => toMenu() : undefined}
+            // A mod's way on, where one offers it, comes first and stands in for the game's own
+            // Continue; the menu stays beside it. Continue waits for the contacts' last posts,
+            // which the next semester carries.
+            {...(endingOffer
+              ? {
+                  confirmText: endingOffer.label,
+                  onConfirm: () => toModChoice(endingOffer),
+                  cancelText: 'Return to the main menu',
+                  onCancel: () => toMenu()
+                }
+              : continuable
+                ? {
+                    cancelText: 'Return to the main menu',
+                    onCancel: () => toMenu(),
+                    confirmText: 'Continue',
+                    confirmDisabled: endingPostsPending,
+                    onConfirm: () => toNextSemester()
+                  }
+                : { confirmText: 'Return to the main menu', onConfirm: () => toMenu() })}
           />
         )}
       </AnimatePresence>
@@ -2791,7 +2874,7 @@ export function GameView(): JSX.Element {
               const { turn } = panel
               closePanel()
               if (turn.kind === 'words') sendInterjection(turn.action)
-              else sendGift(turn.charId, turn.itemId, turn.message)
+              else sendGift(turn.charId, turn.pick, turn.message)
             }}
           />
         )}

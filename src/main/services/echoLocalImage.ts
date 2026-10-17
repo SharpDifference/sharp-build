@@ -16,7 +16,7 @@ export async function generateLocalEcho(prompt: string, signal: AbortSignal): Pr
   try {
     await runGenerationJob({workflowFile:'echoMegaten.json',nodes:{seed:'7',positivePrompt:'4',saveImage:'9'},
       prompts:{positive:`kazuma_kaneko_(style), masterpiece, best quality, solo fantasy creature, full body, plain white background, well-lit opaque body, colored surfaces, balanced midtones, soft fill light, readable shadow details, restrained dark accents, visible surface details, ${prompt}`,negative:'(text, lettering, typography, words, letters, numbers, captions, labels, annotations, speech bubble, watermark, signature, logo:1.4), character sheet, reference sheet, infographic, diagram, border, frame, scenery, black background, silhouette, underexposed, crushed blacks, featureless black body, monochrome, invisible body, rim lighting only, checkerboard, chibi, plush toy, cropped, out of frame, human, person'},
-      seed:randomInt(0,2147483647),destPath,label:'Echo artwork',logContext:'Echo-only Megaten LoRA'
+      seed:randomInt(0,2147483647),destPath,format:'raw',label:'Echo artwork',logContext:'Echo-only Megaten LoRA'
     },{signal})
     signal.throwIfAborted()
     return await readFile(destPath)

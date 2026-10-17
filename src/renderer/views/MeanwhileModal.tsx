@@ -24,7 +24,7 @@ export function MeanwhilePage(): JSX.Element | null {
     if (held) { held.active=false; void window.api.jobs.cancelGroup(held.group); ticket.current=null }
   }
   useEffect(() => { cancel(); setSelected(null); setBusy(false); setError(''); return cancel }, [game.loads,game.playthroughId,game.date,game.time,on])
-  const dateLabel = (event: MeanwhileScene): string => event.origin ? termOriginLabel(event.origin) : formatShortGameDate(event.date)
+  const dateLabel = (event: MeanwhileScene): string => event.origin ? termOriginLabel(event.origin) : formatShortGameDate(event.date, game.calendar.season)
   const rows=meanwhileEvents(game), line=selected?.lines[index]
   const spriteVersion = useSpriteVersion(line?.speaker)
   if (!on) return null

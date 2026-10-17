@@ -16,6 +16,7 @@ import { PHOTO_META_READ, type PhotoMeta } from './photos'
 import { REPLAY_ID, replayIdsOf, validateReplay, type SlotReplay } from './replays'
 import { classifySaveId, ENROLLMENT_READ, RECORD_READ, SAVE_READ, SAFE_NUMERIC_ID } from './saveRules'
 import { validateSavedScene, type SavedScene } from './sceneCreator'
+import { recordReplayIds } from './semesters'
 import type {
   Character,
   Enrollment,
@@ -37,6 +38,7 @@ export const BACKUP_SCHEMA_VERSION = 1
 /** Where each kind of file sits inside a backup. */
 export const CHARACTERS_DIR = 'characters'
 const ENDING_ART_DIR = 'endingArt'
+const SEMESTER_ENDING_ART_DIR = 'semesterEndingArt'
 const PROFILE_PICTURES_DIR = 'profilePictures'
 const PHOTOS_DIR = 'photos'
 const BACKGROUNDS_DIR = 'backgrounds'
@@ -81,8 +83,10 @@ export interface BackupFile {
   grabbags: GrabBags
   playthroughs: Record<string, BackupPlaythrough>
   saves: BackupSave[]
-  /** The playthroughs whose graduation picture is in the zip. */
+  /** The playthroughs whose first semester's graduation picture is in the zip. */
   endingArt: string[]
+  /** Every later semester's graduation picture in the zip; absent in backups from before them. */
+  semesterEndingArt?: SemesterPicture[]
   /** The playthroughs whose profile picture is in the zip; absent in backups from before it. */
   profilePictures?: string[]
   /** Every Bunnyboard photo in the zip; absent in backups from before it. */
@@ -198,6 +202,50 @@ export function endingArtEntry(playthroughId: string): string {
   return `${ENDING_ART_DIR}/${playthroughId}`
 }
 
+/** One later semester's graduation picture, by playthrough and semester. */
+export interface SemesterPicture {
+  playthroughId: string
+  semesterId: string
+}
+
+/**
+ * Where a later semester's graduation picture sits: a folder of its own, since the first
+ * semester's sits at its playthrough's own name in `endingArt`.
+ */
+export function semesterEndingArtEntry(playthroughId: string, semesterId: string): string {
+  return `${SEMESTER_ENDING_ART_DIR}/${playthroughId}/${semesterId}`
+}
+
+/**
+ * The later semesters' graduation pictures a backup carries, each under ids that can name a
+ * path and no pair twice; refuses the backup before anything is written.
+ */
+export function semesterPicturesFromBackup(record: BackupFile): SemesterPicture[] {
+  const carried: unknown = record.semesterEndingArt ?? []
+  if (!Array.isArray(carried)) {
+    throw appError(BACKUP_READ.malformed.code, BACKUP_READ.malformed.message, 'semesterEndingArt')
+  }
+  const seen = new Set<string>()
+  return carried.map((entry: unknown, index) => {
+    const { playthroughId, semesterId } = (entry ?? {}) as Partial<SemesterPicture>
+    if (
+      typeof playthroughId !== 'string' ||
+      !SAFE_NUMERIC_ID.test(playthroughId) ||
+      typeof semesterId !== 'string' ||
+      !SAFE_NUMERIC_ID.test(semesterId) ||
+      seen.has(`${playthroughId}/${semesterId}`)
+    ) {
+      throw appError(
+        BACKUP_READ.malformed.code,
+        BACKUP_READ.malformed.message,
+        `semesterEndingArt[${String(index)}]`
+      )
+    }
+    seen.add(`${playthroughId}/${semesterId}`)
+    return { playthroughId, semesterId }
+  })
+}
+
 /** Where one playthrough's profile picture sits; the PNG bytes keep no extension. */
 export function profilePictureEntry(playthroughId: string): string {
   return `${PROFILE_PICTURES_DIR}/${playthroughId}`
@@ -232,10 +280,10 @@ function isPlaythroughPicture(name: string, dir: string): boolean {
   return SAFE_NUMERIC_ID.test(id) && !id.includes('/')
 }
 
-/** Whether `name` is one photo's picture: `photos/<playthroughId>/<photoId>` and nothing deeper. */
-function isPhotoPicture(name: string): boolean {
-  if (!name.startsWith(`${PHOTOS_DIR}/`)) return false
-  const rest = name.slice(PHOTOS_DIR.length + 1)
+/** Whether `name` is one picture a playthrough keeps by id: `<dir>/<playthroughId>/<id>` and nothing deeper. */
+function isPicturePair(name: string, dir: string): boolean {
+  if (!name.startsWith(`${dir}/`)) return false
+  const rest = name.slice(dir.length + 1)
   const parts = rest.split('/')
   return parts.length === 2 && SAFE_NUMERIC_ID.test(parts[0]) && SAFE_NUMERIC_ID.test(parts[1])
 }
@@ -259,8 +307,9 @@ export function classifyBackupEntry(name: string): 'record' | 'image' | 'audio' 
   if (isArchiveCruft(name)) return 'skip'
   if (charFileOf(name)) return 'image'
   if (isPlaythroughPicture(name, ENDING_ART_DIR)) return 'image'
+  if (isPicturePair(name, SEMESTER_ENDING_ART_DIR)) return 'image'
   if (isPlaythroughPicture(name, PROFILE_PICTURES_DIR)) return 'image'
-  if (isPhotoPicture(name)) return 'image'
+  if (isPicturePair(name, PHOTOS_DIR)) return 'image'
   if (isBackgroundPicture(name)) return 'image'
   return 'reject'
 }
@@ -306,19 +355,28 @@ export function scenesFromBackup(record: BackupFile): SavedScene[] {
   })
 }
 
-/** Every replay a backup's saves name, once each, by playthrough: what an export carries. */
+/**
+ * Every replay a backup's saves or its records' semester logs name, once each, by playthrough:
+ * what an export carries.
+ */
 export function namedReplays(
-  saves: readonly BackupSave[]
+  saves: readonly BackupSave[],
+  playthroughs: Readonly<Record<string, Pick<BackupPlaythrough, 'record'>>> = {}
 ): Array<{ playthroughId: string; replayId: string }> {
   const seen = new Set<string>()
   const named: Array<{ playthroughId: string; replayId: string }> = []
+  const name = (playthroughId: string, replayId: string): void => {
+    const key = `${playthroughId}/${replayId}`
+    if (seen.has(key)) return
+    seen.add(key)
+    named.push({ playthroughId, replayId })
+  }
   for (const { playthroughId, save } of saves) {
-    for (const replayId of replayIdsOf(save.replays)) {
-      const key = `${playthroughId}/${replayId}`
-      if (seen.has(key)) continue
-      seen.add(key)
-      named.push({ playthroughId, replayId })
-    }
+    for (const replayId of replayIdsOf(save.replays)) name(playthroughId, replayId)
+  }
+  for (const [playthroughId, { record }] of Object.entries(playthroughs)) {
+    if (!record) continue
+    for (const replayId of recordReplayIds(record)) name(playthroughId, replayId)
   }
   return named
 }

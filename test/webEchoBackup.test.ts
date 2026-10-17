@@ -10,7 +10,7 @@ import { defaultSettings } from '@shared/settingsRules'
 const mocks = vi.hoisted(() => ({ pick: vi.fn(), download: vi.fn() }))
 vi.mock('../src/web/transfer', async original => ({ ...await original<typeof import('../src/web/transfer')>(), pickFile: mocks.pick }))
 vi.mock('../src/web/download', () => ({ offerDownload: mocks.download }))
-vi.mock('../src/web/packs', () => ({ isShipped: () => false, buildPack: (files: Record<string, Uint8Array>) => zipSync(files) }))
+vi.mock('../src/web/packs', () => ({ isShipped: () => false, shippedCharIds: () => [], buildPack: (files: Record<string, Uint8Array>) => zipSync(files) }))
 vi.mock('../src/web/settings', () => ({ rendererSettings: async () => defaultSettings(), currentSettings: async () => defaultSettings(), rowFor: (v: unknown) => v, forgetSettings: () => {} }))
 vi.mock('../src/web/backgrounds', () => ({ forgetBackgroundUrls: () => {} }))
 vi.mock('../src/web/db/chars', () => ({ forgetRels: () => {} }))
