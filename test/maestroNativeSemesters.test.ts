@@ -5,7 +5,7 @@ import { prepareEchoSetup } from '@shared/echoSetup'
 import { normalizeMeanwhile } from '@shared/meanwhile'
 import { normalizeStoryMemory, storySnapshot } from '@shared/storyMemory'
 import { normalizeWhisper, whisperTerm } from '@shared/venusWhisper'
-import { calendarOf, semesterOf } from '@shared/semesters'
+import { calendarOf, semesterOf, LAST_SEMESTER } from '@shared/semesters'
 import { SAVE_READ, stampSave } from '@shared/saveRules'
 import { validateRecord } from '@shared/jsonValidate'
 import { useGameStore } from '../src/renderer/stores/gameStore'
@@ -17,7 +17,7 @@ import { character, charInfo, enrollment, playthroughRecord } from './fixtures'
 
 afterEach(() => { useGameStore.getState().reset(); useModsStore.setState({ switches: { on: {}, options: {} } }) })
 
-it('keeps Maestro save data through native spring and fall boundaries with mods disabled', () => {
+it('keeps Maestro save data through all eight native semesters and older branch reloads with mods disabled', () => {
   const a = character({ charId: 'a' }), b = character({ charId: 'b', firstName: 'Mina' })
   const cast = { a, b }
   const mods = ['city-life-locations', 'city-life-jobs', 'character-dynamics']
@@ -49,15 +49,17 @@ it('keeps Maestro save data through native spring and fall boundaries with mods 
       title: 'An encounter', where: 'Library', positive: true, ref: 'library', kind: 'hangout', lines }] }),
     exVenusWhisper: whisper })
   useModsStore.setState({ switches: { on: Object.fromEntries(MODS.map(mod => [mod.id, false])), options: {} } })
+  const endings: ReturnType<typeof stampSave>[] = []
   let shifted = 9
-  for (const index of [1, 2]) {
+  for (let index = 1; index <= LAST_SEMESTER; index++) {
+    endings.push(stampSave(game().toGameSave(), '123', `ending-${index}`, index))
     const view = semesterOf(record, game().semesterId ?? undefined)
     const handoff = carryOf(game(), view)
     handoff.carry.mods = modFieldsLeaving(game().toGameSave(), { playthroughId: '123', index: view.index, season: view.season, characters: cast })
     shifted -= view.season === 'spring' ? 210 : 155
     const roster = handoff.continuing.map(id => cast[id as keyof typeof cast])
     const draft = enrollment({ chars: roster.map(c => c.charId), mods, perChar: Object.fromEntries(roster.map(c =>
-      [c.charId, { year: 1, major: 'Biology', dorm: 'lowrise_1', schedule: {} }])),
+      [c.charId, { ...handoff.priorProfiles[c.charId], schedule: {} }])),
       continued: { id: String(200 + index), index, ...(view.id ? { parent: view.id } : {}),
         alumni: handoff.alumni, priorProfiles: handoff.priorProfiles, pursuits: { b: 'Working elsewhere.' }, carry: handoff.carry } })
     const start = continuedStartOf(draft, {}, roster)
@@ -82,4 +84,24 @@ it('keeps Maestro save data through native spring and fall boundaries with mods 
     expect(JSON.stringify(facts)).not.toContain('spectator line')
     useGameStore.setState({ date: 123, time: 0 })
   }
+  const final = game().toGameSave()
+  // An older ending may be continued into a sibling semester. Its source must be that
+  // ending alone, even after a much newer semester from the same playthrough was loaded.
+  for (const ending of endings.reverse()) {
+    game().loadSave(ending, record, cast)
+    const view = semesterOf(record, game().semesterId ?? undefined)
+    const original = JSON.stringify(ending)
+    const first = modFieldsLeaving(ending, { playthroughId: '123', index: view.index, season: view.season, characters: cast })
+    const sibling = modFieldsLeaving(ending, { playthroughId: '123', index: view.index, season: view.season, characters: cast })
+    expect(first).toEqual(sibling)
+    first.exPlotTwist = 'A different direction in the sibling semester.'
+    first.exEcho!.girls.a.name = 'Sibling-only name'
+    expect(sibling.exPlotTwist).toBe('An ongoing story direction.')
+    expect(sibling.exEcho!.girls.a.name).toBe(echo.girls.a.name)
+    expect(JSON.stringify(ending)).toBe(original)
+    expect(game().exPlotTwist).toBe('An ongoing story direction.')
+    expect(game().semesterIndex).toBe(view.index)
+    expect(storySnapshot(game())!.records.filter(f => f.kind === 'encounter')).toHaveLength(1)
+  }
+  expect(final.exEcho).toEqual(echo)
 })
