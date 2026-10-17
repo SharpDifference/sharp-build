@@ -196,6 +196,29 @@ describe('Bowling pins', () => {
     expect(average({ ...POCKET, power: 0.25 }).pins).toBeLessThan(pocket.pins)
   })
 
+  it('never leaves the 2 and the 3 standing with the head pin down: a ball between them clips both', () => {
+    const rand = seeded(5)
+    for (let i = 0; i < 4000; i++) {
+      const arriveX = (rand() - 0.5) * 2 * 12
+      const fell = resolvePins(arriveX, (rand() - 0.5) * 2, 0.3 + rand() * 0.7, ALL_PINS, rand)
+      if (fell.includes(1)) expect(fell.includes(2) || fell.includes(3)).toBe(true)
+    }
+  })
+
+  it('leaves a nose hit split more often than a pocket hit', () => {
+    const splits = (thrown: Throw): number => {
+      const rand = seeded(9)
+      const path = pathOf(thrown)
+      let count = 0
+      for (let i = 0; i < 4000; i++) {
+        const fell = resolvePins(path.arriveX, path.angle, thrown.power, ALL_PINS, rand)
+        if (isSplit(ALL_PINS.filter((pin) => !fell.includes(pin)))) count++
+      }
+      return count
+    }
+    expect(splits({ position: 0, power: 0.78, hook: 0 })).toBeGreaterThan(splits(POCKET))
+  })
+
   it('lands a sloppy ball somewhere in the middle of the rack on average', () => {
     const rand = seeded(11)
     let pins = 0
