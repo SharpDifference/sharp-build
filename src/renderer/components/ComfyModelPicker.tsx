@@ -27,7 +27,8 @@ export interface ComfyModelPickerProps {
   listed: boolean
   folders: Record<ComfyModelRole, boolean>
   onPick: (role: ComfyModelRole, value: string) => void
-  onOpenFolder: (role: ComfyModelRole) => void
+  /** Opens a slot's folder, given the file the slot shows so the one holding it can be found. */
+  onOpenFolder: (role: ComfyModelRole, pick: string) => void
   /** The LoRA weight as typed, shown blank while the LoRA is None. */
   weightText: string
   onWeightText: (text: string) => void
@@ -191,7 +192,7 @@ export function ComfyModelPicker({
                 ? { text: weightText, onText: onWeightText, onBlur: onWeightBlur }
                 : undefined
             }
-            onOpenFolder={folders[slot.role] ? () => onOpenFolder(slot.role) : undefined}
+            onOpenFolder={folders[slot.role] ? () => onOpenFolder(slot.role, pick) : undefined}
           />
         )
       })}

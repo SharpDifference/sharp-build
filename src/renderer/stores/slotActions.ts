@@ -3,7 +3,7 @@ import { jobDefOf } from '@shared/jobs'
 import { LOWRISE_LOCATION } from '@shared/locations'
 import { statsLowestFirst, type StatKey } from '@shared/playerStats'
 import type { SemesterCalendar } from '@shared/semesters'
-import type { ClassEntry } from '@shared/types'
+import type { ClassEntry, TimeSlot } from '@shared/types'
 import { examOn } from '../prompts/classProgress'
 import { STAT_ACTIONS, statActionBag } from '../prompts/statActions'
 import { useGameStore } from './gameStore'
@@ -160,6 +160,19 @@ function fillers(count: number): SlotAction[] {
     tone: 'idle',
     verdict: null
   }))
+}
+
+/** What the Relax row is keyed by, which `relax` answers rather than the classifier. */
+export const RELAX_KEY = 'relax'
+
+/** The row that spends the slot doing nothing, last under the rest. */
+export function relaxAction(time: TimeSlot): SlotAction {
+  return {
+    key: RELAX_KEY,
+    text: time === 0 ? 'Relax (Skip to tonight)' : 'Relax (Skip to tomorrow)',
+    tone: 'idle',
+    verdict: null
+  }
 }
 
 /** The whole row for the slot the clock is on. */

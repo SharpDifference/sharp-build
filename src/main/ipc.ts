@@ -568,11 +568,14 @@ export function registerIpcHandlers(): void {
   handle('comfy:listLocalModels', () => listLocalModels())
   handle('comfy:probe', (_event, url: string) => probeComfy(url))
   // The folder is resolved here, never taken from the renderer, and its path is not reported.
-  handle('comfy:openModelFolder', async (_event, role: ComfyModelRole, url: string | null) => {
-    const folder = await modelFolderOf(role, url)
-    const failure = await shell.openPath(folder)
-    if (failure !== '') throw appError('OPEN_FOLDER_FAILED', 'Could not open the models folder.')
-  })
+  handle(
+    'comfy:openModelFolder',
+    async (_event, role: ComfyModelRole, url: string | null, pick?: unknown) => {
+      const folder = await modelFolderOf(role, url, typeof pick === 'string' ? pick : undefined)
+      const failure = await shell.openPath(folder)
+      if (failure !== '') throw appError('OPEN_FOLDER_FAILED', 'Could not open the models folder.')
+    }
+  )
 
   // `staged` renders into the character's staging tree instead of over the live set.
   handle(
