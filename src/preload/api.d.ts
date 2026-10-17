@@ -471,8 +471,15 @@ export interface VenusUniversityApi {
     listLocalModels: () => Promise<Result<ComfyModelLists>>
     /** What the player's own ComfyUI at `url` has: its missing nodes, models and local folders. */
     probe: (url: string) => Promise<Result<ComfyProbe>>
-    /** Opens one slot's model folder: the app's own install's where `url` is null. */
-    openModelFolder: (role: ComfyModelRole, url: string | null) => Promise<Result<void>>
+    /**
+     * Opens one slot's model folder: the app's own install's where `url` is null, else the one
+     * of the server's that holds `pick`, or failing that any of the slot's models.
+     */
+    openModelFolder: (
+      role: ComfyModelRole,
+      url: string | null,
+      pick?: string
+    ) => Promise<Result<void>>
     /** Subscribes to the server's runtime state on the fixed state channel. */
     onState: (listener: (status: ComfyStatus) => void) => () => void
     /**
