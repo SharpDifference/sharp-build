@@ -1,3 +1,4 @@
+import { locationAvailable } from '@shared/cityLife'
 import { locationDefOf } from '@shared/locations'
 import { keyPattern, LOREBOOK } from '../prompts/lorebook'
 import { useGameStore } from '../stores/gameStore'
@@ -41,7 +42,9 @@ const PLACE_PATTERNS: readonly { id: string; pattern: RegExp }[] = LOREBOOK.flat
 function placeNamed(text: string | null | undefined): string | null {
   const raw = (text ?? '').trim().toLowerCase()
   if (!raw) return null
-  const known = (id: string): string | null => (locationDefOf(id) ? id : null)
+  // A place another mod adds is only one where this playthrough has it.
+  const known = (id: string): string | null =>
+    locationDefOf(id) && locationAvailable(id) ? id : null
 
   const direct = known(raw)
   if (direct) return direct

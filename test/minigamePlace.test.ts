@@ -21,3 +21,15 @@ describe("the mini-games' place for a scene", () => {
     expect(placeOf(null, null)).toBeNull()
   })
 })
+
+describe("a place City Life adds", () => {
+  it('is a place only where the playthrough has City Life', async () => {
+    const { setCityLifeEnabled } = await import('@shared/cityLife')
+    setCityLifeEnabled(true, true)
+    expect(placeOf('the student lanes', 'bowling_alley')).toBe('bowling_alley')
+    expect(placeOf('bowling', null)).toBe('bowling_alley')
+    setCityLifeEnabled(false, false)
+    expect(placeOf('bowling', null)).toBeNull()
+    expect(placeOf('the student lanes', 'bowling_alley')).toBeNull()
+  })
+})
