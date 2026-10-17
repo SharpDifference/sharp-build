@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
+  aimOf,
   AREA,
   HOME,
   LIFT_SHARE,
@@ -311,5 +312,24 @@ describe('what the front shows of a go', () => {
     expect(goShown(takeGo(toys, { x: HOME.x, z: HOME.z }, never), null)).toMatch(/^Missed/)
     // Short enough for the machine's front, whatever the toy.
     for (const each of toys) expect(`Go 5: ${goShown({ ...caught, aimed: each }, each.id)}`.length).toBeLessThanOrEqual(40)
+  })
+})
+
+describe('Claw Machine, what the claw would take', () => {
+  it('lights the toy a drop there takes, and nothing where it would take nothing', () => {
+    for (const seed of ['a', 'b', 'c', 'd']) {
+      const toys = pile(seed)
+      const where = seededRand(`stops-${seed}`)
+      for (let i = 0; i < 400; i++) {
+        const stop = { x: 20 + where() * 75, z: where() * 56 }
+        const go = takeGo(toys, stop, seededRand(`go-${i}`))
+        const aim = aimOf(toys, stop)
+        if (go.kind === 'catch' || go.kind === 'slip' || go.kind === 'pinned') {
+          expect(aim?.id).toBe(go.aimed?.id)
+        } else {
+          expect(aim).toBeNull()
+        }
+      }
+    }
   })
 })

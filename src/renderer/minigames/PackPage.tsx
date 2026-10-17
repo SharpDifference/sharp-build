@@ -164,6 +164,32 @@ function GamePage({ game, onBack }: { game: MiniGameDef; onBack: () => void }): 
           ]}
         />
       )}
+      {(game.aids ?? []).map((aid) => {
+        const set = prefs?.aids?.[aid.id]
+        return (
+          <SelectField
+            key={aid.id}
+            id={`minigame-pref-${game.id}-aid-${aid.id}`}
+            label={aid.label}
+            hint={aid.describe}
+            value={set === undefined ? '' : set ? 'yes' : 'no'}
+            onChange={(value) => {
+              const aids = { ...prefs?.aids }
+              if (value === '') delete aids[aid.id]
+              else aids[aid.id] = value === 'yes'
+              setPrefs(game.id, {
+                ...prefs,
+                aids: Object.keys(aids).length > 0 ? aids : undefined
+              })
+            }}
+            options={[
+              { value: '', label: `As the game has it (${aid.on ? 'on' : 'off'})` },
+              { value: 'yes', label: 'On' },
+              { value: 'no', label: 'Off' }
+            ]}
+          />
+        )
+      })}
       <SelectField
         id={`minigame-pref-${game.id}-playbyplay`}
         label="Play-by-play in the text box"

@@ -51,6 +51,8 @@ export interface GamePlay {
    * line it narrates before its next move, and drops its own pauses for reading.
    */
   stepped: boolean
+  /** Which of the game's aids are on, by id, as the game and the player have them. */
+  aids: Readonly<Record<string, boolean>>
   /**
    * The reader has made a move by key: at his own pace, that is him moving on, and the line on
    * the box counts as read. A press on the table's surface is taken so already; a game says it

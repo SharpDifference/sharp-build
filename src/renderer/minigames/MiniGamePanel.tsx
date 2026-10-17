@@ -3,6 +3,7 @@ import { useEffect, useMemo, useRef, useState, type JSX } from 'react'
 import { createPortal } from 'react-dom'
 import { motion } from 'motion/react'
 import {
+  aidsOf,
   CHAT_OPTIONS,
   defaultOptions,
   groupsFor,
@@ -309,6 +310,7 @@ export function MiniGamePanel({ theme, onClose }: ScenePanelProps): JSX.Element 
       opponents: seated?.opponents ?? [],
       location,
       stepped: Boolean(seated?.game.stepped),
+      aids: seated ? aidsOf(seated.game) : {},
       moved: () => stepTable(),
       read: () => (seated?.game.stepped ? tableRead() : Promise.resolve()),
       stake: seated?.stake ?? '',

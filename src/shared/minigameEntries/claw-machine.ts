@@ -26,6 +26,14 @@ const CLAW_MACHINE: MiniGameDef = {
   keys: true,
   // Alone, or with one girl beside him: she watches and picks, and never takes the stick.
   players: { min: 0, max: 1 },
+  aids: [
+    {
+      id: 'target',
+      label: 'Show what the claw would grab',
+      describe: 'Lights up the toy under the claw while you steer, or nothing where it would come up empty.',
+      on: true
+    }
+  ],
   controls:
     'Hold Right or D to run the claw across and let go to stop it, then hold Up or W to run it back into the cabinet and let go: it drops by itself. Each way moves once, and a countdown drops it if you wait. A grab off a toy\'s middle is likelier to slip.',
   stepped: false,
