@@ -9,7 +9,6 @@ import { animate, motion, useMotionValue, useReducedMotion } from 'motion/react'
 import { STAT_KEYS, STAT_LABELS, type PlayerStats } from '@shared/playerStats'
 import { formatNumericGameDate, formatWeekday } from '../prompts/gameDate'
 import type { RevealKey } from '../prompts/introScript'
-import { seasonWords } from '@shared/term'
 import { weekOf } from '../prompts/occasions'
 import type { TextMark } from '@shared/types'
 import type { Weather } from '@shared/weather'
@@ -334,12 +333,13 @@ export function LandingChrome(props: LandingChromeProps): JSX.Element {
                 </>
               )}
             </div>
-            {/* The term is named off the season being played. The goodbyes stand in the week
-                after the semester's last, which is the break it ends into. */}
+            {/* The calendar is anchored in January and ends at graduation in May, so the term it
+                names is a fact about the shipped semester rather than a label invented here. The
+                goodbyes stand in the week after graduation's, which is the summer. */}
             <div className="vu-landing-meta">
               {props.epilogue
-                ? `WEEK ${weekOf(date) + 2} · ${seasonWords().endBreak.toUpperCase()}`
-                : `WEEK ${weekOf(date) + 1} · ${seasonWords().name.toUpperCase()} SEMESTER`}
+                ? `WEEK ${weekOf(date) + 2} · SUMMER VACATION`
+                : `WEEK ${weekOf(date) + 1} · SPRING SEMESTER`}
             </div>
           </div>
         </motion.div>

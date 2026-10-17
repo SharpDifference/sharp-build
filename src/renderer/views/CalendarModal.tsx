@@ -24,7 +24,7 @@ import { profileUrl, useSpriteVersion } from '../stores/characterStore'
 import { useGameStore } from '../stores/gameStore'
 import { keptReplayIds } from '../stores/loop/replay'
 import type { ManualSaveOffer } from '../stores/loop/saves'
-import { dayOfMonth, gridCellsOf, monthIndexOf, monthName, monthsOf } from './calendarMonths'
+import { dayOfMonth, gridCellsOf, MONTHS, monthIndexOf, monthName } from './calendarMonths'
 import type { ScreenTheme } from './clockTheme'
 import {
   dealt,
@@ -286,10 +286,9 @@ export function CalendarModal({
 
   const { host, overlayProps } = useModalShell(onClose)
 
-  const months = monthsOf()
-  const { first, last } = months[month]
+  const { first, last } = MONTHS[month]
   const firstMonth = month === 0
-  const lastMonth = month === months.length - 1
+  const lastMonth = month === MONTHS.length - 1
 
   /** The classes meeting on `date`, each with the half it meets in, Day then Night. */
   function classesOn(date: number): Array<{ time: TimeSlot; entry: ClassEntry }> {
@@ -462,7 +461,7 @@ export function CalendarModal({
     )
   }
 
-  const cells = gridCellsOf(monthsOf()[month])
+  const cells = gridCellsOf(MONTHS[month])
 
   const dayOccasions = occasionsFor(selected).filter((occasion) => occasion.time === null)
 

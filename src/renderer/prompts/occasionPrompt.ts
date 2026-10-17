@@ -1,7 +1,6 @@
 import { CLASS_SLOTS, FINAL_DATE } from '@shared/classes'
 import { slotFromId } from '@shared/jobs'
 import { shuffle } from '@shared/shuffle'
-import { activeSeason, seasonWords } from '@shared/term'
 import type { Occasion, StructuredRequest, TimeSlot } from '@shared/types'
 import { formatDatePart } from './gameDate'
 import { LOREBOOK } from './lorebook'
@@ -9,7 +8,7 @@ import {
   occasionsOn,
   SEMESTER_WEEKS,
   SPRING_BREAK,
-  staticOccasions,
+  STATIC_OCCASIONS,
   weekOf
 } from './occasions'
 import { objectSchema } from './schema'
@@ -64,13 +63,13 @@ function semesterWeeks(): number[] {
 
 /** The weeks with no fixed occasion anywhere in them: the pool the four named events draw from. */
 function unclaimedWeeks(): number[] {
-  const claimed = weeksTouchedBy(staticOccasions())
+  const claimed = weeksTouchedBy(STATIC_OCCASIONS)
   return semesterWeeks().filter((week) => !claimed.has(week))
 }
 
 /** The weeks a filler may go in: all but those a multi-day fixed occasion owns. */
 function fillerWeeks(): number[] {
-  const blocked = weeksTouchedBy(staticOccasions().filter((o) => o.endDate > o.startDate))
+  const blocked = weeksTouchedBy(STATIC_OCCASIONS.filter((o) => o.endDate > o.startDate))
   return semesterWeeks().filter((week) => !blocked.has(week))
 }
 
@@ -205,11 +204,6 @@ function fillerDate(
 /** The mark on a filler line that falls inside spring break. */
 const BREAK_TAG = '[spring break]'
 
-/** The same mark as the season being enrolled for names the week off. */
-function breakTag(): string {
-  return activeSeason() === 'fall' ? `[${seasonWords().midBreak}]` : BREAK_TAG
-}
-
 /** `"Friday, March 27"`, or `"Saturday, May 9 through Monday, May 11"` for a run. */
 function whenLine(span: { startDate: number; endDate: number }): string {
   const start = formatDatePart(span.startDate)
@@ -249,7 +243,7 @@ export function buildOccasionPrompt(
   const user = [
     'ALREADY ON THE CALENDAR',
     'These are fixed and are not yours to write. Never invent one of them, and never invent anything that would read as a second version of one.',
-    ...staticOccasions().map(existingLine),
+    ...STATIC_OCCASIONS.map(existingLine),
     '',
     'EVENTS TO WRITE',
     'One entry in "events" for each id below, and nothing else. The dates are already decided — do not restate them.',
@@ -267,12 +261,12 @@ export function buildOccasionPrompt(
       ? [
           'FILLERS',
           'Each id below is something small happening on campus or in the city for half a day — a club running a table, a market, a screening, a tournament, a protest, a food thing. Ordinary scale. Not a dance, not a gala, not a fair.',
-          `Ids marked ${breakTag()} fall in ${seasonWords().midBreak}: most campus facilities are closed, so these are mostly events put on by the city or remaining students.`,
+          `Ids marked ${BREAK_TAG} fall in spring break: most campus facilities are closed, so these are mostly events put on by the city or remaining students.`,
           '',
           ...fillers.map(
             (request) =>
               `"${request.id}" — ${requestWhenLine(request)} — ${request.seed}${
-                request.springBreak ? ` ${breakTag()}` : ''
+                request.springBreak ? ` ${BREAK_TAG}` : ''
               }`
           )
         ]

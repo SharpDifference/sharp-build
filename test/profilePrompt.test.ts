@@ -1,5 +1,4 @@
 import { describe, expect, it, vi } from 'vitest'
-import { setCityLifeEnabled } from '@shared/cityLife'
 import {
   hiddenScheduleAssignmentsOf,
   jobAssignmentsOf,
@@ -122,54 +121,6 @@ describe('validateProfileDraft', () => {
   it('resolves a job with no shifts to no job at all', () => {
     const out = validateProfileDraft(profile({ jobShifts: 0 }), ROSTER)
     expect(out.characters.sarah_rose.job).toBe('')
-  })
-
-  it('keeps the job a returning student held, whatever the reply gave her', () => {
-    const returning = {
-      sarah_rose: {
-        year: 3,
-        major: 'Biology',
-        dorm: 'lowrise_3' as const,
-        job: { jobId: 'springmart', shifts: 1 }
-      }
-    }
-    const moved = validateProfileDraft(profile({ job: 'cutetea', jobShifts: 2 }), ROSTER, returning)
-    expect(moved.characters.sarah_rose.job).toBe('springmart')
-    expect(moved.characters.sarah_rose.jobShifts).toBe(1)
-
-    const dropped = validateProfileDraft(profile({ job: '', jobShifts: 0 }), ROSTER, returning)
-    expect(dropped.characters.sarah_rose.job).toBe('springmart')
-    expect(dropped.characters.sarah_rose.jobShifts).toBe(1)
-  })
-
-  it('leaves a returning student who had no job to the reply', () => {
-    const returning = { sarah_rose: { year: 3, major: 'Biology', dorm: 'lowrise_3' as const } }
-    const out = validateProfileDraft(profile({ job: 'cutetea', jobShifts: 2 }), ROSTER, returning)
-    expect(out.characters.sarah_rose.job).toBe('cutetea')
-    expect(out.characters.sarah_rose.jobShifts).toBe(2)
-  })
-
-  it.each([false, true])('retains an existing City Life employer while gating new assignments (jobs %s)', (enabled) => {
-    setCityLifeEnabled(true, enabled)
-    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
-    try {
-      const returning = {
-        sarah_rose: {
-          year: 3, major: 'Biology', dorm: 'lowrise_3' as const,
-          job: { jobId: 'ex_cat_cafe', shifts: 1 }
-        }
-      }
-      const kept = validateProfileDraft(profile({ job: 'cutetea', jobShifts: 2 }), ROSTER, returning)
-      expect(kept.characters.sarah_rose.job).toBe('ex_cat_cafe')
-      expect(kept.characters.sarah_rose.jobShifts).toBe(1)
-
-      const fresh = validateProfileDraft(profile({ job: 'ex_cat_cafe', jobShifts: 2 }), ROSTER)
-      expect(fresh.characters.sarah_rose.job).toBe(enabled ? 'ex_cat_cafe' : '')
-      expect(fresh.characters.sarah_rose.jobShifts).toBe(enabled ? 2 : 0)
-    } finally {
-      setCityLifeEnabled(false, false)
-      warn.mockRestore()
-    }
   })
 
   it("folds the array by key: the first row for a student wins, and a stranger's row never becomes a character", () => {

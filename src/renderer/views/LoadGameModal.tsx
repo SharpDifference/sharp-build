@@ -45,7 +45,6 @@ import {
   type ResolvedSave
 } from '../stores/saveStore'
 import { usePhotoStore } from '../stores/photoStore'
-import { seasonOf, termIndexOf } from '@shared/term'
 import { prepareWayOn, saveChoice, type SaveChoice, type WayOn } from '../mods/hooks'
 import { entryCrossing, menuCrossing } from '../stores/slotCrossing'
 import { useUiStore } from '../stores/uiStore'
@@ -122,12 +121,7 @@ function cardOf(entry: ResolvedSave, sticker: string): SaveGridCard {
     headline: summary
       ? summary.graduationSeen
         ? GOODBYES_SAVE_LABEL
-        : // Dated in the season of the playthrough the save is in, whatever game is running.
-          formatDateBanner(
-            summary.date,
-            summary.time,
-            seasonOf(entry.record ? termIndexOf(entry.record) : 0)
-          )
+        : formatDateBanner(summary.date, summary.time)
       : 'Unreadable save',
     meta: `Saved ${writtenAtShort(savedAt)}`,
     reason: unloadable ? `Cannot load — ${unloadable}` : null,
@@ -846,7 +840,7 @@ function PlaythroughRow({
           ? 'Unreadable'
           : playthrough.enrolling
             ? 'Class registration'
-            : formatDateBanner(playthrough.date, playthrough.time, seasonOf(playthrough.term ?? 0))}
+            : formatDateBanner(playthrough.date, playthrough.time)}
       </span>
 
       {/* The faces stand where a list of their names would: recognised, not read. */}

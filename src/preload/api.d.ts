@@ -21,7 +21,6 @@ import type { SlotReplay } from '@shared/replays'
 import type { RoomVariant } from '@shared/room'
 import type { SavedScene, SavedSceneSummary } from '@shared/sceneCreator'
 import type { ExportKind } from '@shared/sillyTavern'
-import type { BreakDraft, TermBreak } from '@shared/termBreak'
 import type {
   Character,
   CharacterBrief,
@@ -135,8 +134,6 @@ export interface VenusUniversityApi {
     generateProfiles: <T>(request: StructuredRequest, group: string) => Promise<Result<T>>
     /** Generates the save's own calendar occasions once, at New Game. */
     generateOccasions: <T>(request: StructuredRequest, group: string) => Promise<Result<T>>
-    /** Generates what the returning roster remembers of the break, once, as a semester is continued. */
-    generateBreak: <T>(request: StructuredRequest, group: string) => Promise<Result<T>>
     /** Generates one exam's multiple-choice questions. Never streams. */
     generateQuiz: <T>(request: StructuredRequest) => Promise<Result<T>>
     /**
@@ -335,12 +332,6 @@ export interface VenusUniversityApi {
     enroll: (draft: EnrollmentDraft) => Promise<Result<CreatedEnrollment>>
     /** The semester waiting in one folder, for the registrar reopening on it. */
     enrollment: (playthroughId: string) => Promise<Result<Enrollment>>
-    /** The break being played after one finished semester; `null` where none has been opened. */
-    break: (playthroughId: string) => Promise<Result<TermBreak | null>>
-    /** Writes that break over whatever stood there. */
-    writeBreak: (playthroughId: string, draft: BreakDraft) => Promise<Result<TermBreak>>
-    /** Removes it, once the next semester has been generated from it. */
-    removeBreak: (playthroughId: string) => Promise<Result<void>>
     /**
      * Starts a new playthrough: its record, then its opening slot-save — into the folder its
      * enrollment minted, whose file it replaces, or a freshly minted one.

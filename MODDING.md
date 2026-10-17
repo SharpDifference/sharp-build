@@ -109,7 +109,7 @@ optionGroups: [{ id: 'loader', label: 'Loading animation', hint: 'The animation 
 
 Shared code holds no switches. Where a rule there has to follow one, give the rule a flag with
 a setter, and set it from `modsStore.ts` at boot and whenever a switch moves
-(`useModsStore.subscribe`). Continuing Semesters does this for its seniors option.
+(`useModsStore.subscribe`). Echo does this for its bonus, and Photo Feature for its switches.
 
 ## Hook points
 

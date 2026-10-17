@@ -211,15 +211,6 @@ export interface PromptState {
    */
   farewell?: { firstName: string; senior: boolean }
   /**
-   * Set only for a scene a break is running, down the goodbye's path: what stands in the NOW
-   * block where a goodbye's own two lines would.
-   */
-  trip?: {
-    now: readonly string[]
-    /** The day the scene really falls on, which is what her mood cycle is read at. */
-    day: number
-  }
-  /**
    * Classes he added at add/drop and has not yet walked into — every unspent add;
    * `classCode` decides which applies.
    */
@@ -661,14 +652,11 @@ function castBlock(cast: readonly Character[], state: PromptState): string[] {
     lines.push(...profileLines(character, flags, cast.length))
 
     // What kind of day she is having; a created scene's notes say it instead.
-    // A break's scene stands on the epilogue's slot whatever day it falls on, so her mood is read
-    // at the day it really is: otherwise she would have the same kind of day on every visit.
-    const moodDay = state.trip?.day ?? state.date
     const mood = state.createdScene
       ? null
       : moodLine(
           character.firstName,
-          moodDay,
+          state.date,
           info?.moodCycleOffset ?? 0,
           hasTrait(character, 'Mood-swings')
         )
@@ -685,7 +673,7 @@ function castBlock(cast: readonly Character[], state: PromptState): string[] {
         // In the room, so this only says whether they have met on the phone first.
         { texting: false, texted: state.textedWith?.includes(character.charId) ?? false },
         // Where she is in her cycle, for a Promiscuous girl's DTF days.
-        state.createdScene ? undefined : { date: moodDay, offset: info?.moodCycleOffset ?? 0 },
+        state.createdScene ? undefined : { date: state.date, offset: info?.moodCycleOffset ?? 0 },
         !state.createdScene
       )
     )
@@ -703,18 +691,15 @@ function castBlock(cast: readonly Character[], state: PromptState): string[] {
     // Who she is closest to among the girls who are *not* here.
     lines.push(...bestFriendLines(character, state.roster, state.npcRelationships))
 
-    // A break's scene is far from any class or shift, and is told so by the break itself.
-    if (!state.trip) {
-      lines.push(
-        ...scheduleLines(
-          `${character.firstName}'s Schedule:`,
-          info?.schedule ?? {},
-          classes,
-          info?.job,
-          state.date
-        )
+    lines.push(
+      ...scheduleLines(
+        `${character.firstName}'s Schedule:`,
+        info?.schedule ?? {},
+        classes,
+        info?.job,
+        state.date
       )
-    }
+    )
     // What she and the reader have planned for later.
     lines.push(...(state.upcomingPlans?.[character.charId] ?? []))
     // Where she is spending the break, from the notice through to the week after.
@@ -1088,16 +1073,13 @@ function whoBlock(cast: readonly Character[], state: PromptState, reader: string
   return [
     'READER',
     reader,
-    // Left out of a break's scene, as hers is.
-    ...(state.trip
-      ? []
-      : scheduleLines(
-          "The reader's Schedule:",
-          state.playerSchedule,
-          state.classes,
-          state.playerJob,
-          state.date
-        )),
+    ...scheduleLines(
+      "The reader's Schedule:",
+      state.playerSchedule,
+      state.classes,
+      state.playerJob,
+      state.date
+    ),
     '',
     ...castBlock(cast, state),
     ''
@@ -1120,10 +1102,8 @@ function nowBlock(cast: readonly Character[], state: PromptState): string[] {
   return [
     'NOW',
     // A farewell replaces the date and semester lines.
-    ...(state.trip
-      ? state.trip.now
-      : state.farewell
-        ? farewellNowLines(state.farewell.firstName, state.farewell.senior)
+    ...(state.farewell
+      ? farewellNowLines(state.farewell.firstName, state.farewell.senior)
       : [
           `It is ${formatDateBanner(state.date, state.time)}`,
           formatSemesterProgress(state.date),

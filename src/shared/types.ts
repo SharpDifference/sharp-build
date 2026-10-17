@@ -21,7 +21,6 @@ import type { ComfyGpu } from './setupManifest'
 import type { Weather } from './weather'
 import type { ReaderTallies } from './tallies'
 import type { PromptEdit } from './imagePrompt'
-import type { TermCarry, TermInfo } from './termTypes'
 
 /** Discriminated result envelope returned by every IPC handler. */
 export type Result<T> = { ok: true; data: T } | { ok: false; error: AppError }
@@ -1701,10 +1700,6 @@ export type EnrollmentDraft = QuickstartBundle & {
   bio?: string
   /** The output tokens New Game's own generation calls cost, carried onto the save at Finalize. */
   tokensGenerated?: number
-  /** The semester being enrolled for; absent on the first spring. */
-  term?: TermInfo
-  /** What the opening save takes over from the semester before; absent on a new story. */
-  carry?: TermCarry
 }
 
 /**

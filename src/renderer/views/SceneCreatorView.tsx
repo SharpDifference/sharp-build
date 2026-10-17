@@ -28,7 +28,6 @@ import {
   type OutfitLock,
   type TimeSlot
 } from '@shared/types'
-import { setActiveTerm } from '@shared/term'
 import { WEATHER_KINDS, type Weather } from '@shared/weather'
 import { DeleteX } from '../components/DeleteX'
 import { SelectField } from '../components/SelectField'
@@ -139,10 +138,6 @@ function outfitOptionLabel(character: Character, outfit: OutfitLock): string {
 /** The Scene Creator screen. */
 export function SceneCreatorView(): JSX.Element {
   const [theme] = useState(heldScreenTheme)
-  // A created scene is set in the game's own spring semester. Its calendar and every date it
-  // shows are read against the active term, which a continued semester played last may have left
-  // on another season (Continuing Semesters).
-  useState(() => setActiveTerm(0))
   const draft = useSceneCreatorStore((s) => s.draft)
   const saved = useSceneCreatorStore((s) => s.saved)
   const characters = useCharacterStore((s) => s.characters)

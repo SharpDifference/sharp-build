@@ -1,9 +1,8 @@
 import { currentStorySnapshot } from '../storyMemory'
 import { BREAKTHROUGH_MOD } from '@shared/breakthrough'
 import { cityLifeBackgrounds } from '@shared/cityLife'
-import { slotFullLabel } from '@shared/classes'
+import { SENIOR_YEAR, slotFullLabel } from '@shared/classes'
 import { activePlotTwist, PLOT_TWIST_MOD } from '@shared/plotTwists'
-import { graduatesNow, readerGraduatesNow } from '@shared/term'
 import { modIsOn } from '../modsStore'
 import { globalSlotOf, slotFromId } from '@shared/jobs'
 import type { PlayerStats } from '@shared/playerStats'
@@ -14,7 +13,6 @@ import { memoryBudgetsOf } from '@shared/settingsRules'
 import { affectionsOf } from '@shared/sceneCreator'
 import {
   charKeyOf,
-  type BackgroundSets,
   type CharInfo,
   type Character,
   type CustomCgSlot,
@@ -51,7 +49,7 @@ import { stageAsWritten } from '../sceneSanitizer'
 import { cancelAllTexts, expireHangoutInvitations } from '../textingLoop'
 import { presentCastOf } from './cast'
 import { prefetchTextLedger } from './hooks'
-import { currentRun, loopState, runStale } from './state'
+import { currentRun, runStale } from './state'
 
 /** The projection of `gameStore` every prompt builder is written against. */
 
@@ -243,37 +241,6 @@ export function announceableAdds(): AddedNotice[] {
   })
 }
 
-/** The places that are the university's own, which a scene set far from it is not offered. */
-const CAMPUS_ONLY = new Set([
-  'auditorium',
-  'cafeteria',
-  'campus_basement',
-  'campus_hallway',
-  'campus_road',
-  'classroom',
-  'dorm_lounge',
-  'elysium_living_room',
-  'elysium_road',
-  'lab',
-  'lecture_hall',
-  'lowrise_dorm_room',
-  'music_practice',
-  'pinocola_lounge',
-  'quad',
-  'reserve_cafe',
-  'stadium',
-  'stanchion_street',
-  'track'
-])
-
-/** `sets` without the university's own places; anything the player added himself is kept. */
-function offCampus(sets: BackgroundSets): BackgroundSets {
-  return {
-    interior: sets.interior.filter((name) => !CAMPUS_ONLY.has(name)),
-    exterior: sets.exterior.filter((name) => !CAMPUS_ONLY.has(name))
-  }
-}
-
 /**
  * The stretch of the running scene a continuation or closing call reads word for word: the
  * transcript's tail under the word budget, reaching back to where the running summary stops.
@@ -345,7 +312,7 @@ export function promptState(): PromptState {
   const farewell = goodbyeWith
     ? {
         firstName: goodbyeWith.firstName,
-        senior: readerGraduatesNow() || graduatesNow(game.charInfo[goodbyeWith.charId]?.year)
+        senior: (game.charInfo[goodbyeWith.charId]?.year ?? 0) >= SENIOR_YEAR
       }
     : null
 
@@ -357,11 +324,7 @@ export function promptState(): PromptState {
     breakthrough: modIsOn(BREAKTHROUGH_MOD) ? game.exBreakthrough : undefined,
     date: game.date,
     time: game.time,
-    backgrounds: cityLifeBackgrounds(
-      loopState.trip
-        ? offCampus(useAssetStore.getState().backgrounds)
-        : useAssetStore.getState().backgrounds
-    ),
+    backgrounds: cityLifeBackgrounds(useAssetStore.getState().backgrounds),
     charInfo: game.charInfo,
     exCharacterDynamics: game.exCharacterDynamics,
     npcRelationships: game.npcRelationships,
@@ -379,8 +342,6 @@ export function promptState(): PromptState {
     springBreakAway: game.springBreakAway,
     // Only ever set inside the epilogue.
     ...(farewell ? { farewell } : {}),
-    // Only ever set for a scene a break is running.
-    ...(loopState.trip ? { trip: { now: loopState.trip.now, day: loopState.trip.day } } : {}),
     playerJob: game.job,
     occasions: game.occasions,
     weather: game.weather,

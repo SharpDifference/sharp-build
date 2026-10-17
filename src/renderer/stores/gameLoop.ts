@@ -5,9 +5,7 @@ import { dynamicFor } from '@shared/characterDynamics'
 import { fullNameOf } from '@shared/types'
 import { currentStorySnapshot } from './storyMemory'
 import { finishBreakthrough, rearmBreakthrough, withBreakthrough } from './breakthrough'
-import { GAME_OVER_SCENES, gameOverReasonOf, gameOverSceneOf } from '@shared/gameOver'
-import { affectionFor } from '@shared/relationship'
-import { readerGraduatesNow } from '@shared/term'
+import { GAME_OVER_SCENES, gameOverReasonOf } from '@shared/gameOver'
 import { earnLine, spendLine, spentOf } from '@shared/money'
 import {
   globalSlotOf,
@@ -55,12 +53,9 @@ import {
   introScrollLines,
   isOrientationSlot,
   isTutorialSlot,
-  newcomerPremise,
   ORIENTATION_PREMISE,
   orientationAcquaintancePremise,
   orientationLeaderPremise,
-  returnScrollLines,
-  reunionPremise,
   tutorialLines
 } from '../prompts/introScript'
 import {
@@ -69,7 +64,7 @@ import {
   graduationScrollLines,
   isGraduationSlot
 } from '../prompts/graduation'
-import { GRADUATION_DATE, occasionLeadUpLines, occasionsAt } from '../prompts/occasions'
+import { occasionLeadUpLines, occasionsAt } from '../prompts/occasions'
 import { examOn, projectPeriodOf, workedOn } from '../prompts/classProgress'
 import {
   buildSlotIntroPrompt,
@@ -266,7 +261,6 @@ import {
   LOOP_LLM_GROUP,
   SCENE_LLM_GROUP,
   type EndingAnswer,
-  type TripRun,
   type TurnSnapshot
 } from './loop/state'
 import { buildStatusSteps, markStatusLine } from './loop/statusSteps'
@@ -339,9 +333,7 @@ async function beginSlot(): Promise<void> {
     // goodbye; outside the branch below because a reload lands here too.
     armEpilogue()
     // Queued only: `graduationSeen` is raised where the scroll is read.
-    if (!state.graduationSeen) {
-      state.appendPendingLines(graduationScrollLines(seniorNames(), readerGraduatesNow()))
-    }
+    if (!state.graduationSeen) state.appendPendingLines(graduationScrollLines(seniorNames()))
     advance()
     // The curtain announces the morning like any other and peels back off the scroll's first
     // line, which `advance` has already put up.
@@ -355,16 +347,11 @@ async function beginSlot(): Promise<void> {
   state.clearSceneGifts()
   state.setSceneQuiz(null)
 
-  // The authored first slot: the arrival scroll, then freshman orientation — or, on a semester
-  // continued from the one before, the scroll back onto campus and the scene it leads into.
+  // The authored first slot: the arrival scroll, then freshman orientation.
   if (isOrientationSlot(state.date, state.time)) {
     state.setWaitingForLine(false)
     state.setAwaitingInput(false)
-    state.appendPendingLines(
-      state.termIndex > 0
-        ? returnScrollLines(state.stats, state.date)
-        : introScrollLines(state.stats, state.date)
-    )
+    state.appendPendingLines(introScrollLines(state.stats, state.date))
     advance()
     // The curtain the timetable was finalized under opens on the scroll.
     void revealSlot()
@@ -483,71 +470,26 @@ async function beginSlot(): Promise<void> {
   await foldOpeningIntoSlotSave(lines)
 }
 
-/**
- * Who a new story's first scene is with, and the premise it is written from: a freshman, or
- * anyone at all when there are none, who gets the leader premise instead. No attendance filter:
- * orientation cancels every class on day 0.
- */
-function orientationOpening(): { cast: string[]; action: string } {
+/** The playthrough's first scene, cast and sent without a classifier. */
+async function startOrientationScene(): Promise<void> {
+  const run = currentRun()
   const game = useGameStore.getState()
+
+  // A freshman, or anyone at all when there are none, who gets the leader premise instead.
+  // No attendance filter: orientation cancels every class on day 0.
   const freshmen = game.chars.filter((charId) => game.charInfo[charId]?.year === 1)
   const pool = freshmen.length > 0 ? freshmen : game.chars
   if (pool.length === 0) {
     console.warn('[intro] no characters on the roster; orientation plays solo')
   }
   const picked = pool.length > 0 ? anyOf(pool) : null
-  return {
-    cast: picked ? [picked] : [],
-    action:
-      picked && game.charInfo[picked]?.flags.hasMet
-        ? orientationAcquaintancePremise(game.characters[picked]?.firstName ?? 'she', freshmen.length === 0)
-        : picked && freshmen.length === 0
+  const cast = picked ? [picked] : []
+  const action =
+    picked && game.charInfo[picked]?.flags.hasMet
+      ? orientationAcquaintancePremise(game.characters[picked]?.firstName ?? 'she', freshmen.length === 0)
+      : picked && freshmen.length === 0
         ? orientationLeaderPremise(game.characters[picked]?.firstName ?? 'she')
         : ORIENTATION_PREMISE
-  }
-}
-
-/**
- * The same for a continued semester: somebody he has never met, a freshman first, and when
- * there is nobody new at all, the girl he is closest to, seen again for the first time since
- * the break. A tie keeps roster order.
- */
-function returnOpening(): { cast: string[]; action: string } {
-  const game = useGameStore.getState()
-  const strangers = game.chars.filter((charId) => !game.charInfo[charId]?.flags.hasMet)
-  if (strangers.length > 0) {
-    const freshmen = strangers.filter((charId) => game.charInfo[charId]?.year === 1)
-    return {
-      cast: [anyOf(freshmen.length > 0 ? freshmen : strangers)],
-      action: newcomerPremise(freshmen.length > 0)
-    }
-  }
-
-  let closest: string | null = null
-  let best = -Infinity
-  for (const charId of game.chars) {
-    const affection = affectionFor(game.charInfo[charId], game.date, game.characters[charId])
-    if (affection > best) {
-      best = affection
-      closest = charId
-    }
-  }
-  if (!closest) {
-    console.warn('[intro] no characters on the roster; the first morning plays solo')
-    return { cast: [], action: newcomerPremise(false) }
-  }
-  return {
-    cast: [closest],
-    action: reunionPremise(game.characters[closest]?.firstName ?? 'her')
-  }
-}
-
-/** The playthrough's first scene, cast and sent without a classifier. */
-async function startOrientationScene(): Promise<void> {
-  const run = currentRun()
-  const game = useGameStore.getState()
-
-  const { cast, action } = game.termIndex > 0 ? returnOpening() : orientationOpening()
 
   const snapshot: TurnSnapshot = { scene: game.captureScene(), action, intro: true }
   loopState.lastTurn = snapshot
@@ -683,8 +625,7 @@ export async function startFarewellScene(charId: string): Promise<void> {
   const character = game.characters[charId]
   if (!character) return
 
-  // A stretch of a break's trip is written from the break's own premise, down the same path.
-  const action = loopState.trip?.action ?? farewellAction(character.firstName)
+  const action = farewellAction(character.firstName)
   const snapshot: TurnSnapshot = { scene: game.captureScene(), action, farewell: charId }
   loopState.lastTurn = snapshot
 
@@ -720,15 +661,6 @@ export async function startFarewellScene(charId: string): Promise<void> {
 /** The end of one goodbye: the scene is cleared, the button spent, and the menu back. */
 function finishFarewell(charId: string | null): void {
   const game = useGameStore.getState()
-  // A break's scene leaves nothing behind in this game: the break has what it came to.
-  const trip = loopState.trip
-  if (trip) {
-    game.setSceneEnding(false)
-    game.setStatusShown(false)
-    game.setBusy(true)
-    trip.done()
-    return
-  }
   // The two the boundary clears, so the next thing on screen does not inherit the ending.
   game.setSceneEnding(false)
   game.setStatusShown(false)
@@ -785,9 +717,7 @@ function endEpilogue(reason: 'gameComplete' | 'endingDebt'): void {
   game.setWaitingForLine(false)
   game.setAwaitingInput(false)
   game.setBusy(false)
-  game.appendPendingLines(
-    gameOverSceneOf(reason, readerGraduatesNow()).lines.map((text) => ({ speaker: '', text }))
-  )
+  game.appendPendingLines(GAME_OVER_SCENES[reason].lines.map((text) => ({ speaker: '', text })))
   advance()
 }
 
@@ -1747,13 +1677,6 @@ async function runEnding(solo: boolean): Promise<void> {
   if (isGraduationSlot(game.date, game.time) || game.createdScene) {
     const closed = await runClosing(dropped)
     if (runStale(run) || dropped()) return
-    // A break's scene is judged by the break before its last lines are read out.
-    const trip = loopState.trip
-    if (closed && trip) {
-      const lines = await trip.judge(sceneSoFar())
-      if (runStale(run) || dropped()) return
-      trip.lines = lines
-    }
     useGameStore.getState().setBusy(false)
     if (!closed) return
     useGameStore.getState().setEndingInFlight(false)
@@ -2268,14 +2191,12 @@ export function advance(): void {
       // What a save taken on the status line records: the goodbye's last line, unturned.
       loopState.statusBase = endingSave()
       game.setStatusShown(true)
-      game.appendPendingLines(
-        loopState.trip?.lines ?? [
-          farewellStatusLine(
-            game.characters[farewell]?.firstName ?? '',
-            farewellDisposition(farewell)
-          )
-        ]
-      )
+      game.appendPendingLines([
+        farewellStatusLine(
+          game.characters[farewell]?.firstName ?? '',
+          farewellDisposition(farewell)
+        )
+      ])
       advance()
       return
     }
@@ -2927,34 +2848,6 @@ export function enterGame(
       prefetchTextLedger()
     }
   }
-}
-
-/**
- * Opens a game on one stretch of a break's trip: the finished semester's save as the break has
- * made it, with no playthrough behind it — so nothing the scene does is written anywhere — and
- * the scene started at once, down the goodbye's path.
- */
-export function enterTrip(
-  save: GameSave,
-  record: PlaythroughRecord,
-  characters: Record<string, Character>,
-  trip: TripRun
-): void {
-  resetLoop()
-  loopState.trip = trip
-  // Rule ownership survives even though this visit must never write to its source save.
-  loopState.record = record
-  // The goodbye's path is keyed on the epilogue's own slot, so the scene is stood on it whatever
-  // slot the save was taken in.
-  useGameStore
-    .getState()
-    .loadSave(
-      { ...save, date: GRADUATION_DATE, time: 0, graduationSeen: true, scene: null },
-      record,
-      characters
-    )
-  useGameStore.setState({ playthroughId: null })
-  void startFarewellScene(trip.charId)
 }
 
 /**

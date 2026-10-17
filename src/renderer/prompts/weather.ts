@@ -2,8 +2,7 @@ import type { TimeSlot } from '@shared/types'
 import { isWet, weatherAt, type Weather } from '@shared/weather'
 import { formatRelativeSlot, formatWeekday, prevSlot } from './gameDate'
 import { isEpilogueNight } from './graduation'
-import { staticOccasions } from './occasions'
-import { FALL_DRY_OCCASION_IDS } from './occasionsFall'
+import { STATIC_OCCASIONS } from './occasions'
 
 /**
  * The sky as the game reads it: which days are authored clear, the one reading every screen
@@ -27,9 +26,8 @@ export const DRY_OCCASION_IDS: ReadonlySet<string> = new Set([
 /** Every date a dry occasion covers, for the roll to keep clear. */
 export function dryOccasionDates(): Set<number> {
   const dates = new Set<number>()
-  // The active season's calendar, and either season's list of what is held outdoors.
-  for (const occasion of staticOccasions()) {
-    if (!DRY_OCCASION_IDS.has(occasion.id) && !FALL_DRY_OCCASION_IDS.has(occasion.id)) continue
+  for (const occasion of STATIC_OCCASIONS) {
+    if (!DRY_OCCASION_IDS.has(occasion.id)) continue
     for (let date = occasion.startDate; date <= occasion.endDate; date++) dates.add(date)
   }
   return dates
