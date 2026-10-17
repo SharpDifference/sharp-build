@@ -68,8 +68,14 @@ export function pathOf(thrown: Throw): Path {
   return { arriveX: raw, angle: thrown.hook * bite(thrown.power), gutter: Math.abs(raw) > LANE_HALF }
 }
 
-/** How near a pin's middle the ball's must pass to hit it. */
-const REACH = 5.8
+/**
+ * How near a pin's middle the ball's must pass to hit it: half a ball (8.5 inches across) and
+ * half a pin at its belly (4.77). At this reach a ball down the middle still clips the 2 and 3.
+ */
+const REACH = 6.6
+
+/** How much of its push a pin the ball only grazes loses: at the edge of the reach, this much. */
+const GRAZE = 0.45
 
 const clamp = (value: number, low: number, high: number): number =>
   Math.min(high, Math.max(low, value))
@@ -92,14 +98,17 @@ export function resolvePins(
   if (Math.abs(arriveX) > LANE_HALF) return []
   const up = new Set(standing)
   const down: number[] = []
-  /** Each fallen pin and the way it was sent: -1 hard left to 1 hard right. */
-  const sent: { pin: Pin; lean: number }[] = []
-  const fell = (pin: Pin, lean: number): void => {
+  /**
+   * Each fallen pin, the way it was sent (-1 hard left to 1 hard right) and how hard: a pin the
+   * ball only grazed slides off with little in it to take the pins behind.
+   */
+  const sent: { pin: Pin; lean: number; force: number }[] = []
+  const fell = (pin: Pin, lean: number, force = 1): void => {
     if (!up.delete(pin.id)) return
     down.push(pin.id)
-    sent.push({ pin, lean })
+    sent.push({ pin, lean, force })
   }
-  const carry = 0.5 + 0.47 * Math.min(1, power / 0.8)
+  const carry = 0.52 + 0.47 * Math.min(1, power / 0.8)
 
   let x = arriveX
   for (let row = 0; row < 4; row++) {
@@ -107,7 +116,7 @@ export function resolvePins(
       if (pin.row !== row || !up.has(pin.id)) continue
       const off = (pin.x - x) / REACH
       if (Math.abs(off) >= 1) continue
-      fell(pin, off)
+      fell(pin, off, 1 - GRAZE * Math.abs(off) ** 3)
       // A glancing hit turns the ball the other way; a full one does not turn it at all.
       x -= Math.sign(off) * 4 * Math.abs(off) * (1 - Math.abs(off)) * 2 * (1.3 - power)
     }
@@ -115,17 +124,25 @@ export function resolvePins(
   }
 
   for (let i = 0; i < sent.length; i++) {
-    const { pin, lean } = sent[i]
+    const { pin, lean, force } = sent[i]
     for (const side of [-1, 1]) {
       const behind = PINS.find((p) => p.row === pin.row + 1 && p.x === pin.x + side * 6)
       if (!behind || !up.has(behind.id)) continue
-      if (rand() < carry * clamp(0.58 + 1.1 * lean * side, 0.04, 1)) fell(behind, side * 0.55)
+      if (rand() < force * carry * clamp(0.58 + 1.1 * lean * side, 0.04, 1)) fell(behind, side * 0.55)
     }
-    // Now and then a pin goes off across the deck and takes one nobody aimed at.
-    if (up.size > 0 && rand() < 0.07 * carry) {
-      const left = PINS.filter((p) => up.has(p.id))
-      const struck = left[Math.floor(rand() * left.length)]
-      fell(struck, rand() < 0.5 ? -0.5 : 0.5)
+    // Now and then a pin goes off across the deck and takes one nobody aimed at: one beside it
+    // or a row behind, on the side it was sent, never one across the rack it could not reach.
+    if (rand() < 0.07 * carry) {
+      const side = lean === 0 ? (rand() < 0.5 ? -1 : 1) : Math.sign(lean)
+      const near = PINS.filter(
+        (p) =>
+          up.has(p.id) &&
+          p.row - pin.row >= 0 &&
+          p.row - pin.row <= 1 &&
+          (p.x - pin.x) * side > 0 &&
+          Math.abs(p.x - pin.x) <= 18
+      )
+      if (near.length > 0) fell(near[Math.floor(rand() * near.length)], side * 0.5)
     }
   }
   return down.sort((a, b) => a - b)
