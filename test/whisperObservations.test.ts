@@ -155,7 +155,7 @@ describe('firsthand Whisper evidence', () => {
     expect(whisperSources(game()).map(s => s.basis)).toEqual(['witnessed'])
     expect(whisperSources({ ...game(), date: 7, time: 0 })).toEqual([])
     expect(whisperSources({ ...game(), date: 16 })).toEqual([])
-    expect(whisperSources({ ...game(), termIndex: 1 })).toEqual([])
+    expect(whisperSources({ ...game(), semesterIndex: 1 })).toEqual([])
     // Public posts are readable remotely, but are never classified as witnessed scenes.
     useGameStore.setState(s => ({ charInfo: { ...s.charInfo, b: { ...s.charInfo.b, feed: [{ id: 'p', text: 'A public update.', date: 8, time: 1, likes: 0 }] } } }))
     expect(whisperSources(game()).map(s => s.basis)).toEqual(['public-post', 'witnessed'])

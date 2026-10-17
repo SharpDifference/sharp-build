@@ -3,9 +3,15 @@ import { dirname, join } from 'path'
 import { ECHO_LOCAL_MODELS } from '@shared/echoModels'
 import { getComfyModelFilePath, getComfyPythonPath } from '../paths'
 import { downloadFile, hashFile } from './downloadService'
+import { resolveTarget } from './comfyService'
 
 export async function installEchoModels(signal: AbortSignal): Promise<void> {
   signal.throwIfAborted()
+  const target = await resolveTarget()
+  signal.throwIfAborted()
+  if (target.source === 'external') {
+    throw Error('Your ComfyUI server is selected in Settings. Install the Megaten Style LoRA on that server and choose its checkpoint in Settings. This installer only writes to the game-managed ComfyUI.')
+  }
   if (!(await stat(getComfyPythonPath()).catch(() => null))?.isFile()) {
     throw Error('Install ComfyUI through the game’s Setup screen first, then return here for the Echo models. Gemini does not need ComfyUI.')
   }
