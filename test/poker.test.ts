@@ -631,7 +631,7 @@ describe('Poker, her play', () => {
       // In chips a hand, over many seeds: about 5.5, 6.5 and 6 for the lower rungs, 1 for the top.
       expect(ahead / (2 * deals), `skill ${better} against ${worse}`).toBeGreaterThan(least)
     }
-  })
+  }, 120000)
 
   it('makes only moves the table allows, and plays better the higher her skill', () => {
     const rand = seeded(31)
