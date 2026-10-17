@@ -39,7 +39,8 @@ it takes over Photo Feature's post comments and photo posts get the same threads
 - She keeps one memory of your comments among her own, arriving with her answers, the newest
   replacing the last, as her texting memory does. It shows in her Memories ("…, on her post"), can
   be edited there, counts in her affection like any memory, and every scene, text and slot opening
-  can bring it up. The closing before her answers show announces it, as it does any memory.
+  can bring it up. The closing before her answers show announces it, as it does any memory;
+  switch off "Announce feed memories" in the Mods screen to keep it quiet.
 - A roster girl who has met you and answers you under somebody else's post keeps the same kind of
   memory ending "…, under <name>'s post", so she can bring it up in her own texts and scenes.
   It comes out of the same call and replaces her last feed memory, whether she posted or commented.

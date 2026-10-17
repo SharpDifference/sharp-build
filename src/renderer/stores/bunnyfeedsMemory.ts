@@ -3,7 +3,8 @@ import { memoryStatusLine } from '@shared/relationship'
 import type { CharMemory, SceneLine } from '@shared/types'
 import { TEXT_LEDGER_FEED_LINES } from '../prompts/bunnyfeedsPrompt'
 import { UNKNOWN_NAME, useGameStore } from './gameStore'
-import { modIsOn } from './modsStore'
+import { optionOn } from '@shared/mods'
+import { modIsOn, useModsStore } from './modsStore'
 
 /** Where a held memory without a poster says it happened, as earlier test builds wrote it. */
 const FEED_MEMORY_TAG = ', on the feed'
@@ -91,6 +92,7 @@ function dueFeedMemories(through: number): HeldFeedMemory[] {
  */
 export function feedStatusLines(through: number): SceneLine[] {
   if (!modIsOn(BUNNYFEEDS)) return []
+  if (!optionOn(useModsStore.getState().switches, BUNNYFEEDS, 'announce')) return []
   const game = useGameStore.getState()
   return dueFeedMemories(through).map(({ charId, type, desc, posterId }) => {
     const character = game.characters[charId]
