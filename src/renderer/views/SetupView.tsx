@@ -715,8 +715,8 @@ function OwnComfyCard({ onDone }: { onDone: () => void }): JSX.Element {
                   listed={probe.listed}
                   folders={probe.folders}
                   onPick={handlePick}
-                  onOpenFolder={(role) => {
-                    if (folderUrl !== null) void openModelFolder(role, folderUrl)
+                  onOpenFolder={(role, pick) => {
+                    if (folderUrl !== null) void openModelFolder(role, folderUrl, pick)
                   }}
                   weightText={weightText}
                   onWeightText={setWeightText}

@@ -222,9 +222,9 @@ export function SettingsComfyTab({
               listed={probe.listed}
               folders={probe.folders}
               onPick={handlePick}
-              onOpenFolder={(role) => {
+              onOpenFolder={(role, pick) => {
                 if (own && folderUrl === null) return
-                void openModelFolder(role, own ? folderUrl : null)
+                void openModelFolder(role, own ? folderUrl : null, own ? pick : undefined)
               }}
               weightText={weightText[source]}
               onWeightText={(text) => setWeightText((prev) => ({ ...prev, [source]: text }))}
