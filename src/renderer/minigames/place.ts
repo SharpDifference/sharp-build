@@ -55,3 +55,17 @@ function placeNamed(text: string | null | undefined): string | null {
   }
   return null
 }
+
+/**
+ * The line that keeps a game where the scene is. A game a place has is played there: without
+ * this the model may walk them off to wherever it pictures the game (an air hockey table at the
+ * arcade, though the alley has one) and change the background with it.
+ */
+export function hereLine(place: string | null): string[] {
+  const label = place ? locationDefOf(place)?.label : undefined
+  return label
+    ? [
+        `Every game listed is played right here at ${label}, where the scene already is: agreeing to one never takes anyone somewhere else, and the background stays as it is.`
+      ]
+    : []
+}

@@ -98,7 +98,7 @@ registerHooks(MINI_GAMES, {
       if (proposal && ctx.query.includes(proposal.text)) {
         const game = gameById(proposal.gameId)
         const asked = askedOf(proposal.charIds, ctx.cast)
-        return game && asked.length > 0 ? withProposal(request, game, asked) : request
+        return game && asked.length > 0 ? withProposal(request, game, asked, placeOf(ctx.state.sceneLocation, ctx.state.bg)) : request
       }
       // Every other turn the reader takes with a girl carries the standing offer. A scene's
       // closing is not one: it has no action of his, and nothing more is going to be played.
