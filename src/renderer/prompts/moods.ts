@@ -18,7 +18,7 @@ const MOOD_CYCLE: readonly MoodDay[] = [
     moodSwings: '{name} woke up with terrible cramps today and wants to be left alone.'
   },
   {
-    normal: '{name} is a little frustrated that her cramps are still bothering her, but she\'s mostly normal.',
+    normal: '{name} is a little frustrated that her cramps are still bothering her, but she\'s mostly acting normal.',
     moodSwings: '{name} is cramping hard and is exceptionally irritable.'
   },
   {

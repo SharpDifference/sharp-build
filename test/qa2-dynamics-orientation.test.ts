@@ -47,7 +47,7 @@ describe('QA: Dynamics acquaintance must survive the first orientation cast', ()
     const record = playthroughRecord({ chars: girls.map(girl => girl.charId), mods: ['character-dynamics'] })
     loopState.record = record
     useGameStore.setState({
-      playthroughId: '123', date: 0, time: 0, termIndex: 0,
+      playthroughId: '123', date: 0, time: 0,
       chars: record.chars, characters: charactersById(...girls),
       charKeyToId: Object.fromEntries(girls.map(girl => [`${girl.firstName.toLowerCase()}_rose`, girl.charId])),
       charInfo: Object.fromEntries(girls.map(girl => [girl.charId, charInfo({ year, nameKnown: true,

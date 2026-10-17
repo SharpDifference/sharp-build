@@ -9,9 +9,8 @@ import { animate, motion, useMotionValue, useReducedMotion } from 'motion/react'
 import { STAT_KEYS, STAT_LABELS, type PlayerStats } from '@shared/playerStats'
 import { formatNumericGameDate, formatWeekday } from '../prompts/gameDate'
 import type { RevealKey } from '../prompts/introScript'
-import { seasonWords } from '@shared/term'
 import { weekOf } from '../prompts/occasions'
-import type { TextMark } from '@shared/types'
+import type { Season, TextMark } from '@shared/types'
 import type { Weather } from '@shared/weather'
 import type { SlotAction, SlotActionTone } from '../stores/slotActions'
 import type { ScreenTheme } from './clockTheme'
@@ -98,7 +97,7 @@ export type LandingRow = SlotAction & { faceUrl?: string; word?: string; apart?:
 
 /**
  * How long a column has to be before it stops growing upward and starts scrolling. The goodbye
- * menu can be thirteen rows; an ordinary slot is never more than six.
+ * menu can be thirteen rows; an ordinary slot is never more than seven.
  */
 const LONG_ASK = 8
 
@@ -106,6 +105,8 @@ export interface LandingChromeProps {
   /** The slot's own half of the day, not the hour the screen is being read at. */
   theme: ScreenTheme
   date: number
+  /** The semester's season, which names the month of the date. */
+  season: Season
   night: boolean
   /** The sky over the slot, which the banner's mark is drawn as wherever it is not clear. */
   weather: Weather
@@ -133,6 +134,8 @@ export interface LandingChromeProps {
   /* What he has. */
   money: number
   stats: PlayerStats
+  /** How his cold stands, said under the date where it shows; null where it does not. */
+  cold: string | null
 
   /* What he may do about it. */
   actions: readonly LandingRow[]
@@ -181,8 +184,20 @@ export interface LandingChromeProps {
 }
 
 export function LandingChrome(props: LandingChromeProps): JSX.Element {
-  const { theme, date, night, weather, covered, hidden, held, sending, stats, actions, shown } =
-    props
+  const {
+    theme,
+    date,
+    season,
+    night,
+    weather,
+    covered,
+    hidden,
+    held,
+    sending,
+    stats,
+    actions,
+    shown
+  } = props
   // What the banner wears where the sun or the crescent would be.
   const markKind = halfMarkKindOf(weather, night)
 
@@ -330,16 +345,18 @@ export function LandingChrome(props: LandingChromeProps): JSX.Element {
                 'Someday, sometime...'
               ) : (
                 <>
-                  {weekday} {formatNumericGameDate(date)} · {night ? 'Evening' : 'Morning'}
+                  {weekday} {formatNumericGameDate(date, season)} · {night ? 'Evening' : 'Morning'}
                 </>
               )}
             </div>
-            {/* The term is named off the season being played. The goodbyes stand in the week
-                after the semester's last, which is the break it ends into. */}
+            {/* The term is the semester's season. The goodbyes stand in the week after
+                graduation's, which is the break that follows it. */}
             <div className="vu-landing-meta">
               {props.epilogue
-                ? `WEEK ${weekOf(date) + 2} · ${seasonWords().endBreak.toUpperCase()}`
-                : `WEEK ${weekOf(date) + 1} · ${seasonWords().name.toUpperCase()} SEMESTER`}
+                ? `WEEK ${weekOf(date) + 2} · ${season === 'fall' ? 'WINTER' : 'SUMMER'} VACATION`
+                : `WEEK ${weekOf(date) + 1} · ${season === 'fall' ? 'FALL' : 'SPRING'} SEMESTER${
+                    props.cold ? ` · ${props.cold.toUpperCase()}` : ''
+                  }`}
             </div>
           </div>
         </motion.div>

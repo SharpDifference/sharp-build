@@ -1,4 +1,5 @@
 import '../src/renderer/modEntries/breakthrough'
+import { calendarOf } from '@shared/semesters'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { BREAKTHROUGH_MOD, breakthroughFacts, normalizeBreakthrough, reconcileBreakthrough, settleBreakthrough } from '@shared/breakthrough'
 import { DEFAULT_MEMORY_BUDGETS } from '@shared/settingsRules'
@@ -62,7 +63,8 @@ describe('spirit accounting',()=>{
     const lines=[{speaker:READER_SPEAKER,text:'Hello'},...sceneLines('One','Two')]
     useGameStore.setState({awaitingInput:false,busy:true,streaming:true,currentSceneTranscript:lines,pendingLines:[lines[2]]})
     expect(canBreakthrough(game(),'a')).toBe(true)
-    useGameStore.setState({sceneClass:'ART101'})
+    // A lecture in session holds the reply shut; since 0.5.0 a project class and PE do not.
+    useGameStore.setState({sceneClass:'ART101',classes:{ART101:{category:'art',kind:'lecture'} as never}})
     expect(canBreakthrough(game(),'a')).toBe(false)
     useGameStore.setState({sceneClass:null,departed:['a']})
     expect(canBreakthrough(game(),'a')).toBe(false)
@@ -114,7 +116,7 @@ describe('actual outcomes and independent continuity',()=>{
     const snapshot:TurnSnapshot={action:intent.direction,scene:game().captureScene(),breakthrough:intent}
     const saved=vi.fn(async(_id:string,draft:ReturnType<GameSaveDraft>)=>({ok:true as const,data:{...draft,playthroughId:'p',saveId:'auto',saveDate:0}}))
     stubApi({saves:{autosave:saved}})
-    await runSceneTurn(Promise.resolve({ok:true,data:{lines,summary:null,end:false,applied:false,at:1}}),snapshot,['a'],[a],false)
+    await runSceneTurn(Promise.resolve({ok:true,data:{lines,summary:null,end:false,applied:false,at:1,reply:{lines:[]}}}),snapshot,['a'],[a],false)
     expect(game().exBreakthrough.meters.a).toBe(0)
     expect(game().exBreakthrough.pending).toBeNull()
     const moment=game().exBreakthrough.moments.a[0]
@@ -130,7 +132,7 @@ describe('actual outcomes and independent continuity',()=>{
     const pending=runSceneTurn(new Promise(r=>{resolve=r}),snapshot,['a'],[a],false)
     loopState.sceneCall={}
     finishBreakthrough(intent.id,true)
-    resolve({ok:true,data:{lines:sceneLines('Discard me'),summary:null,end:false,applied:false,at:1}})
+    resolve({ok:true,data:{lines:sceneLines('Discard me'),summary:null,end:false,applied:false,at:1,reply:{lines:[]}}})
     await pending
     expect(game().exBreakthrough.moments).toEqual({})
     activateBreakthrough('a','Hope',()=>true)
@@ -174,8 +176,8 @@ describe('actual outcomes and independent continuity',()=>{
   })
   it('carries committed outcomes into new scenes and texts, with no repeated advantage',()=>{
     const state=normalizeBreakthrough({moments:{a:[{id:'m',date:6,time:0,outcome:'A promise about the observatory.'}]}})
-    const common={date:7,time:0 as const,charInfo:{a:charInfo()},npcRelationships:{},roster:[],classes:{},playerSchedule:{},occasions:[],playerJob:null,breakthrough:state}
-    const scene=buildScenePrompt([a],'Hello',{...common,playthroughId:'p',seedWord:'aspen',backgrounds:{interior:['library'],exterior:['quad']},bg:null,classCode:null,projectClass:null,jobId:null,visitJobId:null,giftNotes:[],emotions:{},onStage:[],lessNsfwText:false,memoryBudgets:DEFAULT_MEMORY_BUDGETS,cgReady:{},outfitReady:{},roomReady:{}, customCgReady:{}},'SETTING','READER')
+    const common={date:7,time:0 as const,charInfo:{a:charInfo()},npcRelationships:{},roster:[],classes:{},playerSchedule:{},classRosters:{},calendar:calendarOf('spring',[]),history:{},playerJob:null,breakthrough:state}
+    const scene=buildScenePrompt([a],'Hello',{...common,playthroughId:'p',backgrounds:{interior:['library'],exterior:['quad']},bg:null,classCode:null,projectClass:null,jobId:null,visitJobId:null,giftNotes:[],emotions:{},onStage:[],lessNsfwText:false,memoryBudgets:DEFAULT_MEMORY_BUDGETS,cgReady:{},outfitReady:{},roomReady:{}, customCgReady:{}},'SETTING','READER')
     const text=buildTextingPrompt(a,charInfo(),undefined,'Hello',{...common,memoryBudget:10},'READER')
     for (const r of [scene,text]) {expect(r.user).toContain('observatory');expect(r.user).not.toContain('ONE-TURN NARRATIVE ADVANTAGE')}
     expect(buildTextingPrompt(b,charInfo(),undefined,'Hello',{...common,memoryBudget:10},'READER').user).not.toContain('observatory')

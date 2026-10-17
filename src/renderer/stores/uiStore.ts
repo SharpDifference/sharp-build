@@ -15,12 +15,12 @@ export type ViewName =
   /** One scene set up by hand and played outside any playthrough. */
   | 'sceneCreator'
   | 'newGame'
-  /** The break a finished semester is continued through, on the way to the next one's roster. */
-  | 'break'
   /** The canned start, rendered by `NewGameView` for `classSelect`'s reason. */
   | 'quickstart'
   /** The class selector, rendered by `NewGameView` so the roster survives it. */
   | 'classSelect'
+  /** A playthrough's next semester's roster, rendered by `NewGameView` off the ending's Continue. */
+  | 'nextSemester'
   | 'game'
 
 /** Modals that can be stacked over the current view. */

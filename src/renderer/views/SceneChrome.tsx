@@ -7,11 +7,12 @@ import { useEffect, useLayoutEffect, useRef, useState, type JSX, type ReactNode 
 import { AnimatePresence, motion } from 'motion/react'
 
 import type { QuizAnswer, QuizLetter } from '@shared/academics'
-import type { TextMark } from '@shared/types'
+import type { Season, TextMark } from '@shared/types'
 import type { Weather } from '@shared/weather'
 import { formatNumericGameDate, formatWeekday } from '../prompts/gameDate'
 import { weekOf } from '../prompts/occasions'
 import type { RevealKey } from '../prompts/introScript'
+import { scenePlays, type RailSeatProps } from '../mods/hooks'
 import type { ScreenTheme } from './clockTheme'
 import {
   BunnyIcon,
@@ -54,8 +55,8 @@ export interface SceneChromeProps {
   /** The slot's own half of the day, not the hour the screen is being read at. */
   theme: ScreenTheme
   date: number
-  /** What the date card reads where the scene is not on a day of the semester. */
-  stamp?: { week: number; figure: string; weekday: string }
+  /** The semester's season, which names the month of the date. */
+  season: Season
   night: boolean
   /** The sky over the slot, which the stamp's mark is drawn as wherever it is not clear. */
   weather: Weather
@@ -95,6 +96,8 @@ export interface SceneChromeProps {
    * all while the scene will not be interrupted — `'locked'`. Null for the turn's own row.
    */
   interject: 'open' | 'locked' | null
+  /** What holds a locked row shut, which the divider says: a class in session or her present. */
+  lockedBy: 'class' | 'gift'
   /** The scene has resolved: its closing is coming or playing, which the divider says. */
   ending: boolean
   /** The current question's answers while an exam is being sat, which the row stands in for. */
@@ -127,6 +130,8 @@ export interface SceneChromeProps {
   /** Absent when Echo is disabled or this screen has no ordinary playthrough. */
   onEchoes?: () => void
   onSettings: () => void
+  /** Opens the panel of the mod whose seat on the rail was pressed. */
+  onModPanel: (modId: string) => void
   onHideUi: () => void
   onBackground: () => void
   onCast: () => void
@@ -140,7 +145,7 @@ export interface SceneChromeProps {
 
 /** The scene's chrome: the stamp, the rail, the box and the row under it. */
 export function SceneChrome(props: SceneChromeProps): JSX.Element {
-  const { theme, date, stamp, night, weather, covered, hidden, shown, rowShown, quiz, interject } =
+  const { theme, date, season, night, weather, covered, hidden, shown, rowShown, quiz, interject } =
     props
   // What the stamp wears where the sun or the crescent would be.
   const markKind = halfMarkKindOf(weather, night)
@@ -203,7 +208,13 @@ export function SceneChrome(props: SceneChromeProps): JSX.Element {
   /** Which word the divider last said, held while it fades so it does not change on the way out. */
   const dividerWord = useRef<DividerWord>('hover')
   if (rowInterject !== null) {
-    dividerWord.current = props.ending ? 'ending' : rowInterject === 'locked' ? 'locked' : 'hover'
+    dividerWord.current = props.ending
+      ? 'ending'
+      : rowInterject === 'locked'
+        ? props.lockedBy === 'gift'
+          ? 'gift'
+          : 'locked'
+        : 'hover'
   }
 
   /**
@@ -302,12 +313,10 @@ export function SceneChrome(props: SceneChromeProps): JSX.Element {
         <div className="vu-scene-week">
           WK
           <br />
-          <span>{String(stamp?.week ?? weekOf(date) + 1).padStart(2, '0')}</span>
+          <span>{String(weekOf(date) + 1).padStart(2, '0')}</span>
         </div>
-        <div className="vu-scene-figure">{stamp?.figure ?? formatNumericGameDate(date)}</div>
-        <div className="vu-scene-weekday">
-          {stamp?.weekday ?? formatWeekday(date).slice(0, 3).toUpperCase()}
-        </div>
+        <div className="vu-scene-figure">{formatNumericGameDate(date, season)}</div>
+        <div className="vu-scene-weekday">{formatWeekday(date).slice(0, 3).toUpperCase()}</div>
         <div className={night ? 'vu-scene-half vu-scene-half--night' : 'vu-scene-half'}>
           <span>{night ? 'NIGHT' : 'DAY'}</span>
           {/* Two elements because they are two transforms: the stamp carries the jump and the
@@ -376,6 +385,16 @@ export function SceneChrome(props: SceneChromeProps): JSX.Element {
             <EchoIcon />
           </RailSeat>
         )}
+        {/* The mods' own seats, each deciding for itself whether it stands. They arrive on the
+            rail with the Calendar, the last of the game's own gated seats, hence its reveal. */}
+        {scenePlays().map(({ modId, play }) => (
+          <play.Seat
+            key={modId}
+            Seat={RailSeat}
+            visible={!dark && shown.has('calendar')}
+            open={() => props.onModPanel(modId)}
+          />
+        ))}
         {/* Never gated: the way out must be reachable from wherever the reader is stuck. */}
         <RailSeat
           label="Settings"
@@ -542,19 +561,7 @@ function seatState(visible: boolean, dead: boolean): 'shown' | 'dim' | 'gone' {
 }
 
 /** One control on the rail: icon only, its count riding the corner. */
-function RailSeat({
-  label,
-  badge,
-  state,
-  onClick,
-  children
-}: {
-  label: string
-  badge?: number
-  state: 'shown' | 'dim' | 'gone'
-  onClick: () => void
-  children: ReactNode
-}): JSX.Element {
+function RailSeat({ label, badge, state, onClick, children }: RailSeatProps): JSX.Element {
   const dead = state !== 'shown'
   return (
     <motion.button
@@ -642,20 +649,21 @@ function SceneTips({ live, shown }: { live: boolean; shown: boolean }): JSX.Elem
 }
 
 /** Which state word the divider says. */
-type DividerWord = 'hover' | 'locked' | 'ending'
+type DividerWord = 'hover' | 'locked' | 'gift' | 'ending'
 
 const DIVIDER_WORDS: Record<DividerWord, string> = {
   hover: 'HOVER TO SHOW ACTION BOX',
   locked: 'CLASS IN SESSION',
+  gift: 'ACTION UNAVAILABLE',
   ending: 'SCENE IS ENDING'
 }
 
 /**
  * What stands in the well's place while a reply is being read: a rule either side of a state word
- * saying how to bring the well out, that the class will not be interrupted yet, or that the scene
- * has resolved and is heading into or playing its closing. It is the row's one hover target while
- * the well is away (`Scene.css`), and the well's box it sits in hears the move that swaps the two
- * as the strip's events bubble up to it.
+ * saying how to bring the well out, that the class or her present will not be interrupted yet, or
+ * that the scene has resolved and is heading into or playing its closing. It is the row's one
+ * hover target while the well is away (`Scene.css`), and the well's box it sits in hears the move
+ * that swaps the two as the strip's events bubble up to it.
  */
 function SceneDivider({
   state,
