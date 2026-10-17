@@ -22,8 +22,11 @@ interface ComfyStoreState {
   listLocalModels: () => Promise<Result<ComfyModelLists>>
   /** What the player's own ComfyUI at `url` has; a failure is the form's to read. */
   probe: (url: string) => Promise<Result<ComfyProbe>>
-  /** Opens one slot's model folder, the app's own install's where `url` is null. */
-  openModelFolder: (role: ComfyModelRole, url: string | null) => Promise<void>
+  /**
+   * Opens one slot's model folder, the app's own install's where `url` is null; on a player's
+   * own server, the one holding `pick` where one does.
+   */
+  openModelFolder: (role: ComfyModelRole, url: string | null, pick?: string) => Promise<void>
   /**
    * The LoRAs the ComfyUI the settings name can draw with, asked afresh: the app's own install's
    * folder, or the player's own server's list. Null where that cannot be told.
@@ -59,9 +62,9 @@ export const useComfyStore = create<ComfyStoreState>((_set, get) => ({
 
   probe: async (url) => (isWebBuild() ? desktopOnly() : window.api.comfy.probe(url)),
 
-  openModelFolder: async (role, url) => {
+  openModelFolder: async (role, url, pick) => {
     if (isWebBuild()) return
-    const result = await window.api.comfy.openModelFolder(role, url)
+    const result = await window.api.comfy.openModelFolder(role, url, pick)
     if (!result.ok) useUiStore.getState().showError(result.error)
   },
 
