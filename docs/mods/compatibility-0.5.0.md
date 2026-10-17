@@ -49,7 +49,7 @@ It checks that the playthrough selections, Echo identity and spent aspect change
 
 ## Validation
 
-The final integrated test/build results are recorded with the compatibility PR. Reproduce with:
+Final results with the merged PR #69 included: all three TypeScript checks passed; 253 test files passed with 3,172 passing tests and one pre-existing skip; desktop and web production builds both passed. The browser checks below also passed without uncaught page errors. Reproduce with:
 
 ```sh
 npm ci
