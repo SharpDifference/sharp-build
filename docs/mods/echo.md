@@ -6,7 +6,7 @@ Echo ships off by default (version 0.14.2). Enable it explicitly in Mods; saved 
 
 ## Setup and customization
 
-The shared Echoes manager appears near the end of new-game setup, after course selection. It starts with aspects, names and creature suggestions drawn from each profile. Before the game begins, the reader and new students can freely change starting aspects, names, creature details, artwork and staging. Returning students retain the history and identity brought forward by Continuing Semesters. Setup does not automatically buy artwork; generation buttons use the configured provider.
+The shared Echoes manager appears near the end of new-game setup, after course selection. It starts with aspects, names and creature suggestions drawn from each profile. Before the game begins, the reader and new students can freely change starting aspects, names, creature details, artwork and staging. Native New Game+ also opens this manager: new students can choose their aspects, while returning students and the reader keep their established aspects and the reader's spent change. Carried artwork, names and staging remain available. Accepted next-semester setup is saved with registration before writing the opening save, so a failed save can be retried or registration resumed. Setup does not automatically buy artwork; generation buttons use the configured provider.
 
 During play, open Echoes from its scene sidebar icon between Calendar and Settings, or the corner controls between scenes. Only met students appear in the manager, gallery and batch-generation list. Unmet students keep their assigned identities privately until introduced. Existing playthroughs do not repeat enrollment.
 
@@ -44,13 +44,14 @@ Every aspect has a one-exchange ability costing 25, 50 or 75 spirit. Activations
 
 ## Saves, backups and source map
 
-Echo identity, locks, staging and affinity markers are validated in the exEcho save extension. Continuing Semesters carries them through modCarry; turning the mod off preserves the data. Whole-game desktop/browser backups include finished Echo artwork and reject conflicting immutable image IDs. Loose save JSON does not embed image bytes or recovery originals. This tree has no separate single-playthrough export.
+Echo identity, locks, staging and affinity markers are validated in the exEcho save extension. Native New Game+ carries them through modCarry; turning the mod off preserves the data. Whole-game desktop/browser backups include finished Echo artwork and reject conflicting immutable image IDs. Loose save JSON does not embed image bytes or recovery originals. This tree has no separate single-playthrough export.
 
 Unheard Soul artwork is a separate character image, not an Echo replacement. Its desktop character export/import/duplicate and whole-game backup support are described in [Breaking Through the Silence](reckoning.md). The browser supports ordinary Echo artwork but currently uses the inverted normal portrait for Unheard Souls; their custom image editor and portable extension are desktop-only.
 
 | Source | Responsibility |
 | --- | --- |
 | shared/echoAspects, echoReasons, echoNaming, echo, echoStage, echoSetup | Catalog, profile defaults, validation, naming, placement and enrollment rules |
+| shared/continuedModSetup | Accepted newcomer choices applied to the native next-semester save |
 | shared/modEntries/echo and renderer/modEntries/echo | Discovery, settings, lifecycle and semester carry |
 | renderer/views/EchoPanel and NewGameView | Shared manager, gallery/stage and late enrollment step |
 | main/services/echoService, echoCutout and renderer/art/echoCutout | Desktop generation, storage and isolated segmentation |

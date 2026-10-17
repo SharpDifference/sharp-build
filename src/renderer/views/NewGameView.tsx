@@ -73,6 +73,7 @@ import { enrollmentMods } from '@shared/enrollmentMods'
 import { modIsOn, setEnrollmentMods, useModsStore } from '../stores/modsStore'
 import { CHARACTER_DYNAMICS_MOD, dynamicsKnowsReader, readCharacterDynamics, type CharacterDynamics } from '@shared/characterDynamics'
 import { CharacterDynamicsModal } from './CharacterDynamicsModal'
+import { continuedDynamics, returningSetupIds, withContinuedModSetup } from '@shared/continuedModSetup'
 import { EchoPanel } from './EchoPanel'
 import { type EchoState } from '@shared/echo'
 import { echoSetupLocks, finalizeEchoSetup, prepareEchoSetup } from '@shared/echoSetup'
@@ -199,20 +200,25 @@ export function NewGameView(): JSX.Element {
     () => resumed?.playthroughId ?? null
   )
   const [exCharacterDynamics, setCharacterDynamics] = useState<CharacterDynamics | undefined>(() =>
-    readCharacterDynamics(resumed?.enrollment))
-  const [startingMods] = useState(() => enrollmentMods(resumed?.enrollment, useModsStore.getState().switches))
+    readCharacterDynamics(resumed?.enrollment) ??
+    readCharacterDynamics(resumed?.enrollment.continued?.carry.mods ?? next?.handoff.carry.mods))
+  const [startingMods] = useState(() => next
+    ? [...(next.record.mods ?? [])]
+    : enrollmentMods(resumed?.enrollment, useModsStore.getState().switches))
   const dynamicsEnabled = modIsOn(CHARACTER_DYNAMICS_MOD, { mods: startingMods })
   useEffect(() => {
     setEnrollmentMods(startingMods)
     return () => setEnrollmentMods(null)
   }, [startingMods])
   // Previous classmates cannot be given a new past; a first semester has none.
-  const returningDynamicsIds: string[] = []
+  const returningDynamicsIds = nextDraft ? returningSetupIds(nextDraft) : []
   const [choosingDynamics, setChoosingDynamics] = useState(false)
-  const [echoDraft,setEchoDraft]=useState<EchoState|null>(null)
+  const [dynamicsSchedule, setDynamicsSchedule] = useState<Record<number, string> | null>(null)
+  const setupWriting = useRef(false)
+  const [echoDraft,setEchoDraft]=useState<EchoState|null>(resumed?.enrollment.exEcho ?? null)
   const [echoSchedule,setEchoSchedule]=useState<Record<number,string>|null>(null)
   const [echoSetupId]=useState(()=>crypto.randomUUID())
-  const carriedEcho: EchoState | undefined = undefined
+  const carriedEcho = nextDraft?.continued?.carry.mods?.exEcho ?? next?.handoff.carry.mods?.exEcho
   const [picking, setPicking] = useState(false)
   const [inspecting, setInspecting] = useState<string | null>(null)
   const [warnings, setWarnings] = useState<string[] | null>(null)
@@ -238,7 +244,7 @@ export function NewGameView(): JSX.Element {
     resumed?.enrollment.stats ?? DEFAULT_PLAYER_STATS
   )
   // What the reader says about himself, as the same modal took it down; blank is an answer.
-  const [playerBio, setPlayerBio] = useState(resumed?.enrollment.bio ?? '')
+  const [playerBio, setPlayerBio] = useState(resumed?.enrollment.bio ?? next?.handoff.carry.bio ?? '')
   // What New Game's own calls cost, kept with the enrollment so the registrar can be left and
   // come back to.
   const [enrolledTokens, setEnrolledTokens] = useState(resumed?.enrollment.tokensGenerated ?? 0)
@@ -663,6 +669,7 @@ export function NewGameView(): JSX.Element {
       playerFirstName: next.record.playerFirstName,
       playerLastName: next.record.playerLastName,
       stats: handoff.carry.stats,
+      mods: startingMods,
       ...(handoff.carry.bio ? { bio: handoff.carry.bio } : {}),
       ...(tokensGenerated > 0 ? { tokensGenerated } : {}),
       continued: {
@@ -708,10 +715,19 @@ export function NewGameView(): JSX.Element {
       )
     })
 
+    // Persist the accepted setup before the opening save, so failed writes remain retryable.
+    setNextDraft(draft)
+    const registered = await useSaveStore.getState().enroll(draft, target)
+    if (!registered.ok) {
+      endCrossing()
+      showError(registered.error)
+      return
+    }
     const start = continuedStartOf(draft, playerSchedule, roster)
+    const save = withContinuedModSetup(start.save, draft, roster)
     const written = await useSaveStore
       .getState()
-      .continueSemester(target, start.id, start.semester, start.save)
+      .continueSemester(target, start.id, start.semester, save)
     if (!written.ok) {
       // The registrar is revealed again and the error read over it, the abandon idiom.
       endCrossing()
@@ -728,20 +744,53 @@ export function NewGameView(): JSX.Element {
 
   /** The last setup screen; profile defaults exist before any optional customization. */
   function requestFinalize(playerSchedule:Record<number,string>):void {
-    if(!schedules)return
-    // A next semester keeps the Echoes it carried: New Game+ brings them over through the mod's
-    // own carry, so the setup is a first semester's only.
-    if(modIsOn('echo') && !nextDraft?.continued){
+    if(!schedules || choosingDynamics || echoSchedule || setupWriting.current)return
+    if (nextDraft?.continued && dynamicsEnabled && roster.some(c => !returningDynamicsIds.includes(c.charId))) {
+      setDynamicsSchedule(playerSchedule)
+      setChoosingDynamics(true)
+      return
+    }
+    requestEchoSetup(playerSchedule)
+  }
+
+  /** Bank newcomer history with the registration before opening the next setup screen. */
+  async function acceptContinuedDynamics(choices: CharacterDynamics, playerSchedule: Record<number, string>): Promise<void> {
+    const target = next?.playthroughId ?? playthroughId
+    if (!nextDraft?.continued || !target || setupWriting.current) return
+    setupWriting.current = true
+    try {
+      const dynamics = continuedDynamics(nextDraft, roster, choices)
+      const draft = { ...nextDraft, mods: startingMods, exCharacterDynamics: dynamics, exCharacterDynamicsEnabled: true }
+      setCharacterDynamics(dynamics)
+      const written = await useSaveStore.getState().enroll(draft, target)
+      if (!written.ok) {
+        showError(written.error)
+        return
+      }
+      setNextDraft(draft)
+      requestEchoSetup(playerSchedule, draft)
+    } catch (error) {
+      showError(toAppError(error))
+    } finally {
+      setupWriting.current = false
+      setChoosingDynamics(false)
+      setDynamicsSchedule(null)
+    }
+  }
+
+  /** Echo choices follow the timetable and any newcomer history, with returning aspects locked. */
+  function requestEchoSetup(playerSchedule: Record<number, string>, draft = nextDraft): void {
+    if(modIsOn('echo')){
       setEchoDraft(prepareEchoSetup(echoDraft??carriedEcho,playthroughId??echoSetupId,roster,`${playerName.first} ${playerName.last}`,playerBio))
       setEchoSchedule(playerSchedule)
-    }else void onFinalize(playerSchedule)
+    }else void onFinalize(playerSchedule, undefined, draft)
   }
 
   /** The save write, once the player has picked their timetable and optional Echoes. */
-  async function onFinalize(playerSchedule: Record<number, string>, echoes?:EchoState): Promise<void> {
+  async function onFinalize(playerSchedule: Record<number, string>, echoes?:EchoState, draft = nextDraft): Promise<void> {
     if (!schedules) return
-    if (nextDraft?.continued) {
-      await finalizeNext(nextDraft, playerSchedule)
+    if (draft?.continued) {
+      await finalizeNext({ ...draft, ...(echoes ? { exEcho: echoes } : {}) }, playerSchedule)
       return
     }
 
@@ -983,6 +1032,10 @@ export function NewGameView(): JSX.Element {
   const dynamicsModal = choosingDynamics ? (
     <CharacterDynamicsModal key="dynamics" theme={theme} roster={roster} initial={exCharacterDynamics} returning={returningDynamicsIds}
       onContinue={choices => {
+        if (dynamicsSchedule && nextDraft?.continued) {
+          void acceptContinuedDynamics(choices, dynamicsSchedule)
+          return
+        }
         setCharacterDynamics(choices)
         setChoosingDynamics(false)
         finishNaming(playerName.first, playerName.last, playerStats, playerBio, choices)
@@ -1037,7 +1090,7 @@ export function NewGameView(): JSX.Element {
     )
   }
 
-  if (classSelect) return <>{classSelect}{echoModal}</>
+  if (classSelect) return <>{classSelect}{echoModal}<AnimatePresence>{dynamicsModal}</AnimatePresence></>
 
   return (
     // The crossing takes the pointer from its first frame but not the keyboard, and a screen
