@@ -38,6 +38,8 @@ export interface PromptSpots {
   dm: { character: Character; info: CharInfo | undefined; state: TextingPromptState }
   /** The status updates the slot's opening writes, one entry per post. */
   'slot-posts': Record<string, never>
+  /** The girl the slot's opening has texting the reader just to talk, one call per girl. */
+  'slot-reach-outs': { character: Character; info: CharInfo; date: number }
   /** A character being generated. */
   character: Record<string, never>
 }
@@ -47,7 +49,10 @@ export type PromptSpot = keyof PromptSpots
 /** What a mod adds to one prompt: instruction lines, and fields the reply has to fill in. */
 export interface PromptAddition<C> {
   lines?: (ctx: C) => readonly string[]
-  /** Schema properties: the top level for `dm` and `character`, each post for `slot-posts`. */
+  /**
+   * Schema properties: the top level for `dm` and `character`, each post for `slot-posts`, each
+   * girl's entry for `slot-reach-outs`.
+   */
   fields?: () => Record<string, unknown>
   /** Which of those fields the reply must fill in. */
   required?: () => readonly string[]
@@ -212,6 +217,15 @@ export interface ModHooks {
   afterSceneReply?: (ctx: SceneReplied) => void
   /** A seat on the scene's rail, and the panel it opens over the scene. */
   scenePlay?: ScenePlay
+  /**
+   * After the texts of a girl reaching out just to talk have landed. `reply` is her entry from the
+   * slot's opening, with whatever fields `prompts['slot-reach-outs']` added to it.
+   */
+  afterReachOut?: (ctx: {
+    charId: string
+    character: Character
+    reply: Readonly<Record<string, unknown>>
+  }) => void
   /** As the reader commits to something: an action sent, or a hangout begun. */
   playerActs?: () => void
   /** As a game is entered, new or loaded. */
@@ -334,6 +348,14 @@ export function scenePlays(): { modId: string; play: ScenePlay }[] {
     .filter((entry) => rules.isOn(entry.modId) && entry.hooks.scenePlay)
     .sort((a, b) => rules.order(a.modId) - rules.order(b.modId))
     .map((entry) => ({ modId: entry.modId, play: entry.hooks.scenePlay as ScenePlay }))
+}
+
+export function afterReachOut(ctx: {
+  charId: string
+  character: Character
+  reply: Readonly<Record<string, unknown>>
+}): void {
+  for (const hooks of active()) hooks.afterReachOut?.(ctx)
 }
 
 export function playerActs(): void {

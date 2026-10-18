@@ -2518,7 +2518,7 @@ export interface SlotIntroResponse {
    * The messages the girl the slot rolled to reach out sends, just to talk: `char` is her charKey,
    * `texts` the run of messages in the order she sends them.
    */
-  reachOuts?: Array<{ char: string; texts: string[] }>
+  reachOuts?: Array<{ char: string; texts: string[]; [field: string]: unknown }>
   /**
    * The messages the graduate back for Homecoming sends to tell the reader she is in town:
    * `char` is her charKey, `texts` the run of messages in the order she sends them.
