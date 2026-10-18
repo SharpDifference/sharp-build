@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
 import type { Chattiness } from '@shared/minigames'
 import type { GamePlay } from './play'
+import { busGain, volumesOf } from '@shared/audio'
+import { useSettingsStore } from '../stores/settingsStore'
 
 /**
  * Everything a game pack may use from outside its own files, for the half of a pack that is
@@ -20,6 +22,7 @@ export {
   type Opponent,
   type PlayOutcome,
   type PlayResult,
+  type TableExpression,
   type RoundAsk
 } from './play'
 
@@ -121,4 +124,9 @@ export function pointIn(
   if (!matrix) return null
   const point = new DOMPoint(event.clientX, event.clientY).matrixTransform(matrix.inverse())
   return { x: point.x, y: point.y }
+}
+
+/** A pack's synthesized effects follow the saved SFX slider's squared gain. */
+export function useEffectsGain(): number {
+  return useSettingsStore(state => busGain(volumesOf(state.settings?.volumes).sfx))
 }

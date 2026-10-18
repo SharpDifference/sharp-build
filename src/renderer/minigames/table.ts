@@ -1,7 +1,8 @@
 import { create } from 'zustand'
 import { gamesOffered, gameSwitchOn, listed, type MiniGameDef } from '@shared/minigames'
 import { modById, optionKey } from '@shared/mods'
-import { charKeyOf, READER_SPEAKER } from '@shared/types'
+import { parseSpriteRef } from '@shared/outfits'
+import { charKeyOf, READER_SPEAKER, type Emotion } from '@shared/types'
 import { useGameStore } from '../stores/gameStore'
 import { submitAction, takeTurnFromReply } from '../stores/gameLoop'
 import { advance } from '../stores/loop/hooks'
@@ -127,10 +128,13 @@ let moveLines = new Set<object>()
  * Puts lines on the transcript and on the box at once, the box turning to the first of them.
  * `moves` marks a game's own narration of its moves, as against a result that stays in the scene.
  */
-function playLines(text: string, speaker = '', moves = false): void {
-  const lines = splitOverflow({ speaker, text }, boxFits)
-  if (moves) for (const line of lines) moveLines.add(line)
+function playLines(text: string, speaker = '', moves = false, expression?: Emotion): void {
   const game = useGameStore.getState()
+  const charId = game.charKeyToId[speaker]
+  const outfit = charId ? parseSpriteRef(game.emotions[charId] ?? 'neutral')?.set : undefined
+  const actions = expression && charId ? [`sprite:${speaker},${expression}${outfit ? `_${outfit}` : ''}`] : undefined
+  const lines = splitOverflow({ speaker, text, ...(actions ? { actions } : {}) }, boxFits)
+  if (moves) for (const line of lines) moveLines.add(line)
   game.appendSceneLines(lines)
   game.appendPendingLines(lines)
   game.setAwaitingInput(false)
@@ -251,26 +255,26 @@ export function tableQuietIn(): number {
 }
 
 /** Resolves once the line is on the box, which is after everything said before it. */
-function show(text: string, speaker: string): Promise<void> {
+function show(text: string, speaker: string, expression?: Emotion): Promise<void> {
   // A line too long for the box is several, each given the box in its turn: put on together,
   // only the first would be shown and every later line would run one behind.
   const parts = splitOverflow({ speaker, text }, boxFits)
   if (parts.length > 1) {
     return parts.reduce<Promise<void>>(
-      (said, part) => said.then(() => showOne(part.text, speaker)),
+      (said, part) => said.then(() => showOne(part.text, speaker, expression)),
       Promise.resolve()
     )
   }
-  return showOne(text, speaker)
+  return showOne(text, speaker, expression)
 }
 
-function showOne(text: string, speaker: string): Promise<void> {
+function showOne(text: string, speaker: string, expression?: Emotion): Promise<void> {
   const at = sitting
   if (stepped) {
     // Behind whatever is still being read, and on the box as soon as he steps past it.
     chain = chain.then(stepPast).then(() => {
       if (at !== sitting) return
-      playLines(text, speaker, speaker === '')
+      playLines(text, speaker, speaker === '', expression)
       unread = true
     })
     return chain
@@ -280,7 +284,7 @@ function showOne(text: string, speaker: string): Promise<void> {
   heldUntil = Math.max(now, heldUntil) + holdFor(text, speaker !== '')
   return new Promise((resolve) => {
     const put = (): void => {
-      if (at === sitting) playLines(text, speaker, speaker === '')
+      if (at === sitting) playLines(text, speaker, speaker === '', expression)
       resolve()
     }
     if (wait === 0) put()
@@ -322,11 +326,11 @@ export async function sayAtTable(charId: string, situation: string, cue: string)
 }
 
 /** A girl's line at the table in words already written, shown as hers and given its time. */
-export async function speakAtTable(charId: string, text: string): Promise<void> {
+export async function speakAtTable(charId: string, text: string, expression?: Emotion): Promise<void> {
   const character = useGameStore.getState().characters[charId]
   const line = text.trim()
   if (!character || !line) return
-  await show(line, charKeyOf(character.firstName, character.lastName))
+  await show(line, charKeyOf(character.firstName, character.lastName), expression)
   // At the reader's own pace the line is his to leave; otherwise it is given its time.
   if (!stepped) await new Promise((resolve) => setTimeout(resolve, holdFor(line, true)))
 }
@@ -419,7 +423,9 @@ export function fileResult(result: PlayResult, played: PlayedWith, tries = 0): v
                     : `Riding on it, as they agreed: ${played.stake} Nobody won outright, so what becomes of it is theirs to settle.`
                 ]
               : []),
-            `Open on the result, then let ${who} react to it in character: how the game went, anything in it worth a remark, and the stake if there was one.`
+            ...(played.game.resultBrief?.length
+              ? played.game.resultBrief
+              : [`Open on the result, then let ${who} react to it in character: how the game went, anything in it worth a remark, and the stake if there was one.`])
           ]
     })
     void submitAction(result.summary)
