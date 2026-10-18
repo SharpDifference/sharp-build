@@ -44,6 +44,7 @@ import type {
   Result,
   SaveDraft,
   SceneResponse,
+  SemesterRecord,
   SetTarget,
   SettingsPatch,
   SlotIntroResponse,
@@ -66,6 +67,7 @@ import {
   readAudio
 } from './services/assetService'
 import {
+  continueSemester,
   createPlaythrough,
   deletePlaythrough,
   deleteSave,
@@ -80,13 +82,11 @@ import {
   writeManualSave,
   writeSlotSave
 } from './services/saveService'
-import { readBreak, removeBreak, writeBreak } from './services/breakService'
-import type { BreakDraft } from '@shared/termBreak'
 import {
   applyWardrobeFix,
   decodePng,
-  assertEditableChar,
   assertSafeCharId,
+  claimCharacter,
   commitStagedSet,
   createCharacter,
   deleteCharacter,
@@ -105,6 +105,7 @@ import {
   readCharacterImage,
   readReference,
   readWardrobeImage,
+  resetDefault,
   restoreDefaults,
   setProfileCrop,
   writeCharacter
@@ -125,11 +126,17 @@ import {
   removeCustomBackground
 } from './services/backgroundService'
 import {
+  comfySourceChanged,
   fixHands,
   generateCg,
   generateSprite,
+  listLocalModels,
+  modelFolderOf,
+  probe as probeComfy,
+  resolveTarget as resolveComfyTarget,
   setStateSink as setComfyStateSink,
   start as startComfy,
+  type ComfyTarget,
   stopByHand as stopComfyByHand
 } from './services/comfyService'
 import { classifyCloud } from '@shared/llm/cloudClassifier'
@@ -146,12 +153,13 @@ import {
 import { backupName } from '@shared/backup'
 import { photoExportName, type PhotoMeta, type PhotoRequest } from '@shared/photos'
 import { exportFileName } from '@shared/characterTransfer'
-import { ENDING_ART_FILE_NAME } from '@shared/endingPicture'
+import { endingArtExportName } from '@shared/endingPicture'
 import type { ExportKind } from '@shared/sillyTavern'
 import { useSettingsSource } from '@shared/llm/settingsPort'
 import { setTokenSink } from '@shared/llm/tokenPort'
 import { logExportName, logRecordOf } from '@shared/logRules'
 import { storedEndpointKeyFor } from '@shared/settingsRules'
+import { comfySourceOf, comfyUrlOf, type ComfyModelRole } from '@shared/comfyModels'
 import {
   cancelGroup,
   cancelKeys,
@@ -187,6 +195,7 @@ import {
   verifyModel
 } from './services/setupService'
 import { applyUpdate, getUpdateCheck } from './services/updateService'
+import { convertLegacyImages } from './services/legacyImageService'
 import { copyLogTo, writeLogLine } from './logFile'
 import { getCharacterPath } from './paths'
 import { redactError } from './redact'
@@ -238,18 +247,24 @@ function redactedProgress<T extends { error?: AppError }>(progress: T): T {
 async function enqueueComfyJob<T>(
   character: Character,
   key: string,
-  run: (options: { signal: AbortSignal; onProgress: (step: string) => void }) => Promise<T>
+  run: (options: {
+    signal: AbortSignal
+    onProgress: (step: string) => void
+    target: ComfyTarget
+  }) => Promise<T>
 ): Promise<T> {
-  // The gate in front of every sprite channel: `/assets` is read-only.
-  await assertEditableChar(character.charId)
+  // The gate in front of every sprite channel: a shipped character is copied out first.
+  await claimCharacter(character.charId)
   return enqueue({
     group: character.charId,
     key,
     run: async ({ signal, report }) => {
       // The job starts ComfyUI itself; the queue is serial, so only the first pays the boot.
+      // Which ComfyUI it is is read once, so the server started is the one every graph goes to.
       report('Waiting for ComfyUI')
-      await startComfy((step) => report(step))
-      return run({ signal, onProgress: (step) => report(step) })
+      const target = await resolveComfyTarget()
+      await startComfy(target, (step) => report(step))
+      return run({ signal, onProgress: (step) => report(step), target })
     }
   })
 }
@@ -334,12 +349,23 @@ export function registerIpcHandlers(): void {
   handle('settings:get', () => getRendererSettings())
   // A write that changes the fullscreen setting puts the window there at once; any other write
   // leaves the window as F11 left it.
+  // A write that changes which ComfyUI draws, or where the player's own one answers, lets go of
+  // the one left behind once the write has landed, without holding the reply for it.
   handle('settings:set', async (event, patch: SettingsPatch) => {
-    const wasFullscreen = (await getSettings()).fullscreen !== false
+    const before = await getSettings()
+    const wasFullscreen = before.fullscreen !== false
     const next = await applySettingsPatch(patch)
     const fullscreen = next.fullscreen !== false
     if (fullscreen !== wasFullscreen) {
       BrowserWindow.fromWebContents(event.sender)?.setFullScreen(fullscreen)
+    }
+    if (
+      comfySourceOf(before) !== comfySourceOf(next) ||
+      (comfySourceOf(next) === 'external' && comfyUrlOf(before) !== comfyUrlOf(next))
+    ) {
+      void comfySourceChanged().catch((err) =>
+        console.warn('[comfy] letting go of the last ComfyUI failed:', toAppError(err).message)
+      )
     }
     return next
   })
@@ -364,6 +390,14 @@ export function registerIpcHandlers(): void {
     })
     setTimeout(() => app.quit(), 250)
   })
+  // The boot's one pass over pictures older builds kept as PNG or JPEG; progress goes out on a
+  // fixed push channel, as the update's does.
+  handle('images:convertLegacy', (event) =>
+    convertLegacyImages((progress) => {
+      if (event.sender.isDestroyed()) return
+      event.sender.send('images:progress', progress)
+    })
+  )
   // The renderer's own console, appended to the file main's goes to; main stamps the clock and
   // holds what the window sent to one level of its own and one record's worth of characters.
   handle('log:write', (_event, level: unknown, text: unknown) => {
@@ -409,13 +443,15 @@ export function registerIpcHandlers(): void {
   })
 
   // Unqueued; the streamed deltas are preview-only and the invoke result is the
-  // authoritative one. `group` is the loop's own.
-  handle('llm:completeScene', (event, request: StructuredRequest, group: string) =>
-    runAbortable(group, (signal) =>
-      completeStructured<SceneResponse>(request, signal, (delta) =>
-        event.sender.send('llm:sceneDelta', delta)
+  // authoritative one. `group` is the loop's own; every delta carries the call's `stream`.
+  handle(
+    'llm:completeScene',
+    (event, request: StructuredRequest, group: string, stream: string) =>
+      runAbortable(group, (signal) =>
+        completeStructured<SceneResponse>(request, signal, (delta) =>
+          event.sender.send('llm:sceneDelta', stream, delta)
+        )
       )
-    )
   )
 
   // The end-of-scene bookkeeping call: no deltas, its own schema.
@@ -459,13 +495,20 @@ export function registerIpcHandlers(): void {
 
   handle('saves:playthroughs', () => listPlaythroughs())
   handle('saves:list', (_event, playthroughId: string) => listSaves(playthroughId))
-  handle('saves:enroll', (_event, draft: EnrollmentDraft) => writeEnrollment(draft))
-  handle('saves:enrollment', (_event, playthroughId: string) => readEnrollment(playthroughId))
-  handle('saves:break', (_event, playthroughId: string) => readBreak(playthroughId))
-  handle('saves:writeBreak', (_event, playthroughId: string, draft: BreakDraft) =>
-    writeBreak(playthroughId, draft)
+  handle('saves:enroll', (_event, draft: EnrollmentDraft, playthroughId?: string) =>
+    writeEnrollment(draft, playthroughId)
   )
-  handle('saves:removeBreak', (_event, playthroughId: string) => removeBreak(playthroughId))
+  handle(
+    'saves:continueSemester',
+    (
+      _event,
+      playthroughId: string,
+      semesterId: string,
+      semester: SemesterRecord,
+      draft: SaveDraft
+    ) => continueSemester(playthroughId, semesterId, semester, draft)
+  )
+  handle('saves:enrollment', (_event, playthroughId: string) => readEnrollment(playthroughId))
   handle(
     'saves:create',
     (_event, playthrough: PlaythroughDraft, draft: SaveDraft, playthroughId?: string) =>
@@ -492,20 +535,41 @@ export function registerIpcHandlers(): void {
   // The graduation picture.
   handle(
     'saves:generateEndingArt',
-    (_event, playthroughId: string, sheet: string, friendCount: number, group: string) =>
-      runAbortable(group, (signal) => generateEndingArt(playthroughId, sheet, friendCount, signal))
+    (
+      _event,
+      playthroughId: string,
+      sheet: string,
+      friendCount: number,
+      group: string,
+      semesterId?: string
+    ) =>
+      runAbortable(group, (signal) =>
+        generateEndingArt(playthroughId, sheet, friendCount, signal, semesterId)
+      )
   )
-  handle('saves:readEndingArt', (_event, playthroughId: string) => readEndingArt(playthroughId))
+  handle('saves:readEndingArt', (_event, playthroughId: string, semesterId?: string) =>
+    readEndingArt(playthroughId, semesterId)
+  )
   // A copy of the picture, saved where the native dialog points; a dismissed dialog resolves `null`.
-  handle('saves:exportEndingArt', async (event, playthroughId: string) => {
+  handle('saves:exportEndingArt', async (event, playthroughId: string, semesterId?: string) => {
+    const bytes = await readEndingArt(playthroughId, semesterId)
+    if (bytes === null) {
+      throw appError(
+        'ENDING_ART_UNEXPORTABLE',
+        'Failed to save the ending CG.',
+        'No picture is stored for this playthrough.'
+      )
+    }
+    const name = endingArtExportName(bytes)
+    const extension = name.slice(name.lastIndexOf('.') + 1)
     const { canceled, filePath } = await showSaveDialogFor(event, {
       title: 'Save ending CG',
-      defaultPath: ENDING_ART_FILE_NAME,
-      filters: [{ name: 'PNG image', extensions: ['png'] }]
+      defaultPath: name,
+      filters: [{ name: `${extension.toUpperCase()} image`, extensions: [extension] }]
     })
     if (canceled || filePath === undefined || filePath === '') return null
 
-    await copyEndingArtTo(playthroughId, filePath)
+    await copyEndingArtTo(playthroughId, filePath, semesterId)
     return filePath
   })
 
@@ -588,6 +652,17 @@ export function registerIpcHandlers(): void {
 
   handle('comfy:start', () => startComfy())
   handle('comfy:stop', () => stopComfyByHand())
+  handle('comfy:listLocalModels', () => listLocalModels())
+  handle('comfy:probe', (_event, url: string) => probeComfy(url))
+  // The folder is resolved here, never taken from the renderer, and its path is not reported.
+  handle(
+    'comfy:openModelFolder',
+    async (_event, role: ComfyModelRole, url: string | null, pick?: unknown) => {
+      const folder = await modelFolderOf(role, url, typeof pick === 'string' ? pick : undefined)
+      const failure = await shell.openPath(folder)
+      if (failure !== '') throw appError('OPEN_FOLDER_FAILED', 'Could not open the models folder.')
+    }
+  )
 
   // `staged` renders into the character's staging tree instead of over the live set.
   handle(
@@ -640,7 +715,7 @@ export function registerIpcHandlers(): void {
 
   /*
    * The hand repair's render, queued and cancellable like the sprite jobs and gated
-   * by the same `assertEditableChar`. It answers with bytes rather than a path: what it renders
+   * by the same `claimCharacter`. It answers with bytes rather than a path: what it renders
    * belongs to no file until the player has looked at it and said yes.
    */
   handle(
@@ -692,8 +767,8 @@ export function registerIpcHandlers(): void {
     runAbortable(group, (signal) => completeStructured(request, signal))
   )
 
-  // The fourth, sent only when a semester is continued from the one before it.
-  handle('llm:generateBreak', (_event, request: StructuredRequest, group: string) =>
+  // The roster's secrets, the fourth one-shot, on the same terms.
+  handle('llm:generateSecrets', (_event, request: StructuredRequest, group: string) =>
     runAbortable(group, (signal) => completeStructured(request, signal))
   )
 
@@ -882,6 +957,7 @@ export function registerIpcHandlers(): void {
   // The shipped cast and which of them the player has taken off the roster.
   handle('chars:defaults', () => getDefaultsStatus())
   handle('chars:restoreDefaults', () => restoreDefaults())
+  handle('chars:resetDefault', (_event, charId: string) => resetDefault(charId))
   // Every `shell.openPath` goes through `openFolder`.
   handle('chars:openFolder', async (_event, charId: string) => {
     assertSafeCharId(charId)
@@ -893,7 +969,7 @@ export function registerIpcHandlers(): void {
     'chars:generateRoom',
     async (_event, character: Character, variant: RoomVariant, staged?: boolean) => {
       // The cloud bucket's own copy of `enqueueComfyJob`'s gate.
-      await assertEditableChar(character.charId)
+      await claimCharacter(character.charId)
       return enqueue({
         group: character.charId,
         key: `room:${variant}`,
@@ -909,7 +985,7 @@ export function registerIpcHandlers(): void {
   handle(
     'chars:uploadRoom',
     async (_event, charId: string, variant: RoomVariant, png: string) => {
-      await assertEditableChar(charId)
+      await claimCharacter(charId)
       await writeRoomUpload(charId, variant, png)
     }
   )

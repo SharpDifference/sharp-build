@@ -1,19 +1,20 @@
-import type { CharJob, TimeSlot } from '@shared/types'
+import type { CharJob, Season, TimeSlot } from '@shared/types'
 import { shiftSlotOf } from '@shared/jobs'
-import { activeSeason, type Season } from '@shared/term'
 
 /**
- * In-game calendar helpers; a fixed non-leap anchor per season keeps dates deterministic. 2015
- * is chosen so both day 0s — January 19 and August 17 — are Mondays, which the class schedule
- * depends on.
+ * In-game calendar helpers; fixed non-leap anchor keeps dates deterministic. 2015
+ * is chosen so day 0 — January 19 — is a Monday, which the class schedule depends on; a fall's
+ * day 0, August 17, is a Monday thirty weeks later, so every weekday reads off the one anchor.
  */
 const ANCHOR_YEAR = 2015
+const ANCHOR_MONTH = 0 // January
+const ANCHOR_DAY = 19
 
-/** Day 0 of each season's semester, as a month index and a day of that month. */
-const ANCHORS: Record<Season, { month: number; day: number }> = {
-  spring: { month: 0, day: 19 },
-  fall: { month: 7, day: 17 }
-}
+/** Where each season's day 0 falls in a year: January 19 and August 17, counted from January 1. */
+const SEASON_DAY_OF_YEAR: Record<Season, number> = { spring: 18, fall: 228 }
+
+/** Days in the year every semester is laid out in, whichever year it falls in. */
+const LAYOUT_YEAR_DAYS = 365
 
 const WEEKDAYS = [
   'Sunday',
@@ -41,33 +42,44 @@ const MONTHS = [
 ]
 
 /**
- * The calendar date a game day falls on, in UTC so the machine's timezone cannot shift it a
- * day; every reader below goes through here. A screen outside any game names the season of the
- * playthrough it is dating; everything else reads the active term's.
+ * The weekday-bearing date a game day falls on, in UTC so the machine's timezone cannot shift it
+ * a day; read for the weekday alone, which is the same in either season.
  */
-function dateFromDay(date: number, season: Season = activeSeason()): Date {
-  const anchor = ANCHORS[season]
-  return new Date(Date.UTC(ANCHOR_YEAR, anchor.month, anchor.day + date))
+function dateFromDay(date: number): Date {
+  return new Date(Date.UTC(ANCHOR_YEAR, ANCHOR_MONTH, ANCHOR_DAY + date))
 }
 
 /**
- * "January 19" for date 0 of a spring. Month and day only — the year is an implementation
- * detail.
+ * The month and day a `season` semester's game day falls on, read off one non-leap year: a date
+ * carried back across semesters prints the month and day it was lived on, however many years
+ * back it reaches.
  */
-export function formatGameDate(date: number, season?: Season): string {
-  const at = dateFromDay(date, season)
+function monthDayOf(date: number, season: Season): Date {
+  const offset = (SEASON_DAY_OF_YEAR[season] + date) % LAYOUT_YEAR_DAYS
+  const dayOfYear = (offset + LAYOUT_YEAR_DAYS) % LAYOUT_YEAR_DAYS
+  return new Date(Date.UTC(ANCHOR_YEAR, 0, 1 + dayOfYear))
+}
+
+/** The month a `season` semester's game day falls in, January 0. */
+export function monthOf(date: number, season: Season): number {
+  return monthDayOf(date, season).getUTCMonth()
+}
+
+/** "January 19" for a spring's date 0. Month and day only — the year is an implementation detail. */
+export function formatGameDate(date: number, season: Season): string {
+  const at = monthDayOf(date, season)
   return `${MONTHS[at.getUTCMonth()]} ${at.getUTCDate()}`
 }
 
 /** Compact date for memory entries in prompt cast blocks. */
-export function formatShortGameDate(date: number, season?: Season): string {
-  const at = dateFromDay(date, season)
+export function formatShortGameDate(date: number, season: Season): string {
+  const at = monthDayOf(date, season)
   return `${MONTHS[at.getUTCMonth()].slice(0, 3)} ${at.getUTCDate()}`
 }
 
 /** `"1/28"` — the date as a figure, for the day-change splash's mono row. */
-export function formatNumericGameDate(date: number, season?: Season): string {
-  const at = dateFromDay(date, season)
+export function formatNumericGameDate(date: number, season: Season): string {
+  const at = monthDayOf(date, season)
   return `${at.getUTCMonth() + 1}/${at.getUTCDate()}`
 }
 
@@ -172,18 +184,18 @@ export function formatTimeSlot(time: TimeSlot): string {
 }
 
 /** The date half of the banner, e.g. `"Monday, January 19"`. */
-export function formatDatePart(date: number, season?: Season): string {
+export function formatDatePart(date: number, season: Season): string {
   return `${formatWeekday(date)}, ${formatGameDate(date, season)}`
 }
 
 /** The slot-opening banner, e.g. `"Monday, January 19. Day."`. */
-export function formatDateBanner(date: number, time: TimeSlot, season?: Season): string {
+export function formatDateBanner(date: number, time: TimeSlot, season: Season): string {
   return `${formatDatePart(date, season)}. ${formatTimeSlot(time)}.`
 }
 
-/** The first line of every slot opening: date, weekday and half, semester phrase. */
-export function formatSlotOpening(date: number, time: TimeSlot): string {
-  return `${formatGameDate(date)}, ${formatWeekday(date)} ${slotHalf(time)}. ${formatSemesterPhrase(date)}`
+/** The first line of every slot opening: date, weekday with morning or night, semester phrase. */
+export function formatSlotOpening(date: number, time: TimeSlot, season: Season): string {
+  return `${formatGameDate(date, season)}, ${formatWeekday(date)} ${time === 0 ? 'morning' : 'night'}. ${formatSemesterPhrase(date)}`
 }
 
 /** The slot after this one — night wraps to the next date's day. */
@@ -202,8 +214,8 @@ export function slotHalf(time: TimeSlot): 'day' | 'night' {
 }
 
 /** The chat divider label, e.g. `"Jan 19, night"`, shared by the Bunnyboard thread and the texting stubs. */
-export function formatChatDivider(date: number, time: TimeSlot): string {
-  return `${formatShortGameDate(date)}, ${slotHalf(time)}`
+export function formatChatDivider(date: number, time: TimeSlot, season: Season): string {
+  return `${formatShortGameDate(date, season)}, ${slotHalf(time)}`
 }
 
 /** How long ago a slot was, from another slot: `"earlier today"`, `"last night"`, `"3 days ago"`. */

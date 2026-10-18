@@ -1,11 +1,11 @@
 import { afterEach, expect, it } from 'vitest'
 import { NO_SWITCHES } from '@shared/mods'
 import { activePlotTwist, PLOT_TWIST_MOD } from '@shared/plotTwists'
-import { carriedOpening, carryTerm } from '@shared/termCarry'
+import { carriedModFields } from '@shared/modCarry'
+import { modFieldsLeaving } from '../src/renderer/stores/semesterModCarry'
 import type { GameSave } from '@shared/types'
 import { useGameStore } from '../src/renderer/stores/gameStore'
 import { modIsOn, useModsStore } from '../src/renderer/stores/modsStore'
-import { playthroughRecord } from './fixtures'
 
 // @shared/mods loads the actual entry files, including the retention adapter.
 afterEach(() => {
@@ -13,7 +13,7 @@ afterEach(() => {
   useModsStore.setState({ switches: NO_SWITCHES })
 })
 
-it.each([true, false])('retains the twist through a continued opening with its switch %s', (enabled) => {
+it.each([true, false])('retains the twist through New Game+ with its switch %s', (enabled) => {
   useGameStore.getState().reset()
   useModsStore.setState({ switches: { on: { [PLOT_TWIST_MOD]: enabled }, options: {} } })
   const draft = useGameStore.getState().toGameSave()
@@ -21,8 +21,8 @@ it.each([true, false])('retains the twist through a continued opening with its s
   const save: GameSave = {
     ...draft, playthroughId: '123', saveId: 'end', saveDate: 0, exPlotTwist: twist
   }
-  const carry = carryTerm(save, playthroughRecord(), []).carry
-  const opening = carriedOpening(draft, JSON.parse(JSON.stringify(carry)))
+  const mods = modFieldsLeaving(save, { playthroughId: '123', index: 0, season: 'spring', characters: {} })
+  const opening = { ...draft, ...carriedModFields(JSON.parse(JSON.stringify(mods))) }
   expect(opening.exPlotTwist).toBe(twist)
   expect(activePlotTwist(opening.exPlotTwist, modIsOn(PLOT_TWIST_MOD))).toBe(enabled ? twist : '')
   expect(save.exPlotTwist).toBe(twist)
@@ -39,6 +39,7 @@ it.each([undefined, ''])('keeps a missing or explicitly cleared twist blank (%s)
   const save: GameSave = {
     ...draft, playthroughId: '123', saveId: 'end', saveDate: 0, exPlotTwist: twist
   }
-  const opening = carriedOpening(draft, carryTerm(save, playthroughRecord(), []).carry)
+  const mods = modFieldsLeaving(save, { playthroughId: '123', index: 0, season: 'spring', characters: {} })
+  const opening = { ...draft, ...carriedModFields(mods) }
   expect(opening.exPlotTwist ?? '').toBe('')
 })

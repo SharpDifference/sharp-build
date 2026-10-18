@@ -112,9 +112,9 @@ const MENU_VIEWS: readonly ViewName[] = [
   'manageCharacters',
   'sceneCreator',
   'newGame',
-  'break',
   'quickstart',
   'classSelect',
+  'nextSemester',
   'apiKey',
   'setup'
 ]

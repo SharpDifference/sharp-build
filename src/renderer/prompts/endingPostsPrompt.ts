@@ -1,19 +1,25 @@
 import { affectionFor, dedupedMemoriesFor, emptyFlags } from '@shared/relationship'
 import { DEFAULT_PLAYER_STATS, type PlayerStats } from '@shared/playerStats'
-import { activeSeason, seasonWords } from '@shared/term'
 import {
   fullNameOf,
   type Character,
   type CharInfo,
+  type Season,
   type StructuredRequest,
   type TimeSlot
 } from '@shared/types'
 import { formatGameDate } from './gameDate'
 import { GRADUATION_DATE } from './occasions'
 import { relationshipLines } from './relationship'
-import { lastDayName } from './termEnd'
 import { objectSchema } from './schema'
-import { memoryLines, notesLines, personaFor, profileLines, spaced } from './scenePrompt'
+import {
+  memoryLines,
+  notesLines,
+  personaFor,
+  profileLines,
+  secretLines,
+  spaced
+} from './scenePrompt'
 
 /** The epilogue's status updates: the one call the days after graduation are written by. */
 
@@ -25,8 +31,8 @@ export interface EndingPoster {
   charKey: string
   /** Whether a Bunnyboard thread with her already holds anything (`hasTexted`). */
   texted: boolean
-  /** She is graduating out of reach rather than home for the summer. */
-  senior: boolean
+  /** She graduated at the ceremony, rather than going home for the break. */
+  graduating: boolean
   /** How long after the ceremony she is posting, in days. */
   daysAfter: number
   /** Which half of that day she is posting in. */
@@ -41,6 +47,12 @@ export interface EndingPostsInput {
   stats?: PlayerStats
   /** The player's `lessNsfwText` setting; picks which persona heads this call's prefix. */
   lessNsfwText: boolean
+  /** How many of her told secrets each poster's entry carries; absent is the default. */
+  secretBudget?: number
+  /** The semester's season, which names the month of every date and the break that follows it. */
+  season: Season
+  /** The reader graduated at the ceremony too, which is the end of his time at Venus. */
+  readerGraduated: boolean
   /** Everybody the reply writes a post for, one entry each. */
   posters: readonly EndingPoster[]
 }
@@ -61,34 +73,28 @@ const SCHEMA = objectSchema('ending_posts', ['posts'], {
   }
 })
 
-
 /** The day the semester ended and what the campus is doing about it. */
-function semesterBlock(): string[] {
-  const words = seasonWords()
-  if (activeSeason() === 'spring') {
-    return [
-      'THE SEMESTER IS OVER',
-      `The graduation ceremony was held on ${formatGameDate(GRADUATION_DATE)} and campus is emptying out for ${words.endBreak}.`,
-      'The seniors have graduated and are leaving Veridan.',
-      `Everybody else is heading home until ${words.backIn}.`
-    ]
-  }
+function semesterBlock(season: Season, readerGraduated: boolean): string[] {
+  const fall = season === 'fall'
   return [
     'THE SEMESTER IS OVER',
-    `The winter send-off was held on ${formatGameDate(GRADUATION_DATE)} and campus is emptying out for ${words.endBreak}.`,
-    `Everybody is heading home until ${words.backIn}.`
+    `The graduation ceremony was held on ${formatGameDate(GRADUATION_DATE, season)} and campus is emptying out for ${fall ? 'winter' : 'summer'} vacation.`,
+    'The seniors have graduated and are leaving Veridan.',
+    ...(readerGraduated ? ['The reader graduated with them and is leaving Veridan too.'] : []),
+    `Everybody else is heading home until the ${fall ? 'spring' : 'fall'}.`
   ]
 }
 
 /** When she is writing, and what she is writing it from — the last line of her entry. */
-function postingLine(poster: EndingPoster): string {
-  const words = seasonWords()
+function postingLine(poster: EndingPoster, season: Season): string {
   const days = poster.daysAfter === 1 ? '1 day' : `${poster.daysAfter} days`
   const half = poster.time === 0 ? 'morning' : 'evening'
-  const where = poster.senior
+  const where = poster.graduating
     ? 'has graduated and is moving on from Venus University'
-    : `is home for ${words.endBreakSpan} and back in ${words.backIn}`
-  return `${poster.character.firstName} is posting ${days} after ${lastDayName()}, in the ${half}; she ${where}.`
+    : season === 'fall'
+      ? 'is home for winter vacation and back in the spring'
+      : 'is home for the summer and back in the fall'
+  return `${poster.character.firstName} is posting ${days} after graduation, in the ${half}; she ${where}.`
 }
 
 /** Everybody the call names, described once each. */
@@ -105,14 +111,16 @@ function characterBlock(input: EndingPostsInput): string[] {
         info.flags ?? emptyFlags(),
         info.nameKnown,
         affectionFor(info, date, character),
+        info,
         input.stats ?? DEFAULT_PLAYER_STATS,
         // Everybody here is off campus: whatever they have left is a phone.
         { texting: true, texted },
         // Where she is in her cycle, for a Promiscuous girl's DTF days.
         { date, offset: info.moodCycleOffset ?? 0 }
       ),
-      ...memoryLines(character, dedupedMemoriesFor(info).slice(-3), info.textMemory),
-      postingLine(poster),
+      ...memoryLines(character, dedupedMemoriesFor(info).slice(-3), info.textMemory, input.season),
+      ...secretLines(info.toldSecrets, input.secretBudget),
+      postingLine(poster, input.season),
       ...notesLines(character.firstName, info.notes)
     ]
   })
@@ -138,13 +146,13 @@ export function buildEndingPostsPrompt(
   reader: string
 ): StructuredRequest {
   const user = [
-    ...spaced(semesterBlock()),
+    ...spaced(semesterBlock(input.season, input.readerGraduated)),
     ...spaced(characterBlock(input)),
     ...spaced(posterBlock(input)),
     'YOUR TURN',
     'Hey RITA, the semester is over and everybody is scattering. Write what each of them posts about it.',
     'Fill "posts", one entry per character under STATUS UPDATES. "char" is her key exactly as written there.',
-    `"text" is the post itself: one or two short lines in her own voice, the way she would actually type it — lowercase, slang and emoji are fine if that is how she writes. It is about how the days after ${lastDayName()} are going for her: what she is doing, where she is, what kind of mood she is in, something small she noticed. Looking back on the semester is welcome.`,
+    '"text" is the post itself: one or two short lines in her own voice, the way she would actually type it — lowercase, slang and emoji are fine if that is how she writes. It is about how the days after graduation are going for her: what she is doing, where she is, what kind of mood she is in, something small she noticed. Looking back on the semester is welcome.',
     'Even though the semester is over, she still hasn\'t gone home yet.',
     'She is NOT writing to the reader and must not address him, mention him, or refer to meeting anyone. No narration and no stage directions.'
   ].join('\n')

@@ -39,6 +39,21 @@ beforeEach(() => {
 afterEach(async () => { stop?.(); stop = undefined; await vi.advanceTimersByTimeAsync(200); await writesSettled(); restoreApi(); vi.useRealTimers(); vi.restoreAllMocks() })
 
 describe('Wednesday edition and unread state', () => {
+  it('delivers new editions in native later semesters without reopening earlier discussions', async () => {
+    api()
+    const first = await publishWhisper('spring', () => true)
+    const original = structuredClone(game().exVenusWhisper.issues[0])
+    for (const semesterIndex of [1, 2]) {
+      useGameStore.setState({ semesterIndex, date: 2, time: 0 })
+      const id = await publishWhisper(`semester-${semesterIndex}`, () => true)
+      expect(id).toBe(whisperIssueId(semesterIndex, 2))
+      expect(game().exVenusWhisper.issues.at(-1)).toMatchObject({ term: semesterIndex, day: 2 })
+      await expect(commentOnWhisper(first, 'An old discussion.', undefined, () => true)).rejects.toThrow('archived')
+    }
+    expect(game().exVenusWhisper.issues).toHaveLength(3)
+    expect(game().exVenusWhisper.issues[0]).toEqual(original)
+  })
+
   it('waits for Wednesday, delivers with Bunnyboard closed, and never publishes twice in the same week', async () => {
     const { complete } = api()
     useGameStore.setState({ date: 1 })

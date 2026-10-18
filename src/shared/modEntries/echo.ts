@@ -5,7 +5,7 @@ import { ECHO_BREAKTHROUGH_OPTION } from '../echoBreakthrough'
 declare module '../modCarry' { interface ModCarryFields { exEcho?: EchoState } }
 registerTermCarry('exEcho', save => save.exEcho ? normalizeEcho(save.exEcho) : undefined)
 const mod: ModDef = {
-  id: 'echo', name: 'Echo', author: 'Maestro Leeds', version: '0.14.1', scope: 'anytime', defaultOn: false,
+  id: 'echo', name: 'Echo', author: 'Maestro Leeds', version: '0.14.2', scope: 'anytime', defaultOn: false,
   blurb: 'Named ethereal companions shaped by character profiles, with matching and competing bonds. API artwork downloads a background-removal model on first use.',
   offNote: 'Keeps your Echo choices, type lock and artwork; hides companions and disables affinity effects.',
   options: [{id:'megaten-art',label:'Local Megaten artwork',default:false,
