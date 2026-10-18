@@ -72,6 +72,7 @@ import {
 } from '../stores/characterStore'
 import { LandingChrome, type LandingRow } from './LandingChrome'
 import { SceneChrome } from './SceneChrome'
+import { useTableInputLayout } from '../minigames/inputLayout'
 import { BreakthroughPanel, BreakthroughFlourish } from './BreakthroughPanel'
 import { DialogueBox } from './Dialogue'
 import {
@@ -583,6 +584,7 @@ function InterruptEndingModal({
 
 /** Game View: renders `gameStore`; `gameLoop.ts` owns state changes. */
 export function GameView(): JSX.Element {
+  const tableOwnsInput = useTableInputLayout((state) => state.layout !== null)
   const plotTwistOn = useModOn(PLOT_TWIST_MOD)
   const echoOn = useModOn('echo')
   const bg = useGameStore((s) => s.bg)
@@ -2112,6 +2114,7 @@ export function GameView(): JSX.Element {
           goodbye menu), or the three game overs — each wearing the slot's own half of the day. */}
       {sceneMode || cinematic || created || replaying ? (
         <SceneChrome
+          inputOwned={tableOwnsInput}
           theme={half}
           date={date}
           season={season}

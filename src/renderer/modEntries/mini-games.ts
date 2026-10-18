@@ -22,7 +22,7 @@ import { gameIsOn, nameOf } from '../minigames/table'
 import { registerHooks } from '../mods/hooks'
 import { useGameStore } from '../stores/gameStore'
 import { useModsStore } from '../stores/modsStore'
-import { placeOf, scenePlace } from '../minigames/place'
+import { scenePlace } from '../minigames/place'
 
 /** The games a girl in this scene could be played at, each with a component to play it with. */
 function gamesWith(cast: readonly Character[], location: string | null): MiniGameDef[] {
@@ -98,14 +98,14 @@ registerHooks(MINI_GAMES, {
       if (proposal && ctx.query.includes(proposal.text)) {
         const game = gameById(proposal.gameId)
         const asked = askedOf(proposal.charIds, ctx.cast)
-        return game && asked.length > 0 ? withProposal(request, game, asked, placeOf(ctx.state.sceneLocation, ctx.state.bg)) : request
+        return game && asked.length > 0 ? withProposal(request, game, asked, scenePlace()) : request
       }
       // Every other turn the reader takes with a girl carries the standing offer. A scene's
       // closing is not one: it has no action of his, and nothing more is going to be played.
       if (!request.user.includes("Reader's action:")) return request
       // Only the games a girl may bring up here are on it, and any his action names: the rest
       // are his to ask for from the table.
-      const location = placeOf(ctx.state.sceneLocation, ctx.state.bg)
+      const location = scenePlace()
       const { busy, keen } = sceneTerms()
       const here = gamesWith(ctx.cast, location)
       const suggested = gamesSuggested(here, location, busy, keen)

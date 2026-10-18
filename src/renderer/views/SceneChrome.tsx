@@ -90,6 +90,8 @@ export interface SceneChromeProps {
   /** Bumped by a click during that arrival: the box lands at once rather than losing a line. */
   skips: number
   rowShown: boolean
+  /** A running scene activity owns input; its own row replaces the scene action row. */
+  inputOwned?: boolean
   /**
    * The row is standing over a reply still being read rather than for the player's turn: the
    * divider stands in the well's place, and the well answers a hover — `'open'` — or nothing at
@@ -154,7 +156,7 @@ export function SceneChrome(props: SceneChromeProps): JSX.Element {
   const dark = covered || hidden
 
   /** The row is up and answering: what every hover in it is dropped against. */
-  const rowLive = rowShown && !dark
+  const rowLive = rowShown && !dark && !props.inputOwned
 
   /**
    * The pointer has moved over the divider's strip, or is on the well's box or Go's seat once the
@@ -269,6 +271,13 @@ export function SceneChrome(props: SceneChromeProps): JSX.Element {
    */
   const root = useRef<HTMLDivElement>(null)
   const row = useRef<HTMLDivElement>(null)
+  useLayoutEffect(() => {
+    if (!props.inputOwned) return
+    setHover(false)
+    setPinned(false)
+    const active = document.activeElement
+    if (active instanceof HTMLElement && row.current?.contains(active)) active.blur()
+  }, [props.inputOwned])
   useEffect(() => {
     const box = row.current
     if (!box || typeof ResizeObserver === 'undefined') return
@@ -461,11 +470,13 @@ export function SceneChrome(props: SceneChromeProps): JSX.Element {
       <motion.div
         ref={row}
         className="vu-turn vu-scene-row"
+        style={props.inputOwned ? { visibility: 'hidden' } : undefined}
+        aria-hidden={props.inputOwned || undefined}
         data-well={wellOut ? 'out' : rowInterject === 'locked' ? 'locked' : 'away'}
         variants={sceneRow}
         initial="hidden"
-        animate={rowShown && !dark ? 'shown' : 'hidden'}
-        inert={rowShown && !dark ? undefined : true}
+        animate={rowLive ? 'shown' : 'hidden'}
+        inert={rowLive ? undefined : true}
       >
         {answers ? (
           <div className="vu-scene-quiz">
@@ -493,7 +504,7 @@ export function SceneChrome(props: SceneChromeProps): JSX.Element {
               sending={props.sending}
               cg={props.cg}
               submitDead={props.submitDead}
-              inputDead={props.inputDead}
+              inputDead={props.inputDead || Boolean(props.inputOwned)}
               focus={rowLive && props.inputFocus}
               placeholder="What do you do?"
               multiline
@@ -665,16 +676,18 @@ const DIVIDER_WORDS: Record<DividerWord, string> = {
  * hover target while the well is away (`Scene.css`), and the well's box it sits in hears the move
  * that swaps the two as the strip's events bubble up to it.
  */
-function SceneDivider({
+export function SceneDivider({
   state,
-  word
+  word,
+  className = ''
 }: {
   state: 'shown' | 'dim' | 'hidden'
   word: DividerWord
+  className?: string
 }): JSX.Element {
   return (
     <motion.div
-      className="vu-scene-divider"
+      className={`vu-scene-divider ${className}`}
       variants={sceneDivider}
       initial={false}
       animate={state}
