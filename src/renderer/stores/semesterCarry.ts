@@ -1,4 +1,5 @@
 import { coursePointsOf, gradedCourses } from '@shared/academics'
+import { carryPostFields } from '@shared/modCarry'
 import { overTextDesc } from '@shared/relationship'
 import {
   advancesAfter,
@@ -159,11 +160,16 @@ function carriedState(
 /** A feed moved onto the next semester's clock, in posting order. */
 function carriedFeed(feed: readonly SocialPost[], shift: number): SocialPost[] {
   return feed
-    .map((post) => ({
-      ...post,
-      date: post.date - shift,
-      ...(post.likedOn !== undefined ? { likedOn: post.likedOn - shift } : {})
-    }))
+    .map((post) =>
+      carryPostFields(
+        {
+          ...post,
+          date: post.date - shift,
+          ...(post.likedOn !== undefined ? { likedOn: post.likedOn - shift } : {})
+        },
+        shift
+      )
+    )
     .sort((a, b) => a.date * 2 + a.time - (b.date * 2 + b.time))
 }
 
