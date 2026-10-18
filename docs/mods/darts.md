@@ -182,3 +182,33 @@ closing if you want a completed result. Updating the precision balance does not 
 resetting cached NPC skill; start a new match to use the updated throw plans.
 
 The Arcade & Bar Games pack defaults on and requires the Mini-games framework. Turning the framework off disables Darts; with the framework on, Darts is available unless its pack is explicitly switched off. Existing saved mod preferences are respected.
+
+## Artwork, audio and licensing
+
+Dart artwork was contributed by **naudh1r**. The images are AI-generated or adapted
+from AI-generated artwork and models. For the multi-angle views, an AI-generated dart
+image was used as a reference to generate a 3D model in **[Meshy](https://www.meshy.ai/)**.
+Screenshots were captured from the required angles and edited into game sprites.
+
+| Asset | Source and permission |
+| --- | --- |
+| `src/assets/darts/dart-hud-side.png` | Separately AI-generated 2D artwork contributed by naudh1r for inclusion and redistribution with Venus Extracurriculars. |
+| `src/assets/darts/darts-eye-level.png` | Multi-angle sprite artwork prepared by naudh1r using AI artwork and Meshy model views; provided under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/). |
+| `src/assets/darts/darts-meshy-views.png` | Screenshots of a Meshy-generated dart model, captured and adapted by naudh1r; provided under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/). |
+
+**Attribution for the model-derived sprites:** Dart model created by naudh1r using
+Meshy — CC BY 4.0. Screenshots captured and edited into game sprites by naudh1r.
+Adaptations include cropping, background removal, sprite-sheet layout and colour
+variations where applicable. Retain this attribution and the licence link when
+redistributing or adapting the CC BY 4.0 assets.
+
+These contributed images are **not Venus Dev assets**. Their
+[directory-specific asset notice](../../src/assets/darts/LICENSE.md) identifies the
+separate permissions that apply to these three files, rather than the repository-wide
+Venus Dev attribution. The game's AGPL code licence does not replace these permissions.
+Meshy's output licence does not grant rights to unrelated third-party material.
+See [Meshy's ownership guidance](https://help.meshy.ai/en/articles/10137554-what-is-the-ownership-of-the-generated-models)
+and [terms of service](https://www.meshy.ai/terms-of-use).
+
+All Darts sound effects are synthesized at runtime by the game's audio code;
+there are no bundled third-party Darts sound recordings.
