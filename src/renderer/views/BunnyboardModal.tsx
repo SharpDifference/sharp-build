@@ -81,6 +81,7 @@ import {
   playerClassNow,
   shiftNow
 } from '../stores/timetable'
+import { PostCommentAction, PostCommentsView, PostPicture } from '../components/PostSpots'
 import { ContactPage } from './ContactPage'
 import { PhotosPage } from './PhotosPage'
 import { EditPromptModal } from './EditPromptModal'
@@ -108,6 +109,7 @@ import {
 } from './motion'
 import { BackIcon, BunnyMark, CloseIcon, HeartIcon, MapIcon, PlusIcon } from './screenIcons'
 import { LettersFilter, lettersUrl } from '../components/LettersMark'
+import type { PostComment } from '@shared/postComments'
 import '../vu_styles/Bunnyboard.css'
 
 export interface BunnyboardModalProps {
@@ -1768,7 +1770,15 @@ const FeedPost = memo(function FeedPost({
   emoji?: string
   name: string
   handle?: string
-  post: { id?: string; text: string; date: number; time: TimeSlot; likes: number; liked?: boolean }
+  post: {
+    id?: string
+    text: string
+    date: number
+    time: TimeSlot
+    likes: number
+    liked?: boolean
+    comments?: PostComment[]
+  }
   /** Somebody he has no contact info for — the one route by which one reaches his feed. */
   stranger?: boolean
   /** She already has his request, so the control that sent it is spent. */
@@ -1828,16 +1838,31 @@ const FeedPost = memo(function FeedPost({
         )}
       </div>
       <p className="vu-bb-post-text">{post.text}</p>
-      <motion.button
-        className={`vu-bb-like${post.liked ? ' vu-bb-like--on' : ''}`}
-        type="button"
-        aria-pressed={Boolean(post.liked)}
-        {...gestures(false, quietLift, quietPress)}
-        onClick={like}
-      >
-        <HeartIcon />
-        {post.likes + (post.liked ? 1 : 0)}
-      </motion.button>
+      {charId && post.id && <PostPicture charId={charId} postId={post.id} />}
+      <PostCommentsView
+        comments={post.comments ?? []}
+        charId={charId}
+        postId={post.id}
+        stranger={stranger || random}
+      />
+      <div className="vu-bb-post-actions">
+        <motion.button
+          className={`vu-bb-like${post.liked ? ' vu-bb-like--on' : ''}`}
+          type="button"
+          aria-pressed={Boolean(post.liked)}
+          {...gestures(false, quietLift, quietPress)}
+          onClick={like}
+        >
+          <HeartIcon />
+          {post.likes + (post.liked ? 1 : 0)}
+        </motion.button>
+        <PostCommentAction
+          comments={post.comments ?? []}
+          charId={charId}
+          postId={post.id}
+          stranger={stranger || random}
+        />
+      </div>
     </motion.div>
   )
 })

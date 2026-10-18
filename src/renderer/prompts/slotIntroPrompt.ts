@@ -350,10 +350,11 @@ function slotIntroSchema(): ReturnType<typeof objectSchema> {
       items: {
         type: 'object',
         additionalProperties: false,
-        required: ['char', 'texts'],
+        required: ['char', 'texts', ...promptRequired('slot-reach-outs')],
         properties: {
           char: { type: 'string' },
-          texts: { type: 'array', items: { type: 'string' } }
+          texts: { type: 'array', items: { type: 'string' } },
+          ...promptFields('slot-reach-outs')
         }
       }
     },
@@ -527,7 +528,10 @@ function reachOutBlock(input: SlotIntroInput): string[] {
   return [
     'REACHING OUT',
     'Each of these characters is texting the reader right now just to talk, about what is listed beside her. Write one entry in "reachOuts" for each, and nothing for anyone else. They are described under LOREBOOK.',
-    ...input.reachOuts.map(({ charKey, topic }) => `- ${charKey} — ${REACH_OUT_TOPIC_PHRASE[topic]}`)
+    ...input.reachOuts.flatMap(({ character, info, charKey, topic }) => [
+      `- ${charKey} — ${REACH_OUT_TOPIC_PHRASE[topic]}`,
+      ...promptLines('slot-reach-outs', { character, info, date: input.date })
+    ])
   ]
 }
 
