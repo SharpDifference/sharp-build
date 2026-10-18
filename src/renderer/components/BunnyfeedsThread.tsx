@@ -157,6 +157,7 @@ function PostView(props: CommentViewProps & { charId: string; postId: string }):
   const character = useGameStore((s) => s.characters[charId])
   const handle = useGameStore((s) => s.charInfo[charId]?.handle)
   const post = useGameStore((s) => s.charInfo[charId]?.feed?.find((one) => one.id === postId))
+  const season = useGameStore((s) => s.calendar.season)
   const canComment = useCanComment(props)
   const sceneActive = useGameStore(sceneActiveOf)
   // Over the whole screen, as a photo opens: the phone's veil is the layer it lies on.
@@ -209,7 +210,7 @@ function PostView(props: CommentViewProps & { charId: string; postId: string }):
             <div className="vu-bb-postview-name">{fullNameOf(character)}</div>
             <div className="vu-bb-postview-meta">
               {handle && <span>@{handle} · </span>}
-              {formatShortGameDate(post.date)} · {slotHalf(post.time)}
+              {formatShortGameDate(post.date, season)} · {slotHalf(post.time)}
             </div>
           </div>
         </div>

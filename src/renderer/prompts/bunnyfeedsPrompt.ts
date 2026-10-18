@@ -5,6 +5,7 @@ import {
   fullNameOf,
   type Character,
   type CharInfo,
+  type Season,
   type StructuredRequest,
   type TimeSlot
 } from '@shared/types'
@@ -127,6 +128,8 @@ export interface FeedThreadsInput {
   stats?: PlayerStats
   lessNsfwText: boolean
   date: number
+  /** The semester's season, which the posts' dates are read in. */
+  season: Season
   threads: readonly FeedThread[]
 }
 
@@ -195,11 +198,17 @@ function characterBlock(input: FeedThreadsInput): string[] {
         info.flags ?? emptyFlags(),
         info.nameKnown,
         affectionFor(info, input.date, character),
+        info,
         input.stats ?? DEFAULT_PLAYER_STATS,
         { texting: true, texted },
         { date: input.date, offset: info.moodCycleOffset ?? 0 }
       ),
-      ...memoryLines(character, dedupedMemoriesFor(info).slice(-3), info.textMemory)
+      ...memoryLines(
+        character,
+        dedupedMemoriesFor(info).slice(-3),
+        info.textMemory,
+        input.season
+      )
     ])
   }
 
@@ -245,10 +254,10 @@ function readerTieLines(character: Character, info: CharInfo | undefined, date: 
 }
 
 /** One post, its thread so far, and what is owed under it. */
-function threadLines(thread: FeedThread): string[] {
+function threadLines(thread: FeedThread, season: Season): string[] {
   const { character, charKey, post } = thread
   const name = character.firstName
-  const when = `${formatShortGameDate(post.date)}, ${post.time === 0 ? 'morning' : 'evening'}`
+  const when = `${formatShortGameDate(post.date, season)}, ${post.time === 0 ? 'morning' : 'evening'}`
   const repliers = thread.repliers.map(
     ({ character: other, charKey: key, friend }) =>
       `${other.firstName} ("${key}", ${friend ? 'her friend' : 'barely knows her'})`
@@ -296,7 +305,9 @@ export function buildFeedThreadsPrompt(
     'THREADS',
     '',
     ...input.threads.flatMap((thread, index) =>
-      index === 0 ? threadLines(thread) : ['', ...threadLines(thread)]
+      index === 0
+        ? threadLines(thread, input.season)
+        : ['', ...threadLines(thread, input.season)]
     ),
     '',
     'YOUR TURN',

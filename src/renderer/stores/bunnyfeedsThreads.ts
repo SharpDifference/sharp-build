@@ -224,6 +224,7 @@ export async function armFeedThreads(showAt: 'now' | 'next' = 'now'): Promise<vo
       stats: game.stats,
       lessNsfwText: lessNsfwTextNow(),
       date: game.date,
+      season: game.calendar.season,
       threads
     },
     SETTING,

@@ -56,7 +56,7 @@ const RECENT_POSTS = 2
  * she answered: so a girl he talks to knows what she posted and what he wrote under it.
  */
 function recentPostLines(characters: readonly Character[]): string[] {
-  const { charInfo, date, time } = useGameStore.getState()
+  const { charInfo, date, time, calendar } = useGameStore.getState()
   return characters.flatMap((character) => {
     const posts = (charInfo[character.charId]?.feed ?? [])
       .filter(postVisible)
@@ -73,7 +73,7 @@ function recentPostLines(characters: readonly Character[]): string[] {
           (one) => one.charId === character.charId && one.replyTo && hisIds.has(one.replyTo)
         )
         return [
-          `- ${formatShortGameDate(post.date)}: "${post.text}"`,
+          `- ${formatShortGameDate(post.date, calendar.season)}: "${post.text}"`,
           ...his.map((one) => `  The reader commented: "${one.text}"`),
           ...hers.map((one) => `  ${name} answered him: "${one.text}"`)
         ]
