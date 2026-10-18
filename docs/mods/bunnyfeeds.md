@@ -36,6 +36,8 @@ it takes over Photo Feature's post comments and photo posts get the same threads
 - Commenting is closed during a scene, exactly when texting is: the post view's box says so, and
   Reply is hidden. Reading stays open.
 - Strangers' posts, and the slot's random student post, take no comments.
+- Threads carry through New Game+: what she still owes you and what she has yet to remember move
+  onto the next semester with her post. Their comments move with Photo Feature 1.4.0 or later.
 - She keeps one memory of your comments among her own, arriving with her answers, the newest
   replacing the last, as her texting memory does. It shows in her Memories ("…, on her post"), can
   be edited there, counts in her affection like any memory, and every scene, text and slot opening

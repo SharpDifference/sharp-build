@@ -1,5 +1,6 @@
-import { BUNNYFEEDS } from '@shared/bunnyfeeds'
+import { BUNNYFEEDS, carriedThread } from '@shared/bunnyfeeds'
 import { globalSlotOf } from '@shared/jobs'
+import { registerPostCarry } from '@shared/modCarry'
 import { PHOTO_FEATURE } from '@shared/mods'
 import { shownComments } from '@shared/postComments'
 import { charKeyOf, type Character } from '@shared/types'
@@ -158,3 +159,7 @@ registerHooks(BUNNYFEEDS, {
     void threads().then((module) => module.resetFeedThreads())
   }
 })
+
+// New Game+ moves her posts onto the next semester's clock; a thread's last round and its held
+// memories move with them. The comments are Photo Feature's to move. Runs with the mod off too.
+registerPostCarry(BUNNYFEEDS, carriedThread)

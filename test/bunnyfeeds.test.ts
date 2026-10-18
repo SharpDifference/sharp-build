@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest'
-import { MAX_POSTER_REPLIES, threadWork, WRAP_UP_AFTER } from '../src/shared/bunnyfeeds'
+import {
+  carriedThread,
+  MAX_POSTER_REPLIES,
+  threadWork,
+  WRAP_UP_AFTER
+} from '../src/shared/bunnyfeeds'
+import { globalSlotOf } from '../src/shared/jobs'
+import type { SocialPost } from '../src/shared/types'
 import type { PostComment } from '../src/shared/postComments'
 
 /** What the once-a-slot thread call still owes a post, read off the comments alone. */
@@ -41,5 +48,24 @@ describe('threadWork', () => {
       Array.from({ length: count }, (_, i) => comment(`p${i}`, i, { player: true }))
     expect(threadWork(mine(WRAP_UP_AFTER - 1), 'her', undefined, 99)?.windingDown).toBe(false)
     expect(threadWork(mine(WRAP_UP_AFTER), 'her', undefined, 99)?.windingDown).toBe(true)
+  })
+})
+
+/** New Game+ moves a post back onto the next semester's clock; its thread moves with it. */
+describe('carriedThread', () => {
+  it('moves the last round and every held memory back the same days, leaving the rest', () => {
+    const post = {
+      id: 'p',
+      text: 'hi',
+      date: 90,
+      time: 1,
+      threadedThrough: globalSlotOf(90, 1),
+      heldMemories: [{ charId: 'her', at: globalSlotOf(91, 0), type: 'liked', desc: 'the reader' }]
+    } as SocialPost
+    const carried = carriedThread(post, 100)
+    expect(carried.threadedThrough).toBe(globalSlotOf(-10, 1))
+    expect(carried.heldMemories?.[0]).toMatchObject({ at: globalSlotOf(-9, 0), desc: 'the reader' })
+    expect(carried.date).toBe(90)
+    expect(post.threadedThrough).toBe(globalSlotOf(90, 1))
   })
 })

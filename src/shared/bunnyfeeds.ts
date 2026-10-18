@@ -1,5 +1,6 @@
 import type { PostComment } from './postComments'
-import type { MemoryType } from './types'
+import { globalSlotOf } from './jobs'
+import type { MemoryType, SocialPost } from './types'
 
 /**
  * Bunnyfeeds' saved shape and its one rule: what a post's thread still owes the reader. The
@@ -107,4 +108,20 @@ export function threadWork(
   const windingDown =
     comments.filter((one) => one.player && one.at <= now).length >= WRAP_UP_AFTER
   return { player, others, othersLeft, windingDown }
+}
+
+/**
+ * A post's thread moved back `days`, as New Game+ moves the post onto the next semester's clock:
+ * the last round answered, and every memory still held for the slot its answers show.
+ */
+export function carriedThread(post: SocialPost, days: number): SocialPost {
+  if (post.threadedThrough === undefined && !post.heldMemories) return post
+  const back = globalSlotOf(days, 0)
+  return {
+    ...post,
+    ...(post.threadedThrough !== undefined ? { threadedThrough: post.threadedThrough - back } : {}),
+    ...(post.heldMemories
+      ? { heldMemories: post.heldMemories.map((memory) => ({ ...memory, at: memory.at - back })) }
+      : {})
+  }
 }
