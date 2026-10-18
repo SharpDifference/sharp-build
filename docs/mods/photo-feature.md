@@ -4,7 +4,7 @@ An unofficial mod for Venus University by **naudh1r**. Version **1.2.0**, for th
 
 The girls send you photos in their DMs and post them on their feeds, with comments from the rest
 of campus. Each contact gets a gallery, and characters can get optional body details. Photos are
-drawn on your own machine by the game's local ComfyUI.
+drawn on your own machine by ComfyUI, the game's own or yours.
 
 It is separate from the game's own **Photos** tab in the Bunnyboard, where you make pictures
 yourself. This mod is about the photos *she* sends and posts.
@@ -13,8 +13,8 @@ This is not made or supported by Venus Dev. Please do not report problems with i
 
 ## What you need
 
-- The desktop game, with local image generation (ComfyUI) working. The browser version never
-  makes photos.
+- The desktop game, with image generation working: the game's own ComfyUI, or your own one set
+  in Settings. The browser version never makes photos.
 - Photos use the game's own photo checkpoint and LoRA (`assets/workflows/characterPhoto.json`).
   Nothing else to download.
 
