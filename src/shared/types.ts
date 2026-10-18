@@ -6,6 +6,7 @@ import type { LedgerStats, PlayerStats, StatKey, StatTier } from './playerStats'
 import type { ClassDifficulty, ClassKind, ExamPeriod, Professor } from './academics'
 import type { CharacterTrait } from './traits'
 import type { ModCarryFields } from './modCarry'
+import type { PostComment } from './postComments'
 import type { GiftPreferences, GiftReaction } from './shop'
 import type { NpcFriendship, NpcRelationshipMap, NpcSlotOverlay } from './npcRelationships'
 import type { PromptKind } from './promptKinds'
@@ -893,6 +894,8 @@ export interface SocialPost {
   liked?: boolean
   /** The game date the like was made — absent exactly when `liked` is. */
   likedOn?: number
+  /** What was said under it, written and drawn by a mod; the game draws none of its own. */
+  comments?: PostComment[]
 }
 
 /**

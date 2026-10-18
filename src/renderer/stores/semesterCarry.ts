@@ -1,5 +1,6 @@
 import { coursePointsOf, gradedCourses } from '@shared/academics'
 import { carryPostFields } from '@shared/modCarry'
+import { carriedComments } from '@shared/postComments'
 import { overTextDesc } from '@shared/relationship'
 import {
   advancesAfter,
@@ -162,11 +163,14 @@ function carriedFeed(feed: readonly SocialPost[], shift: number): SocialPost[] {
   return feed
     .map((post) =>
       carryPostFields(
-        {
-          ...post,
-          date: post.date - shift,
-          ...(post.likedOn !== undefined ? { likedOn: post.likedOn - shift } : {})
-        },
+        carriedComments(
+          {
+            ...post,
+            date: post.date - shift,
+            ...(post.likedOn !== undefined ? { likedOn: post.likedOn - shift } : {})
+          },
+          shift
+        ),
         shift
       )
     )
