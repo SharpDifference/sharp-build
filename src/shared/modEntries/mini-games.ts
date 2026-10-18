@@ -7,7 +7,8 @@ const def: ModDef = {
   author: 'morrowkiln',
   version: '0.1.0-beta',
   scope: 'anytime',
-  defaultOn: true,
+  // Off until the player turns it on, as every new mod in the build ships.
+  defaultOn: false,
   blurb:
     'Play a game inside a scene, alone or with the girls who are there. This is the frame alone: the games come as mods of their own. In beta: to report a problem, press Copy bug report at the table or on a game’s page and paste it with what happened.',
   offNote: 'A game already played stays in the story and in her memories.',
