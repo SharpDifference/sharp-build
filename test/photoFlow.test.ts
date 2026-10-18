@@ -40,6 +40,9 @@ function pendingRender(): { reserve: ReserveName; generate: GeneratePhoto } {
   }
 }
 
+// Every test imports the stores fresh, which can outrun the default timeout on a busy machine.
+vi.setConfig({ testTimeout: 30_000 })
+
 beforeEach(() => {
   vi.resetModules()
 })
