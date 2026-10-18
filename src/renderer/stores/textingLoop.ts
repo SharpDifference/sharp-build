@@ -88,7 +88,7 @@ import {
 } from '@shared/types'
 import { useBunnyboardStore } from './bunnyboardStore'
 import { useGameStore } from './gameStore'
-import { afterDmReply } from '../mods/hooks'
+import { afterDmReply, afterReachOut } from '../mods/hooks'
 import { prefetchHangoutScene, startHangoutScene } from './loop/hooks'
 import { createRetryGate } from './retryGate'
 import { createTextExtractor } from './textingStream'
@@ -1641,20 +1641,24 @@ export function deliverSlotReachOuts(reachOuts: SlotIntroResponse['reachOuts']):
     // An invitation of hers still standing outranks just talking.
     if (game.bunnyboard.conversations[charId]?.pendingHangout) continue
 
-    deliverContactTexts(charId, entry.texts, 3, true)
+    // Mods hang what they add on the texts she just sent, so only once there are some.
+    const character = game.characters[charId]
+    if (deliverContactTexts(charId, entry.texts, 3, true) > 0 && character) {
+      afterReachOut({ charId, character, reply: entry })
+    }
   }
 }
 
 /**
  * Files a run of a contact's messages, blanks dropped and at most `cap` of them; `reachOut`
- * marks the first as her reaching out.
+ * marks the first as her reaching out. Answers how many it filed.
  */
 function deliverContactTexts(
   charId: string,
   texts: readonly string[] | undefined,
   cap: number,
   reachOut = false
-): void {
+): number {
   // A custom endpoint's JSON is not held to the schema, so a lone string is not a run of texts.
   const kept = (Array.isArray(texts) ? texts : [])
     .map((text) => (typeof text === 'string' ? text.trim() : ''))
@@ -1665,6 +1669,7 @@ function deliverContactTexts(
     if (reachOut && index === 0) message.reachOut = true
     deliver(charId, message)
   })
+  return kept.length
 }
 
 /**
