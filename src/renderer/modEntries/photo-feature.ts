@@ -18,16 +18,15 @@ import {
   bodySchemaRequired,
   type DraftBody
 } from '../prompts/bodyBrief'
-import { commentHandoff } from '../stores/commentHandoff'
 import { canSendPhotos, noExplicitPhotos } from '../stores/localPhotoStore'
 import { postLikes, rollComments, strangerLikes } from '../stores/photoComments'
 import { holdPostPhoto, preparePostPhoto, startHeldPostPhoto } from '../stores/photoPost'
 import { settlePendingPhotos } from '../stores/photoRecovery'
 import { sendPhoto } from '../stores/photoTurn'
 import { useGameStore } from '../stores/gameStore'
-import { registerPostCarry, registerTermFiles } from '@shared/modCarry'
-import { carriedComments } from '@shared/postComments'
-import { registerHooks } from '../mods/hooks'
+import { registerTermFiles } from '@shared/modCarry'
+import { ownsPostComments, registerHooks } from '../mods/hooks'
+import { PhotoComments, PhotoPostPicture } from '../components/PhotoPostSpots'
 
 /**
  * Photo Feature, plugged into the game through its hooks. Everything it adds to the game's own
@@ -59,17 +58,16 @@ registerHooks(PHOTO_FEATURE, {
       required: () => PHOTO_SCHEMA_REQUIRED
     },
     'slot-posts': {
-      // Replies another mod has taken over are asked for in its words and its shape.
+      // The replies are asked for only while Photo Feature is the mod drawing them.
       lines: () => [
         ...postPhotoLines(canSendPhotos()),
-        ...(commentHandoff()?.lines() ?? postCommentLines(true))
+        ...(ownsPostComments(PHOTO_FEATURE) ? postCommentLines(true) : [])
       ],
-      fields: () => {
-        const handoff = commentHandoff()
-        if (!handoff) return POST_PHOTO_SCHEMA_FIELD
-        return { ...POST_PHOTO_SCHEMA_FIELD, comments: handoff.field() }
-      },
-      required: () => POST_PHOTO_SCHEMA_REQUIRED
+      fields: () =>
+        ownsPostComments(PHOTO_FEATURE)
+          ? POST_PHOTO_SCHEMA_FIELD
+          : { image: POST_PHOTO_SCHEMA_FIELD.image },
+      required: () => (ownsPostComments(PHOTO_FEATURE) ? POST_PHOTO_SCHEMA_REQUIRED : ['image'])
     },
     character: {
       lines: () => bodyBriefLines(),
@@ -109,10 +107,10 @@ registerHooks(PHOTO_FEATURE, {
     const reply = filing.reply as { image?: string; comments?: unknown }
     // Awaited: the picture's name has to be in the post the slot save is about to write down.
     const shot = await preparePostPhoto(filing.charId, reply.image)
-    const handoff = commentHandoff()
-    const comments = handoff
-      ? handoff.dress(filing.charId, reply.comments, shot?.shot.tier ?? 'none')
-      : rollComments(filing.charId, reply.comments as string[] | undefined, shot?.shot.tier)
+    // Another mod drawing the replies has filed its own already.
+    const comments = ownsPostComments(PHOTO_FEATURE)
+      ? rollComments(filing.charId, reply.comments as string[] | undefined, shot?.shot.tier)
+      : (filing.post.comments ?? [])
     filing.post = {
       ...filing.post,
       likes: postLikes(filing.charId, shot?.shot.tier),
@@ -137,7 +135,13 @@ registerHooks(PHOTO_FEATURE, {
     })
   },
 
-  postVisible: postIsOut
+  postVisible: postIsOut,
+
+  // Strangers' replies under a post, while no mod ahead of it in the list draws them instead.
+  postComments: { View: PhotoComments },
+
+  // Her picture under the post's text.
+  postPicture: PhotoPostPicture
 })
 
 // A continued semester carries her threads and feed into a new playthrough; the pictures on them
@@ -147,7 +151,3 @@ registerTermFiles(PHOTO_FEATURE, async ({ from, to }) => {
   const result = await window.api.photo.carry(from, to)
   if (!result.ok) throw Error(result.error.message)
 })
-
-// New Game+ moves her posts onto the next semester's clock; their comments move with them, or they
-// would wait for slots the new semester reaches only weeks in. Runs with the mod off too.
-registerPostCarry(PHOTO_FEATURE, carriedComments)
