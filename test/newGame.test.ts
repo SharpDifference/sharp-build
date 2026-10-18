@@ -3,13 +3,7 @@ import { appError } from '@shared/errors'
 import { charKeyOf, type Result, type StructuredRequest } from '@shared/types'
 import type { ClassGenReply } from '../src/renderer/prompts/classPrompt'
 import type { ProfileGenReply } from '../src/renderer/prompts/profilePrompt'
-import { FINAL_DATE } from '@shared/classes'
-import { pointsForTier } from '@shared/playerStats'
-import { emptyFlags } from '@shared/relationship'
-import { setActiveTerm } from '@shared/term'
-import { emptyBunnyboard, type GameSave } from '@shared/types'
-import type { Continuation } from '../src/renderer/stores/newGame'
-import { character, playerStats, playthroughRecord, restoreApi, stubApi } from './fixtures'
+import { character, restoreApi, stubApi } from './fixtures'
 
 // The start reaches `gameLoop` for the ComfyUI nudge, and `jobStore` down that
 // chain subscribes to `jobs:progress` at module scope — so the bridge has to
@@ -20,7 +14,7 @@ const { cancelNewGameStart, retryNewGameStart, startNewGame, NEW_GAME_LLM_GROUP 
 )
 
 /**
- * What Start Game will and will not hand the player. All three one-shots
+ * What Start Game will and will not hand the player. All four one-shots
  * are written into the first save and can never be fetched again, so a failure
  * is retried, then asked about, and a cancelled start leaves nothing half-answered.
  */
@@ -81,6 +75,20 @@ function occasionReply(ids: readonly string[]): { events: Record<string, unknown
   return { events }
 }
 
+/** A secrets reply giving the one student all three tiers. */
+function secretsReply(): { characters: Record<string, string>[] } {
+  return {
+    characters: [
+      {
+        key,
+        friendly: 'Sarah still sleeps with a nightlight.',
+        trusted: 'Sarah failed her first driving test four times.',
+        devoted: 'Sarah once ran away from home for a week.'
+      }
+    ]
+  }
+}
+
 const dropped = (): Result<never> => ({
   ok: false,
   error: appError('LLM_NETWORK', 'the connection dropped')
@@ -89,12 +97,18 @@ const dropped = (): Result<never> => ({
 let classes = vi.fn()
 let profiles = vi.fn()
 let occasions = vi.fn()
+let secrets = vi.fn()
 let cancelGroup = vi.fn()
 
-/** Installs the bridge over whatever the three mocks currently answer. */
+/** Installs the bridge over whatever the four mocks currently answer. */
 function bridge(): void {
   stubApi({
-    llm: { generateClasses: classes, generateProfiles: profiles, generateOccasions: occasions },
+    llm: {
+      generateClasses: classes,
+      generateProfiles: profiles,
+      generateOccasions: occasions,
+      generateSecrets: secrets
+    },
     jobs: { cancelGroup }
   })
 }
@@ -123,6 +137,7 @@ beforeEach(() => {
   classes = vi.fn(async () => dropped())
   profiles = vi.fn(async () => dropped())
   occasions = vi.fn(async () => dropped())
+  secrets = vi.fn(async () => dropped())
   cancelGroup = vi.fn(async () => ({ ok: true, data: undefined }))
   bridge()
 })
@@ -141,10 +156,11 @@ describe('startNewGame', () => {
     expect(classes).toHaveBeenCalledTimes(6)
     expect(profiles).toHaveBeenCalledTimes(6)
     expect(occasions).toHaveBeenCalledTimes(6)
+    expect(secrets).toHaveBeenCalledTimes(6)
     expect(outcome.status).toBe('failed')
     if (outcome.status !== 'failed') return
     // Every half still missing is named, not merely the first one to fail.
-    expect(outcome.missing).toHaveLength(3)
+    expect(outcome.missing).toHaveLength(4)
   })
 
   // The bug the whole path was written for: the call came back, nothing in it
@@ -153,6 +169,7 @@ describe('startNewGame', () => {
     classes = vi.fn(async () => ({ ok: true, data: classReply() }))
     profiles = vi.fn(async () => ({ ok: true, data: profileReply() }))
     occasions = vi.fn(async () => ({ ok: true, data: { events: {} } }))
+    secrets = vi.fn(async () => ({ ok: true, data: secretsReply() }))
     bridge()
 
     const outcome = await settle(startNewGame(roster))
@@ -164,105 +181,11 @@ describe('startNewGame', () => {
   })
 })
 
-describe('a continued start', () => {
-  /** The semester `roster` finished: its one girl has met the reader and is coming back. */
-  function finished(): Continuation {
-    const charId = roster[0].charId
-    return {
-      playthroughId: '1',
-      save: {
-        stats: playerStats(pointsForTier(3), pointsForTier(3), pointsForTier(3)),
-        money: 100,
-        date: FINAL_DATE,
-        time: 0,
-        charInfo: {
-          [charId]: { memories: [], flags: { ...emptyFlags(), hasMet: true }, nameKnown: true }
-        },
-        bunnyboard: emptyBunnyboard(),
-        inventory: [],
-        npcRelationships: {},
-        gradesStanding: null,
-        bunnybotThrough: 24,
-        bunnymapUnlocked: true,
-        bunnyshopUnlocked: true,
-        venusJobIntroSent: true,
-        bunnybotContactIntroSent: true,
-        bunnybotFirstPostNudgeSent: false,
-        bunnybotTwoTimingTipSent: false,
-        bunnybotDeferred: [],
-        graduationSeen: true
-      } as unknown as GameSave,
-      record: playthroughRecord({
-        chars: [charId],
-        profiles: { [charId]: { year: 1, dorm: 'lowrise_4', major: 'Culinary Arts', schedule: {} } }
-      }),
-      characters: { [charId]: roster[0] }
-    }
-  }
-
-  // The break screen has already closed the break, and the player may have reworded it: a
-  // second call here would overwrite what he was shown.
-  it('takes a played break as it was closed and asks nothing more about it', async () => {
-    setActiveTerm(1)
-    const generateBreak = vi.fn(async () => dropped())
-    classes = vi.fn(async () => ({ ok: true, data: classReply() }))
-    profiles = vi.fn(async () => ({ ok: true, data: profileReply() }))
-    occasions = vi.fn(async (request: StructuredRequest) => ({
-      ok: true,
-      data: occasionReply(requestedIds(request))
-    }))
-    stubApi({
-      llm: {
-        generateClasses: classes,
-        generateProfiles: profiles,
-        generateOccasions: occasions,
-        generateBreak
-      },
-      jobs: { cancelGroup }
-    })
-
-    const charId = roster[0].charId
-    const stats = playerStats(pointsForTier(2) + 3, pointsForTier(2), pointsForTier(2))
-    const outcome = await settle(
-      startNewGame(roster, {
-        ...finished(),
-        played: {
-          stats,
-          memories: { [charId]: [{ type: 'loved', desc: 'the reader visited her in July' }] },
-          talks: [
-            {
-              slot: 0,
-              charId,
-              lines: [
-                { sender: 'player', text: 'hey' },
-                { sender: 'contact', text: 'hi' }
-              ],
-              ended: 'player',
-              verdict: 'neutral'
-            }
-          ]
-        }
-      })
-    )
-    setActiveTerm(0)
-
-    expect(generateBreak).not.toHaveBeenCalled()
-    expect(outcome.status).toBe('ready')
-    if (outcome.status !== 'ready') return
-    expect(outcome.data.carried?.stats).toEqual(stats)
-    expect(outcome.data.carried?.carry.charInfo[charId].memories.map((m) => m.desc)).toEqual([
-      'the reader visited her in July'
-    ])
-    expect(
-      outcome.data.carried?.carry.bunnyboard.conversations[charId].messages.map((m) => m.text)
-    ).toEqual(['hey', 'hi'])
-  })
-})
-
 describe('retryNewGameStart', () => {
   it('re-sends only what is still missing, and keeps what landed', async () => {
     classes = vi.fn(async () => ({ ok: true, data: classReply() }))
     profiles = vi.fn(async () => ({ ok: true, data: profileReply() }))
+    secrets = vi.fn(async () => ({ ok: true, data: secretsReply() }))
     bridge()
     expect((await settle(startNewGame(roster))).status).toBe('failed')
 
@@ -275,9 +198,10 @@ describe('retryNewGameStart', () => {
 
     const outcome = await settle(retryNewGameStart(roster))
 
-    // The two replies already paid for are not asked for a second time.
+    // The three replies already paid for are not asked for a second time.
     expect(classes).toHaveBeenCalledTimes(1)
     expect(profiles).toHaveBeenCalledTimes(1)
+    expect(secrets).toHaveBeenCalledTimes(1)
     expect(outcome.status).toBe('ready')
     if (outcome.status !== 'ready') return
     expect(asked.length).toBeGreaterThan(0)
@@ -313,6 +237,7 @@ describe('cancelNewGameStart', () => {
       ok: true,
       data: occasionReply(requestedIds(request))
     }))
+    secrets = vi.fn(async () => ({ ok: true, data: secretsReply() }))
     bridge()
 
     const outcome = await settle(retryNewGameStart(roster))

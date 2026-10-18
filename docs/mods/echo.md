@@ -2,11 +2,11 @@
 
 Echoes gives the reader and each student a named symbolic creature and one of 22 original aspects. Matching aspects increase new positive relationship progress by 25%; competing aspects reduce it by 25%. Existing memories and negative gains are unchanged. Aspect assignment is a local profile-cue classifier, not an AI personality assessment. Ability prices and narrative effects remain experimental.
 
-Echo ships off by default (version 0.14.1). Enable it explicitly in Mods; saved switch choices are not reset.
+Echo ships off by default (version 0.14.2). Enable it explicitly in Mods; saved switch choices are not reset.
 
 ## Setup and customization
 
-The shared Echoes manager appears near the end of new-game setup, after course selection. It starts with aspects, names and creature suggestions drawn from each profile. Before the game begins, the reader and new students can freely change starting aspects, names, creature details, artwork and staging. Returning students retain the history and identity brought forward by Continuing Semesters. Setup does not automatically buy artwork; generation buttons use the configured provider.
+The shared Echoes manager appears near the end of new-game setup, after course selection. It starts with aspects, names and creature suggestions drawn from each profile. Before the game begins, the reader and new students can freely change starting aspects, names, creature details, artwork and staging. Native New Game+ also opens this manager: new students can choose their aspects, while returning students and the reader keep their established aspects and the reader's spent change. Carried artwork, names and staging remain available. Accepted next-semester setup is saved with registration before writing the opening save, so a failed save can be retried or registration resumed. Setup does not automatically buy artwork; generation buttons use the configured provider.
 
 During play, open Echoes from its scene sidebar icon between Calendar and Settings, or the corner controls between scenes. Only met students appear in the manager, gallery and batch-generation list. Unmet students keep their assigned identities privately until introduced. Existing playthroughs do not repeat enrollment.
 
@@ -30,7 +30,9 @@ Generation reserves its cancellable job before reading settings, on desktop and 
 
 Whole-game backups include all retained finished Echo artwork, including images used by historical saves. There is no separate 4,096-image manifest cutoff; combined collections can be exported and restored subject to the existing whole-archive import limits (16,384 entries, 8 GiB) and per-image validation. This change does not delete old images or recovery originals. Recovery originals remain local and outside backups.
 
-The optional local workflow uses ComfyUI with novaAnimeXL_ilV190.safetensors and Megaten_Style.safetensors. Set up local artwork → Install local art models explicitly downloads missing originals (about 6.9 GB and 218 MB), checks pinned sizes and hashes, reuses matching files and refuses to overwrite a different version. Downloads can be cancelled; manual installation remains available. LoRA strength is 0.7 with the workflow's SDXL encoder configuration. Weights are not bundled in Git. See the [separate asset notices](echo-asset-licenses.md).
+The optional local workflow uses the ComfyUI server and checkpoint selected in Settings, plus Megaten_Style.safetensors on that server. It supports both game-managed ComfyUI and the player's external server in 0.5.0. Choose an SDXL checkpoint compatible with the LoRA; Nova Anime XL is the shipped default. The server and model choices are captured once for each job. External generation does not require a separate game-managed Python or checkpoint installation.
+
+For game-managed ComfyUI, Set up local artwork → Install local art models explicitly downloads missing originals (Nova Anime XL, about 6.9 GB, and Megaten Style, 218 MB), checks pinned sizes and hashes, reuses matching files and refuses to overwrite a different version. Downloads can be cancelled; manual installation remains available. For an external server, install the LoRA in that server's models/loras directory yourself; the managed installer is hidden and its service rejects external-server requests. ComfyUI still validates the game's required nodes and model selections. LoRA strength is 0.7 with the workflow's SDXL encoder configuration. Weights are not bundled in Git. See the [separate asset notices](echo-asset-licenses.md).
 
 ## Staging and abilities
 
@@ -42,13 +44,14 @@ Every aspect has a one-exchange ability costing 25, 50 or 75 spirit. Activations
 
 ## Saves, backups and source map
 
-Echo identity, locks, staging and affinity markers are validated in the exEcho save extension. Continuing Semesters carries them through modCarry; turning the mod off preserves the data. Whole-game desktop/browser backups include finished Echo artwork and reject conflicting immutable image IDs. Loose save JSON does not embed image bytes or recovery originals. This tree has no separate single-playthrough export.
+Echo identity, locks, staging and affinity markers are validated in the exEcho save extension. Native New Game+ carries them through modCarry; turning the mod off preserves the data. Whole-game desktop/browser backups include finished Echo artwork and reject conflicting immutable image IDs. Loose save JSON does not embed image bytes or recovery originals. This tree has no separate single-playthrough export.
 
 Unheard Soul artwork is a separate character image, not an Echo replacement. Its desktop character export/import/duplicate and whole-game backup support are described in [Breaking Through the Silence](reckoning.md). The browser supports ordinary Echo artwork but currently uses the inverted normal portrait for Unheard Souls; their custom image editor and portable extension are desktop-only.
 
 | Source | Responsibility |
 | --- | --- |
 | shared/echoAspects, echoReasons, echoNaming, echo, echoStage, echoSetup | Catalog, profile defaults, validation, naming, placement and enrollment rules |
+| shared/continuedModSetup | Accepted newcomer choices applied to the native next-semester save |
 | shared/modEntries/echo and renderer/modEntries/echo | Discovery, settings, lifecycle and semester carry |
 | renderer/views/EchoPanel and NewGameView | Shared manager, gallery/stage and late enrollment step |
 | main/services/echoService, echoCutout and renderer/art/echoCutout | Desktop generation, storage and isolated segmentation |

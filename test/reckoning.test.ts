@@ -55,7 +55,7 @@ it('requires finished-scene nighttime travel even after reloading the paid invoc
  const draft=saved[0],writes=saved.length
  useGameStore.setState({awaitingInput:true,pendingLines:[]})
  await expect(enterReckoningDungeon()).rejects.toThrow('Finish the current scene')
- game().loadSave({...draft,schemaVersion:12,playthroughId:'test',saveId:'autosave',saveDate:0},playthroughRecord({chars:['a']}),charactersById(girl))
+ game().loadSave({...draft,schemaVersion:13,playthroughId:'test',saveId:'autosave',saveDate:0},playthroughRecord({chars:['a']}),charactersById(girl))
  game().restoreScene(draft.scene);useGameStore.setState({awaitingInput:true,pendingLines:[]})
  await expect(enterReckoningDungeon()).rejects.toThrow('Finish the current scene')
  expect(game().exReckoning.dungeon?.phase).toBe('unlocked');expect(saved).toHaveLength(writes)
@@ -71,7 +71,7 @@ it('requires finished-scene nighttime travel even after reloading the paid invoc
 it('retains the paid doorway when its saved ordinary scene is reloaded',async()=>{
  await unlockReckoningDungeon('a');const state=game().exReckoning,draft=saved[0]
  useReckoningLinkEffect.setState({pulse:null})
- game().loadSave({...draft,schemaVersion:12,playthroughId:'test',saveId:'autosave',saveDate:0},playthroughRecord({chars:['a']}),charactersById(girl))
+ game().loadSave({...draft,schemaVersion:13,playthroughId:'test',saveId:'autosave',saveDate:0},playthroughRecord({chars:['a']}),charactersById(girl))
  game().restoreScene(draft.scene);expect(game().exReckoning).toEqual(state);expect(game().exBreakthrough.meters.a).toBe(0);expect(game().currentSceneTranscript).toEqual(draft.scene!.transcript);expect(useReckoningLinkEffect.getState().pulse).toBeNull()
 })
 it('separates the reflection from the real schedule, warns at three and expels at four; no goodbye scene and erases private dialogue',async()=>{

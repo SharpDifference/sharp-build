@@ -13,6 +13,9 @@ export const ROOM_LOCATION = 'room'
 /** Where the weekly grocery run goes. */
 export const GROCERY_LOCATION = 'spring_mart'
 
+/** The hotel: a place only a lover or a friend with benefits invites the reader to. */
+export const HOTEL_LOCATION = 'hotel_dreams'
+
 /**
  * The dorms as a place: a character home in a Lowrise is findable in its shared kitchens and
  * lounges, never in her room.
@@ -43,6 +46,11 @@ export interface LocationDef {
   onCampus?: true
   /** Emptied on a day an occasion closes campus, like `JobDef.closesWithUniversity`. */
   closesWithUniversity?: true
+  /**
+   * The place is open-air, so under rain nobody keeps a haunt there, goes on an outing to it,
+   * runs into anybody there or invites the reader to it. Read through `isRainedOut`.
+   */
+  outdoors?: true
   /**
    * The shift-week slots the place is open (`weekday * 2 + time`, Monday 0, nights odd); absent,
    * it is open every half of every day. Read through {@link isLocationOpen}.
@@ -119,7 +127,8 @@ export const LOCATIONS: readonly LocationDef[] = [
     id: 'green_hill_park',
     label: 'Green Hill Park',
     blurb: 'a big public park at the center of Downtown with hills and cobbled paths',
-    icon: '🌳'
+    icon: '🌳',
+    outdoors: true
   },
   {
     id: 'kendall_library',
@@ -192,7 +201,8 @@ export const LOCATIONS: readonly LocationDef[] = [
     blurb: 'a landscaped park at the center of campus: fire pits, gazebos and the Concord Fountain',
     icon: '⛲',
     onCampus: true,
-    closesWithUniversity: true
+    closesWithUniversity: true,
+    outdoors: true
   },
   {
     id: 'whitman_greenhouse',
@@ -234,7 +244,8 @@ export const NARRATIVE_LOCATIONS: readonly LocationDef[] = [
     id: 'pier_44',
     label: 'Pier 44',
     blurb: 'a riverside amusement park and boardwalk with an antique carousel, cheap rides, and a ferris wheel',
-    icon: '🎡'
+    icon: '🎡',
+    outdoors: true
   },
   {
     id: 'riverside_aquarium',
@@ -252,7 +263,8 @@ export const NARRATIVE_LOCATIONS: readonly LocationDef[] = [
     id: 'selkie_beach',
     label: 'Selkie Beach',
     blurb: 'a riverside beach resort with cabanas, jet skis and boats for rent',
-    icon: '🏖️'
+    icon: '🏖️',
+    outdoors: true
   },
   {
     id: 'veridan_museum',

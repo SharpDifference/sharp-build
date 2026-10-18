@@ -1,5 +1,5 @@
 import { affectionFor, dispositionOf, isPositive } from '@shared/relationship'
-import { graduatesNow, readerGraduatesNow } from '@shared/term'
+import { LAST_SEMESTER } from '@shared/semesters'
 import { useGameStore } from '../gameStore'
 
 /**
@@ -11,8 +11,8 @@ import { useGameStore } from '../gameStore'
 export interface FarewellOption {
   charId: string
   firstName: string
-  /** One of the two is graduating out of reach, rather than both being home for the break. */
-  senior: boolean
+  /** One of them is graduating out of the other's reach, rather than going home for the break. */
+  forAWhile: boolean
 }
 
 /**
@@ -42,7 +42,7 @@ export function farewellOptions(): FarewellOption[] {
       option: {
         charId,
         firstName: game.characters[charId].firstName,
-        senior: readerGraduatesNow() || graduatesNow(game.charInfo[charId].year)
+        forAWhile: partsForAWhile(charId)
       },
       affection: affectionFor(game.charInfo[charId], game.date, game.characters[charId])
     }))
@@ -56,14 +56,20 @@ export function farewellDisposition(charId: string): ReturnType<typeof dispositi
   return dispositionOf(affectionFor(game.charInfo[charId], game.date, game.characters[charId]))
 }
 
-/**
- * The first names of everyone graduating this semester, in roster order — who the reader
- * watches cross the stage, or crosses it with.
- */
-export function seniorNames(): string[] {
+/** Whether the reader and `charId` part for longer than a break: she graduates, or he does. */
+export function partsForAWhile(charId: string): boolean {
   const game = useGameStore.getState()
-  return game.chars
-    .filter((charId) => graduatesNow(game.charInfo[charId]?.year))
+  return game.semesterIndex === LAST_SEMESTER || game.graduating.includes(charId)
+}
+
+/**
+ * The first names of everyone graduating whose name the reader knows, in roster order — who he
+ * watches cross the stage.
+ */
+export function graduatingNames(): string[] {
+  const game = useGameStore.getState()
+  return game.graduating
+    .filter((charId) => game.charInfo[charId]?.nameKnown)
     .map((charId) => game.characters[charId]?.firstName)
     .filter((name): name is string => Boolean(name))
 }

@@ -90,9 +90,9 @@ New saves, enrollments, and `modCarry` use the `exCharacterDynamics` field, foll
 
 `exCharacterDynamics` is an optional, versioned field on the enrollment and each save. Keeping it on enrollment preserves it if the registrar is left and resumed. `exCharacterDynamicsEnabled` also freezes this mod's enrollment choice, so changing the main-menu switch before resuming cannot accidentally activate or discard the setup. The game store loads, resets, and serializes the choices explicitly; absent data stays absent and older saves need no schema upgrade. The stored object is preserved even when its effects are not active. Unknown future tags are retained on disk but are not applied by this version.
 
-The shared entry imports a `modCarry` adapter. It copies choices independently of switches, retaining historical entries for girls no longer in the active roster. The setup component accepts all returning character IDs and makes those girls read-only, including returning girls with no tags. Only new girls can receive fresh choices. The integration with Continuing Semesters passes the outgoing choices and returning IDs into that same screen; carried history is never re-entered as a new starting relationship.
+The shared entry imports a `modCarry` adapter. It copies choices independently of switches, retaining historical entries for girls no longer in the active roster. The setup component accepts all returning character IDs and makes those girls read-only, including returning girls with no tags. Only new girls can receive fresh choices. Native New Game+ opens that same screen after Finalize at the registrar, before Echo setup when Echo is enabled. Carried history and earned growth remain intact.
 
-On continuation, setup is skipped if there are no newcomers or this mod is off. At Finalize, New Game supplies the settled choices to `carriedOpening` alongside the other carried fields; otherwise its older snapshot would overwrite choices just made for newcomers. Returning girls retain their actual relationship flags and memories through Continuing Semesters' existing logic. A returning girl without old choices cannot be assigned a retroactive background by enabling this mod later.
+On continuation, setup is skipped if there are no newcomers or the playthrough did not start with this mod. The existing playthrough's mod list controls both a fresh continuation and resumed registration, even if the main-menu switches have changed. Accepted choices are written to registration before proceeding. `withContinuedModSetup` applies them to the native opening save, establishing acquaintance only for newcomers given shared history. Returning girls retain the flags and memories the native carry produces. Echo and Character Dynamics each work independently.
 
 ## Code map
 
@@ -101,6 +101,7 @@ On continuation, setup is skipped if there are no newcomers or this mod is off. 
 | `src/shared/modEntries/character-dynamics.ts` | Discovery, author credit, optional playthrough switch. |
 | `src/shared/characterDynamics.ts` | Saved shape, catalog, required reasons, and settling new choices without changing returning girls. |
 | `src/shared/characterDynamicsCarry.ts` | Pure semester retention adapter. |
+| `src/shared/continuedModSetup.ts` | Returnee locks and newcomer choices applied to a native next-semester save. |
 | `src/renderer/views/CharacterDynamicsModal.tsx` | One setup screen, drag/drop, click alternative, validation, read-only returnees. |
 | `src/renderer/vu_styles/CharacterDynamics.css` | Native theme roles, scroll areas, character cards, searchable trait palette. |
 | `src/renderer/views/CharacterDynamicsBackstory.tsx`, `src/renderer/vu_styles/CharacterDynamicsBackstory.css` | Compact Backstory link and separate read-only trait/background panel. |
@@ -115,7 +116,7 @@ On continuation, setup is skipped if there are no newcomers or this mod is off. 
 
 ## Branches and validation
 
-The `mod/character-dynamics` branch starts from `core` and contains only this feature. A separate integration branch combines it with `main` and supplies Continuing Semesters' context. Shared mod lists are discovered automatically; no manual registration or shared documentation section is needed.
+The `mod/character-dynamics` branch contains the standalone feature. The integrated `main` build connects its setup to native New Game+. Shared mod lists are discovered automatically; no manual registration or shared documentation section is needed.
 
 Validate typechecks and the test suite, then exercise New Game and Quickstart, required explanations, multiple tags, duplicate drops, removal, no selections, resumed enrollment, save reload, and returning versus new girls in a continued semester. Check day/night themes, reduced motion, and the supported stage sizes. Use synthetic story backgrounds for test captures.
 

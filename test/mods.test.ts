@@ -1,4 +1,3 @@
-import { CONTINUING_SEMESTERS } from '../src/shared/continuingSemestersMod'
 import { describe, expect, it } from 'vitest'
 import {
   BUILD,
@@ -67,17 +66,6 @@ describe('the shipped list', () => {
   it('has the Photo Feature off until it is switched on', () => {
     expect(modOn(NO_SWITCHES, 'photo-feature')).toBe(false)
     expect(modOn(withMod(NO_SWITCHES, 'photo-feature', true), 'photo-feature')).toBe(true)
-  })
-
-  it('plays the break and offers continuing in Load Game until told otherwise', () => {
-    expect(optionOn(NO_SWITCHES, CONTINUING_SEMESTERS, 'play-the-break')).toBe(true)
-    expect(optionOn(NO_SWITCHES, CONTINUING_SEMESTERS, 'offer-in-load-game')).toBe(true)
-    expect(optionOn(NO_SWITCHES, CONTINUING_SEMESTERS, 'seniors-graduate')).toBe(true)
-  })
-
-  it('has Continuing Semesters on until it is switched off', () => {
-    expect(modOn(NO_SWITCHES, CONTINUING_SEMESTERS)).toBe(true)
-    expect(modOn(withMod(NO_SWITCHES, CONTINUING_SEMESTERS, false), CONTINUING_SEMESTERS)).toBe(false)
   })
 })
 

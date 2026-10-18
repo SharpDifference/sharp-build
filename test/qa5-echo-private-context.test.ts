@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { calendarOf } from '@shared/semesters'
 import { normalizeBreakthrough } from '@shared/breakthrough'
 import { CHARACTER_DYNAMICS_MOD, type CharacterDynamics } from '@shared/characterDynamics'
 import '@shared/characterDynamicsCarry'
@@ -69,7 +70,7 @@ function ordinaryPrompt(): StructuredRequest {
   const state = game()
   return buildTextingPrompt(girl, state.charInfo.a, undefined, 'How is your day?', {
     date: state.date, time: state.time, memoryBudget: 10, charInfo: state.charInfo,
-    npcRelationships: {}, roster: [girl], classes: {}, playerSchedule: {}, occasions: [], playerJob: null,
+    npcRelationships: {}, roster: [girl], classes: {}, playerSchedule: {}, classRosters: {}, calendar: calendarOf('spring', []), history: {}, playerJob: null,
     exCharacterDynamics: state.exCharacterDynamics
   }, 'READER')
 }

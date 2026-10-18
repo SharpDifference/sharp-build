@@ -1,9 +1,8 @@
-import type { TimeSlot } from '@shared/types'
+import type { Season, TimeSlot } from '@shared/types'
 import { isWet, weatherAt, type Weather } from '@shared/weather'
 import { formatRelativeSlot, formatWeekday, prevSlot } from './gameDate'
 import { isEpilogueNight } from './graduation'
-import { staticOccasions } from './occasions'
-import { FALL_DRY_OCCASION_IDS } from './occasionsFall'
+import { staticOccasionsOf } from './occasions'
 
 /**
  * The sky as the game reads it: which days are authored clear, the one reading every screen
@@ -11,8 +10,9 @@ import { FALL_DRY_OCCASION_IDS } from './occasionsFall'
  */
 
 /**
- * The occasions held under an open sky, which the roll never rains on: the authored first day,
- * the ceremony, the beach festival and the holidays whose programme is outdoors.
+ * The occasions held under an open sky, which the roll never rains on, of either season: the
+ * first day, the ceremony, the beach festivals, the homecoming game and the holidays whose
+ * programme is outdoors.
  */
 export const DRY_OCCASION_IDS: ReadonlySet<string> = new Set([
   'orientation',
@@ -21,15 +21,18 @@ export const DRY_OCCASION_IDS: ReadonlySet<string> = new Set([
   'easter',
   'mardi-gras',
   'earth-day',
-  'thorne-day'
+  'thorne-day',
+  'selkie-send-off',
+  'oktoberfest',
+  'homecoming-game',
+  'halloween'
 ])
 
-/** Every date a dry occasion covers, for the roll to keep clear. */
-export function dryOccasionDates(): Set<number> {
+/** Every date a season's dry occasions cover, for the roll to keep clear. */
+export function dryOccasionDates(season: Season): Set<number> {
   const dates = new Set<number>()
-  // The active season's calendar, and either season's list of what is held outdoors.
-  for (const occasion of staticOccasions()) {
-    if (!DRY_OCCASION_IDS.has(occasion.id) && !FALL_DRY_OCCASION_IDS.has(occasion.id)) continue
+  for (const occasion of staticOccasionsOf(season)) {
+    if (!DRY_OCCASION_IDS.has(occasion.id)) continue
     for (let date = occasion.startDate; date <= occasion.endDate; date++) dates.add(date)
   }
   return dates

@@ -2,10 +2,10 @@ import { useCallback, useEffect, useRef, useState, type JSX } from 'react'
 import { AnimatePresence, motion } from 'motion/react'
 import { toAppError } from '@shared/errors'
 import { buildLine, modsOn } from '@shared/mods'
+import { seasonOf } from '@shared/semesters'
 import { writerReady } from '@shared/settingsRules'
 import { shuffle } from '@shared/shuffle'
-import { seasonOf, seasonWords, type Season } from '@shared/term'
-import type { PlaythroughSummary, Result } from '@shared/types'
+import type { Result, Season } from '@shared/types'
 import logoUrl from '../../../assets/vu_logo.png'
 import { ConfirmModal } from '../components/ConfirmModal'
 import { PhotoFailedModal } from '../components/PhotoFailedModal'
@@ -17,7 +17,7 @@ import { beginCrossing, coverSwap, endCrossing, useCrossingStore } from '../stor
 import { entryCrossing } from '../stores/slotCrossing'
 import { firstPhotoFailure, usePhotoStore } from '../stores/photoStore'
 import { useAssetStore } from '../stores/assetStore'
-import { resolveContinuation, stageContinuation, stageEnrollment } from '../stores/newGame'
+import { stageEnrollment } from '../stores/newGame'
 import {
   isEnrollment,
   newestPlaythrough,
@@ -27,7 +27,7 @@ import {
 } from '../stores/saveStore'
 import { useModsStore } from '../stores/modsStore'
 import { useSettingsStore } from '../stores/settingsStore'
-import { useSetupStore } from '../stores/setupStore'
+import { comfyAvailable, useSetupStore } from '../stores/setupStore'
 import { useUiStore } from '../stores/uiStore'
 import { useUpdateStore } from '../stores/updateStore'
 import { bgUrl } from './bgAssets'
@@ -91,8 +91,8 @@ export function MainMenu(): JSX.Element {
   const loadPlaythroughs = useSaveStore((s) => s.loadPlaythroughs)
   const continueNewest = useSaveStore((s) => s.continueNewest)
 
-  const comfyInstalled = status?.comfyReady ?? false
-  const comfyDeferred = useSettingsStore((s) => s.settings?.comfyDeferred ?? false)
+  // Whether characters can be rendered, which the footer's setup notice answers for.
+  const renderable = useSettingsStore((s) => comfyAvailable(s.settings, status))
   const available = useUpdateStore((s) => s.available)
   // The browser has no local renderer to install and no window of its own to close.
   const webBuild = isWebBuild()
@@ -257,42 +257,6 @@ export function MainMenu(): JSX.Element {
   const newest = newestPlaythrough(playthroughs)
   const playDead = !writerOk
 
-  // The playthrough whose break is where he left off, if a break is: one under way after any
-  // finished semester and written more recently than every save there is — a semester played
-  // since outranks it. Read whenever the listing changes, and again on the click.
-  const [breakOf, setBreakOf] = useState<PlaythroughSummary | null>(null)
-  useEffect(() => {
-    let live = true
-    void newestBreak(playthroughs).then((held) => {
-      if (live) setBreakOf(held)
-    })
-    return () => {
-      live = false
-    }
-  }, [playthroughs])
-
-  /**
-   * The top slot's answer: back onto the break where one is where he left off, under the plain
-   * cut the registrar takes, and onto the newest save otherwise. A break that can no longer be
-   * continued has said why, and the save is opened instead.
-   */
-  async function continueGame(): Promise<void> {
-    const held = await newestBreak(playthroughs)
-    const next = held ? await resolveContinuation(held.playthroughId) : null
-    if (next) {
-      beginCrossing(
-        () => {
-          stageContinuation(next)
-          setView('break')
-        },
-        { from: theme }
-      )
-      endCrossing()
-      return
-    }
-    setResuming(continueNewest())
-  }
-
   /* Each button's deadness is named once and read three times: the deal it lands on, the
      gestures it is not handed, and the attribute. A dealt button carries motion's own inline
      `opacity`, which beats the CSS dim, so a dead one is dealt to the dim instead. The writer
@@ -401,15 +365,13 @@ export function MainMenu(): JSX.Element {
               variants={continueDead ? dealtItemDead : dealtItem}
               {...gestures(continueDead, lift, press)}
               disabled={continueDead}
-              onClick={() => void continueGame()}
+              onClick={() => setResuming(continueNewest())}
             >
               Continue
               <span className="vu-btn-sub">
                 {newest.enrolling
                   ? 'class registration'
-                  : breakOf
-                    ? seasonWords(seasonOf(breakOf.term ?? 0)).endBreak
-                    : whereYouLeftOff(newest.date, seasonOf(newest.term ?? 0))}
+                  : whereYouLeftOff(newest.date, seasonOf(newest.semesterIndex ?? 0))}
               </span>
             </motion.button>
           ) : (
@@ -523,7 +485,7 @@ export function MainMenu(): JSX.Element {
         </motion.nav>
 
         <motion.div className="vu-menu-footer" variants={fadeIn(0.95)}>
-          {!webBuild && (comfyDeferred || !comfyInstalled) && (
+          {!webBuild && !renderable && (
             <button className="vu-menu-notice" onClick={() => setView('setup')}>
               Image generation isn&apos;t installed — open Setup
             </button>
@@ -618,29 +580,6 @@ export function MainMenu(): JSX.Element {
 }
 
 /** Where the newest playthrough stands, in the bookkeeping voice: `wk2 · tue jan 27`. */
-/**
- * The playthrough whose break is the newest thing on disk: the break written last among those
- * under way, where it was written after every playthrough's newest save. `null` with no break
- * under way, or where something has been played since.
- */
-async function newestBreak(
-  playthroughs: readonly PlaythroughSummary[]
-): Promise<PlaythroughSummary | null> {
-  let held: { of: PlaythroughSummary; savedAt: number } | null = null
-  for (const playthrough of playthroughs) {
-    // A break follows a semester that was played; a registrar has none.
-    if (playthrough.enrolling) continue
-    const read = await window.api.saves.break(playthrough.playthroughId)
-    if (!read.ok || !read.data) continue
-    if (!held || read.data.savedAt > held.savedAt) {
-      held = { of: playthrough, savedAt: read.data.savedAt }
-    }
-  }
-  if (!held) return null
-  const at = held.savedAt
-  return playthroughs.every((playthrough) => playthrough.savedAt <= at) ? held.of : null
-}
-
 function whereYouLeftOff(date: number, season: Season): string {
   const week = Math.floor(date / 7) + 1
   return `wk${week} · ${formatWeekday(date).slice(0, 3)} ${formatShortGameDate(date, season)}`.toLowerCase()

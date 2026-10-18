@@ -186,7 +186,7 @@ const HOOKS: readonly {
   },
   {
     file: 'src/renderer/views/NewGameView.tsx',
-    needs: ["postLikes(\n        { kind: 'winter'"],
+    needs: ["postLikes(\n              { kind: 'winter'"],
     why: 'her winter posts are liked by her roster friends alone, not by her following'
   },
   {

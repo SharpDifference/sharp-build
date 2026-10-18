@@ -3,7 +3,6 @@ import { CITY_LIFE_LOCATIONS_MOD, CITY_LIFE_JOBS_MOD, setCityLifeEnabled } from 
 import { useGameStore } from './gameStore'
 import { create } from 'zustand'
 import { toAppError } from '@shared/errors'
-import { CONTINUING_SEMESTERS } from '@shared/continuingSemestersMod'
 import {
   MODS,
   modOn,
@@ -15,7 +14,6 @@ import {
   type ModSwitches
 } from '@shared/mods'
 import { setPhotoSwitches } from '@shared/photoSwitches'
-import { setSeniorsGraduate } from '@shared/term'
 import type { PlaythroughRecord } from '@shared/types'
 import { setHookRules } from '../mods/hooks'
 import { loopState } from './loop/state'
@@ -90,16 +88,9 @@ export const useModsStore = create<ModsStoreState>((set, get) => {
 /**
  * Rules that live in shared code, which holds no switches of its own, are told theirs here:
  * at once, and again whenever a switch moves.
- *
- * Seniors stay only where Continuing Semesters is on and its option says so. With the mod off
- * there is no next semester for them to stay for, and the ending is the game's own.
  */
 function tellSharedRules(switches: ModSwitches): void {
   setEchoBonusEnabled(modOn(switches, 'echo'))
-  const staying =
-    modOn(switches, CONTINUING_SEMESTERS) &&
-    !optionOn(switches, CONTINUING_SEMESTERS, 'seniors-graduate')
-  setSeniorsGraduate(!staying)
   // Photo Feature reads its own switches; this hands them over.
   setPhotoSwitches(photoSwitchesOf(switches))
 }
@@ -132,7 +123,7 @@ export function useModOption(modId: string, optionId: string): boolean {
 /** Bind shared catalogs to the current record, or to the switches while creating a game. */
 function syncCityLife(): void {
   const game = useGameStore.getState()
-  const record = enrollmentRecord ?? (game.playthroughId ? { mods: [...game.playthroughMods] } : loopState.trip ? loopState.record : null)
+  const record = enrollmentRecord ?? (game.playthroughId ? { mods: [...game.playthroughMods] } : null)
   setCityLifeEnabled(modIsOn(CITY_LIFE_LOCATIONS_MOD, record), modIsOn(CITY_LIFE_JOBS_MOD, record))
 }
 useModsStore.subscribe(syncCityLife)

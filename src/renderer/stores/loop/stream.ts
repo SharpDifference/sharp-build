@@ -1,5 +1,5 @@
 import { appError } from '@shared/errors'
-import type { AppError, SceneLine, StructuredRequest } from '@shared/types'
+import type { AppError, SceneLine, SceneResponse, StructuredRequest } from '@shared/types'
 import { useGameStore } from '../gameStore'
 import {
   createSceneSanitizer,
@@ -82,12 +82,20 @@ export interface PreviewSink {
 
 /**
  * What one scene call comes back with, resolved; `at` is the transcript length the call was
- * made at, which is what the reply's summary covers up to.
+ * made at, which is what the reply's summary covers up to (Breakthrough reads it). `reply` is the
+ * reply as the model wrote it, for the mods that asked it for fields of their own.
  */
 export type SceneCall = Promise<
   | {
       ok: true
-      data: { lines: SceneLine[]; summary: string | null; end: boolean; applied: boolean; at: number }
+      data: {
+        lines: SceneLine[]
+        summary: string | null
+        end: boolean
+        applied: boolean
+        at: number
+        reply: SceneResponse
+      }
     }
   | { ok: false; error: AppError }
 >
@@ -110,6 +118,9 @@ export function sceneInProgress(): boolean {
   return game.currentSceneTranscript.length > 0 || game.sceneSummary !== null
 }
 
+/** How many scene calls this session has made, which names each one's deltas. */
+let streamCount = 0
+
 /**
  * Runs one scene request for an action or wrap-up turn. Streams sanitized preview
  * lines behind the reply floor, then reconciles with the resolved response. It becomes the one
@@ -125,7 +136,11 @@ export async function streamScene(
   // abandons it from that moment.
   const mine = {}
   loopState.sceneCall = mine
+  // The transcript this call answers, which its summary covers up to.
   const at = useGameStore.getState().currentSceneTranscript.length
+  // What this call's deltas are tagged with: an abandoned call's still in flight reach every
+  // listener, the next call's included.
+  const stream = `scene-${++streamCount}`
   /** The run was left, or another scene call or an interjection has taken this one's place. */
   const abandoned = (): boolean => runStale(run) || loopState.sceneCall !== mine
 
@@ -194,9 +209,9 @@ export async function streamScene(
           }, owedFloor(startedAt))
         })
 
-  const unsubscribe = window.api.llm.onSceneDelta((delta) => {
+  const unsubscribe = window.api.llm.onSceneDelta((deltaStream, delta) => {
     // The broadcast outlives the run, and the call.
-    if (abandoned()) return
+    if (deltaStream !== stream || abandoned()) return
 
     const fresh = extractor
       .feed(delta)
@@ -215,7 +230,7 @@ export async function streamScene(
 
   let result: Awaited<ReturnType<typeof window.api.llm.completeScene>>
   try {
-    result = await window.api.llm.completeScene(request, SCENE_LLM_GROUP)
+    result = await window.api.llm.completeScene(request, SCENE_LLM_GROUP, stream)
     // Inside the `try`, so the flag below falls on the far side of the floor and a drained
     // queue cannot read as the end of a scene still owed lines.
     if (floor && !abandoned()) await floor
@@ -235,7 +250,7 @@ export async function streamScene(
   const { lines, summary, end } = sanitizeScene(result.data, options)
 
   // A prefetch still holding its lines has nothing to reconcile; Begin appends the reply whole.
-  if (sink && !sink.live) return { ok: true, data: { lines, summary, end, applied: false, at } }
+  if (sink && !sink.live) return { ok: true, data: { lines, summary, end, applied: false, at, reply: result.data } }
 
   const game = useGameStore.getState()
 
@@ -261,7 +276,7 @@ export async function streamScene(
   // that read the store here would find a scene that has not arrived yet.
   await delivered
 
-  return { ok: true, data: { lines, summary, end, applied: true, at } }
+  return { ok: true, data: { lines, summary, end, applied: true, at, reply: result.data } }
 }
 
 /** Hands playback back to a player parked on the spinner at the end of the queue. */
