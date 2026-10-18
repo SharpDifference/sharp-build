@@ -34,7 +34,8 @@ Everything is in **Mods → Photo Feature**. The mod is off until you turn it on
 ## How a photo is made
 
 1. In a DM, she decides whether a picture fits the moment. She can send one when you ask, or on
-   her own. On the feed, some of her posts come with one.
+   her own, and when she texts you first she can send one with it. On the feed, some of her posts
+   come with one.
 2. She writes one sentence describing it: where she is, what she wears, her pose, what her hands
    are doing, how close the shot is.
 3. The game decides how much the photo may show (everyday, suggestive or explicit) from your
@@ -76,6 +77,12 @@ seed, file name, the full prompt and the negative. Send it with the picture: mos
 were one word in her sentence the model drew too literally, and each is a small fix.
 
 If a photo stays PNG while WebP is on, look for a `[photo] kept ... as PNG:` line.
+
+## 1.4.0
+
+- **Photos when she texts first**: a girl who texts you just to talk (new in 0.5.0) can send a
+  picture with it when it fits, a selfie in bed with her cold or something she wants to show you.
+  The same limits as her other DMs apply.
 
 ## 1.3.0
 

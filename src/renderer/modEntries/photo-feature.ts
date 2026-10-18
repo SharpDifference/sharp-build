@@ -45,6 +45,18 @@ registerHooks(PHOTO_FEATURE, {
       fields: () => PHOTO_SCHEMA_FIELDS,
       required: () => PHOTO_SCHEMA_REQUIRED
     },
+    // A girl texting first may send a picture with it, under the same gate as her replies.
+    'slot-reach-outs': {
+      lines: ({ character, info, date }) =>
+        photoLines(
+          character,
+          info,
+          { date, canRenderImages: canSendPhotos(), noNsfwImages: noExplicitPhotos() },
+          'reachOut'
+        ),
+      fields: () => PHOTO_SCHEMA_FIELDS,
+      required: () => PHOTO_SCHEMA_REQUIRED
+    },
     'slot-posts': {
       // Replies another mod has taken over are asked for in its words and its shape.
       lines: () => [
@@ -74,6 +86,15 @@ registerHooks(PHOTO_FEATURE, {
   // Her picture, if she offered one and the save will have it. Left to finish on its own: a
   // render is half a minute, and her words have already landed.
   afterDmReply: ({ charId, character, reply }) => void sendPhoto(charId, character, reply),
+
+  // The same for a girl texting first, read off her entry in the slot's opening: a custom
+  // endpoint's JSON is not held to the schema, so each field is taken only as the type it should be.
+  afterReachOut: ({ charId, character, reply }) =>
+    void sendPhoto(charId, character, {
+      sendPhoto: reply.sendPhoto === true,
+      photoPrompt: typeof reply.photoPrompt === 'string' ? reply.photoPrompt : '',
+      ...(typeof reply.photoTier === 'string' ? { photoTier: reply.photoTier } : {})
+    }),
 
   // The slot's held feed pictures, now that he is busy with something: they draw under the scene
   // and the posts are waiting on the feed when he is free again.
