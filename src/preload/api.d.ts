@@ -9,6 +9,7 @@ import type {
   CustomBackgroundDraft,
   CustomBackgroundListing
 } from '@shared/customBackgrounds'
+import type { FeedThreadsResponse } from '@shared/bunnyfeeds'
 import type { PromptEdit } from '@shared/imagePrompt'
 import type { ModSwitches } from '@shared/mods'
 import type { SoundtracksApi } from '@shared/soundtracks'
@@ -190,6 +191,11 @@ export interface VenusUniversityApi {
     /** Writes a bounded, noncanonical spectator conversation; never streams. */
     completeReckoning: (request: StructuredRequest, group: string) => Promise<Result<unknown>>
     completeMeanwhile: (request: StructuredRequest, group: string) => Promise<Result<MeanwhileResponse>>
+    /** Sends Bunnyfeeds' thread prompt. Never streams. */
+    completeFeedThreads: (
+      request: StructuredRequest,
+      group: string
+    ) => Promise<Result<FeedThreadsResponse>>
     /** Sends a Bunnyboard texting turn; `group` enables cancellation. */
     completeWhisper: (request: StructuredRequest, group: string) => Promise<Result<WhisperDraft | WhisperReply>>
     completeTexting: (
