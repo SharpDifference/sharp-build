@@ -11,6 +11,8 @@ const mocks = vi.hoisted(() => ({
 vi.mock('../src/main/services/modsService', () => ({ getModSwitches: mocks.switches }))
 vi.mock('@shared/llm/cloudImage', () => ({ generateImage: mocks.cloud }))
 vi.mock('../src/main/services/echoLocalImage', () => ({ generateLocalEcho: mocks.local }))
+vi.mock('../src/main/services/reflectionLocalImage', () => ({ generateLocalReflection: vi.fn(), resolveLocalReflectionTarget: vi.fn() }))
+vi.mock('../src/main/services/echoArtImage', () => ({ decodeEchoArt: async (bytes: Uint8Array) => Buffer.from(bytes), MAX_ECHO_ART_BYTES: 20 * 1024 * 1024 }))
 vi.mock('../src/main/services/echoCutout', () => ({
   prepareEchoCutout: mocks.prepare, cutoutEchoImage: mocks.cutout, releaseEchoCutout: vi.fn()
 }))

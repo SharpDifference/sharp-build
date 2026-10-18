@@ -10,6 +10,8 @@ import { modOn, optionOn } from '@shared/mods'
 import { getModSwitches } from './modsService'
 import { clearEchoMatte } from './echoMatte'
 import { generateLocalEcho } from './echoLocalImage'
+import { decodeEchoArt, MAX_ECHO_ART_BYTES } from './echoArtImage'
+import { generateLocalReflection, resolveLocalReflectionTarget } from './reflectionLocalImage'
 import { installEchoModels } from './echoModelSetup'
 import { cutoutEchoImage, prepareEchoCutout, releaseEchoCutout } from './echoCutout'
 import { assertSafeCharId } from '@shared/characterRules'
@@ -19,7 +21,7 @@ import { reflectionPortraitPrompt, reflectionStageOf, assertReflectionStage, typ
 
 const jobs = new Map<string, { owner: number; controller: AbortController }>()
 const folder = (): string => join(getDataPath(),'echoes','art')
-const MAX_BYTES = 20 * 1024 * 1024
+const MAX_BYTES = MAX_ECHO_ART_BYTES
 export async function readReflectionStage(charId:string):Promise<ReflectionStage> {
  return (await readPortableReflection(charId))?.stage ?? reflectionStageOf(null)
 }
@@ -42,7 +44,7 @@ export async function resetReflectionPortrait(charId:string):Promise<void> {
  await writePortableReflection(charId,{version:1,image:null,stage:existing?.stage??reflectionStageOf(null)})
 }
 async function storeReflection(charId:string,bytes:Uint8Array,signal?:AbortSignal):Promise<string> {
- const image=`data:image/png;base64,${decodeArt(bytes).toPNG().toString('base64')}`
+ const image=`data:image/png;base64,${(await decodeEchoArt(bytes)).toString('base64')}`
  const existing=await readPortableReflection(charId)
  signal?.throwIfAborted()
  await writePortableReflection(charId,{version:1,image,stage:existing?.stage??reflectionStageOf(null)})
@@ -54,25 +56,32 @@ export async function uploadReflectionPortrait(charId:string,path:string):Promis
  if((await stat(path)).size>MAX_BYTES)throw Error('Choose an image smaller than 20 MB.')
  return storeReflection(charId,await readFile(path))
 }
-export async function generateReflectionPortrait(charId:string,requestId:string,owner:number):Promise<string> {
+export async function generateReflectionPortrait(charId:string,requestId:string,owner:number,source:unknown='api'):Promise<string> {
  assertSafeCharId(charId)
+ if(source!=='api' && source!=='local')throw Error('Choose the image API or Local ComfyUI for this portrait.')
  if(!ECHO_ART_ID.test(requestId))throw Error('Invalid artwork request.')
  if(jobs.size)throw Error('Another image is already being generated. Wait or cancel it first.')
  // Admit the job before any await, so Stop also covers the settings read.
  const controller=new AbortController();jobs.set(requestId,{owner,controller})
  try {
-  const signal=AbortSignal.any([controller.signal,AbortSignal.timeout(600000)])
+  const signal=AbortSignal.any([controller.signal,AbortSignal.timeout(source==='local'?900000:600000)])
   const switches=await getModSwitches();signal.throwIfAborted()
   if(!modOn(switches,'reckoning'))throw Error('Enable Reckoning in Mods first.')
+  const target=source==='local'?await resolveLocalReflectionTarget():null
+  signal.throwIfAborted()
   const character=await getCharacter(charId),original=await readCharacterImage(charId,expressionRel('neutral'))
   signal.throwIfAborted()
   if(!original)throw Error('Generate or import her normal neutral portrait first.')
-  const reference=decodeArt(original).toPNG()
+  const reference=await decodeEchoArt(original)
+  signal.throwIfAborted()
   await prepareEchoCutout(signal)
   signal.throwIfAborted()
-  const bytes=await generateImage(reflectionPortraitPrompt(character),{aspectRatio:'3:4',sources:[{bytes:reference,mimeType:'image/png'}],signal})
+  const bytes=target
+   ?await generateLocalReflection(character,reference,signal,target)
+   :await generateImage(reflectionPortraitPrompt(character),{aspectRatio:'3:4',sources:[{bytes:reference,mimeType:'image/png'}],signal})
   signal.throwIfAborted()
-  const png=decodeArt(bytes).toPNG(),sourceId=randomUUID(),sourceFolder=join(getDataPath(),'echoes','sources')
+  const png=await decodeEchoArt(bytes),sourceId=randomUUID(),sourceFolder=join(getDataPath(),'echoes','sources')
+  signal.throwIfAborted()
   await mkdir(sourceFolder,{recursive:true});await writeFile(join(sourceFolder,`${sourceId}.png`),png,{flag:'wx'})
   const cutout=await cutoutEchoImage(png,signal);signal.throwIfAborted()
   return await storeReflection(charId,cutout,signal)
@@ -82,22 +91,13 @@ function artPath(id: string): string {
   if (typeof id !== 'string' || !ECHO_ART_ID.test(id)) throw Error('Invalid Echo artwork id.')
   return join(folder(),`${id}.png`)
 }
-function decodeArt(bytes: Uint8Array): Electron.NativeImage {
-  if (bytes.byteLength > MAX_BYTES) throw Error('Choose an image smaller than 20 MB.')
-  let image = nativeImage.createFromBuffer(Buffer.from(bytes))
-  if (image.isEmpty()) throw Error('This file is not a readable image. Use PNG, JPEG or WebP.')
-  const size = image.getSize()
-  if (size.width * size.height > 25_000_000) throw Error('Choose an image smaller than 25 megapixels.')
-  if (Math.max(size.width,size.height) > 1536) image = image.resize(size.height >= size.width ? {height:1536} : {width:1536})
-  return image
-}
 /** An immutable file id lets old saves keep their original artwork after a replacement. */
 async function storeArt(bytes: Uint8Array, signal?: AbortSignal): Promise<string> {
-  const image = decodeArt(bytes)
+  const image = await decodeEchoArt(bytes)
   const id = randomUUID()
   await mkdir(folder(),{recursive:true})
   signal?.throwIfAborted()
-  await writeFile(artPath(id),image.toPNG(),{flag:'wx'})
+  await writeFile(artPath(id),image,{flag:'wx'})
   return id
 }
 export async function generateEchoArt(value: EchoArtRequest, owner: number): Promise<string> {
@@ -118,7 +118,8 @@ export async function generateEchoArt(value: EchoArtRequest, owner: number): Pro
     signal.throwIfAborted()
     const bytes = local ? await generateLocalEcho(prompt,signal) : await generateImage(prompt,{aspectRatio:'3:4',signal})
     signal.throwIfAborted()
-    const png = decodeArt(bytes).toPNG()
+    const png = await decodeEchoArt(bytes)
+    signal.throwIfAborted()
     const sourceFolder = join(getDataPath(),'echoes','sources')
     const sourceId = randomUUID()
     await mkdir(sourceFolder,{recursive:true})

@@ -51,6 +51,10 @@ The girl and her Echo are visible in the private location. The reader's Echo app
 
 Character management offers a separate Unheard Soul screen for default and custom girls. Its shared top viewport supports full-art and scene preview, with adjustable dungeon X/Y and scale. Download image, Upload image and Restore default share one action row. Generation uses the character as a reference; it never overwrites her ordinary sprites. Restore default returns to the inverted normal portrait.
 
+Generate with offers **Configured image API** (the default, potentially paid) and **Local ComfyUI** on desktop. Local uses the server and model selections in Settings → ComfyUI, including a player's own server, and requires that ComfyUI setup to work first. It sends the neutral portrait to that server and uses image-to-image generation with her appearance tags and optional character LoRA. The shipped workflow targets SDXL-compatible checkpoints; results and likeness depend on the selected models. It does not need the Echo creature's Megaten LoRA and never falls back to a cloud request. This choice is for the current editor session, not a change to the game's other image settings.
+
+PNG, JPEG and WebP references/uploads use the game's Sharp decoder, keeping transparency and converting the result to PNG for the existing portable artwork format. Both generation choices share background removal, cancellation and separate artwork storage. The remover's first-use model/runtime download still needs an internet connection; it runs locally and receives no portrait upload. Cancellation or failure keeps the previous finished artwork and placement. Reference uploads remain in the selected ComfyUI server's `input/venus-university/unheard-soul` folder, like the game's other staged inputs; output scratch files are cleaned up after the job.
+
 On desktop, character ZIP export/import/duplicate carries a validated optional exReflection manifest extension containing the image and staging. Whole-game backups carry exReflections. These paths work with the mods off, and older packages without the extension remain accepted. A stock importer can ignore the optional JSON extension and import the ordinary character; that does not preserve the extra artwork through a stock re-export. Browser Echo artwork support exists, but the new Unheard Soul editor/portable extension currently remains desktop-only; the browser uses the inverted default portrait.
 
 ## Music
@@ -79,7 +83,7 @@ The dungeon does not call native scene settlement or Story Memory extraction. It
 | Lifecycle and persistence | renderer/stores/reckoning, reckoningDungeon, loop/saves, loop/turn, gameLoop |
 | Bounded model context | renderer/prompts/reckoningPrompt, shared/dungeonConversation, renderer/prompts/characterDynamics |
 | Visuals and placement | ReckoningDungeon, ReckoningModal, UnspokenVoice, UnspokenLinkGlitch, ReflectionPortrait, FallingGlass, whisperLayout, whisperSilhouette |
-| Character images and portability | main/services/echoService, reflectionStorage, characterTransferService, backupService |
+| Character images and portability | main/services/echoService, echoArtImage, reflectionLocalImage, reflectionStorage, shared/reflectionPortrait, assets/workflows/reflectionPortrait.json, characterTransferService, backupService |
 | Audio | shared/audio, shared/soundtracks, renderer/stores/audioEngine, audioStore, soundscape |
 
 See [current validation](echo-validation.md), [Echoes](echo.md), [abilities](echo-breakthrough.md) and [Custom soundtracks](custom-soundtracks.md). This remains a draft feature for source review and broader live-model/balance/release testing; simulated responses do not establish narrative quality.

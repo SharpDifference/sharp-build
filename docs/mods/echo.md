@@ -46,7 +46,7 @@ Every aspect has a one-exchange ability costing 25, 50 or 75 spirit. Activations
 
 Echo identity, locks, staging and affinity markers are validated in the exEcho save extension. Native New Game+ carries them through modCarry; turning the mod off preserves the data. Whole-game desktop/browser backups include finished Echo artwork and reject conflicting immutable image IDs. Loose save JSON does not embed image bytes or recovery originals. This tree has no separate single-playthrough export.
 
-Unheard Soul artwork is a separate character image, not an Echo replacement. Its desktop character export/import/duplicate and whole-game backup support are described in [Breaking Through the Silence](reckoning.md). The browser supports ordinary Echo artwork but currently uses the inverted normal portrait for Unheard Souls; their custom image editor and portable extension are desktop-only.
+Unheard Soul artwork is a separate character image, not an Echo replacement. Its desktop editor offers the configured image API or Local ComfyUI with her neutral portrait as a reference, independently of the Echo creature's Megaten artwork option. Its character export/import/duplicate and whole-game backup support are described in [Breaking Through the Silence](reckoning.md). The browser supports ordinary Echo artwork but currently uses the inverted normal portrait for Unheard Souls; their custom image editor and portable extension are desktop-only.
 
 | Source | Responsibility |
 | --- | --- |

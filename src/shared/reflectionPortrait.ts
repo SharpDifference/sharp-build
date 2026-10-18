@@ -1,4 +1,15 @@
 import { fullNameOf, type Character } from './types'
+export type ReflectionArtSource = 'api' | 'local'
+
+/** The local SDXL graph reads appearance tags, with the actual portrait supplying identity. */
+export function reflectionLocalPrompt(character: Character): { positive: string; negative: string } {
+ const appearance = character.baseAppearance.filter(tag => !tag.endsWith('_eyes'))
+ return {
+  positive: ['masterpiece, best quality, anime, 1girl, solo, adult, full_body, standing, looking_at_viewer',
+   appearance.join(', '), 'gold_eyes, glowing_eyes, serious, guarded expression, dark elegant clothing, fully_clothed, subtle cracked glass accents, detailed face, readable colors, balanced lighting, simple_background, light_gray_background'].join(', '),
+  negative: ['worst quality, bad quality, lowres, text, lettering, watermark, signature, logo, multiple girls, cropped, out_of_frame, silhouette, underexposed, nude, naked, gore', ...(character.negativeTags ?? [])].join(', ')
+ }
+}
 export interface ReflectionStage { x: number; y: number; scale: number }
 export const DEFAULT_REFLECTION_STAGE: ReflectionStage = { x: 0, y: 0, scale: 1 }
 /** Offsets are percentages of the dungeon portrait box, shared with its stage preview. */

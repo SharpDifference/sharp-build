@@ -298,7 +298,7 @@ export function registerIpcHandlers(): void {
   handle('echo:reflectionRead',(_event,charId:string)=>readReflectionPortrait(charId))
   handle('echo:reflectionStageRead',(_event,charId:string)=>readReflectionStage(charId))
   handle('echo:reflectionStageSave',(_event,charId:string,stage:unknown)=>saveReflectionStage(charId,stage))
-  handle('echo:reflectionGenerate',(event,charId:string,id:string)=>generateReflectionPortrait(charId,id,event.sender.id))
+  handle('echo:reflectionGenerate',(event,charId:string,id:string,source:unknown)=>generateReflectionPortrait(charId,id,event.sender.id,source))
   handle('echo:generate',(event,request: EchoArtRequest) => generateEchoArt(request,event.sender.id))
   handle('echo:installLocalModels', (event, id: string) => installLocalEchoModels(id, event.sender.id))
   handle('echo:cancel',(event,id: string) => cancelEchoArt(id,event.sender.id))

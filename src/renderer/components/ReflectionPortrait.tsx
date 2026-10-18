@@ -1,11 +1,12 @@
 import { useEffect, useRef, useState, type CSSProperties, type JSX } from 'react'
 import { createPortal } from 'react-dom'
 import { create } from 'zustand'
-import { DEFAULT_REFLECTION_STAGE, reflectionStageOf, reflectionStageTransform, type ReflectionStage } from '@shared/reflectionPortrait'
+import { DEFAULT_REFLECTION_STAGE, reflectionStageOf, reflectionStageTransform, type ReflectionStage, type ReflectionArtSource } from '@shared/reflectionPortrait'
 import { useModOn } from '../stores/modsStore'
 import { spriteUrl, useSpriteVersion } from '../stores/characterStore'
 import { useModalShell } from './useModalShell'
 import { Lightbox } from './Lightbox'
+import { SelectField } from './SelectField'
 import { DownloadIcon, UploadIcon } from '../views/screenIcons'
 import '../vu_styles/ReflectionPortrait.css'
 
@@ -46,6 +47,7 @@ function ReflectionPortraitEditor({ charId, name, theme, height, onClose }: { ch
  const [loaded, setLoaded] = useState(false), [busy, setBusy] = useState(false), [saving, setSaving] = useState(false)
  const [fullImage, setFullImage] = useState(false), [error, setError] = useState(''), [message, setMessage] = useState('')
  const [preview, setPreview] = useState<'portrait' | 'scene'>('portrait')
+ const [artSource, setArtSource] = useState<ReflectionArtSource>('api')
  const [discard, setDiscard] = useState(false), request = useRef<string | null>(null), live = useRef(true)
  const dirty = JSON.stringify(stage) !== JSON.stringify(saved)
  const close = (): void => { if (fullImage) { setFullImage(false); return }; if (busy || saving) return; if (dirty) setDiscard(true); else onClose() }
@@ -64,7 +66,7 @@ function ReflectionPortraitEditor({ charId, name, theme, height, onClose }: { ch
   if (busy || !window.api.echo?.reflectionGenerate) return
   const id = crypto.randomUUID(); request.current = id; setBusy(true); setError(''); setMessage('')
   try {
-   const r = await window.api.echo.reflectionGenerate(charId, id)
+   const r = await window.api.echo.reflectionGenerate(charId, id, artSource)
    if (!r.ok) throw Error(r.error.message)
    versions.setState(s => ({ art: s.art + 1 }))
    if (live.current) setMessage('Unheard Soul artwork saved. Your position settings are kept.')
@@ -141,7 +143,13 @@ function ReflectionPortraitEditor({ charId, name, theme, height, onClose }: { ch
       <p className="vu-reflection-help">Left / right, up / down, and size. Position is saved separately for each character and shared across her local playthroughs.</p>
       <div className="vu-reflection-actions"><button type="button" className="vu-btn vu-btn--primary vu-paper" disabled={!dirty || busy} onClick={() => void save()}>{saving ? 'Saving…' : 'Save position'}</button><button type="button" className="vu-btn vu-btn--outline" onClick={() => { setStage({ ...DEFAULT_REFLECTION_STAGE }); setPreview('scene'); setMessage(''); setDiscard(false) }}>Reset position</button></div>
      </fieldset>
-     <h2>Unheard Soul artwork</h2><p>Uses her saved profile and neutral portrait as a reference. Save character edits before generating. This uses your configured image API and may incur a charge.</p>
+     <h2>Unheard Soul artwork</h2><p>Uses her saved character details and neutral portrait as a reference. Save character edits before generating.</p>
+     <SelectField id="reflection-art-source" label="Generate with" value={artSource}
+      onChange={value => setArtSource(value as ReflectionArtSource)} disabled={busy || saving || !window.api.echo?.reflectionGenerate}
+      options={[{ value: 'api', label: 'Configured image API' }, { value: 'local', label: 'Local ComfyUI' }]}/>
+     <p>{artSource === 'local'
+      ? 'Uses the server and models selected in Settings → ComfyUI. Set up ComfyUI there first. No image API call is made. Her reference portrait is sent to that server; results depend on its models.'
+      : 'Uses your configured image API and may incur a charge.'}</p>
      <button type="button" className="vu-btn vu-btn--primary vu-paper" disabled={busy || saving || !window.api.echo?.reflectionGenerate} onClick={() => void generate()}>{busy ? 'Generating portrait…' : image ? 'Regenerate Unheard Soul portrait' : 'Generate Unheard Soul portrait'}</button>
      {busy && <button type="button" className="vu-btn vu-btn--outline" onClick={() => { if (request.current) void window.api.echo?.cancel(request.current) }}>Cancel generation</button>}
      {!window.api.echo?.reflectionStageRead && <p>Unheard Soul editing is available in the desktop prototype.</p>}

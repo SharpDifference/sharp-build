@@ -3,12 +3,15 @@ import { normalizeEcho, echoImagePrompt } from '@shared/echo'
 import { NO_SWITCHES, optionOn } from '@shared/mods'
 
 const mocks = vi.hoisted(() => ({
-  switches: vi.fn(), cloud: vi.fn(), local: vi.fn(), prepare: vi.fn(), cutout: vi.fn(),
+  switches: vi.fn(), cloud: vi.fn(), local: vi.fn(), reflectionLocal: vi.fn(), target: vi.fn(), decode: vi.fn(), prepare: vi.fn(), cutout: vi.fn(),
   mkdir: vi.fn(), write: vi.fn(), read: vi.fn(), stat: vi.fn(), matte: vi.fn(), rename:vi.fn(),character:vi.fn(),sprite:vi.fn(), rm:vi.fn(), readdir:vi.fn()
 }))
 vi.mock('../src/main/services/modsService', () => ({ getModSwitches: mocks.switches }))
 vi.mock('@shared/llm/cloudImage', () => ({ generateImage: mocks.cloud }))
 vi.mock('../src/main/services/echoLocalImage', () => ({ generateLocalEcho: mocks.local }))
+vi.mock('../src/main/services/reflectionLocalImage', () => ({ generateLocalReflection: mocks.reflectionLocal, resolveLocalReflectionTarget: mocks.target }))
+// Service tests exercise writes/routing; echoArtImage.test uses the real decoder and image bytes.
+vi.mock('../src/main/services/echoArtImage', () => ({ decodeEchoArt: mocks.decode, MAX_ECHO_ART_BYTES: 20 * 1024 * 1024 }))
 vi.mock('../src/main/services/echoCutout', () => ({ prepareEchoCutout: mocks.prepare, cutoutEchoImage: mocks.cutout, releaseEchoCutout: vi.fn() }))
 vi.mock('../src/main/services/echoMatte', () => ({ clearEchoMatte: mocks.matte }))
 vi.mock('../src/main/paths', () => ({ getDataPath: () => 'echo-test-data' }))
@@ -25,6 +28,9 @@ const request = () => ({ requestId: 'fdc99b1a-bd3b-41ca-897f-757b3bf983c3',
 
 beforeEach(() => {
   vi.resetAllMocks()
+  mocks.decode.mockImplementation(async bytes => Buffer.from(bytes))
+  mocks.target.mockResolvedValue({ source: 'external', baseUrl: 'http://127.0.0.1:8189', loraWeight: 1 })
+  mocks.reflectionLocal.mockResolvedValue(Buffer.from('local-reflection'))
   mocks.switches.mockResolvedValue({ on: { echo: true, reckoning: true }, options: {} })
   mocks.cloud.mockResolvedValue(Buffer.from('original'))
   mocks.cutout.mockResolvedValue(Buffer.from('transparent'))
@@ -102,6 +108,43 @@ describe('separate reflection portraits for default and custom girls',()=>{
   mocks.sprite.mockResolvedValueOnce(null);await expect(generateReflectionPortrait('nina',request().requestId,7)).rejects.toThrow('neutral portrait')
   mocks.prepare.mockRejectedValueOnce(Error('missing remover'));await expect(generateReflectionPortrait('nina',request().requestId,7)).rejects.toThrow('missing remover')
   expect(mocks.cloud).not.toHaveBeenCalled();expect(mocks.rename).not.toHaveBeenCalled()
+ })
+ it('routes the actual reference to the captured local server and preserves placement without calling the image API', async () => {
+  mocks.switches.mockResolvedValue({ on: { reckoning: true, echo: false }, options: {} })
+  const stage = { x: 11, y: -8, scale: 1.2 }
+  await saveReflectionStage('nina', stage)
+  await generateReflectionPortrait('nina', request().requestId, 7, 'local')
+  expect(mocks.reflectionLocal).toHaveBeenCalledWith(await mocks.character.mock.results[0].value,
+   Buffer.from('normal-portrait'), expect.any(AbortSignal), await mocks.target.mock.results[0].value)
+  expect(mocks.target).toHaveBeenCalledOnce()
+  expect(mocks.cloud).not.toHaveBeenCalled()
+  expect(mocks.local).not.toHaveBeenCalled()
+  expect(await readReflectionStage('nina')).toEqual(stage)
+  expect(await readReflectionPortrait('nina')).toMatch(/^data:image\/png;base64,/)
+ })
+ it('keeps prior artwork on local failure or cancellation, with no cloud fallback', async () => {
+  await generateReflectionPortrait('nina', request().requestId, 7)
+  const before = await readReflectionPortrait('nina')
+  mocks.cloud.mockClear(); mocks.write.mockClear()
+  mocks.reflectionLocal.mockRejectedValueOnce(Error('missing local model'))
+  await expect(generateReflectionPortrait('nina', request().requestId, 7, 'local')).rejects.toThrow('missing local model')
+  mocks.reflectionLocal.mockImplementationOnce(async (_character, _reference, signal: AbortSignal) => {
+   cancelEchoArt(request().requestId, 8)
+   expect(signal.aborted).toBe(false)
+   cancelEchoArt(request().requestId, 7)
+   signal.throwIfAborted()
+  })
+  await expect(generateReflectionPortrait('nina', request().requestId, 7, 'local')).rejects.toMatchObject({ name: 'AbortError' })
+  expect(await readReflectionPortrait('nina')).toEqual(before)
+  expect(mocks.cloud).not.toHaveBeenCalled()
+  expect(mocks.write).not.toHaveBeenCalled()
+ })
+ it('rejects an unknown provider or unreadable reference before either generator or any write', async () => {
+  await expect(generateReflectionPortrait('nina', request().requestId, 7, 'other')).rejects.toThrow('Choose the image API')
+  mocks.decode.mockRejectedValueOnce(Error('unreadable reference'))
+  await expect(generateReflectionPortrait('nina', request().requestId, 7, 'local')).rejects.toThrow('unreadable reference')
+  expect(mocks.cloud).not.toHaveBeenCalled(); expect(mocks.reflectionLocal).not.toHaveBeenCalled()
+  expect(mocks.write).not.toHaveBeenCalled()
  })
  it('does not replace the previous reflection or retry a paid request after segmentation fails',async()=>{
   mocks.cutout.mockRejectedValueOnce(Error('segmentation failed'))
