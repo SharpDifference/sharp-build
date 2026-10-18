@@ -1,8 +1,7 @@
 import { fallbackHandleOf } from '@shared/feed'
 import { globalSlotOf } from '@shared/jobs'
 import { npcFriendsOf, type NpcRelationshipMap } from '@shared/npcRelationships'
-import type { PhotoTier } from '@shared/photoGate'
-import { reachOf, rollCrowdCount } from '@shared/postAudience'
+import { followingOf, rollCrowd } from '@shared/bunnyfeedsCrowd'
 import type { PostComment } from '@shared/postComments'
 import { shuffle } from '@shared/shuffle'
 import { charKeyOf, type Character, type CharInfo } from '@shared/types'
@@ -84,12 +83,12 @@ export interface WrittenComment {
  * Dresses the replies the model wrote for one post: a face, a handle, and the slot each one
  * turns up in. A roster girl replies as her own handle; a stranger is drawn a handle and an emoji.
  * How many are kept is read off her following and what she posted: a picture draws more than
- * words, one with skin in it more again, and a girl the campus watches more than one it does not.
+ * words, and a girl the campus watches more than one it does not.
  */
 export function rollFeedComments(
   charId: string,
   written: readonly WrittenComment[] | undefined,
-  photoTier: PhotoTier = 'none'
+  picture = false
 ): PostComment[] {
   const lines = (written ?? [])
     .map((one) => ({ ...one, text: one.text.trim() }))
@@ -97,8 +96,8 @@ export function rollFeedComments(
   if (lines.length === 0) return []
 
   const game = useGameStore.getState()
-  const reach = reachOf(game.playthroughId, charId, game.characters[charId])
-  const count = Math.min(lines.length, rollCrowdCount({ photoTier, reach }))
+  const following = followingOf(game.playthroughId, charId, game.characters[charId])
+  const count = Math.min(lines.length, rollCrowd({ picture, following }))
   if (count === 0) return []
 
   const kept = lines.slice(0, count)

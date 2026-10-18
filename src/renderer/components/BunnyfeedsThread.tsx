@@ -10,16 +10,15 @@ import { profileUrl, useSpriteVersion } from '../stores/characterStore'
 import { useGameStore } from '../stores/gameStore'
 import { leavePlayerComment } from '../stores/bunnyfeedsThreads'
 import { epilogueOf, sceneActiveOf } from '../stores/textingLoop'
-import type { CommentViewProps } from '../stores/commentHandoff'
+import type { PostCommentsProps } from '../mods/hooks'
 import { fadeIn, gestures, quietLift, quietPress } from '../views/motion'
 import { CloseIcon, HeartIcon } from '../views/screenIcons'
 import { formatShortGameDate, slotHalf } from '../prompts/gameDate'
-import { PostPhoto } from './PhotoBubble'
+import { PostPicture } from './PostSpots'
 import { armFeedThreads } from '../stores/bunnyfeedsThreads'
 import { takeCommented } from '../stores/bunnyfeedsVisit'
 import { useBunnyboardStore } from '../stores/bunnyboardStore'
 import '../vu_styles/PopList.css'
-import '../vu_styles/PostComments.css'
 import '../vu_styles/Bunnyfeeds.css'
 
 /** The post whose full view is open, if any; one at a time across the whole feed. */
@@ -64,7 +63,7 @@ function useShown(comments: readonly PostComment[]): PostComment[] {
 }
 
 /** Whether he may write under this post: a contact's own, outside the epilogue and any scene. */
-function useCanComment({ charId, postId, stranger }: CommentViewProps): boolean {
+function useCanComment({ charId, postId, stranger }: PostCommentsProps): boolean {
   const epilogue = useGameStore(epilogueOf)
   // Closed exactly when texting is, so the phone answers the same everywhere.
   const sceneActive = useGameStore(sceneActiveOf)
@@ -75,7 +74,7 @@ function useCanComment({ charId, postId, stranger }: CommentViewProps): boolean 
  * In the feed: one comment, his own if he left one and else the newest, and the way into the
  * post's full view. The rest of the thread is read there.
  */
-export function FeedPreview(props: CommentViewProps): JSX.Element | null {
+export function FeedPreview(props: PostCommentsProps): JSX.Element | null {
   const said = useShown(props.comments)
   const show = usePostView((s) => s.show)
   if (said.length === 0 || !props.charId || !props.postId) return null
@@ -89,7 +88,7 @@ export function FeedPreview(props: CommentViewProps): JSX.Element | null {
       {said.length > 1 && (
         <motion.button
           type="button"
-          className="vu-bb-comment-reply vu-bb-comment-open"
+          className="vu-bf-comment-reply vu-bf-comment-open"
           {...gestures(false, quietLift, quietPress)}
           onClick={open}
         >
@@ -100,7 +99,7 @@ export function FeedPreview(props: CommentViewProps): JSX.Element | null {
       {replies > 0 && (
         <motion.button
           type="button"
-          className="vu-bb-comment-reply vu-bb-comment-more"
+          className="vu-bf-comment-reply vu-bf-comment-more"
           {...gestures(false, quietLift, quietPress)}
           onClick={open}
         >
@@ -112,7 +111,7 @@ export function FeedPreview(props: CommentViewProps): JSX.Element | null {
 }
 
 /** Beside the like: the comment count, which opens the post's full view, and that view. */
-export function CommentPill(props: CommentViewProps): JSX.Element | null {
+export function CommentPill(props: PostCommentsProps): JSX.Element | null {
   const said = useShown(props.comments)
   const canComment = useCanComment(props)
   const open = usePostView((s) => s.open)
@@ -151,7 +150,7 @@ function BubbleIcon(): JSX.Element {
  * One post and its whole thread, popped up over the whole screen as a photo is. Closing it ends the visit as
  * closing the phone does: whatever he wrote while it was open is sent to be answered.
  */
-function PostView(props: CommentViewProps & { charId: string; postId: string }): JSX.Element | null {
+function PostView(props: PostCommentsProps & { charId: string; postId: string }): JSX.Element | null {
   const { charId, postId } = props
   const show = usePostView((s) => s.show)
   const character = useGameStore((s) => s.characters[charId])
@@ -215,11 +214,7 @@ function PostView(props: CommentViewProps & { charId: string; postId: string }):
           </div>
         </div>
         <p className="vu-bb-post-text">{post.text}</p>
-        {post.photo && (
-          <div className="vu-bb-post-shot">
-            <PostPhoto charId={charId} postId={postId} photo={post.photo} />
-          </div>
-        )}
+        <PostPicture charId={charId} postId={postId} />
         <div className="vu-bb-post-actions">
           <motion.button
             className={`vu-bb-like${post.liked ? ' vu-bb-like--on' : ''}`}
@@ -237,7 +232,7 @@ function PostView(props: CommentViewProps & { charId: string; postId: string }):
       {!canComment && sceneActive && !props.stranger && (
         <div className="vu-bb-postview-foot">
           <input
-            className="vu-input vu-bb-comment-input"
+            className="vu-input vu-bf-comment-input"
             disabled
             aria-label="Comment"
             placeholder="You should probably focus on what's in front of you."
@@ -249,7 +244,7 @@ function PostView(props: CommentViewProps & { charId: string; postId: string }):
           {/* One comment on the post itself; the conversation carries on in its thread. */}
           {commented ? (
             <input
-              className="vu-input vu-bb-comment-input"
+              className="vu-input vu-bf-comment-input"
               disabled
               aria-label="Comment"
               placeholder="You've commented on this post. Reply in its thread to keep going."
@@ -299,13 +294,13 @@ function Thread({
   }
 
   return (
-    <ul className="vu-bb-comments">
+    <ul className="vu-bf-comments">
       {roots.map((root) => {
         const replies = repliesTo.get(root.id) ?? []
         const answering = replying?.root === root
         const open = root.player || unfolded.has(root.id) || answering
         return (
-          <li className="vu-bb-comment-group" key={root.id}>
+          <li className="vu-bf-comment-group" key={root.id}>
             <CommentRow
               comment={root}
               onReply={canComment ? () => setReplying({ root, to: root }) : undefined}
@@ -313,7 +308,7 @@ function Thread({
             {replies.length > 0 && !open && (
               <motion.button
                 type="button"
-                className="vu-bb-comment-reply vu-bb-comment-more"
+                className="vu-bf-comment-reply vu-bf-comment-more"
                 {...gestures(false, quietLift, quietPress)}
                 onClick={() => setUnfolded(new Set([...unfolded, root.id]))}
               >
@@ -321,7 +316,7 @@ function Thread({
               </motion.button>
             )}
             {open && (replies.length > 0 || answering) && (
-              <ul className="vu-bb-comments vu-bb-comments--replies">
+              <ul className="vu-bf-comments vu-bf-comments--replies">
                 {replies.map((one) => (
                   <li key={one.id}>
                     <CommentRow
@@ -371,28 +366,28 @@ function CommentRow({
 }): JSX.Element {
   const reader = useReaderHandle()
   return (
-    <div className="vu-bb-comment">
+    <div className="vu-bf-comment">
       {comment.charId ? (
         <RosterFace charId={comment.charId} />
       ) : comment.player ? (
         <PlayerFace />
       ) : (
         <span
-          className="vu-bb-comment-face"
+          className="vu-bf-comment-face"
           style={{ '--vu-face-hue': hashString(comment.handle) % 360 } as CSSProperties}
           aria-hidden
         >
           {comment.emoji}
         </span>
       )}
-      <span className="vu-bb-comment-said">
-        <span className="vu-bb-comment-who vu-bb-comment-who--over">
+      <span className="vu-bf-comment-said">
+        <span className="vu-bf-comment-who vu-bf-comment-who--over">
           {comment.player ? reader : `@${comment.handle}`}
         </span>
-        {to && <span className="vu-bb-comment-mention">{to} </span>}
+        {to && <span className="vu-bf-comment-mention">{to} </span>}
         {comment.text.split(/(@[\w.]+)/).map((part, i) =>
           i % 2 === 1 ? (
-            <span key={i} className="vu-bb-comment-mention">
+            <span key={i} className="vu-bf-comment-mention">
               {part}
             </span>
           ) : (
@@ -402,7 +397,7 @@ function CommentRow({
         {onReply && (
           <motion.button
             type="button"
-            className="vu-bb-comment-reply"
+            className="vu-bf-comment-reply"
             {...gestures(false, quietLift, quietPress)}
             onClick={onReply}
           >
@@ -425,11 +420,11 @@ function useReaderHandle(): string {
 function PlayerFace(): JSX.Element {
   const picture = useGameStore((s) => s.profilePicture)
   return picture ? (
-    <span className="vu-bb-comment-face vu-bb-comment-face--roster" aria-hidden>
+    <span className="vu-bf-comment-face vu-bf-comment-face--roster" aria-hidden>
       <img src={picture} alt="" />
     </span>
   ) : (
-    <span className="vu-bb-comment-face vu-bb-comment-face--player" aria-hidden>
+    <span className="vu-bf-comment-face vu-bf-comment-face--player" aria-hidden>
       you
     </span>
   )
@@ -439,7 +434,7 @@ function PlayerFace(): JSX.Element {
 function RosterFace({ charId }: { charId: string }): JSX.Element {
   const version = useSpriteVersion(charId)
   return (
-    <span className="vu-bb-comment-face vu-bb-comment-face--roster" aria-hidden>
+    <span className="vu-bf-comment-face vu-bf-comment-face--roster" aria-hidden>
       <img src={profileUrl(charId, version)} alt="" />
     </span>
   )
@@ -543,14 +538,14 @@ function CommentField({
   }
 
   return (
-    <div className="vu-bb-comment-compose">
+    <div className="vu-bf-comment-compose">
       {replyTo && (
-        <div className="vu-bb-comment-replying">
+        <div className="vu-bf-comment-replying">
           <span>{replyTo.player ? 'Adding to your thread' : `Replying to @${replyTo.handle}`}</span>
           {onCancel && (
             <motion.button
               type="button"
-              className="vu-bb-comment-reply"
+              className="vu-bf-comment-reply"
               {...gestures(false, quietLift, quietPress)}
               onClick={onCancel}
             >
@@ -562,7 +557,7 @@ function CommentField({
       <input
         ref={input}
         autoFocus={Boolean(replyTo)}
-        className="vu-input vu-bb-comment-input"
+        className="vu-input vu-bf-comment-input"
         value={draft}
         autoComplete="off"
         role="combobox"
@@ -615,7 +610,7 @@ function CommentField({
               >
                 <RosterFace charId={one.charId} />
                 <span>{one.name}</span>
-                <span className="vu-bb-comment-who">@{one.handle}</span>
+                <span className="vu-bf-comment-who">@{one.handle}</span>
               </button>
             ))}
           </div>

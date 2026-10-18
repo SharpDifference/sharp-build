@@ -1,12 +1,11 @@
 # Bunnyfeeds
 
-Comment on your contacts' posts, and they answer you. Works on its own; with Photo Feature on too,
-it takes over Photo Feature's post comments and photo posts get the same threads.
+Comment on your contacts' posts, and they answer you. It needs no other mod: posts with a picture
+on them, from any mod that puts one there, get threads like any other post.
 
 ## Playing
 
-- Turn on **Bunnyfeeds** in Mods. Photo Feature can be on or off, and either can be switched
-  at any time: threads carry on whichever is on.
+- Turn on **Bunnyfeeds** in Mods. Other mods can be on or off around it: threads carry on.
 - In the feed a post shows one comment (yours if you left one, otherwise the newest), its reply
   count, **View all N comments**, and a speech-bubble pill with the count beside the heart.
 - The pill or **View all** opens the post in a popup over the whole screen, like a photo: the
@@ -37,7 +36,7 @@ it takes over Photo Feature's post comments and photo posts get the same threads
   Reply is hidden. Reading stays open.
 - Strangers' posts, and the slot's random student post, take no comments.
 - Threads carry through New Game+: what she still owes you and what she has yet to remember move
-  onto the next semester with her post. Their comments move with Photo Feature 1.4.0 or later.
+  onto the next semester with her post, comments and all.
 - She keeps one memory of your comments among her own, arriving with her answers, the newest
   replacing the last, as her texting memory does. It shows in her Memories ("…, on her post"), can
   be edited there, counts in her affection like any memory, and every scene, text and slot opening
@@ -74,8 +73,8 @@ Bunnyfeeds makes **one extra AI call** of its own, to your usual model, on top o
   calls the game already makes.
 - If a call fails, or you reload before it was saved, the slot's settling asks again for whatever
   is still unanswered.
-- Off, no call is made, and posts go back to Photo Feature's plain stranger comments, or none if
-  Photo Feature is off too.
+- Off, no call is made and the threads are hidden. Another mod that draws comments under posts
+  draws its own instead.
 
 ## For modders
 
@@ -85,9 +84,10 @@ Bunnyfeeds makes **one extra AI call** of its own, to your usual model, on top o
 | --- | --- |
 | `src/shared/modEntries/bunnyfeeds.ts` | The entry: anytime, off by default, no requirements. |
 | `src/shared/bunnyfeeds.ts` | The optional fields it adds to comments and posts, the thread call's reply shape, and `threadWork`, what a thread still owes. |
-| `src/renderer/modEntries/bunnyfeeds.ts` | Registers the comment hand-off and the hooks. |
+| `src/renderer/modEntries/bunnyfeeds.ts` | Registers the hooks, the post comments it draws among them. |
 | `src/renderer/prompts/bunnyfeedsPrompt.ts` | The slot opening's reply lines, the replier block, the thread call's prompt and the texting bookkeeping's note. |
 | `src/renderer/stores/bunnyfeedsReplies.ts` | Who may reply under a post, and how the slot opening's replies are filed. |
+| `src/shared/bunnyfeedsCrowd.ts` | How many answer a post: her following, and whether it carries a picture. |
 | `src/renderer/stores/bunnyfeedsThreads.ts` | The thread call: what is owed, sending on phone close, filing the answers. |
 | `src/renderer/stores/bunnyfeedsMemory.ts` | Feed memories: held until the answers show, filed, announced in the closing; and the texting bookkeeping's note. |
 | `src/renderer/stores/bunnyfeedsVisit.ts` | Whether he commented during this phone visit. |
@@ -95,22 +95,24 @@ Bunnyfeeds makes **one extra AI call** of its own, to your usual model, on top o
 | `src/main/ipc.ts`, `src/preload/*`, `src/web/bridge.ts` | The `llm:completeFeedThreads` channel (direct edit). |
 | `src/renderer/prompts/textLedgerPrompt.ts` | One line adding `textLedgerFeedLines` (direct edit). |
 | `src/renderer/stores/gameLoop.ts` | One line adding `feedStatusLines` to the closing's memories (direct edit). |
-| `test/bunnyfeeds.test.ts` | `threadWork`. |
+| `test/bunnyfeeds.test.ts` | `threadWork` and `carriedThread`. |
 
-From Photo Feature 1.3.0 it uses the comment hand-off (`stores/commentHandoff.ts`), `PostComments`
-and `CommentAction`, and the post's `comments` field, so Photo Feature's code must be in the build,
-whether or not it is switched on.
+It uses nothing of any other mod: only the game's places on a post (`postComments`,
+`PostPicture`) and the post's `comments` field, both the game's own.
 
 ### How it plugs in
 
-- **Alone**, it asks the slot opening for each post's replies (`prompts['slot-posts']`) and files
-  them (`fileFeedPost`). Both step aside while Photo Feature is on, which asks and files through
-  the hand-off instead, so replies are never asked for twice.
-
-- **Photo Feature's comment hand-off** (`stores/commentHandoff.ts`, Photo Feature 1.3.0): while
-  Bunnyfeeds is on, the slot opening asks for replies in its words and its schema (each reply names
-  who wrote it), a filed post's replies are dressed by it with the picture's tier already known,
-  `PostComments` draws its preview, and `CommentAction` puts its comment pill beside the like.
+- **`postComments`**: it draws the thread's preview under each post and puts its comment pill
+  beside the like. Only one mod draws comments at a time, the first on in the mods list, so with
+  another comment-drawing mod on it is asked first. Its `claims` marks the comments only it writes
+  (yours, roster girls', replies), which another mod drawing comments leaves out while Bunnyfeeds
+  is off.
+- While it is the mod drawing comments (`ownsPostComments`), it asks the slot opening for each
+  post's replies (`prompts['slot-posts']`, each reply naming who wrote it) and files them
+  (`fileFeedPost`); a post another mod is putting a picture on, read off the post's `image` as plain
+  data, draws more. So replies are never asked for twice.
+- The post view draws the post's picture through the game's `PostPicture`, whichever mod draws it,
+  and the thread call is told what a picture shows where a mod described one on the post.
 - Two direct edits, where no hook exists: `textLedgerPrompt.ts` adds `textLedgerFeedLines`, telling
   the end-of-slot texting bookkeeping that comments under her posts are the feed's, so talk about a
   post in her DMs is not filed as something said over text; `gameLoop.ts` adds `feedStatusLines` to
@@ -130,6 +132,7 @@ into her memories as the slot before it settles, so it arrives with the answers.
 his comments is one of her ordinary memories, ending ", on her post" or ", under <name>'s post",
 which is how the next one finds and replaces it.
 
-Comments keep Photo Feature's `comments` field. A comment written by Photo Feature alone reads as
-a stranger's. While Bunnyfeeds is off, Photo Feature's own view leaves out the comments only
-Bunnyfeeds writes (yours, roster girls', replies); they stay saved and come back with it.
+Comments live in the game's own `comments` field on a post, so New Game+ moves them with the post;
+`carriedThread` moves `threadedThrough` and the held memories the same way. A comment with none of
+its fields reads as a stranger's. While Bunnyfeeds is off, a mod drawing comments in its place
+leaves out the ones only Bunnyfeeds writes; they stay saved and come back with it.

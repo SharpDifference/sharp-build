@@ -1,25 +1,26 @@
 import { BUNNYFEEDS, carriedThread } from '@shared/bunnyfeeds'
 import { globalSlotOf } from '@shared/jobs'
 import { registerPostCarry } from '@shared/modCarry'
-import { PHOTO_FEATURE } from '@shared/mods'
 import { shownComments } from '@shared/postComments'
 import { charKeyOf, type Character } from '@shared/types'
 import { formatShortGameDate } from '../prompts/gameDate'
 import { createElement, lazy, Suspense } from 'react'
-import { postVisible, registerHooks } from '../mods/hooks'
+import {
+  ownsPostComments,
+  postVisible,
+  registerHooks,
+  type PostCommentsProps
+} from '../mods/hooks'
 import {
   replierBlock,
   slotCommentLines,
   slotCommentsField
 } from '../prompts/bunnyfeedsPrompt'
-import { handOffComments } from '../stores/commentHandoff'
 import { repliersFor, rollFeedComments, writtenComments } from '../stores/bunnyfeedsReplies'
 import { useBunnyboardStore } from '../stores/bunnyboardStore'
 import { fileDueFeedMemories } from '../stores/bunnyfeedsMemory'
 import { takeCommented } from '../stores/bunnyfeedsVisit'
 import { useGameStore } from '../stores/gameStore'
-import { modIsOn } from '../stores/modsStore'
-import type { CommentViewProps } from '../stores/commentHandoff'
 
 // Loaded on first draw, so registering the mod pulls in no screen code.
 const screens = (): Promise<typeof import('../components/BunnyfeedsThread')> =>
@@ -28,26 +29,14 @@ const LazyPreview = lazy(() => screens().then((module) => ({ default: module.Fee
 const LazyPill = lazy(() => screens().then((module) => ({ default: module.CommentPill })))
 
 /** The thread's preview under a post, drawn once its code has loaded. */
-function FeedPreviewView(props: CommentViewProps): ReturnType<typeof createElement> {
+function FeedPreviewView(props: PostCommentsProps): ReturnType<typeof createElement> {
   return createElement(Suspense, { fallback: null }, createElement(LazyPreview, props))
 }
 
 /** The comment count beside the post's like, drawn once its code has loaded. */
-function CommentPillView(props: CommentViewProps): ReturnType<typeof createElement> {
+function CommentPillView(props: PostCommentsProps): ReturnType<typeof createElement> {
   return createElement(Suspense, { fallback: null }, createElement(LazyPill, props))
 }
-
-handOffComments({
-  active: () => modIsOn(BUNNYFEEDS),
-  lines: slotCommentLines,
-  field: slotCommentsField,
-  dress: (charId, written, photoTier) =>
-    rollFeedComments(charId, writtenComments(written, charId), photoTier),
-  View: FeedPreviewView,
-  Action: CommentPillView,
-  // His own, a roster girl's, and every reply: none of them a comment Photo Feature makes.
-  claims: (comment) => Boolean(comment.player || comment.charId || comment.replyTo)
-})
 
 /** How many of her newest posts a prompt with her in it is shown. */
 const RECENT_POSTS = 2
@@ -94,21 +83,21 @@ useBunnyboardStore.subscribe((state, before) => {
   void threads().then((module) => module.armFeedThreads('next'))
 })
 
-/** Photo Feature is acting, so it asks for and files the replies itself, through the hand-off. */
-function photoFeatureActing(): boolean {
-  return modIsOn(PHOTO_FEATURE)
+/** Whether Bunnyfeeds is the mod drawing post comments, and so the one asking for them. */
+function writesComments(): boolean {
+  return ownsPostComments(BUNNYFEEDS)
 }
 
 registerHooks(BUNNYFEEDS, {
   prompts: {
     scene: { lines: ({ cast }) => recentPostLines(cast) },
     dm: { lines: ({ character }) => recentPostLines([character]) },
-    // Alone, the mod asks for the replies itself; with Photo Feature on they come through it.
+    // The replies each post arrives with, asked for while Bunnyfeeds draws the comments.
     'slot-posts': {
-      lines: () => (photoFeatureActing() ? [] : slotCommentLines()),
+      lines: () => (writesComments() ? slotCommentLines() : []),
       fields: (): Record<string, unknown> =>
-        photoFeatureActing() ? {} : { comments: slotCommentsField() },
-      required: () => (photoFeatureActing() ? [] : ['comments'])
+        writesComments() ? { comments: slotCommentsField() } : {},
+      required: () => (writesComments() ? ['comments'] : [])
     },
   },
 
@@ -142,16 +131,25 @@ registerHooks(BUNNYFEEDS, {
     void threads().then((module) => module.armFeedThreads('next'))
   },
 
-  // Alone, it files the replies too; a post with no picture coming draws the plain post's crowd.
+  // Files the replies too. A post another mod is putting a picture on (its "image") draws more.
   fileFeedPost: (filing) => {
-    if (photoFeatureActing()) return
-    const reply = filing.reply as { comments?: unknown }
+    if (!writesComments()) return
+    const reply = filing.reply as { comments?: unknown; image?: unknown }
+    const picture = typeof reply.image === 'string' && reply.image.trim() !== ''
     const comments = rollFeedComments(
       filing.charId,
       writtenComments(reply.comments, filing.charId),
-      'none'
+      picture
     )
     if (comments.length > 0) filing.post = { ...filing.post, comments }
+  },
+
+  // The threads under each post, and the comment count beside its like.
+  postComments: {
+    View: FeedPreviewView,
+    Action: CommentPillView,
+    // His own, a roster girl's, and every reply: comments only Bunnyfeeds writes.
+    claims: (comment) => Boolean(comment.player || comment.charId || comment.replyTo)
   },
 
   gameEntered: () => {
@@ -161,5 +159,5 @@ registerHooks(BUNNYFEEDS, {
 })
 
 // New Game+ moves her posts onto the next semester's clock; a thread's last round and its held
-// memories move with them. The comments are Photo Feature's to move. Runs with the mod off too.
+// memories move with them, as the game moves the comments. Runs with the mod off too.
 registerPostCarry(BUNNYFEEDS, carriedThread)

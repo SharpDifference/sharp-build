@@ -192,7 +192,7 @@ export async function armFeedThreads(showAt: 'now' | 'next' = 'now'): Promise<vo
         text: post.text,
         date: post.date,
         time: post.time,
-        ...(post.photo?.scene ? { picture: post.photo.scene } : {})
+        ...(pictureOf(post) ? { picture: pictureOf(post) } : {})
       },
       lines,
       mustAnswer: work.player.map((one) => refOf.get(one.id) ?? ''),
@@ -428,4 +428,13 @@ function patchPost(charId: string, postId: string, next: (post: SocialPost) => S
 /** Adds comments under one of her posts. */
 function addComments(charId: string, postId: string, comments: readonly PostComment[]): void {
   patchPost(charId, postId, (post) => ({ ...post, comments: [...(post.comments ?? []), ...comments] }))
+}
+
+/**
+ * What the picture on a post shows, where another mod put one there and described it: read off
+ * the post as plain data, so the thread can answer the picture without that mod being installed.
+ */
+function pictureOf(post: object): string | undefined {
+  const photo = (post as { photo?: { scene?: unknown } }).photo
+  return typeof photo?.scene === 'string' && photo.scene.trim() ? photo.scene : undefined
 }
