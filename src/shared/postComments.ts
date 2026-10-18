@@ -38,3 +38,16 @@ export function shownComments(
   const now = globalSlotOf(date, time)
   return comments.filter((comment) => comment.at <= now)
 }
+
+/**
+ * A post's comments moved back `days`, as New Game+ moves the post onto the next semester's
+ * clock: each keeps its place in the day, so a carried thread shows as it did.
+ */
+export function carriedComments<P extends { comments?: PostComment[] }>(post: P, days: number): P {
+  if (!post.comments) return post
+  const back = globalSlotOf(days, 0)
+  return {
+    ...post,
+    comments: post.comments.map((comment) => ({ ...comment, at: comment.at - back }))
+  }
+}

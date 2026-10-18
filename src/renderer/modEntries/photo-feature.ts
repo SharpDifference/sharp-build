@@ -25,7 +25,8 @@ import { holdPostPhoto, preparePostPhoto, startHeldPostPhoto } from '../stores/p
 import { settlePendingPhotos } from '../stores/photoRecovery'
 import { sendPhoto } from '../stores/photoTurn'
 import { useGameStore } from '../stores/gameStore'
-import { registerTermFiles } from '@shared/modCarry'
+import { registerPostCarry, registerTermFiles } from '@shared/modCarry'
+import { carriedComments } from '@shared/postComments'
 import { registerHooks } from '../mods/hooks'
 
 /**
@@ -88,7 +89,8 @@ registerHooks(PHOTO_FEATURE, {
   afterDmReply: ({ charId, character, reply }) => void sendPhoto(charId, character, reply),
 
   // The same for a girl texting first, read off her entry in the slot's opening: a custom
-  // endpoint's JSON is not held to the schema, so each field is taken only as the type it should be.
+  // endpoint's JSON is not held to the schema, so each field is taken only as the type it should
+  // be.
   afterReachOut: ({ charId, character, reply }) =>
     void sendPhoto(charId, character, {
       sendPhoto: reply.sendPhoto === true,
@@ -145,3 +147,7 @@ registerTermFiles(PHOTO_FEATURE, async ({ from, to }) => {
   const result = await window.api.photo.carry(from, to)
   if (!result.ok) throw Error(result.error.message)
 })
+
+// New Game+ moves her posts onto the next semester's clock; their comments move with them, or they
+// would wait for slots the new semester reaches only weeks in. Runs with the mod off too.
+registerPostCarry(PHOTO_FEATURE, carriedComments)

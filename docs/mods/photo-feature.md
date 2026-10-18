@@ -83,6 +83,8 @@ If a photo stays PNG while WebP is on, look for a `[photo] kept ... as PNG:` lin
 - **Photos when she texts first**: a girl who texts you just to talk (new in 0.5.0) can send a
   picture with it when it fits, a selfie in bed with her cold or something she wants to show you.
   The same limits as her other DMs apply.
+- **Comments survive New Game+**: comments on posts carried into the next semester show as they
+  did, instead of staying hidden until the new semester caught up with the old dates.
 
 ## 1.3.0
 
