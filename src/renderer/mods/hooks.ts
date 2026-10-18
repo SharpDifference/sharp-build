@@ -37,6 +37,8 @@ export interface PromptSpots {
   dm: { character: Character; info: CharInfo | undefined; state: TextingPromptState }
   /** The status updates the slot's opening writes, one entry per post. */
   'slot-posts': Record<string, never>
+  /** The girl the slot's opening has texting the reader just to talk, one call per girl. */
+  'slot-reach-outs': { character: Character; info: CharInfo; date: number }
   /** A character being generated. */
   character: Record<string, never>
 }
@@ -46,7 +48,10 @@ export type PromptSpot = keyof PromptSpots
 /** What a mod adds to one prompt: instruction lines, and fields the reply has to fill in. */
 export interface PromptAddition<C> {
   lines?: (ctx: C) => readonly string[]
-  /** Schema properties: the top level for `dm` and `character`, each post for `slot-posts`. */
+  /**
+   * Schema properties: the top level for `dm` and `character`, each post for `slot-posts`, each
+   * girl's entry for `slot-reach-outs`.
+   */
   fields?: () => Record<string, unknown>
   /** Which of those fields the reply must fill in. */
   required?: () => readonly string[]
@@ -176,6 +181,15 @@ export interface ModHooks {
   ) => Partial<Character>
   /** After her reply in a DM has landed. */
   afterDmReply?: (ctx: { charId: string; character: Character; reply: TextingResponse }) => void
+  /**
+   * After the texts of a girl reaching out just to talk have landed. `reply` is her entry from the
+   * slot's opening, with whatever fields `prompts['slot-reach-outs']` added to it.
+   */
+  afterReachOut?: (ctx: {
+    charId: string
+    character: Character
+    reply: Readonly<Record<string, unknown>>
+  }) => void
   /** As the reader commits to something: an action sent, or a hangout begun. */
   playerActs?: () => void
   /** As a game is entered, new or loaded. */
@@ -307,6 +321,14 @@ export function afterDmReply(ctx: {
   reply: TextingResponse
 }): void {
   for (const hooks of active()) hooks.afterDmReply?.(ctx)
+}
+
+export function afterReachOut(ctx: {
+  charId: string
+  character: Character
+  reply: Readonly<Record<string, unknown>>
+}): void {
+  for (const hooks of active()) hooks.afterReachOut?.(ctx)
 }
 
 export function playerActs(): void {
