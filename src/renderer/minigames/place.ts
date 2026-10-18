@@ -1,5 +1,6 @@
+import { minigameLocation, minigameSceneLocation } from '@shared/minigames'
 import { locationAvailable } from '@shared/cityLife'
-import { locationDefOf } from '@shared/locations'
+import { locationDefOf, ROOM_LOCATION } from '@shared/locations'
 import { keyPattern, LOREBOOK } from '../prompts/lorebook'
 import { useGameStore } from '../stores/gameStore'
 
@@ -23,12 +24,25 @@ export function placeOf(sceneLocation: string | null | undefined, bg: string | n
 /** {@link placeOf} for the scene in the store now. */
 export function scenePlace(): string | null {
   const game = useGameStore.getState()
-  return placeOf(game.sceneLocation, game.bg)
+  return reachedScenePlace(game.sceneLocation, game.sceneLog)
 }
 
 /** {@link placeOf} for the scene in the store, kept current. */
 export function useScenePlace(): string | null {
-  return useGameStore((s) => placeOf(s.sceneLocation, s.bg))
+  return useGameStore((s) => reachedScenePlace(s.sceneLocation, s.sceneLog))
+}
+
+/** Reached playback takes precedence over the classifier and queued scene backgrounds. */
+export function reachedScenePlace(
+  sceneLocation: string | null | undefined,
+  reached: readonly { bg?: string }[]
+): string | null {
+  for (let i = reached.length - 1; i >= 0; i--) {
+    const bg = reached[i].bg
+    if (bg === undefined) continue
+    return placeNamed(minigameSceneLocation(null, [{ bg }]) ?? bg)
+  }
+  return placeOf(sceneLocation, null)
 }
 
 /** Each place's lorebook keys as one pattern, built once: the selector above runs on every change. */
@@ -44,9 +58,9 @@ function placeNamed(text: string | null | undefined): string | null {
   if (!raw) return null
   // A place another mod adds is only one where this playthrough has it.
   const known = (id: string): string | null =>
-    locationDefOf(id) && locationAvailable(id) ? id : null
+    (id === ROOM_LOCATION || locationDefOf(id)) && locationAvailable(id) ? id : null
 
-  const direct = known(raw)
+  const direct = known(minigameLocation(raw) ?? raw)
   if (direct) return direct
 
   // A place's lorebook keys, the matcher's own patterns: "bowling", "the bowling alley", "arcade".

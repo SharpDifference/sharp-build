@@ -8,6 +8,7 @@
  */
 
 import type { ModDef } from './mods'
+import { LOCATIONS, NARRATIVE_LOCATIONS } from './locations'
 
 /** The framework's mod id. A pack names it in its `requires`. */
 export const MINI_GAMES = 'mini-games'
@@ -216,15 +217,58 @@ export interface PlaySpot {
  * The games on offer in a scene: their mod is on, the place is one of theirs, and enough girls
  * are here to play. A game with a `min` of 0 is offered with anyone or no one around.
  */
+/** Classifier locations are human names; compare them to catalog ids before filtering games. */
+export function minigameLocation(location: string | null): string | null {
+  if (!location) return null
+  const keyOf = (value: string): string => value.trim().toLowerCase().replace(/^the\s+/, '').replace(/[^a-z0-9]/g, '')
+  const key = keyOf(location)
+  // The classifier also returns the venue's brand without "Lounge".
+  if (key === 'pinocola') return 'pino_cola_lounge'
+  const found = [...LOCATIONS, ...NARRATIVE_LOCATIONS].find((place) =>
+    keyOf(place.id) === key || keyOf(place.label) === key
+  )
+  // Preserve custom pack ids; avoid guessing a place from only part of its name.
+  return found?.id ?? location
+}
+
+/** Canonical scene art keys, not arbitrary images or text mentions of a place. */
+const GAME_BACKGROUND_LOCATIONS: Readonly<Record<string, string>> = {
+  pinocola_lounge: 'pino_cola_lounge', arcade: 'btb_arcade', bar: 'stalestein_bar',
+  club: 'apogee_club', dorm_lounge: 'lowrise_dorms', lowrise_dorm_room: 'room', cute_tea: 'cutetea',
+  bowling_alley: 'bowling_alley', roller_rink: 'roller_rink', cat_cafe: 'cat_cafe',
+  stadium: 'palaestra_stadium', quad: 'venus_quad', park: 'green_hill_park',
+  beach: 'selkie_beach', theme_park: 'pier_44'
+}
+
+/**
+ * Before any scene background is reached, use the classifier's location. Thereafter the
+ * last reached background wins, including an unknown background clearing a stale venue.
+ * Callers pass the playback log, never queued lines, bgOverride or a projected stage.
+ */
+export function minigameSceneLocation(
+  location: string | null,
+  reached: readonly { bg?: string }[]
+): string | null {
+  for (let i = reached.length - 1; i >= 0; i--) {
+    const bg = reached[i].bg
+    if (bg === undefined) continue
+    if (Object.hasOwn(GAME_BACKGROUND_LOCATIONS, bg)) return GAME_BACKGROUND_LOCATIONS[bg]
+    // Also accept catalog IDs used directly as scene art keys.
+    return [...LOCATIONS, ...NARRATIVE_LOCATIONS].find((place) => place.id === bg)?.id ?? null
+  }
+  return minigameLocation(location)
+}
+
 export function gamesOffered(
   spot: PlaySpot,
   isOn: (modId: string, game: MiniGameDef) => boolean,
   games: readonly MiniGameDef[] = MINI_GAMES_LIST
 ): MiniGameDef[] {
+  const location = minigameLocation(spot.location)
   return games.filter(
     (game) =>
       isOn(game.modId, game) &&
-      (!game.locations || (spot.location !== null && game.locations.includes(spot.location))) &&
+      (!game.locations || (location !== null && game.locations.includes(location))) &&
       spot.girls >= game.players.min
   )
 }
@@ -243,7 +287,8 @@ export function suggestRate(
 ): SuggestRate {
   if (busy) return 'never'
   if (keen) return 'often'
-  return (location && game.suggestAt?.[location]) || game.suggest || 'sometimes'
+  const resolved = minigameLocation(location)
+  return (resolved && game.suggestAt?.[resolved]) || game.suggest || 'sometimes'
 }
 
 /**
