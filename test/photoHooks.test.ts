@@ -181,7 +181,7 @@ const HOOKS: readonly {
   },
   {
     file: 'src/renderer/views/BunnyboardModal.tsx',
-    needs: ['<PostPhoto '],
+    needs: ['<PostPicture '],
     why: 'a post whose picture failed has no frame saying so and nothing to reroll it with'
   },
   {
@@ -216,7 +216,7 @@ const HOOKS: readonly {
   },
   {
     file: 'src/renderer/views/BunnyboardModal.tsx',
-    needs: ['MessagePhotoBubble', 'messageId={message.id}', 'PhotoLightboxHost', 'PostComments'],
+    needs: ['MessagePhotoBubble', 'messageId={message.id}', 'PhotoLightboxHost', '<PostCommentsView'],
     why: 'nothing draws the picture on a text, on a post, or the replies under one'
   },
   {

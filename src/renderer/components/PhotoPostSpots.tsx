@@ -1,10 +1,29 @@
 import type { CSSProperties, JSX } from 'react'
 import { hashString } from '@shared/hash'
-import { shownComments, type PostComment } from '@shared/postComments'
-import { commentHandoff, plainComments, type CommentViewProps } from '../stores/commentHandoff'
+import { shownComments } from '@shared/postComments'
+import type { PostCommentsProps, PostPictureProps } from '../mods/hooks'
 import { useGameStore } from '../stores/gameStore'
 import { usePhotosVisible } from '../stores/photoSwitchHooks'
+import { PostPhoto } from './PhotoBubble'
 import '../vu_styles/PostComments.css'
+
+/**
+ * What Photo Feature draws on a post, through the game's places for it: her picture, and what
+ * other students said under it.
+ */
+
+/** Her picture under the post's text, read off the post itself. */
+export function PhotoPostPicture({ charId, postId }: PostPictureProps): JSX.Element | null {
+  const photo = useGameStore(
+    (s) => s.charInfo[charId]?.feed?.find((post) => post.id === postId)?.photo
+  )
+  if (!photo) return null
+  return (
+    <div className="vu-bb-post-shot">
+      <PostPhoto charId={charId} postId={postId} photo={photo} />
+    </div>
+  )
+}
 
 /**
  * What other students said under one post, as much of it as has arrived.
@@ -16,24 +35,7 @@ import '../vu_styles/PostComments.css'
  * The face is the handle's own: a hue hashed off the name, so one stranger is the same colour
  * every time she comments without anything being stored about her.
  */
-export function PostComments(props: CommentViewProps): JSX.Element | null {
-  // A mod that has taken over the replies draws them its own way.
-  const handoff = commentHandoff()
-  return handoff ? (
-    <handoff.View {...props} />
-  ) : (
-    <PlainComments comments={plainComments(props.comments)} />
-  )
-}
-
-/** What a mod that has taken over the replies puts beside the post's like; nothing otherwise. */
-export function CommentAction(props: CommentViewProps): JSX.Element | null {
-  const Action = commentHandoff()?.Action
-  return Action ? <Action {...props} /> : null
-}
-
-/** Photo Feature's own replies: strangers' lines, as many as have arrived. */
-function PlainComments({ comments }: { comments: readonly PostComment[] }): JSX.Element | null {
+export function PhotoComments({ comments }: PostCommentsProps): JSX.Element | null {
   const date = useGameStore((s) => s.date)
   const time = useGameStore((s) => s.time)
   const visible = usePhotosVisible()

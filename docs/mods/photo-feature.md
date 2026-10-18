@@ -79,9 +79,9 @@ If a photo stays PNG while WebP is on, look for a `[photo] kept ... as PNG:` lin
 
 ## 1.3.0
 
-- **Comments can be taken over**: another mod can write and draw the replies under posts in place
-  of Photo Feature's own stranger comments (Bunnyfeeds does). With nothing taking them over,
-  comments work exactly as in 1.2.0.
+- **Comments and pictures go through the game's own places on a post**: the game now keeps a
+  post's comments and draws whatever a mod puts there. Another mod can draw the comments in place
+  of Photo Feature's stranger comments; when none does, comments work exactly as in 1.2.0.
 - **Off by default**: like every mod on the build, it starts off. Turn it on in **Mods**; nothing
   it made is lost while it is off.
 
@@ -193,21 +193,22 @@ Every tag these files can write has to be in the verified list in `test/photoTag
 which fails on any other. A tag goes on that list once a same-seed ComfyUI check shows the
 checkpoint draws it.
 
-### Comment hand-off
+### Comments and the picture on a post
 
-`src/renderer/stores/commentHandoff.ts` lets one other mod take over a post's replies while its
-own switch is on: the slot opening's lines about them, the schema of each post's `comments`
-field, how they are dressed when the post is filed (with the picture's tier already known),
-the component that draws them, and optionally a control beside the post's like. Photo Feature never names that mod; with nothing registered, or
-the mod off, its own plain comments are used.
+A post's comments are the game's (`comments` on `SocialPost`, `shared/postComments.ts`), and the
+game moves them with the post through New Game+. Photo Feature registers `postComments` to draw
+its stranger comments and `postPicture` to draw her picture, both in
+`components/PhotoPostSpots.tsx`. Only one mod draws comments at a time, the first that is on in
+the mods list; Photo Feature asks the slot's opening for comments, and files them, only while it
+is that mod (`ownsPostComments`). It never names any other mod.
 
 ### Hooks
 
 All of Photo Feature's prompt, event and feed additions are in
 `src/renderer/modEntries/photo-feature.ts`.
-In the ten game files involved, lines naming Photo Feature went from 67 to 4: two for its gallery
-on `ContactPage.tsx` (screens have no hook points yet) and two that are Continuing Semesters'
-own photo carry-over in `NewGameView.tsx`.
+Its picture and comments on the feed are drawn through the game's places on a post; its gallery
+on `ContactPage.tsx` and the picture on a text are still direct edits, since those screens have
+no places for a mod yet.
 
 Off, three things differ from before hooks, all because a mod that is off is not asked: the
 photo fields leave the reply's schema rather than being asked for empty; old DMs lose their

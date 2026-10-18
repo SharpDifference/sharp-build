@@ -11,6 +11,7 @@ import type {
   TextingResponse
 } from '@shared/types'
 import type { GameOverReason } from '@shared/gameOver'
+import type { PostComment } from '@shared/postComments'
 import type { PlaythroughRecord } from '@shared/types'
 import type { TextingPromptState } from '../prompts/textingPrompt'
 import type { ResolvedSave } from '../stores/saveStore'
@@ -38,6 +39,8 @@ export interface PromptSpots {
   dm: { character: Character; info: CharInfo | undefined; state: TextingPromptState }
   /** The status updates the slot's opening writes, one entry per post. */
   'slot-posts': Record<string, never>
+  /** The girl the slot's opening has texting the reader just to talk, one call per girl. */
+  'slot-reach-outs': { character: Character; info: CharInfo; date: number }
   /** A character being generated. */
   character: Record<string, never>
 }
@@ -47,7 +50,10 @@ export type PromptSpot = keyof PromptSpots
 /** What a mod adds to one prompt: instruction lines, and fields the reply has to fill in. */
 export interface PromptAddition<C> {
   lines?: (ctx: C) => readonly string[]
-  /** Schema properties: the top level for `dm` and `character`, each post for `slot-posts`. */
+  /**
+   * Schema properties: the top level for `dm` and `character`, each post for `slot-posts`, each
+   * girl's entry for `slot-reach-outs`.
+   */
   fields?: () => Record<string, unknown>
   /** Which of those fields the reply must fill in. */
   required?: () => readonly string[]
@@ -190,8 +196,44 @@ export interface SceneReplied {
   ending: boolean
 }
 
+/** What the row drawing a post hands to whatever draws its comments or acts on them. */
+export interface PostCommentsProps {
+  comments: readonly PostComment[]
+  /** Whose post it is; absent for the slot's random student. */
+  charId?: string
+  postId?: string
+  /** Somebody he has no contact info for. */
+  stranger?: boolean
+}
+
+/**
+ * One mod's way of drawing the comments under a post. Only one draws them at a time: the first
+ * mod that is on and has one, in the order `MODS` lists them ({@link postCommentsOwner}).
+ */
+export interface PostCommentsSpot {
+  /** Under the post's text and picture. */
+  View: ComponentType<PostCommentsProps>
+  /** Beside the post's like, where it has something to put there. */
+  Action?: ComponentType<PostCommentsProps>
+  /**
+   * A comment only this mod could have written. Asked whether or not the mod is on, so another
+   * mod drawing comments leaves this one's out while it is off, and they come back with it.
+   */
+  claims?: (comment: PostComment) => boolean
+}
+
+/** Which post a picture belongs to; whatever draws it reads the post itself. */
+export interface PostPictureProps {
+  charId: string
+  postId: string
+}
+
 export interface ModHooks {
   bunnyboardPage?: BunnyboardPage
+  /** Draws the comments under a post; see {@link PostCommentsSpot}. */
+  postComments?: PostCommentsSpot
+  /** Draws a post's picture under its text, wherever a post is drawn; the first mod on decides. */
+  postPicture?: ComponentType<PostPictureProps>
 
   /** Extend a completed request, preserving other mods' additions. */
   requests?: { [S in keyof RequestSpots]?: (request: StructuredRequest, ctx: RequestSpots[S]) => StructuredRequest }
@@ -212,6 +254,15 @@ export interface ModHooks {
   afterSceneReply?: (ctx: SceneReplied) => void
   /** A seat on the scene's rail, and the panel it opens over the scene. */
   scenePlay?: ScenePlay
+  /**
+   * After the texts of a girl reaching out just to talk have landed. `reply` is her entry from the
+   * slot's opening, with whatever fields `prompts['slot-reach-outs']` added to it.
+   */
+  afterReachOut?: (ctx: {
+    charId: string
+    character: Character
+    reply: Readonly<Record<string, unknown>>
+  }) => void
   /** As the reader commits to something: an action sent, or a hangout begun. */
   playerActs?: () => void
   /** As a game is entered, new or loaded. */
@@ -267,10 +318,45 @@ export function registerHooks(modId: string, hooks: ModHooks): void {
 
 /** The hooks of the mods that are on, in the order `MODS` lists them. */
 function active(): ModHooks[] {
+  return activeEntries().map((entry) => entry.hooks)
+}
+
+function activeEntries(): Registered[] {
   return registered
     .filter((entry) => rules.isOn(entry.modId))
     .sort((a, b) => rules.order(a.modId) - rules.order(b.modId))
-    .map((entry) => entry.hooks)
+}
+
+/** The mod drawing post comments right now: the first that is on and draws them, or none. */
+export function postCommentsOwner(): { modId: string; spot: PostCommentsSpot } | null {
+  const entry = activeEntries().find((one) => one.hooks.postComments)
+  return entry?.hooks.postComments ? { modId: entry.modId, spot: entry.hooks.postComments } : null
+}
+
+/**
+ * Whether `modId` is the one drawing post comments, and so the one that writes them: a mod that
+ * is not leaves the slot's posts without asking for any.
+ */
+export function ownsPostComments(modId: string): boolean {
+  return postCommentsOwner()?.modId === modId
+}
+
+/** A post's comments as `ownerId` draws them: every one no other mod claims, on or off. */
+export function ownedComments(
+  comments: readonly PostComment[],
+  ownerId: string
+): PostComment[] {
+  const others = registered.filter(
+    (entry) => entry.modId !== ownerId && entry.hooks.postComments?.claims
+  )
+  return comments.filter(
+    (comment) => !others.some((entry) => entry.hooks.postComments?.claims?.(comment))
+  )
+}
+
+/** What draws a post's picture: the first mod that is on and draws one, or none. */
+export function postPicture(): ComponentType<PostPictureProps> | null {
+  return active().find((hooks) => hooks.postPicture)?.postPicture ?? null
 }
 
 /** Every mod's lines for one prompt. */
@@ -334,6 +420,14 @@ export function scenePlays(): { modId: string; play: ScenePlay }[] {
     .filter((entry) => rules.isOn(entry.modId) && entry.hooks.scenePlay)
     .sort((a, b) => rules.order(a.modId) - rules.order(b.modId))
     .map((entry) => ({ modId: entry.modId, play: entry.hooks.scenePlay as ScenePlay }))
+}
+
+export function afterReachOut(ctx: {
+  charId: string
+  character: Character
+  reply: Readonly<Record<string, unknown>>
+}): void {
+  for (const hooks of active()) hooks.afterReachOut?.(ctx)
 }
 
 export function playerActs(): void {

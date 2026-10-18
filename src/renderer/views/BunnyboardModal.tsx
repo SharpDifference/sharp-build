@@ -16,11 +16,8 @@ import {
 } from 'react'
 import { createPortal } from 'react-dom'
 import { AnimatePresence, motion } from 'motion/react'
-import type { ChatPhoto } from '@shared/photoTypes'
 import type { PostComment } from '@shared/postComments'
-import { CommentAction, PostComments } from '../components/PostComments'
-import { commentHandoff } from '../stores/commentHandoff'
-import { MessagePhotoBubble, PhotoLightboxHost, PostPhoto } from '../components/PhotoBubble'
+import { MessagePhotoBubble, PhotoLightboxHost } from '../components/PhotoBubble'
 import {
   fullNameOf,
   type Character,
@@ -90,6 +87,7 @@ import {
   playerClassNow,
   shiftNow
 } from '../stores/timetable'
+import { PostCommentAction, PostCommentsView, PostPicture } from '../components/PostSpots'
 import { ContactPage } from './ContactPage'
 import { PhotosPage } from './PhotosPage'
 import { EditPromptModal } from './EditPromptModal'
@@ -1828,9 +1826,6 @@ const FeedPost = memo(function FeedPost({
     time: TimeSlot
     likes: number
     liked?: boolean
-    /** The picture she attached. Declared here because this shape is the row's own, not `SocialPost`. */
-    photo?: ChatPhoto
-    /** What the crowd said under it, for the same reason. */
     comments?: PostComment[]
   }
   /** Somebody he has no contact info for — the one route by which one reaches his feed. */
@@ -1892,19 +1887,13 @@ const FeedPost = memo(function FeedPost({
         )}
       </div>
       <p className="vu-bb-post-text">{post.text}</p>
-      {post.photo && charId && post.id && (
-        <div className="vu-bb-post-shot">
-          <PostPhoto charId={charId} postId={post.id} photo={post.photo} />
-        </div>
-      )}
-      {(post.comments || commentHandoff()) && (
-        <PostComments
-          comments={post.comments ?? []}
-          charId={charId}
-          postId={post.id}
-          stranger={stranger || random}
-        />
-      )}
+      {charId && post.id && <PostPicture charId={charId} postId={post.id} />}
+      <PostCommentsView
+        comments={post.comments ?? []}
+        charId={charId}
+        postId={post.id}
+        stranger={stranger || random}
+      />
       <div className="vu-bb-post-actions">
         <motion.button
           className={`vu-bb-like${post.liked ? ' vu-bb-like--on' : ''}`}
@@ -1916,7 +1905,7 @@ const FeedPost = memo(function FeedPost({
           <HeartIcon />
           {post.likes + (post.liked ? 1 : 0)}
         </motion.button>
-        <CommentAction
+        <PostCommentAction
           comments={post.comments ?? []}
           charId={charId}
           postId={post.id}
