@@ -17,7 +17,8 @@ import { renderPhoto } from './photoWebp'
 export async function sendPhoto(
   charId: string,
   character: Character,
-  data: TextingResponse
+  // A DM reply, or the photo fields of a girl's entry when she texts first.
+  data: Pick<TextingResponse, 'sendPhoto' | 'photoPrompt' | 'photoTier'> & Partial<TextingResponse>
 ): Promise<void> {
   const game = useGameStore.getState()
   const info = game.charInfo[charId]
