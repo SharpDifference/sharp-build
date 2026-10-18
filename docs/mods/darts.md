@@ -123,9 +123,7 @@ possible checkouts and varies high-score targets. It then rolls seeded drift fro
 three stats. The model does not decide points or landing coordinates.
 
 If the skill call fails, the current attempt uses level 3 with neutral biases; the
-framework can try the judgment again next time. See the
-[integration notes](../darts-integration.md#npc-precision-balance) for the current
-precision formula and measured landing rates.
+framework can try the judgment again next time.
 
 ## Dialogue and turn pacing
 
@@ -182,8 +180,5 @@ handles any relationship or player-stat consequences.
 An active match is temporary and does not resume after reloading. Finish it before
 closing if you want a completed result. Updating the precision balance does not require
 resetting cached NPC skill; start a new match to use the updated throw plans.
-
-For source files, framework extensions and validation details, see
-[Venus Darts integration](../darts-integration.md).
 
 The Arcade & Bar Games pack defaults on and requires the Mini-games framework. Turning the framework off disables Darts; with the framework on, Darts is available unless its pack is explicitly switched off. Existing saved mod preferences are respected.
