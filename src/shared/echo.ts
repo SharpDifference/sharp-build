@@ -3,7 +3,7 @@ import { ECHO_ASPECTS, LEGACY_ECHO_ASPECTS, type EchoAspect } from './echoAspect
 import { echoProfileCues, explainEchoAspect, type EchoProfilePart, type EchoReasonExample } from './echoReasons'
 import { echoNameArtDirection, echoNameVisualCues, mythicalEchoName } from './echoNaming'
 import { normalizeEchoStage, type EchoStagePlacement } from './echoStage'
-import type { ReflectionStage } from './reflectionPortrait'
+import type { ReflectionStage, ReflectionArtSource } from './reflectionPortrait'
 export { ECHO_ASPECTS, type EchoAspect } from './echoAspects'
 export const ECHO_MOD = 'echo'
 export const ECHO_BONUS = 0.25
@@ -43,7 +43,7 @@ export interface EchoApi {
   reflectionExport?: (charId:string) => Promise<Result<string|null>>
   reflectionUpload?: (charId:string) => Promise<Result<string|null>>
   reflectionRead?: (charId:string) => Promise<Result<string|null>>
-  reflectionGenerate?: (charId:string,requestId:string) => Promise<Result<string>>
+  reflectionGenerate?: (charId:string,requestId:string,source?:ReflectionArtSource) => Promise<Result<string>>
   reflectionStageRead?: (charId:string) => Promise<Result<ReflectionStage>>
   reflectionStageSave?: (charId:string,stage:ReflectionStage) => Promise<Result<ReflectionStage>>
   /** Desktop only: explicit, hash-verified downloads into an existing ComfyUI install. */
