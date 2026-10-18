@@ -139,7 +139,7 @@ export interface ModHooks {
   ) => Partial<Character>
   /** After her reply in a DM has landed. */
   afterDmReply?: (ctx: { charId: string; character: Character; reply: TextingResponse }) => void
-  /** As the reader commits to something: an action sent, or a hangout begun. */
+  /** As the reader commits to something: an action sent, a hangout begun, or Relax. */
   playerActs?: () => void
   /** As a game is entered, new or loaded. */
   gameEntered?: () => void

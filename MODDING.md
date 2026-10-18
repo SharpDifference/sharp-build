@@ -158,7 +158,7 @@ else names it.
 | `dmHistoryNote` | `textingPrompt.ts` | Add a note after a DM in the history the prompt quotes |
 | `characterFromDraft` | `characterPrompt.ts` | Fill fields of a generated character from the reply |
 | `afterDmReply` | `textingLoop.ts` | Act after her reply in a DM has landed |
-| `playerActs` | `gameLoop.ts` (`submitAction`), `loop/hangouts.ts` | Act when the reader commits to something |
+| `playerActs` | `gameLoop.ts` (`submitAction`), `loop/hangouts.ts`, `loop/relax.ts` | Act when the reader commits to something: an action, a hangout begun, or Relax |
 | `gameEntered` | `gameLoop.ts` (`enterGame`) | Act when a game is entered, new or loaded |
 | `fileFeedPost` | `loop/feed.ts` | Change a slot post before it is filed, or file it later itself (`held`) |
 | `postLikes` | `loop/feed.ts`, `NewGameView.tsx` | Decide likes on ending, stranger and winter posts |
