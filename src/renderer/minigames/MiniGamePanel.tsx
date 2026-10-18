@@ -185,7 +185,8 @@ export function MiniGamePanel({ theme, onClose }: ScenePanelProps): JSX.Element 
           charId: character.charId,
           name: nameOf(character.charId),
           skill: skill.level,
-          style: skill.style
+          style: skill.style,
+          biases: skill.biases
         }
       })
     ).then((opponents) => {
@@ -372,9 +373,9 @@ export function MiniGamePanel({ theme, onClose }: ScenePanelProps): JSX.Element 
         begin()
         return sayAtTable(charId, situationFor(charId), cue)
       },
-      speak: (charId, text) => {
+      speak: (charId, text, expression) => {
         begin()
-        return speakAtTable(charId, text)
+        return speakAtTable(charId, text, expression)
       },
       readerSays: (text) => {
         begin()
@@ -486,6 +487,7 @@ export function MiniGamePanel({ theme, onClose }: ScenePanelProps): JSX.Element 
   if (seated && Game) {
     return createPortal(
       <motion.div
+        data-game={seated.game.id}
         className={`vu-veil vu-minigame-veil${aside ? ' vu-minigame-veil--aside' : ''}`}
         data-theme={theme}
         style={{ '--minigame-turn-h': `${hasInput ? inputHeight : 70}px` } as CSSProperties}

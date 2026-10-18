@@ -145,6 +145,14 @@ export interface MiniGameDef {
   controls?: string
   /** What makes someone good at it, in a sentence, for judging how well a girl plays. */
   skillBrief: string
+  /** Optional game-specific ability axes judged with the same one-off skill call. */
+  skillAxes?: readonly { id: string; label: string; brief: string }[]
+  /**
+   * Replaces the generic narration cue after a completed game with NPC participants.
+   * Static directions from the pack; result facts, names and stakes are supplied separately.
+   * Absent or empty keeps the usual cue. Solo, abandoned and broken games keep their flow.
+   */
+  resultBrief?: readonly string[]
 }
 
 /**

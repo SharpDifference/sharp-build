@@ -3,6 +3,7 @@ import { groupsFor, listed, type MiniGameDef } from '../src/shared/minigames'
 import type { Character, StructuredRequest } from '../src/shared/types'
 import { agreedOf, withOffer } from '../src/renderer/minigames/offer'
 import { answerOf, withProposal, type Asked } from '../src/renderer/minigames/proposal'
+import DARTS from '../src/shared/minigameEntries/darts'
 
 function game(min: number, max: number): MiniGameDef {
   return {
@@ -90,6 +91,16 @@ describe('a proposal to several girls', () => {
 })
 
 describe('the standing offer with several girls here', () => {
+  it('requires an NPC agreement for narrator-launched Darts even though the HUD allows solo', () => {
+    expect(DARTS.players.min).toBe(0)
+    for (const cast of [[], CAST.slice(0, 1), CAST]) {
+      const who = cast.length > 1 ? { ana_seo: 'out', bea_seo: 'out', cy_seo: 'out' } : ''
+      expect(agreedOf({ minigame: { play: 'darts', with: who } }, [DARTS], cast)).toBeNull()
+    }
+    expect(agreedOf({ minigame: { play: 'darts', with: 'ana_seo' } }, [DARTS], CAST.slice(0, 1))?.characters.map((c) => c.charId)).toEqual(['a'])
+    expect(withOffer(REQUEST, [DARTS], CAST.slice(0, 1), 'pino cola', false, false).user).toContain('BOTH agreed')
+    expect(withOffer(REQUEST, [DARTS], CAST.slice(0, 1), 'pino cola', false, false).user).not.toContain('SOLO EXCEPTION')
+  })
   it('names one girl, and says in or out of several', () => {
     const one = shapeOf(withOffer(REQUEST, [game(1, 3)], CAST.slice(0, 1), null, false, false))
     expect((one.properties.minigame.properties.with as { type: string }).type).toBe('string')

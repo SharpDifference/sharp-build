@@ -1,8 +1,12 @@
 import type { ComponentType } from 'react'
+import type { Emotion } from '@shared/types'
 import type { Chattiness } from '@shared/minigames'
 import type { RoundAsk } from './round'
 
 export type { RoundAsk } from './round'
+
+/** A native sprite expression that appears with a spoken line. */
+export type TableExpression = Emotion
 
 /**
  * What a mini-game is to the framework while it is being played: a component handed a
@@ -38,6 +42,8 @@ export interface Opponent {
   skill: 1 | 2 | 3 | 4 | 5
   /** How she plays, in a few words; empty where nothing was judged. */
   style: string
+  /** Optional game-specific signed tendencies, from -2 to 2. */
+  biases?: Readonly<Record<string, number>>
 }
 
 export interface GamePlay {
@@ -97,7 +103,7 @@ export interface GamePlay {
    * Puts a girl's line on the dialogue box as hers, in words the game already has: what a
    * {@link GamePlay.round} wrote for her. Resolves once it has had its time on the box.
    */
-  speak: (charId: string, text: string) => Promise<void>
+  speak: (charId: string, text: string, expression?: TableExpression) => Promise<void>
   /**
    * Something the reader says as part of the game, typed into the game's own field: an answer, a
    * question, a pick. It goes onto the scene as his words; nobody answers it unless the game asks.

@@ -106,3 +106,13 @@ describe('switching the games off', () => {
     expect(MINI_GAMES_LIST.some((game) => game.modId === pack)).toBe(true)
   })
 })
+
+it('lets the framework gate Darts while respecting the pack switch', async () => {
+  const { NO_SWITCHES, modOn, withMod, modById } = await import('../src/shared/mods')
+  const { MINI_GAMES } = await import('../src/shared/minigames')
+  expect(modById('naudh1r-darts')?.defaultOn).toBe(true)
+  const on = withMod(NO_SWITCHES, MINI_GAMES, true)
+  expect(modOn(on, 'naudh1r-darts')).toBe(true)
+  expect(modOn(withMod(on, MINI_GAMES, false), 'naudh1r-darts')).toBe(false)
+  expect(modOn(withMod(on, 'naudh1r-darts', false), 'naudh1r-darts')).toBe(false)
+})
