@@ -1,11 +1,13 @@
 /**
  * The small panels Prompt Studio opens over itself: a preset's name, one block's settings and
- * text, the step a file import goes through before it is kept, and one variable's value. Each
- * holds its own draft and answers with Cancel or its primary; none writes until the primary.
+ * text, the step a file import goes through before it is kept, one variable's value, a find and
+ * replace across the preset, and a game section's example. Each holds its own draft and answers
+ * with Cancel or its primary; none writes until the primary.
  */
 import { useState, type JSX, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { motion } from 'motion/react'
+import { countMatches, presetWithReplacement } from '@shared/presets/glossary'
 import type { Preset, PresetBlock } from '@shared/presets/types'
 import { SelectField } from '../components/SelectField'
 import { TextField } from '../components/TextField'
@@ -239,27 +241,6 @@ export function PresetBlockModal({ theme, block, isNew, onSave, onClose }: Prese
   )
 }
 
-/** Swaps every match of `find` in `text`; a blank `find` changes nothing. */
-function replaced(text: string, find: string, replacement: string): string {
-  return find === '' ? text : text.split(find).join(replacement)
-}
-
-/** The preset with `find` swapped for `replacement` in the name and text of every block of its own. */
-export function presetWithReplacement(preset: Preset, find: string, replacement: string): Preset {
-  return {
-    ...preset,
-    blocks: preset.blocks.map((block) =>
-      block.marker
-        ? block
-        : {
-            ...block,
-            name: replaced(block.name, find, replacement),
-            content: replaced(block.content, find, replacement)
-          }
-    )
-  }
-}
-
 export interface PresetImportModalProps {
   theme: ScreenTheme
   preset: Preset
@@ -378,6 +359,74 @@ export function PartExampleModal({ theme, title, hint, text, onClose }: PartExam
         readOnly
         value={text}
       />
+    </FormFrame>
+  )
+}
+
+export interface FindReplaceModalProps {
+  theme: ScreenTheme
+  preset: Preset
+  /** What Find opens on: a macro picked from the glossary, or nothing. */
+  find: string
+  /** Keeps the swapped preset. False when the write failed, which leaves the panel open. */
+  onSave: (preset: Preset) => Promise<boolean>
+  onClose: () => void
+}
+
+/** A swap of one piece of text for another across the preset's own blocks and its scene text. */
+export function FindReplaceModal({ theme, preset, find: opening, onSave, onClose }: FindReplaceModalProps): JSX.Element | null {
+  const [find, setFind] = useState(opening)
+  const [replacement, setReplacement] = useState('')
+  const [busy, setBusy] = useState(false)
+
+  const matches = countMatches(preset, find)
+
+  /** Keeps the preset with the swap applied; with nothing to swap it only closes. */
+  async function submit(): Promise<void> {
+    if (busy) return
+    if (matches === 0) {
+      onClose()
+      return
+    }
+    setBusy(true)
+    const ok = await onSave(presetWithReplacement(preset, find, replacement))
+    setBusy(false)
+    if (ok) onClose()
+  }
+
+  return (
+    <FormFrame
+      id="preset-find-replace"
+      theme={theme}
+      title="Find and replace"
+      confirm="Replace"
+      wide
+      onClose={onClose}
+      onConfirm={() => void submit()}
+    >
+      <p className="vu-studio-note">
+        Swaps text across this preset&apos;s blocks and its scene text. The game&apos;s own sections are left alone.
+      </p>
+      <div className="vu-studio-pair">
+        <TextField id="preset-find-text" label="Find" value={find} onChange={setFind} placeholder="nothing" autoFocus={opening === ''} />
+        <TextField
+          id="preset-replace-text"
+          label="Replace with"
+          value={replacement}
+          onChange={setReplacement}
+          placeholder="nothing"
+          autoFocus={opening !== ''}
+        />
+      </div>
+      <p className="vu-studio-note" aria-live="polite">
+        {find === ''
+          ? 'Type what to find.'
+          : matches === 0
+            ? 'No matches in this preset.'
+            : matches === 1
+              ? '1 match in this preset.'
+              : `${matches} matches in this preset.`}
+      </p>
     </FormFrame>
   )
 }

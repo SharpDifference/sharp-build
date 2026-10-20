@@ -8,10 +8,19 @@ ones say.
 
 ## What the player can do
 
-The editor has six tabs. **Presets** lists them: import, duplicate, rename, delete, and pick
-the one in force. **Blocks** is the order a scene request is read in. **Scene text** and
-**Other prompts** rewrite the game's instructions. **Variables** appears only inside a
-playthrough. **Preview** shows the last scene request as the active preset would send it now.
+The editor has seven tabs. **Presets** lists them: import, duplicate, rename, delete, and pick
+the one in force. **Blocks** is the order a scene request is read in. **Glossary** lists every
+`{{…}}` macro the active preset writes, what each becomes when a scene is sent, how many blocks
+use it and the variables it names. **Scene text** and **Other prompts** rewrite the game's
+instructions. **Variables** appears only inside a playthrough. **Preview** shows the last scene
+request as the active preset would send it now. The tabs that change the active preset name it
+at the top.
+
+**Find and replace**, on the Blocks tab and beside each name macro in the Glossary, swaps one
+piece of text for another across the preset's blocks, their names and its scene text, never the
+game's own sections. It shows how many matches there are as you type. A common use is
+swapping `{{user}}` for "the reader" and `{{char}}` for "the characters", the way the game's
+own prompts speak.
 
 A built-in Default preset always exists. It holds the game's own sections in their shipped
 order and nothing else, and it leaves every request exactly as it is without the mod. The last
@@ -118,7 +127,8 @@ saved, so turning it on again finds them.
 ## Implementation map
 
 - `src/shared/presets/`: the preset shape, the importers, macros, variable ops and the library
-  rules. `assemble.ts` finds the game's parts again in the built request and rearranges them.
+  rules. `assemble.ts` finds the game's parts again in the built request and rearranges them;
+  `glossary.ts` reads a preset's macros and does its find and replace.
 - `src/main/services/presetsService.ts` and `src/web/presets.ts`: the folder and the browser's
   database. `src/main/ipc.ts` and `src/web/bridge.ts` apply the preset where a structured
   request is sent, and read a scene reply's `vars` back.

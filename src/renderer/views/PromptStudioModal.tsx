@@ -6,6 +6,7 @@
 import { useEffect, useMemo, useRef, useState, type JSX, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { AnimatePresence, motion } from 'motion/react'
+import { presetMacros, type MacroUse } from '@shared/presets/glossary'
 import { hasDynamicMacros } from '@shared/presets/macros'
 import { planPresetRequest } from '@shared/presets/request'
 import {
@@ -44,16 +45,17 @@ import {
   PresetImportModal,
   PresetNameModal,
   VariableModal,
-  PartExampleModal
+  PartExampleModal,
+  FindReplaceModal
 } from './PromptStudioModals'
 import { SystemPromptModal } from './SystemPromptModal'
 import '../vu_styles/Settings.css'
 import '../vu_styles/PromptStudio.css'
 
-type TabId = 'presets' | 'blocks' | 'scene' | 'other' | 'variables' | 'preview'
+type TabId = 'presets' | 'blocks' | 'glossary' | 'scene' | 'other' | 'variables' | 'preview'
 
-/** Each tab's word and the one line over its page. */
-const TABS: readonly { id: TabId; word: string; intro: string }[] = [
+/** Each tab's word, the one line over its page, and whether the page works on the active preset. */
+const TABS: readonly { id: TabId; word: string; intro: string; preset?: true }[] = [
   {
     id: 'presets',
     word: 'Presets',
@@ -64,12 +66,21 @@ const TABS: readonly { id: TabId; word: string; intro: string }[] = [
     id: 'blocks',
     word: 'Blocks',
     intro:
-      "The order the writer reads a scene's request in. Game rows are the game's own sections: move them or turn them off, but they stay."
+      "The order the writer reads a scene's request in. Game rows are the game's own sections: move them or turn them off, but they stay.",
+    preset: true
+  },
+  {
+    id: 'glossary',
+    word: 'Glossary',
+    intro:
+      "Every {{…}} macro this preset writes, and what it becomes when a scene is sent. Only the preset's own blocks are filled in.",
+    preset: true
   },
   {
     id: 'scene',
     word: 'Scene text',
-    intro: "The writer's instructions for scenes. They belong to this preset, so another preset brings its own."
+    intro: "The writer's instructions for scenes. They belong to this preset, so another preset brings its own.",
+    preset: true
   },
   {
     id: 'other',
@@ -85,7 +96,8 @@ const TABS: readonly { id: TabId; word: string; intro: string }[] = [
   {
     id: 'preview',
     word: 'Preview',
-    intro: 'The last scene request, as this preset would send it now. Rolls and random picks change on every call.'
+    intro: 'The last scene request, as this preset would send it now. Rolls and random picks change on every call.',
+    preset: true
   }
 ]
 
@@ -141,6 +153,33 @@ const GAME_ROWS: Record<GameMarker, { word: string; hint: string }> = {
     word: "Game: this turn's instructions",
     hint: 'What the writer is asked to do this turn, ending with what the reader does. Its fixed lines are under Scene text.'
   }
+}
+
+/** What each macro the game fills in becomes when a scene is sent. */
+const MACRO_MEANINGS: Readonly<Record<string, string>> = {
+  user: "The reader's first name.",
+  char: 'The first girl in the scene. Only one name when several girls are there, and empty in a solo scene.',
+  group: 'Every girl in the scene, joined with commas. Empty in a solo scene.',
+  setvar: 'Sets a variable, and writes nothing in its place.',
+  getvar: "Writes a variable's value, or the default given after its name.",
+  addvar: 'Adds to a variable: a number to a number, otherwise text onto the end.',
+  incvar: 'Raises a variable by one and writes the new value.',
+  decvar: 'Lowers a variable by one and writes the new value.',
+  roll: 'Rolls dice, such as 1d20, and writes the total. A new roll on every call.',
+  random: 'Picks one of the options it lists. A new pick on every call.',
+  trim: 'Removes itself and the line breaks around it.'
+}
+
+/** What a macro the game does not fill in becomes. */
+const UNKNOWN_MACRO = "The game doesn't fill this one in, so it is sent as written."
+
+/** Where a macro is written: the preset's blocks, and scene text, where nothing is filled in. */
+function whereUsed(use: MacroUse): string {
+  const blocks = use.blocks === 1 ? '1 block' : `${use.blocks} blocks`
+  const texts = use.sceneTexts === 1 ? '1 scene text' : `${use.sceneTexts} scene texts`
+  if (use.sceneTexts === 0) return `In ${blocks}.`
+  if (use.blocks === 0) return `In ${texts}, where it is sent as written.`
+  return `In ${blocks}, and in ${texts}, where it is sent as written.`
 }
 
 /** A fresh block, ready for its name and text. */
@@ -211,6 +250,8 @@ export function PromptStudioModal({ theme, onClose }: PromptStudioModalProps): J
   const [varEdit, setVarEdit] = useState<string | null>(null)
   const [varsReset, setVarsReset] = useState(false)
   const [partShown, setPartShown] = useState<GameMarker | null>(null)
+  // What the find and replace panel opens on, while it is open.
+  const [findReplace, setFindReplace] = useState<string | null>(null)
   // Holds off a second write while the first is in flight, so each reads the preset the last left.
   const writing = useRef(false)
   const picking = useRef(false)
@@ -321,6 +362,13 @@ export function PromptStudioModal({ theme, onClose }: PromptStudioModalProps): J
   function page(children: ReactNode): JSX.Element {
     return (
       <div className="vu-studio-page" id={`studio-page-${shown.id}`} role="tabpanel">
+        {/* A page that changes the active preset names it first, so an edit never lands on the wrong one. */}
+        {shown.preset && active && (
+          <p className="vu-studio-current">
+            <span className="vu-settings-heading">Editing</span>
+            <span className="vu-studio-current-name">{active.name}</span>
+          </p>
+        )}
         <p className="vu-studio-intro">{shown.intro}</p>
         <div className="vu-scroll-box">
           <div className="vu-studio-scroll">{children}</div>
@@ -481,6 +529,7 @@ export function PromptStudioModal({ theme, onClose }: PromptStudioModalProps): J
             <PlusIcon size={16} />
             Add block
           </motion.button>
+          {pill('studio-find-replace', 'Find and replace', () => setFindReplace(''))}
         </div>
         {main && (
           <CheckField
@@ -493,6 +542,34 @@ export function PromptStudioModal({ theme, onClose }: PromptStudioModalProps): J
         )}
         <ul className="vu-rows">{active.blocks.map((block, index) => blockRow(active, block, index))}</ul>
       </>
+    )
+  }
+
+  /** The Glossary page: each macro the active preset writes, what it becomes, and where. */
+  function glossaryPage(): JSX.Element {
+    if (!active) return page(<p className="vu-empty vu-empty--flush">Loading presets.</p>)
+    const uses = presetMacros(active)
+    if (uses.length === 0) return page(<p className="vu-empty vu-empty--flush">This preset writes no macros.</p>)
+    return page(
+      <ul className="vu-rows">
+        {uses.map((use) => (
+          <li key={use.name} className="vu-row vu-studio-row">
+            <span className="vu-studio-body">
+              <span className="vu-studio-name vu-studio-macro">{`{{${use.name}}}`}</span>
+              <span className="vu-studio-note">{MACRO_MEANINGS[use.name] ?? UNKNOWN_MACRO}</span>
+              <span className="vu-studio-meta">{whereUsed(use)}</span>
+              {use.vars.length > 0 && (
+                <span className="vu-studio-meta">Variables: {use.vars.join(', ')}</span>
+              )}
+            </span>
+            {use.bare && use.name !== 'trim' && (
+              <span className="vu-studio-tools">
+                {pill(`studio-glossary-replace-${use.name}`, 'Replace', () => setFindReplace(use.bare ?? ''))}
+              </span>
+            )}
+          </li>
+        ))}
+      </ul>
     )
   }
 
@@ -626,6 +703,7 @@ export function PromptStudioModal({ theme, onClose }: PromptStudioModalProps): J
           <div className="vu-settings-pages">
             {shown.id === 'presets' && presetsPage()}
             {shown.id === 'blocks' && blocksPage()}
+            {shown.id === 'glossary' && glossaryPage()}
             {shown.id === 'scene' && textPage('preset')}
             {shown.id === 'other' && textPage('global')}
             {shown.id === 'variables' && variablesPage()}
@@ -775,6 +853,18 @@ export function PromptStudioModal({ theme, onClose }: PromptStudioModalProps): J
             hint={GAME_ROWS[partShown].hint}
             text={partText}
             onClose={() => setPartShown(null)}
+          />
+        )}
+      </AnimatePresence>
+      <AnimatePresence propagate>
+        {findReplace !== null && active && (
+          <FindReplaceModal
+            key="studio-find-replace"
+            theme={theme}
+            preset={active}
+            find={findReplace}
+            onSave={(preset) => usePromptStudioStore.getState().save(preset)}
+            onClose={() => setFindReplace(null)}
           />
         )}
       </AnimatePresence>
