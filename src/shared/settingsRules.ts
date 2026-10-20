@@ -65,6 +65,7 @@ const SETTINGS_REQUIRED: Record<
     | 'memoryBudgets'
     | 'secretBudget'
     | 'scenePersona'
+    | 'promptBlocks'
   >,
   true
 > = {
@@ -441,6 +442,8 @@ export function mergePatch(current: Settings, patch: SettingsPatch): Settings {
     secretBudget: patch.secretBudget,
     // Absent stays absent, and absent is the shipped persona.
     scenePersona: patch.scenePersona,
+    // Absent stays absent, and absent is the shipped text of every block.
+    promptBlocks: patch.promptBlocks,
     ...secretsAfter(current, patch)
   }
 }

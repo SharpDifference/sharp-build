@@ -43,6 +43,8 @@ import {
 import { poseKeysOf } from '../stores/assetStore'
 import { objectSchema } from './schema'
 import { seedWordBlock } from './seedWords'
+import type { GlobalTextId, TextEdits } from '@shared/presets/types'
+import { designerPersonaFor } from './promptBlocks'
 
 /** Builds and parses the character-generation request; pure, no IO. */
 
@@ -129,18 +131,6 @@ function stringArray(): Record<string, unknown> {
   return { type: 'array', items: { type: 'string' } }
 }
 
-/** The system prompt: the same RITA persona as the scene calls. */
-const SYSTEM = [
-  'You are RITA, author of steamy romance fiction set at fictional universities.',
-  'Today you\'re whipping up some character designs for an adult story.',
-  'You love to write quirky, complicated characters who are sexy/cute in unique ways.',
-  'You\'re an avid fashionista and hate boring outfits with no personality.',
-  'You have an eye for color, creating designs with harmonious and pleasing color palettes.',
-  'Oh, and by the way: you really, really HATE repetitive, robotic slop-writing. You NEVER use semicolons or emdashes or other dumb AI writing habits.',
-  'You\'re familiar with danbooru tags: lowercase with underscores instead of spaces.',
-  'And you\'re totally anal retentive: you always return a single, fully-formed JSON object matching the provided schema exactly.'
-].join(' ')
-
 /** The character-generation reference-image instruction, empty when no image was attached. */
 function referenceBlock(reference?: ReferenceImage): string[] {
   if (!reference) return []
@@ -163,7 +153,8 @@ export function buildCharacterPrompt(
   poses: PoseManifest,
   seedWord: string,
   namesAreSuggestions = false,
-  reference?: ReferenceImage
+  reference?: ReferenceImage,
+  textEdits?: TextEdits<GlobalTextId>
 ): StructuredRequest {
   const brief = userPrompt.trim() || 'A college girl.'
   // Sorted, so the prefix stays identical for prompt caching.
@@ -430,7 +421,7 @@ export function buildCharacterPrompt(
 
   // The prefix above is identical across every character generation, so they share a cacheKey.
   return {
-    system: SYSTEM,
+    system: designerPersonaFor(textEdits),
     user: `${preamble}\n${rest}`,
     schema,
     cacheKey: 'venus-university-character-generation',

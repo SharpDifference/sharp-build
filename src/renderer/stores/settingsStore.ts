@@ -189,9 +189,10 @@ export function patchOf(settings: RendererSettings): SettingsPatch {
     repetitionPenalty: settings.repetitionPenalty,
     topP: settings.topP,
     topK: settings.topK,
-    // Carried, or a save made from anywhere else would drop the budgets and the persona.
+    // Carried, or a save made from anywhere else would drop the budgets, the persona and the prompt blocks.
     memoryBudgets: settings.memoryBudgets,
     secretBudget: settings.secretBudget,
-    scenePersona: settings.scenePersona
+    scenePersona: settings.scenePersona,
+    promptBlocks: settings.promptBlocks
   }
 }

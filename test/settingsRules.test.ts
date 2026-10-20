@@ -256,8 +256,8 @@ describe('mergePatch — the optional switches', () => {
   })
 })
 
-describe('mergePatch — the sampling fields, memory budgets and scene persona', () => {
-  it('carries all six, and leaves an absent one absent', () => {
+describe('mergePatch — the sampling fields, memory budgets, scene persona and prompt blocks', () => {
+  it('carries all seven, and leaves an absent one absent', () => {
     const next = mergePatch(
       settings(),
       settingsPatch({
@@ -266,7 +266,8 @@ describe('mergePatch — the sampling fields, memory budgets and scene persona',
         topP: 0.9,
         topK: 40,
         memoryBudgets: { one: 30 },
-        scenePersona: 'Custom persona.'
+        scenePersona: 'Custom persona.',
+        promptBlocks: { 'persona.texting': 'Custom texting persona.' }
       })
     )
     expect(next.temperature).toBe(0.8)
@@ -275,11 +276,13 @@ describe('mergePatch — the sampling fields, memory budgets and scene persona',
     expect(next.topK).toBe(40)
     expect(next.memoryBudgets).toEqual({ one: 30 })
     expect(next.scenePersona).toBe('Custom persona.')
+    expect(next.promptBlocks).toEqual({ 'persona.texting': 'Custom texting persona.' })
 
     const untouched = mergePatch(next, settingsPatch())
     expect(untouched.temperature).toBeUndefined()
     expect(untouched.memoryBudgets).toBeUndefined()
     expect(untouched.scenePersona).toBeUndefined()
+    expect(untouched.promptBlocks).toBeUndefined()
   })
 })
 
@@ -597,6 +600,7 @@ describe('settingsFromBackup', () => {
         endpointModel: 'local-13b',
         lessNsfwText: true,
         scenePersona: 'A persona the player wrote.',
+        promptBlocks: { 'persona.solo': 'A solo persona.' },
         forceTime: 'day',
         removedDefaults: ['shipped-2']
       })
@@ -609,6 +613,7 @@ describe('settingsFromBackup', () => {
       endpointModel: 'local-13b',
       lessNsfwText: true,
       scenePersona: 'A persona the player wrote.',
+      promptBlocks: { 'persona.solo': 'A solo persona.' },
       forceTime: 'night',
       freezeSeeds: true,
       rememberKey: true,

@@ -31,7 +31,9 @@ import { useGameStore } from './stores/gameStore'
 import { useGrabBagStore } from './stores/grabBagStore'
 import { convertLegacyImages } from './stores/legacyImageStore'
 import { useSaveStore } from './stores/saveStore'
-import { useModsStore } from './stores/modsStore'
+import { modIsOn, useModsStore } from './stores/modsStore'
+import { PROMPT_STUDIO_MOD } from '@shared/presets/types'
+import { usePromptStudioStore } from './stores/promptStudioStore'
 import { useSettingsStore } from './stores/settingsStore'
 import { comfySourceOf } from '@shared/comfyModels'
 import { comfySettled, useSetupStore } from './stores/setupStore'
@@ -86,6 +88,9 @@ async function boot(): Promise<void> {
 
   // Non-fatal too: with no switches read, every community mod runs at its default.
   await useModsStore.getState().load()
+
+  // Non-fatal as well: Prompt Studio's presets are read only when its mod is on.
+  if (modIsOn(PROMPT_STUDIO_MOD)) await usePromptStudioStore.getState().load()
 
   // The graph opens as soon as the sliders it mixes against are in.
   useAudioStore.getState().start()

@@ -281,6 +281,7 @@ import {
   secretBudgetNow,
   stageCast
 } from './loop/promptState'
+import { textEditsNow } from './promptStudioStore'
 import { forwardOpenOf, interjectOfferOf, replyRowOfferOf, rewindOpenOf } from './loop/playback'
 import {
   authoredTurn,
@@ -1083,6 +1084,7 @@ async function fetchSlotIntro(
       opening,
       exCharacterDynamics: game.exCharacterDynamics,
       lessNsfwText: lessNsfwTextNow(),
+      globalTextEdits: textEditsNow()?.global,
       secretBudget: secretBudgetNow(),
       recent: recentSummaries(date, time, pendingSummary),
       askers,
@@ -2204,7 +2206,11 @@ function startTextLedger(
   stale: () => boolean = () => false
 ): Promise<LedgerResponse | null> {
   const run = currentRun()
-  let request = buildTextLedgerPrompt(schedule, useGameStore.getState().charInfo)
+  let request = buildTextLedgerPrompt(
+    schedule,
+    useGameStore.getState().charInfo,
+    textEditsNow()?.global
+  )
 
   return (async () => {
     let silentSpent = 0

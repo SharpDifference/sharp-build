@@ -72,6 +72,8 @@ import * as replays from './db/replays'
 import * as saves from './db/saves'
 import * as scenes from './db/scenes'
 import { readGrabBags, writeGrabBags } from './db/grabbags'
+import { planPresetRequest, finishPresetReply } from '@shared/presets/request'
+import * as presets from './presets'
 import { readModSwitches, writeModSwitches } from './mods'
 import { soundtrackLibrary, pickSoundtrack } from './soundtracks'
 import { getPoseManifest, getQuickstart, readAudio } from './assets'
@@ -190,6 +192,14 @@ export function buildApi(): VenusUniversityApi {
     grabBags: {
       get: () => result('read the grab bags', readGrabBags),
       set: (bags) => result('save the grab bags', () => writeGrabBags(bags))
+    },
+    presets: {
+      list: () => result('read the presets', presets.listPresets),
+      get: (id) => result('read the preset', () => presets.getPreset(id)),
+      save: (preset) => result('save the preset', () => presets.savePreset(preset)),
+      delete: (id) => result('delete the preset', () => presets.deletePreset(id)),
+      setActive: (id) => result('choose the preset', () => presets.setActivePreset(id)),
+      import: () => result('import the preset', presets.importPreset)
     },
     mods: {
       get: () => result('read the mod switches', readModSwitches),
@@ -571,6 +581,15 @@ export function buildApi(): VenusUniversityApi {
   }
 }
 
-async function completeStructured<T>(request: StructuredRequest, ...args: Parameters<typeof completeCloudStructured<T>> extends [unknown, ...infer R] ? R : never): Promise<T> {
-  return completeCloudStructured<T>(await prepareStoryRequest(request), ...args)
+/**
+ * Sends one structured request: the story recall is prepended, the active Prompt Studio preset is
+ * applied where the request asks for one, and the fields only this app reads never reach the
+ * provider. A preset that cannot be loaded costs nothing but a warning.
+ */
+async function completeStructured<T>(request: StructuredRequest, signal?: AbortSignal, onDelta?: (delta: string) => void): Promise<T> {
+  const prepared = await prepareStoryRequest(request)
+  const plan = planPresetRequest(prepared, prepared.preset ? await presets.loadActivePreset() : null)
+  const reply = await completeCloudStructured<T>(plan.request, signal, onDelta, undefined, plan.sampling)
+  for (const warning of finishPresetReply(reply, plan.applied)) console.warn(`[presets] ${warning}`)
+  return reply
 }

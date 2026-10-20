@@ -99,6 +99,8 @@ src/shared               read by every build: every on-disk shape, the vocabular
                          caps, ids, file names, the job queue)
   llm/                   the cloud LLM transport and its adapters, run by main on the desktop and by src/web
                          in a browser
+  presets/               Prompt Studio's preset shape, importers, macros and variable rules, and applying a
+                         preset to a request, run by main on the desktop and by src/web in a browser
 src/web                  the browser build: the same bridge implemented over IndexedDB, fetch and blob URLs,
                          then the renderer
 assets/                  shipped content: the cast, backgrounds, the pose manifest, the ComfyUI workflows, the map
@@ -119,7 +121,7 @@ build/                   packaging inputs (the icon, the itch manifest, the rele
   itch-page/             the store page: the description HTML pasted into itch, the pictures it points at
                          and a README for putting them on the page
 release/                 the two artifacts, gitignored
-data/                    runtime, gitignored: settings.json, grabbags.json, app.log, saves/{playthrough}/
+data/                    runtime, gitignored: settings.json, grabbags.json, app.log, presets/, saves/{playthrough}/
                          (its replays under replays/{id}.json),
                          characters/{charId}/, backgrounds/{name}/, scenes/{id}.json, services/, tmp/
 private/                 records that stay in this repo: the supporters ledger; never mirrored, never shipped
@@ -171,7 +173,8 @@ Where a thing goes:
 ## 5. Prompts and the LLM
 
 - **Builders are pure** and return `{ system, user, schema, cacheKey }`; main attaches the key and sends. Arrays are joined with newlines, so one element is one line the model reads — no sentence is ever broken across two. A builder never draws from a grab bag: the caller draws the inspiration word or the rumor place and passes it in.
-- **The player may replace the cast-scene persona.** A stored one heads every cast scene call verbatim, whatever `lessNsfwText` says, and reaches no other call; the slot opening, the graduation posts, the ledgers, the solo scene and texting keep their own. Saved identical to the shipped text, it is stored as absent.
+- **The player may replace the cast-scene persona.** A stored one heads every cast scene call verbatim, whatever `lessNsfwText` says, and reaches no other call; the slot opening, the graduation posts, the ledgers, the solo scene and texting keep their own. Saved identical to the shipped text, it is stored as absent. Under Prompt Studio the active preset's own scene persona edit comes first, then the stored one, then the shipped; the mod's global edits cover the solo and ledger, texting, narration and designer personas. Any edited persona is sent verbatim whatever `lessNsfwText` says.
+- **A preset is applied in main, at the one structured-call choke point, and only to a request that asks for one.** Builders emit the game's parts with their edited text and never see a preset; the request-only fields (`parts`, `preset`, `sceneSpot`) are stripped there and never reach a provider. The Default preset leaves the request byte-identical, and a preset that cannot be loaded sends the request as built. A preset's samplers go to a custom endpoint alone.
 - **Order is by rate of change, slowest first.** `system` is what never varies while a playthrough runs (persona, JSON rules, setting); `user` is everything else, cheapest-to-change last and the reader's action at the very end. Scene calls key their cache on the playthrough, never the save; one-shots key on a constant. A list that reaches a prompt is sorted, never shuffled, so the cached prefix holds. A `user` message that opens with a preamble fixed for its cacheKey marks where the preamble ends with `logFrom`, and the console log starts there; the system prompt is never logged.
 - **The writer's window is the running summary plus the transcript's tail.** Every continuation and closing call sends the summary alongside the latest stretch of the transcript verbatim, taken as whole lines from the tail under a word budget and never shorter than the part the summary does not yet cover; the summary a reply arrives with covers the transcript through that reply's own lines, as the goodbye's does, so a cut inside a reply drops its summary with it; each summary is kept with the mark it covers up to, so a cut reverts to the right one. The ledger reads the whole scene.
 - **Structured outputs everywhere**: the schema goes verbatim as `responseJsonSchema` to Gemini and as a non-strict `response_format` JSON schema to a custom endpoint; declared key order is load-bearing (`lines` before `summary`), and leaving a property out of the schema is the only reliable way to stop the model filling it. Gemini rejects a schema past a complexity cap with a bare `INVALID_ARGUMENT`, so a reply carrying a record per character is an array of records with a `key` enum and no item bounds.

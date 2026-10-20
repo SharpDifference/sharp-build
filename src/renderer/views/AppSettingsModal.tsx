@@ -48,6 +48,9 @@ import { useModOn } from '../stores/modsStore'
 import { SoundtracksModal } from './SoundtracksModal'
 import { SettingsAdvancedTab } from './SettingsAdvancedTab'
 import { SettingsComfyTab } from './SettingsComfyTab'
+import { PROMPT_STUDIO_MOD } from '@shared/presets/types'
+import { DEFAULT_SCENE_PERSONA } from '../prompts/promptBlocks'
+import { PromptStudioModal } from './PromptStudioModal'
 import { SystemPromptModal } from './SystemPromptModal'
 import { GamepadIcon, ImageIcon, SlidersIcon, SparklesIcon } from './screenIcons'
 import { useSettingsStore } from '../stores/settingsStore'
@@ -232,6 +235,9 @@ export function AppSettingsModal({ theme, onClose }: AppSettingsModalProps): JSX
   const commitComfy = useRef<(() => Promise<void>) | null>(null)
   // Whether the system prompt editor or the player's own backgrounds stand over this panel.
   const [editing, setEditing] = useState(false)
+  // Prompt Studio's own panel, over this one while the mod is on.
+  const [studio, setStudio] = useState(false)
+  const promptStudio = useModOn(PROMPT_STUDIO_MOD)
   const [backgrounds, setBackgrounds] = useState(false)
   // Custom Soundtracks' own panel, over this one while the mod is on.
   const [soundtracks, setSoundtracks] = useState(false)
@@ -1081,6 +1087,7 @@ export function AppSettingsModal({ theme, onClose }: AppSettingsModalProps): JSX
                 onProblemChange={setAdvancedProblem}
                 commitRef={commitAdvanced}
                 onEditPrompt={() => setEditing(true)}
+                onPromptStudio={() => setStudio(true)}
                 onBackgrounds={() => setBackgrounds(true)}
               />
             )}
@@ -1173,7 +1180,20 @@ export function AppSettingsModal({ theme, onClose }: AppSettingsModalProps): JSX
       </AnimatePresence>
       <AnimatePresence propagate>
         {editing && (
-          <SystemPromptModal key="system-prompt" theme={theme} onClose={() => setEditing(false)} />
+          <SystemPromptModal
+            key="system-prompt"
+            theme={theme}
+            title="Edit system prompt"
+            defaultText={DEFAULT_SCENE_PERSONA}
+            stored={settings?.scenePersona ?? DEFAULT_SCENE_PERSONA}
+            onSave={(value) => update({ scenePersona: value })}
+            onClose={() => setEditing(false)}
+          />
+        )}
+      </AnimatePresence>
+      <AnimatePresence propagate>
+        {studio && promptStudio && (
+          <PromptStudioModal key="prompt-studio" theme={theme} onClose={() => setStudio(false)} />
         )}
       </AnimatePresence>
       <AnimatePresence propagate>

@@ -12,6 +12,7 @@ import type {
 import type { FeedThreadsResponse } from '@shared/bunnyfeeds'
 import type { PromptEdit } from '@shared/imagePrompt'
 import type { ModSwitches } from '@shared/mods'
+import type { Preset, PresetImport, PresetListing } from '@shared/presets/types'
 import type { SoundtracksApi } from '@shared/soundtracks'
 import type {
   PhotoEntry,
@@ -111,6 +112,24 @@ export interface VenusUniversityApi {
     get: () => Promise<Result<GrabBags>>
     /** Replaces every grab bag's set-aside keys. */
     set: (bags: GrabBags) => Promise<Result<void>>
+  }
+  /** Prompt Studio's presets, kept for every playthrough. */
+  presets: {
+    /** Every preset's summary, by name, and the id in force; an empty store gets its Default first. */
+    list: () => Promise<Result<PresetListing>>
+    /** One preset whole; an id nothing readable is kept under is refused with `PRESET_NOT_FOUND`. */
+    get: (id: string) => Promise<Result<Preset>>
+    /** Keeps a preset under its own id, replacing one already there. */
+    save: (preset: Preset) => Promise<Result<void>>
+    /** Removes one; the last preset is refused with `PRESET_LAST`, and deleting the one in force puts another in force. */
+    delete: (id: string) => Promise<Result<void>>
+    /** Puts a preset in force. */
+    setActive: (id: string) => Promise<Result<void>>
+    /**
+     * Reads a SillyTavern or Marinara file the player picks into a preset under a fresh id, with
+     * what the import left behind. Nothing is kept: the caller saves it. `null` where nothing was picked.
+     */
+    import: () => Promise<Result<PresetImport | null>>
   }
   mods: {
     /** Which community mods are switched on, and their options (`shared/mods.ts`). */

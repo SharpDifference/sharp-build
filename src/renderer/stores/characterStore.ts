@@ -76,6 +76,7 @@ import { enqueueLlm } from './llmQueue'
 import { cutRoomPicture } from './roomPicture'
 import { composeCard, composeSpritePack } from './sillyTavernExport'
 import { noNsfwImagesOf, useSettingsStore } from './settingsStore'
+import { textEditsNow } from './promptStudioStore'
 import { useUiStore } from './uiStore'
 
 /** An error thrown composing a SillyTavern export, passed through as is or wrapped generically. */
@@ -1870,7 +1871,8 @@ async function runWritePipeline(
     poses,
     useGrabBagStore.getState().draw(SEED_WORD_BAG, SEED_WORDS),
     request.namesAreSuggestions,
-    request.reference
+    request.reference,
+    textEditsNow()?.global
   )
   // charId doubles as the cancellation group: `jobs:cancelGroup` aborts this request too.
   const drafted = await enqueueLlm(async () => {

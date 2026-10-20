@@ -2,6 +2,17 @@ import { resetReflectionPortrait, uploadReflectionPortrait, generateReflectionPo
 import { writeFile } from 'fs/promises'
 import type { EchoArtRequest } from '@shared/echo'
 import { prepareStoryRequest, inspectStoryMemory } from './services/storyMemoryService'
+import { planPresetRequest, finishPresetReply } from '@shared/presets/request'
+import {
+  deletePreset,
+  getPreset,
+  importPresetFromFile,
+  listPresets,
+  loadActivePreset,
+  savePreset,
+  setActivePreset
+} from './services/presetsService'
+import type { Preset } from '@shared/presets/types'
 import type { StoryRecallRequest } from '@shared/storyMemory'
 import type { WhisperDraft, WhisperReply } from '@shared/venusWhisper'
 import type { MeanwhileResponse } from '@shared/meanwhile'
@@ -369,6 +380,23 @@ export function registerIpcHandlers(): void {
     }
     return next
   })
+  // Prompt Studio's presets. Import reads a file the player picks and keeps nothing; a dismissed
+  // dialog resolves `null`.
+  handle('presets:list', () => listPresets())
+  handle('presets:get', (_event, id: string) => getPreset(id))
+  handle('presets:save', (_event, preset: Preset) => savePreset(preset))
+  handle('presets:delete', (_event, id: string) => deletePreset(id))
+  handle('presets:setActive', (_event, id: string) => setActivePreset(id))
+  handle('presets:import', async (event) => {
+    const { canceled, filePaths } = await showOpenDialogFor(event, {
+      title: 'Import a preset',
+      filters: [{ name: 'Preset', extensions: ['json', 'marinara'] }],
+      properties: ['openFile']
+    })
+    if (canceled || filePaths.length === 0) return null
+    return importPresetFromFile(filePaths[0])
+  })
+
   // The grab bags' set-aside keys, read once at boot and written behind every draw.
   handle('grabBags:get', () => getGrabBags())
   handle('grabBags:set', (_event, bags: GrabBags) => setGrabBags(bags))
@@ -1030,6 +1058,15 @@ async function openFolder(path: string, message: string): Promise<void> {
   if (failure !== '') throw appError('OPEN_FOLDER_FAILED', message, failure)
 }
 
-async function completeStructured<T>(request: StructuredRequest, ...args: Parameters<typeof completeCloudStructured<T>> extends [unknown, ...infer R] ? R : never): Promise<T> {
-  return completeCloudStructured<T>(await prepareStoryRequest(request), ...args)
+/**
+ * Sends one structured request: the story recall is prepended, the active Prompt Studio preset is
+ * applied where the request asks for one, and the fields only this app reads never reach the
+ * provider. A preset that cannot be loaded costs nothing but a warning.
+ */
+async function completeStructured<T>(request: StructuredRequest, signal?: AbortSignal, onDelta?: (delta: string) => void): Promise<T> {
+  const prepared = await prepareStoryRequest(request)
+  const plan = planPresetRequest(prepared, prepared.preset ? await loadActivePreset() : null)
+  const reply = await completeCloudStructured<T>(plan.request, signal, onDelta, undefined, plan.sampling)
+  for (const warning of finishPresetReply(reply, plan.applied)) console.warn(`[presets] ${warning}`)
+  return reply
 }

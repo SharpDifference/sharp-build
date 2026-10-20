@@ -8,6 +8,7 @@ import type { SlotReplay } from '@shared/replays'
 import type { SavedScene } from '@shared/sceneCreator'
 import type { SoundtrackMap } from '@shared/soundtracks'
 import type { Character, GameSave, GrabBags, Settings } from '@shared/types'
+import type { StoredPresets } from './presets'
 
 /**
  * The browser build's whole disk: one IndexedDB database, one store per kind of file the
@@ -63,6 +64,7 @@ export interface VenusUniversityDb extends DBSchema {
   backgrounds: { key: string; value: StoredBackground }
   scenes: { key: string; value: SavedScene }
   replays: { key: [string, string]; value: SlotReplay }
+  presets: { key: 'presets'; value: StoredPresets }
 }
 
 /**
@@ -87,10 +89,11 @@ const STORES = [
   'photos',
   'backgrounds',
   'scenes',
-  'replays'
+  'replays',
+  'presets'
 ] as const
 
-const DB_VERSION = 9
+const DB_VERSION = 10
 
 let opened: Promise<IDBPDatabase<VenusUniversityDb>> | null = null
 

@@ -110,6 +110,8 @@ import {
   type SchedulePromptInput
 } from './schedulePrompt'
 import { objectSchema } from './schema'
+import type { GamePart, GameMarker, GlobalTextId, SceneSpot, SceneSpotTag, SceneTextId, TextEdits } from '@shared/presets/types'
+import { scenePersonaFor, sceneText, soloInstructionLines, soloPersonaFor } from './promptBlocks'
 import { weatherLines } from './weather'
 
 /**
@@ -364,6 +366,8 @@ export interface PromptState {
   lessNsfwText: boolean
   /** The player's own cast-scene persona; absent is the shipped one. */
   scenePersona?: string
+  /** Prompt Studio's edits to the fixed text blocks: the active preset's scene ones and the global ones; absent with the mod off. */
+  textEdits?: { scene?: TextEdits<SceneTextId>; global?: TextEdits<GlobalTextId> }
   /** How many memories per character the cast block carries, by cast size. */
   memoryBudgets: Required<MemoryBudgets>
   /** How many of her told secrets each entry carries; absent is the default. */
@@ -379,81 +383,6 @@ export interface PromptState {
   affection?: Record<string, number>
   /** The wardrobe each girl opens a created scene in; only its opening call carries it. */
   openingOutfits?: Record<string, OutfitLock>
-}
-
-/**
- * The one line each persona says about writing sex; the SFW twins below are built by removing
- * it.
- */
-const SEX_DIRECTION =
-  'When you finally get to write the sex, you get super turned on and don\'t mind getting lewd and using profanity, but you avoid explicit sexual words.'
-const LEDGER_SEX_DIRECTION =
-  'When you finally get to write the sex, you get super turned on and don\'t mind getting lewd and using sexual profanity.'
-
-/** The persona paragraph: who RITA is, how she writes, and what she returns. */
-const PERSONA_LINES = [
-  'You are RITA, author of steamy reader-POV romance fiction set at fictional universities.',
-  'You have a unique style where you use present-tense narration and second-person perspective to put the reader in the action.',
-  'You generally make the reader a silent protagonist, though you occasionally describe things he does and says.',
-  'You\'ve got sexy nerd energy and have been on a hundred dates, and you use that experience to make your writing shockingly realistic.',
-  'You include all cast members in the scene and have them bond, fight... maybe even flirt, keeping their personalities and memories in mind as you write.',
-  'You don\'t jump to having everyone fuck, you make the women play hard to get, making everything a slow burn.',
-  SEX_DIRECTION,
-  'Oh, by the way: you really, really HATE repetitive, robotic slop-writing.',
-  'You dig messy, sparse prose that\'s rich with subtext. You never have characters blurt out what\'s on their mind, instead showing how they feel via actions and body language.',
-  'You NEVER use semicolons or emdashes or other dumb AI writing habits.',
-  'For dialogue, you write lines that are meant to be said, not read. You use contractions, imperfect grammar, ellipses, filler words like "like", and "um", and avoid overly flowery metaphors and strict sentence structure.',
-  'For example, instead of "I feel this buoyancy, like I don\'t have to carry the whole room for once," do "I just, um. Feel this... buoyancy. Like, I don\'t have to be so energetic anymore? I dunno."',
-  'And finally, you\'re totally anal retentive: You always return a single, fully-formed JSON object matching the provided schema exactly.'
-]
-
-const PERSONA = PERSONA_LINES.join('\n')
-
-/**
- * RITA with nobody else in the room — the persona for the calls that stage no cast: the two
- * ledgers and the solo scene.
- */
-const LEDGER_PERSONA_LINES = [
-  'You are RITA, author of steamy reader-POV romance fiction set at fictional universities.',
-  'You\'ve got sexy nerd energy and have been on a hundred dates, and you use that experience to make your writing shockingly realistic.',
-  'You have a unique style where you use present-tense narration and second-person perspective to put the reader in the action.',
-  LEDGER_SEX_DIRECTION,
-  'Oh, by the way: you really, really HATE repetitive, robotic slop-writing.',
-  'You dig messy, sparse prose that is rich with subtext. You never have characters blurt out what\'s on their mind, instead showing how they feel via actions and body language.',
-  'You NEVER use semicolons or emdashes or other dumb AI writing habits.',
-  'And finally, you\'re totally anal retentive: You always return a single, fully-formed JSON object matching the provided schema exactly.'
-]
-
-export const LEDGER_PERSONA = LEDGER_PERSONA_LINES.join('\n')
-
-/**
- * The same two paragraphs with the sex direction taken out and nothing else touched — what
- * `lessNsfwText` sends instead.
- */
-const SFW_PERSONA = PERSONA_LINES.filter((line) => line !== SEX_DIRECTION).join('\n')
-const SFW_LEDGER_PERSONA = LEDGER_PERSONA_LINES.filter(
-  (line) => line !== LEDGER_SEX_DIRECTION
-).join('\n')
-
-/** Whichever scene persona this playthrough's content setting sends. */
-export function personaFor(lessNsfwText: boolean): string {
-  return lessNsfwText ? SFW_PERSONA : PERSONA
-}
-
-/** The shipped cast-scene persona, verbatim — what a player who has set no custom one sends. */
-export const DEFAULT_SCENE_PERSONA = PERSONA
-
-/**
- * The persona a cast scene is written under: the player's own verbatim where one is stored,
- * else the shipped one this content setting sends.
- */
-export function scenePersonaFor(lessNsfwText: boolean, custom: string | undefined): string {
-  return custom ?? personaFor(lessNsfwText)
-}
-
-/** {@link personaFor} for the calls that stage no cast — the ledgers and the solo scene. */
-function ledgerPersonaFor(lessNsfwText: boolean): string {
-  return lessNsfwText ? SFW_LEDGER_PERSONA : LEDGER_PERSONA
 }
 
 /** What each outfit suffix means, in RITA's terms. */
@@ -1194,41 +1123,52 @@ function sceneSchema(
 }
 
 /**
- * The system prompt, shared by the three prose builders. It carries what never varies
- * within a playthrough: the persona, the JSON rules and the world.
+ * The system parts, shared by the three prose builders. They carry what never varies within a
+ * playthrough: the persona, the JSON rules and the world.
  */
-function systemPrompt(
-  cast: readonly Character[],
-  state: PromptState,
-  setting: string
-): string {
+function systemParts(cast: readonly Character[], state: PromptState, setting: string): GamePart[] {
   return [
-    scenePersonaFor(state.lessNsfwText, state.scenePersona),
-    '',
-    ...jsonRules(
-      state.backgrounds,
-      stockCgsAllowed(cast, state),
-      cast.flatMap((character) => cgsOfferedTo(character, cast, state)),
-      castOutfitSets(cast, state),
-      cast.some((character) => offeredOf(character, state).length > 0),
-      cgReadyNames(cast, state)
-    ),
-    '',
-    'SETTING',
-    setting
-  ].join('\n')
+    {
+      id: 'persona',
+      role: 'system',
+      text: scenePersonaFor(state.lessNsfwText, state.scenePersona, state.textEdits?.scene)
+    },
+    {
+      id: 'jsonRules',
+      role: 'system',
+      text: jsonRules(
+        state.backgrounds,
+        stockCgsAllowed(cast, state),
+        cast.flatMap((character) => cgsOfferedTo(character, cast, state)),
+        castOutfitSets(cast, state),
+        cast.some((character) => offeredOf(character, state).length > 0),
+        cgReadyNames(cast, state)
+      ).join('\n')
+    },
+    { id: 'setting', role: 'system', text: ['SETTING', setting].join('\n') }
+  ]
 }
 
-/**
- * Who the scene is about — the `READER` and `CAST` blocks that open every prose builder's
- * user string.
- */
-function whoBlock(
-  cast: readonly Character[],
-  state: PromptState,
-  reader: string,
-  secret?: string | null
-): string[] {
+/** One game part from the lines it was built from, without the blank lines that only separate it from the next; none when empty. */
+function partOf(id: GameMarker, lines: readonly string[]): GamePart[] {
+  let end = lines.length
+  while (end > 0 && lines[end - 1] === '') end--
+  return end === 0 ? [] : [{ id, role: 'user', text: lines.slice(0, end).join('\n') }]
+}
+
+/** The user message and its parts from the blocks in order; the message is the blocks' lines joined, the parts their text. */
+function userOf(blocks: ReadonlyArray<readonly [GameMarker, readonly string[]]>): {
+  user: string
+  parts: GamePart[]
+} {
+  return {
+    user: blocks.flatMap(([, lines]) => lines).join('\n'),
+    parts: blocks.flatMap(([id, lines]) => partOf(id, lines))
+  }
+}
+
+/** The `READER` block with the reader's schedule, which opens every prose builder's user string. */
+function readerBlock(state: PromptState, reader: string): string[] {
   return [
     'READER',
     reader,
@@ -1240,8 +1180,6 @@ function whoBlock(
       state.date,
       readerClassmates(state.classRosters, state.classCode)
     ),
-    '',
-    ...castBlock(cast, state, secret),
     ''
   ]
 }
@@ -1613,7 +1551,9 @@ function castScenePrompt(
   /** What the lorebook is matched against — this turn's words and whatever precedes them. */
   scan: string,
   /** Everything below the context blocks: `STORY`/`SCENE SO FAR`, `YOUR TURN`, the action. */
-  tail: readonly string[],
+  tail: SceneTail,
+  /** Which of the three cast-scene calls this is, for the Prompt Studio preset. */
+  spot: Exclude<SceneSpot, 'solo'>,
   hasSummary: boolean,
   hasEndScene: boolean,
   /**
@@ -1636,19 +1576,41 @@ function castScenePrompt(
     rumor
   )
 
-  return modRequest('scene', { cast, state, query: scan }, {
-    system: systemPrompt(cast, state, setting),
-    user: [
-      ...whoBlock(cast, state, reader, secret),
-      ...nowBlock(cast, state),
-      ...classBlock(state),
-      ...lore,
-      ...promptLines('scene', { cast, state, query: scan }),
-      ...tail
-    ].join('\n'),
-    schema: sceneSchema(state.backgrounds, cast, state, hasSummary, hasEndScene),
-    cacheKey: state.playthroughId
-  })
+  const system = systemParts(cast, state, setting)
+  const { user, parts } = userOf([
+    ['reader', readerBlock(state, reader)],
+    ['cast', [...castBlock(cast, state, secret), '']],
+    ['now', nowBlock(cast, state)],
+    ['class', classBlock(state)],
+    ['lorebook', lore],
+    ['modLines', promptLines('scene', { cast, state, query: scan })],
+    ['storySoFar', tail.storySoFar],
+    ['sceneSoFar', tail.sceneSoFar],
+    ['yourTurn', tail.yourTurn]
+  ])
+
+  return {
+    ...modRequest('scene', { cast, state, query: scan }, {
+      system: system.map((part) => part.text).join('\n\n'),
+      user,
+      parts: [...system, ...parts],
+      schema: sceneSchema(state.backgrounds, cast, state, hasSummary, hasEndScene),
+      cacheKey: state.playthroughId
+    }),
+    sceneSpot: sceneSpotOf(spot, cast)
+  }
+}
+
+/** The scene call a builder made and the given names of who is in it, for the Prompt Studio preset. */
+function sceneSpotOf(spot: SceneSpot, cast: readonly Character[]): SceneSpotTag {
+  return { spot, cast: cast.map((character) => character.firstName) }
+}
+
+/** What a cast scene's user message ends with, block by block. */
+interface SceneTail {
+  storySoFar: readonly string[]
+  sceneSoFar: readonly string[]
+  yourTurn: readonly string[]
 }
 
 /**
@@ -1659,15 +1621,11 @@ function soFarBlocks(
   summary: string | null,
   stubs: readonly string[],
   quoteSummary: boolean
-): string[] {
-  return [
-    ...(summary ? ['STORY SO FAR', quoteSummary ? '"' + summary + '"' : summary, ''] : []),
-    'SCENE SO FAR',
-    '\'\'\'',
-    ...stubs,
-    '\'\'\'',
-    ''
-  ]
+): Pick<SceneTail, 'storySoFar' | 'sceneSoFar'> {
+  return {
+    storySoFar: summary ? ['STORY SO FAR', quoteSummary ? '"' + summary + '"' : summary, ''] : [],
+    sceneSoFar: ['SCENE SO FAR', '\'\'\'', ...stubs, '\'\'\'', '']
+  }
 }
 
 /**
@@ -1723,12 +1681,9 @@ export function buildScenePrompt(
   setting: string,
   reader: string
 ): StructuredRequest {
-  const tail = [
+  const yourTurn = [
     'YOUR TURN',
-    'Let\'s rock and roll, RITA! Your mission is to write a kickass scene based on the reader\'s action.',
-    'Open the scene by rewording what the reader decided to do in a fun narration.',
-    'Then, entertain them with wacky hijinx until you feel like letting the player in to crash the party at a natural decision point.',
-    'Avoid breaking the fourth wall by directly asking the player what they want to do or suggesting an action for them.',
+    sceneText(state.textEdits?.scene, 'scene.opening'),
     // A created scene may open on a background the player picked, standing in NOW.
     state.createdScene && state.bg
       ? 'Make sure the first line sets the bg to the Current bg in the NOW block, and DON\'t set end_scene yet.'
@@ -1747,6 +1702,7 @@ export function buildScenePrompt(
     '',
     `Reader's action: ${action}`
   ]
+  const tail: SceneTail = { storySoFar: [], sceneSoFar: [], yourTurn }
 
   // Nothing has been written yet, so the action is the whole scan. The slot's rumor and the
   // secret she tells ride this call alone — the continuation and the closing pass neither.
@@ -1757,6 +1713,7 @@ export function buildScenePrompt(
     reader,
     action,
     tail,
+    'opening',
     false,
     true,
     state.slotRumor,
@@ -1802,46 +1759,47 @@ export function buildSoloPrompt(
     state.slotRumor
   )
 
-  const user = [
+  const { user, parts } = userOf([
     // With no cast, `nowBlock` is the date and semester lines.
-    ...nowBlock([], state),
-    ...promptLines('scene', { cast: [], state, query: action }),
-    ...lore,
-    'READER',
-    reader,
-    '',
-    'YOUR TURN',
-    'Solo mission, RITA! The reader is on their own for this one, so write it start to finish in one go.',
-    'Open by rewording what the reader decided to do in a fun narration, then play it out to the end. No other characters will show up.',
-    ...outSickLines(state.outSick),
-    'Keep it tight. This is a slice of their day, not an epic.',
-    'DON\'T leave a decision point, a cliffhanger, or a question for the reader.',
-    '',
-    'SUMMARY',
-    'Then, for the "summary" field: condense the whole scene into a recap, third-person, referring to the MC as "the reader".',
-    'This version gets saved for posterity, so keep the important stuff the reader should remember. Leave out the mundane crap.',
-    '',
-    `Reader's action: ${action}`
-  ].join('\n')
+    ['now', nowBlock([], state)],
+    ['modLines', promptLines('scene', { cast: [], state, query: action })],
+    ['lorebook', lore],
+    ['reader', ['READER', reader, '']],
+    [
+      'yourTurn',
+      [
+        'YOUR TURN',
+        ...soloInstructionLines(state.textEdits?.scene, outSickLines(state.outSick)),
+        '',
+        'SUMMARY',
+        'Then, for the "summary" field: condense the whole scene into a recap, third-person, referring to the MC as "the reader".',
+        'This version gets saved for posterity, so keep the important stuff the reader should remember. Leave out the mundane crap.',
+        '',
+        `Reader's action: ${action}`
+      ]
+    ]
+  ])
+  const system: GamePart[] = [
+    { id: 'persona', role: 'system', text: soloPersonaFor(state.lessNsfwText, state.textEdits?.global) },
+    { id: 'jsonRules', role: 'system', text: soloJsonRules(state.backgrounds).join('\n') },
+    { id: 'setting', role: 'system', text: ['SETTING', setting].join('\n') }
+  ]
 
-  return modRequest('scene', { cast: [], state, query: action }, {
-    system: [
-      ledgerPersonaFor(state.lessNsfwText),
-      '',
-      ...soloJsonRules(state.backgrounds),
-      '',
-      'SETTING',
-      setting
-    ].join('\n'),
-    user,
-    // No `end_scene`: the scene is over by construction.
-    schema: sceneSchema(state.backgrounds, [], state, true, false),
-    // Constant, like the ledger's: nothing above the seam varies by save.
-    cacheKey: 'solo',
-    // Routable: an hour by himself has nobody in it to be written badly, which is what
-    // keeps every other scene call off the secondary model.
-    kind: 'solo'
-  })
+  return {
+    ...modRequest('scene', { cast: [], state, query: action }, {
+      system: system.map((part) => part.text).join('\n\n'),
+      user,
+      parts: [...system, ...parts],
+      // No `end_scene`: the scene is over by construction.
+      schema: sceneSchema(state.backgrounds, [], state, true, false),
+      // Constant, like the ledger's: nothing above the seam varies by save.
+      cacheKey: 'solo',
+      // Routable: an hour by himself has nobody in it to be written badly, which is what
+      // keeps every other scene call off the secondary model.
+      kind: 'solo'
+    }),
+    sceneSpot: sceneSpotOf('solo', [])
+  }
 }
 
 /** Builds the continuation request: summary and recent transcript after the cached prefix. */
@@ -1858,27 +1816,19 @@ export function buildContinuationPrompt(
   const stubs = transcriptStubs(transcript, cast, false)
   const scan = [action, summary ?? '', ...stubs].join('\n')
 
-  const tail = [
-    ...soFarBlocks(summary, stubs, true),
+  const edits = state.textEdits?.scene
+  const yourTurn = [
     'YOUR TURN',
-    'Alright RITA, you can write now! Let\'s continue from where the STORY and the SCENE SO FAR have left off.',
-    'The STORY SO FAR is a recap of the whole scene so far, while the SCENE SO FAR is the word-for-word dialogue, so part of it may already be in the recap.',
-    'At the very bottom of this prompt is the reader\'s action: what they just decided to do or say, in their own words.',
+    sceneText(edits, 'scene.continue'),
     '',
     'OPENING LINE',
-    'Your FIRST line must reword the reader\'s action/words into your own voice, as narration or as their dialogue.',
-    `For example, if the reader\'s action is '"Why not? I like bananas," I say, reaching for one.', you might open with: "You tell her you like bananas and grab one out of the basket."`,
+    sceneText(edits, 'scene.continue.first-line'),
     '',
     'CONTINUING THE SCENE',
-    'If the scene is still going strong, keep the good times going! Steer it into new shenanigans and twists.',
-    'Don\'t stop writing until you reach a natural decision point.',
-    'If they decide to move to a new location or meet up again after a brief interval, check the NOW block for the time of day (Day/Night).',
-    'If the time of day is still Day/Night, set a new "bg:" and keep writing. For example, meeting up for coffee after class.',
-    'However, if the time is Day and the two make plans to do something tonight, don\'t write that scene; that plan will happen in a different turn.',
+    sceneText(edits, 'scene.continue.going'),
     '',
     'ENDING THE SCENE',
-    'However, if the scene feels like it\'s drawing to a close, invent an excuse for the characters to need/want to part ways, and send end_scene.',
-    'No need to fully wrap up the scene yet, we\'ll do that in a separate prompt.',
+    sceneText(edits, 'scene.continue.ending'),
     '',
     'SUMMARY',
     summary
@@ -1891,8 +1841,9 @@ export function buildContinuationPrompt(
     `Reader's action: ${action}`,
     `This is the reader's ${ordinal(actionNumber)} action in the scene.`
   ]
+  const tail: SceneTail = { ...soFarBlocks(summary, stubs, true), yourTurn }
 
-  return castScenePrompt(cast, state, setting, reader, scan, tail, true, true)
+  return castScenePrompt(cast, state, setting, reader, scan, tail, 'continue', true, true)
 }
 
 /**
@@ -1910,20 +1861,17 @@ export function buildClosingPrompt(
   const stubs = transcriptStubs(transcript, cast, false)
   const scan = [summary ?? '', ...stubs].join('\n')
 
-  const tail = [
-    ...soFarBlocks(summary, stubs, false),
+  const yourTurn = [
     'YOUR TURN',
-    'And cut! Awesome job, RITA! This scene is over now, and all that\'s left is the landing.',
-    'Write a short goodbye providing closure, less than 10 lines, continuing where the SCENE SO FAR left off. Let the last feeling of the scene sit, "hide:<charKey>" everyone still on screen as they go, and close on some quiet narration.',
-    'If the character is already hidden, don\'t use the "show:<charKey>" action and bring them back.',
-    'If the scene isn\'t quite at the point where they say goodbye yet, do some vague narration to get them there and then close out.',
+    sceneText(state.textEdits?.scene, 'scene.closing'),
     summary
       ? 'Then, for the "summary" field: fold your goodbye, the SCENE SO FAR, and the STORY SO FAR into a single recap using third-person and referring to the MC as "the reader".'
       : 'Then, for the "summary" field: condense the SCENE SO FAR and the goodbye into a single recap, using third-person and referring to the MC as "the reader".',
     'This version gets saved for posterity, so keep the important stuff the reader should remember. Leave out the mundane crap.'
   ]
+  const tail: SceneTail = { ...soFarBlocks(summary, stubs, false), yourTurn }
 
-  return castScenePrompt(cast, state, setting, reader, scan, tail, true, false)
+  return castScenePrompt(cast, state, setting, reader, scan, tail, 'closing', true, false)
 }
 
 /** The two kinds of intimate act the ledger may report, each with the gloss RITA is given. */
@@ -2216,7 +2164,7 @@ export function buildLedgerPrompt(
   ].join('\n')
 
   return modRequest('ledger', { state, charKeys }, {
-    system: ledgerPersonaFor(state.lessNsfwText),
+    system: soloPersonaFor(state.lessNsfwText, state.textEdits?.global),
     user: `${preamble}\n${rest}`,
     schema: ledgerSchema(charKeys, rosterKeys, classScene, castStats),
     // Constant, not the playthrough: nothing above the seam varies by save.
