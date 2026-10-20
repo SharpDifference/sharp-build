@@ -43,7 +43,8 @@ import {
   PresetBlockModal,
   PresetImportModal,
   PresetNameModal,
-  VariableModal
+  VariableModal,
+  PartExampleModal
 } from './PromptStudioModals'
 import { SystemPromptModal } from './SystemPromptModal'
 import '../vu_styles/Settings.css'
@@ -95,21 +96,51 @@ const SOURCE_WORDS: Record<PresetSource, string> = {
   native: 'Built in'
 }
 
-/** What each of the game's own sections is called on its row. */
-const GAME_ROW_WORDS: Record<GameMarker, string> = {
-  persona: 'Game: writer persona',
-  jsonRules: 'Game: reply rules',
-  setting: 'Game: setting',
-  reader: 'Game: the reader',
-  cast: 'Game: cast',
-  now: 'Game: date and time',
-  class: 'Game: class',
-  lorebook: 'Game: lorebook',
-  modLines: 'Game: mod notes',
-  storyRecall: 'Game: story recall',
-  storySoFar: 'Game: story so far',
-  sceneSoFar: 'Game: scene so far',
-  yourTurn: "Game: this turn's instructions"
+/** What each of the game's own sections is called on its row, and what it carries. */
+const GAME_ROWS: Record<GameMarker, { word: string; hint: string }> = {
+  persona: {
+    word: 'Game: writer persona',
+    hint: 'Who the writer is and how a scene should read. A solo scene sends the solo persona here instead.'
+  },
+  jsonRules: {
+    word: 'Game: reply rules',
+    hint: 'The shape every reply must take, and the backgrounds, outfits and CGs it may name. Always sent.'
+  },
+  setting: { word: 'Game: setting', hint: 'The world every scene is set in: Venus University and the city of Veridan.' },
+  reader: { word: 'Game: the reader', hint: 'Who the reader is, and his timetable.' },
+  cast: {
+    word: 'Game: cast',
+    hint: 'Each girl in the scene: who she is, how she feels about the reader, what she remembers and what she has told him.'
+  },
+  now: {
+    word: 'Game: date and time',
+    hint: 'The date, the hour and the weather, the background, and who is on screen in what.'
+  },
+  class: {
+    word: 'Game: class',
+    hint: 'The class the scene is sitting in and what this meeting covers. Sent only during a class.'
+  },
+  lorebook: {
+    word: 'Game: lorebook',
+    hint: 'Background the turn calls for: people named who are not in the scene, classes, earlier days mentioned and the slot\'s rumor.'
+  },
+  modLines: { word: 'Game: mod notes', hint: 'Lines other mods add to a scene. Sent only when a mod has something to add.' },
+  storyRecall: {
+    word: 'Game: story recall',
+    hint: 'What the Story Memory mod recalls from earlier scenes. Sent only while that mod is on.'
+  },
+  storySoFar: {
+    word: 'Game: story so far',
+    hint: 'A running summary of this scene\'s earlier turns, once there is one.'
+  },
+  sceneSoFar: {
+    word: 'Game: scene so far',
+    hint: 'The latest stretch of this scene word for word: the reader\'s actions and the replies to them.'
+  },
+  yourTurn: {
+    word: "Game: this turn's instructions",
+    hint: 'What the writer is asked to do this turn, ending with what the reader does. Its fixed lines are under Scene text.'
+  }
 }
 
 /** A fresh block, ready for its name and text. */
@@ -179,6 +210,7 @@ export function PromptStudioModal({ theme, onClose }: PromptStudioModalProps): J
   const [importing, setImporting] = useState<{ preset: Preset; warnings: string[] } | null>(null)
   const [varEdit, setVarEdit] = useState<string | null>(null)
   const [varsReset, setVarsReset] = useState(false)
+  const [partShown, setPartShown] = useState<GameMarker | null>(null)
   // Holds off a second write while the first is in flight, so each reads the preset the last left.
   const writing = useRef(false)
   const picking = useRef(false)
@@ -353,7 +385,10 @@ export function PromptStudioModal({ theme, onClose }: PromptStudioModalProps): J
     const marker = block.marker
     const replaced = marker === 'persona' && preset.mainReplacesPersona === true && mainBlockOf(preset) !== undefined
     const fixed = marker !== undefined && PROTECTED_MARKERS.includes(marker)
-    const label = marker ? GAME_ROW_WORDS[marker] : block.name
+    const label = marker ? GAME_ROWS[marker].word : block.name
+    const hint = marker ? GAME_ROWS[marker].hint : undefined
+    // What the last scene sent under this row, where it sent anything.
+    const example = marker ? lastSceneRequest?.parts?.find((part) => part.id === marker) : undefined
     const uncached = !marker && block.role === 'system' && block.enabled && hasDynamicMacros(block.content)
 
     return (
@@ -386,11 +421,15 @@ export function PromptStudioModal({ theme, onClose }: PromptStudioModalProps): J
         </span>
         <span className="vu-studio-body">
           {fixed ? (
-            <span className="vu-studio-name">{label}</span>
+            <>
+              <span className="vu-studio-name">{label}</span>
+              {hint && <span className="vu-studio-note">{hint}</span>}
+            </>
           ) : (
             <CheckField
               id={`studio-block-${block.id}`}
               label={label}
+              note={hint}
               checked={block.enabled}
               onChange={(enabled) =>
                 void commit((current) => ({
@@ -415,6 +454,7 @@ export function PromptStudioModal({ theme, onClose }: PromptStudioModalProps): J
         </span>
         {replaced && <span className="vu-studio-tag">Replaced</span>}
         <span className="vu-studio-tools">
+          {marker && example && pill(`studio-example-${marker}`, 'Example', () => setPartShown(marker))}
           {(marker === 'persona' || marker === 'yourTurn') &&
             pill(`studio-text-${marker}`, 'Scene text', () => setTab('scene'))}
           {!marker && pill(`studio-edit-${block.id}`, 'Edit', () => setBlockEdit({ block, isNew: false }))}
@@ -535,6 +575,7 @@ export function PromptStudioModal({ theme, onClose }: PromptStudioModalProps): J
 
   const textDefault = textEdit ? defaultBlockText(textEdit.id, { lessNsfwText, scenePersona }) : ''
   const varName = varEdit !== null && varEdit in presetVars ? varEdit : null
+  const partText = partShown ? lastSceneRequest?.parts?.find((part) => part.id === partShown)?.text : undefined
 
   return createPortal(
     <>
@@ -722,6 +763,18 @@ export function PromptStudioModal({ theme, onClose }: PromptStudioModalProps): J
               useGameStore.getState().setPresetVars({ ...useGameStore.getState().presetVars, [varName]: value })
             }
             onClose={() => setVarEdit(null)}
+          />
+        )}
+      </AnimatePresence>
+      <AnimatePresence propagate>
+        {partShown && partText !== undefined && (
+          <PartExampleModal
+            key="studio-part-example"
+            theme={theme}
+            title={GAME_ROWS[partShown].word}
+            hint={GAME_ROWS[partShown].hint}
+            text={partText}
+            onClose={() => setPartShown(null)}
           />
         )}
       </AnimatePresence>

@@ -23,8 +23,10 @@ Only scene calls: the opening, a continuation, the closing, and the solo scene. 
 slot opening, graduation posts, the ledgers, both classifiers and character generation are
 never arranged. The game's own sections (persona, reply rules, setting, the reader, cast,
 now, class, lorebook, mod notes, story recall, story so far, scene so far, your turn) show
-as rows. Move them, turn them off, or put the preset's blocks between them. The reply rules
-cannot be turned off or moved out of the system prompt.
+as rows, each with a line saying what it carries. Move them, turn them off, or put the preset's
+blocks between them. The reply rules cannot be turned off or moved out of the system prompt.
+Once a scene has been played this session, a row the last scene sent offers Example, which
+shows that section's text exactly as it went out.
 
 A preset block can be edited, added, deleted, turned on or off, given an XML wrapper, set to
 the system, user or assistant role, and placed in order or a number of parts back from the end of

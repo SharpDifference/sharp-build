@@ -29,6 +29,8 @@ interface FormFrameProps {
   onClose: () => void
   /** The panel's size: a line of fields, or a block's own text. */
   wide?: boolean
+  /** False for a panel that only shows something, whose primary is the one way out. */
+  cancel?: boolean
   children: ReactNode
 }
 
@@ -41,6 +43,7 @@ function FormFrame({
   onConfirm,
   onClose,
   wide = false,
+  cancel = true,
   children
 }: FormFrameProps): JSX.Element | null {
   // Dismissing is Cancel: nothing is written until the primary.
@@ -77,15 +80,17 @@ function FormFrame({
         <TitleTab>{title}</TitleTab>
         <div className="vu-studio-form-body">{children}</div>
         <div className="vu-foot">
-          <motion.button
-            id={`${id}-cancel`}
-            className="vu-btn vu-btn--quiet"
-            type="button"
-            {...gestures(false, quietLift, quietPress)}
-            onClick={onClose}
-          >
-            Cancel
-          </motion.button>
+          {cancel && (
+            <motion.button
+              id={`${id}-cancel`}
+              className="vu-btn vu-btn--quiet"
+              type="button"
+              {...gestures(false, quietLift, quietPress)}
+              onClick={onClose}
+            >
+              Cancel
+            </motion.button>
+          )}
           <motion.button
             id={`${id}-confirm`}
             className="vu-btn vu-btn--primary vu-btn--panel vu-paper"
@@ -346,6 +351,33 @@ export function VariableModal({ theme, name, value, onSave, onClose }: VariableM
       }}
     >
       <TextField id="preset-variable-value" label={name} value={text} onChange={setText} multiline autoFocus />
+    </FormFrame>
+  )
+}
+
+export interface PartExampleModalProps {
+  theme: ScreenTheme
+  /** The row's name, which titles the panel. */
+  title: string
+  /** What the section carries, said over the example. */
+  hint: string
+  /** The section's text as the last scene sent it. */
+  text: string
+  onClose: () => void
+}
+
+/** One of the game's own sections as the last scene sent it, to read and not to change. */
+export function PartExampleModal({ theme, title, hint, text, onClose }: PartExampleModalProps): JSX.Element | null {
+  return (
+    <FormFrame id="preset-part-example" theme={theme} title={title} confirm="Done" onClose={onClose} onConfirm={onClose} wide cancel={false}>
+      <p className="vu-studio-note">{hint} This is what the last scene sent here.</p>
+      <textarea
+        id="preset-part-example-text"
+        className="vu-input vu-input--multiline vu-studio-preview"
+        aria-label={title}
+        readOnly
+        value={text}
+      />
     </FormFrame>
   )
 }
