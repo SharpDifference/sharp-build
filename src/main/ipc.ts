@@ -13,6 +13,19 @@ import {
   setActivePreset
 } from './services/presetsService'
 import type { Preset } from '@shared/presets/types'
+import type { StudioPrompts } from '@shared/presets/studioPrompts'
+import { getStudioPrompts, setStudioPrompts } from './services/studioPromptsService'
+import { readStudioBackupFile, saveStudioBackup } from './services/studioBackupService'
+import {
+  deleteLorebook,
+  getLorebook,
+  listLorebooks,
+  readLorebookFile,
+  saveLorebook,
+  saveLorebookShipped,
+  setLorebooksOn
+} from './services/lorebooksService'
+import type { LoreBook, ShippedLoreOverrides } from '@shared/lorebooks/types'
 import type { StoryRecallRequest } from '@shared/storyMemory'
 import type { WhisperDraft, WhisperReply } from '@shared/venusWhisper'
 import type { MeanwhileResponse } from '@shared/meanwhile'
@@ -387,6 +400,46 @@ export function registerIpcHandlers(): void {
   handle('presets:save', (_event, preset: Preset) => savePreset(preset))
   handle('presets:delete', (_event, id: string) => deletePreset(id))
   handle('presets:setActive', (_event, id: string) => setActivePreset(id))
+  // The section backups: a file saved where the native dialog points, and one picked to restore
+  // from; a dismissed dialog resolves `null`.
+  handle('studioBackup:save', async (event, name: string, text: string) => {
+    const { canceled, filePath } = await showSaveDialogFor(event, {
+      title: 'Back up Prompt Studio',
+      defaultPath: name,
+      filters: [{ name: 'Prompt Studio backup', extensions: ['json'] }]
+    })
+    if (canceled || filePath === undefined || filePath === '') return null
+
+    await saveStudioBackup(filePath, text)
+    return filePath
+  })
+  handle('studioBackup:pick', async (event) => {
+    const { canceled, filePaths } = await showOpenDialogFor(event, {
+      title: 'Restore Prompt Studio',
+      filters: [{ name: 'Prompt Studio backup', extensions: ['json'] }],
+      properties: ['openFile']
+    })
+    if (canceled || filePaths.length === 0) return null
+    return readStudioBackupFile(filePaths[0])
+  })
+  handle('studioPrompts:get', () => getStudioPrompts())
+  handle('studioPrompts:set', (_event, record: StudioPrompts) => setStudioPrompts(record))
+  // Lorebooks. Import reads a file the player picks and keeps nothing; a dismissed dialog resolves `null`.
+  handle('lorebooks:list', () => listLorebooks())
+  handle('lorebooks:get', (_event, id: string) => getLorebook(id))
+  handle('lorebooks:save', (_event, book: LoreBook) => saveLorebook(book))
+  handle('lorebooks:delete', (_event, id: string) => deleteLorebook(id))
+  handle('lorebooks:setOn', (_event, ids: string[]) => setLorebooksOn(ids))
+  handle('lorebooks:saveShipped', (_event, shipped: ShippedLoreOverrides) => saveLorebookShipped(shipped))
+  handle('lorebooks:import', async (event) => {
+    const { canceled, filePaths } = await showOpenDialogFor(event, {
+      title: 'Import a lorebook',
+      filters: [{ name: 'World Info', extensions: ['json'] }],
+      properties: ['openFile']
+    })
+    if (canceled || filePaths.length === 0) return null
+    return readLorebookFile(filePaths[0])
+  })
   handle('presets:import', async (event) => {
     const { canceled, filePaths } = await showOpenDialogFor(event, {
       title: 'Import a preset',

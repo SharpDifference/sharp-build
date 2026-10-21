@@ -12,6 +12,14 @@ import type {
 import type { FeedThreadsResponse } from '@shared/bunnyfeeds'
 import type { PromptEdit } from '@shared/imagePrompt'
 import type { ModSwitches } from '@shared/mods'
+import type {
+  LoreBook,
+  LoreBookFile,
+  LoreBookListing,
+  ShippedLoreOverrides
+} from '@shared/lorebooks/types'
+import type { StudioBackupFile } from '@shared/presets/studioBackup'
+import type { StudioPrompts } from '@shared/presets/studioPrompts'
 import type { Preset, PresetImport, PresetListing } from '@shared/presets/types'
 import type { SoundtracksApi } from '@shared/soundtracks'
 import type {
@@ -112,6 +120,44 @@ export interface VenusUniversityApi {
     get: () => Promise<Result<GrabBags>>
     /** Replaces every grab bag's set-aside keys. */
     set: (bags: GrabBags) => Promise<Result<void>>
+  }
+  /** Prompt Studio's section backups as files the player keeps. */
+  studioBackup: {
+    /**
+     * Saves a backup the renderer composed where the native save dialog points (the browser build
+     * offers it as a download), after sniffing it as a studio backup. Answers where it went, or
+     * `null` where the dialog was dismissed.
+     */
+    save: (name: string, text: string) => Promise<Result<string | null>>
+    /** Reads a backup file the player picks as text, with its name; nothing is parsed or kept. `null` where nothing was picked. */
+    pick: () => Promise<Result<StudioBackupFile | null>>
+  }
+  /** What Prompt Studio keeps for the game's own prompts, apart from the settings. */
+  studioPrompts: {
+    /** The record; an empty one where nothing has been kept. A wrong schema version is refused with `STUDIO_PROMPTS_SCHEMA_VERSION`. */
+    get: () => Promise<Result<StudioPrompts>>
+    /** Replaces the record and answers it as kept: blank blocks dropped, pool sizes whole and in range. */
+    set: (record: StudioPrompts) => Promise<Result<StudioPrompts>>
+  }
+  /** Prompt Studio's lorebooks and the edits to the shipped lore, apart from the settings. */
+  lorebooks: {
+    /** The index (shipped edits and the books that are on) and every book's summary, by name. A wrong schema version on the index is refused with `LOREBOOK_INDEX_SCHEMA_VERSION`. */
+    list: () => Promise<Result<LoreBookListing>>
+    /** One book whole; an id nothing readable is kept under is refused with `LOREBOOK_NOT_FOUND`. */
+    get: (id: string) => Promise<Result<LoreBook>>
+    /** Keeps a book under its own id, replacing one already there; a malformed book is refused with `LOREBOOK_INVALID`. */
+    save: (book: LoreBook) => Promise<Result<void>>
+    /** Removes one and takes it off the books that are on. */
+    delete: (id: string) => Promise<Result<void>>
+    /** Replaces which books are on, in order; ids nothing is kept under are left out. */
+    setOn: (ids: string[]) => Promise<Result<void>>
+    /** Replaces the shipped entries as edited, keeping only what differs from the shipped entry. */
+    saveShipped: (shipped: ShippedLoreOverrides) => Promise<Result<void>>
+    /**
+     * Reads a World Info file the player picks as text, with its name; nothing is parsed or kept:
+     * the caller parses it and saves the book. `null` where nothing was picked.
+     */
+    import: () => Promise<Result<LoreBookFile | null>>
   }
   /** Prompt Studio's presets, kept for every playthrough. */
   presets: {

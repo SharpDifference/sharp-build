@@ -50,8 +50,38 @@ export const SCENE_TEXT_IDS = [
 ] as const
 export type SceneTextId = (typeof SCENE_TEXT_IDS)[number]
 
-/** The text blocks the settings own, shared by every preset. */
-export const GLOBAL_TEXT_IDS = ['persona.solo', 'persona.texting', 'persona.narration', 'persona.designer'] as const
+/** The text blocks the studio owns outside any preset: the personas, then the New Game calls' prose. */
+export const GLOBAL_TEXT_IDS = [
+  'persona.solo',
+  'persona.texting',
+  'persona.narration',
+  'persona.designer',
+  'newgame.classes.system',
+  'newgame.classes.additions',
+  'newgame.classes.instructions',
+  'newgame.profiles.system',
+  'newgame.profiles.additions',
+  'newgame.profiles.instructions',
+  'newgame.profiles.housing',
+  'newgame.profiles.freeTime',
+  'newgame.profiles.handle',
+  'newgame.profiles.springBreak',
+  'newgame.profiles.next.newcomers',
+  'newgame.profiles.next.housing',
+  'newgame.profiles.next.graduates',
+  'newgame.occasions.system',
+  'newgame.occasions.additions',
+  'newgame.occasions.instructions',
+  'newgame.occasions.fillers',
+  'newgame.occasions.gala',
+  'newgame.occasions.dance',
+  'newgame.occasions.careerFair',
+  'newgame.occasions.concert',
+  'newgame.secrets.system',
+  'newgame.secrets.additions',
+  'newgame.secrets.instructions',
+  'newgame.secrets.tiers'
+] as const
 export type GlobalTextId = (typeof GLOBAL_TEXT_IDS)[number]
 
 export type TextBlockId = SceneTextId | GlobalTextId

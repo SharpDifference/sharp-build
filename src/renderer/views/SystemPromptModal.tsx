@@ -20,6 +20,8 @@ export interface SystemPromptModalProps {
   discardMessage?: string
   /** What Reset returns to, and what a saved text equal to it is stored as: nothing. */
   defaultText: string
+  /** Lets an empty text be saved, for a text whose default is empty. */
+  allowEmpty?: boolean
   /** What is in force now: the stored text, or the default where nothing has replaced it. */
   stored: string
   /** Keeps the text, or clears the edit where it is `undefined`. False when the write failed. */
@@ -34,6 +36,7 @@ export function SystemPromptModal({
   fieldLabel = 'System prompt',
   discardMessage = 'The system prompt has not been saved.',
   defaultText,
+  allowEmpty = false,
   stored,
   onSave,
   onClose
@@ -45,7 +48,7 @@ export function SystemPromptModal({
   const [closing, setClosing] = useState(false)
 
   const atDefault = text === defaultText
-  const empty = text.trim().length === 0
+  const empty = !allowEmpty && text.trim().length === 0
 
   /** Writes the well, clearing back to the shipped default where the two now agree. */
   async function handleSave(): Promise<void> {

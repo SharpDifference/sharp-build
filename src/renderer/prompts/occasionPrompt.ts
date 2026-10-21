@@ -1,10 +1,12 @@
 import { CLASS_SLOTS, FINAL_DATE } from '@shared/classes'
 import { slotFromId } from '@shared/jobs'
 import { shuffle } from '@shared/shuffle'
+import { blockText } from '@shared/presets/textBlocks'
+import type { GlobalTextId, TextEdits } from '@shared/presets/types'
 import { calendarOf } from '@shared/semesters'
 import type { Occasion, Season, StructuredRequest, TimeSlot } from '@shared/types'
 import { formatDatePart } from './gameDate'
-import { LOREBOOK } from './lorebook'
+import { SHIPPED_LORE, type EffectiveLore } from './lorebook'
 import {
   breakWeekOf,
   occasionsOn,
@@ -12,6 +14,14 @@ import {
   staticOccasionsOf,
   weekOf
 } from './occasions'
+import {
+  CAREER_FAIR_BRIEF,
+  CONCERT_BRIEF,
+  DANCE_BRIEF,
+  GALA_BRIEF,
+  newGameText,
+  withAdditions
+} from './promptBlocks'
 import { objectSchema } from './schema'
 import { SETTING } from './setting'
 
@@ -98,8 +108,7 @@ export function planOccasionSlots(
       startDate: saturdayOf(gala),
       endDate: saturdayOf(gala) + 1,
       time: 1,
-      brief:
-        'A two-night formal gala thrown by the SEB, Saturday and Sunday — the most expensive, most photographed thing the student government does all year. Give it a name students would actually use.'
+      brief: GALA_BRIEF
     })
   }
 
@@ -112,8 +121,7 @@ export function planOccasionSlots(
       startDate: day,
       endDate: day,
       time: 1,
-      brief:
-        'A one-night formal dance, smaller and cheaper than the gala — a themed dance students dress up for, run in one of the campus venues.'
+      brief: DANCE_BRIEF
     })
   }
 
@@ -126,8 +134,7 @@ export function planOccasionSlots(
       startDate: start,
       endDate: start + 1,
       time: 0,
-      brief:
-        'A two-day career fair held during the day — recruiters at tables, free branded junk, and students in interview clothes they own one of. Give it a name and say who is recruiting.'
+      brief: CAREER_FAIR_BRIEF
     })
   }
 
@@ -138,8 +145,7 @@ export function planOccasionSlots(
       startDate: concert * 7 + 4,
       endDate: concert * 7 + 4,
       time: 1,
-      brief:
-        'A Friday night concert in Thorne Auditorium — one booked act plus student openers, run by the SEB. Say who is playing and what they sound like.'
+      brief: CONCERT_BRIEF
     })
   }
 
@@ -244,47 +250,64 @@ function existingLine(occasion: Occasion, season: Season): string {
   return `- ${whenLine(occasion, season)} — ${occasion.title}`
 }
 
-/** Builds the invented-occasions request for a `season` semester. */
+/** The block each named event's brief is edited in. */
+const BRIEF_BLOCKS = {
+  gala: 'newgame.occasions.gala',
+  dance: 'newgame.occasions.dance',
+  'career-fair': 'newgame.occasions.careerFair',
+  concert: 'newgame.occasions.concert'
+} as const
+
+/** What a named event is briefed with: the player's edit where its id has one, else the brief the planner set. */
+function briefOf(request: OccasionRequest, textEdits: TextEdits<GlobalTextId> | undefined): string {
+  const block = BRIEF_BLOCKS[request.id as keyof typeof BRIEF_BLOCKS]
+  return block ? blockText(textEdits, block, request.brief ?? '') : (request.brief ?? '')
+}
+
+/**
+ * Builds the invented-occasions request for a `season` semester; `textEdits` are the player's
+ * edits to its text. `lore` lists every shipped place the player has not turned off, as edited,
+ * and then the player's own entries under their own heading.
+ */
 export function buildOccasionPrompt(
   requests: readonly OccasionRequest[],
-  season: Season
+  season: Season,
+  textEdits?: TextEdits<GlobalTextId>,
+  lore: EffectiveLore = SHIPPED_LORE
 ): StructuredRequest {
   const named = requests.filter((request) => !request.filler)
   const fillers = requests.filter((request) => request.filler)
 
-  const system = [
-    'You invent the events on a university calendar: what the campus and the city put on, and what it is called.',
-    'You return a single JSON object matching the provided schema exactly.',
-    'Everything you invent is set in the world below and nowhere else. Use its real places and institutions by name.',
-    '',
-    'SETTING',
-    SETTING,
-    '',
-    'PLACES',
-    ...LOREBOOK.map((entry) => entry.text)
-  ].join('\n')
+  const system = withAdditions(
+    [
+      newGameText(textEdits, 'newgame.occasions.system'),
+      '',
+      'SETTING',
+      SETTING,
+      '',
+      'PLACES',
+      ...lore.shipped.filter((item) => item.enabled).map((item) => item.entry.text),
+      ...(lore.playerTexts.length > 0 ? ['', 'LORE', ...lore.playerTexts] : [])
+    ].join('\n'),
+    textEdits,
+    'newgame.occasions.additions'
+  )
 
   const user = [
     'ALREADY ON THE CALENDAR',
     'These are fixed and are not yours to write. Never invent one of them, and never invent anything that would read as a second version of one.',
     ...staticOccasionsOf(season).map((occasion) => existingLine(occasion, season)),
     '',
-    'EVENTS TO WRITE',
-    'One entry in "events" for each id below, and nothing else. The dates are already decided — do not restate them.',
-    '"title" is a few words, the way it would be printed on a poster or said out loud on campus.',
-    '"description" is one or two sentences of what actually happens: who runs it, where on campus or in the city it is, what a student would see. Present tense.',
-    'Each id carries an inspiration word. Let it colour that one event, loosely — it is a nudge, not a subject.',
-    'Make them different from each other. Spread them across the campus and the city rather than putting everything in the Quad.',
+    newGameText(textEdits, 'newgame.occasions.instructions'),
     '',
     ...named.flatMap((request) => [
       `"${request.id}" — ${requestWhenLine(request, season)} — ${request.seed}`,
-      request.brief ?? '',
+      briefOf(request, textEdits),
       ''
     ]),
     ...(fillers.length > 0
       ? [
-          'FILLERS',
-          'Each id below is something small happening on campus or in the city for half a day — a club running a table, a market, a screening, a tournament, a protest, a food thing. Ordinary scale. Not a dance, not a gala, not a fair.',
+          newGameText(textEdits, 'newgame.occasions.fillers'),
           `Ids marked ${BREAK_TAG[season]} ${BREAK_NOTE[season]}`,
           '',
           ...fillers.map(

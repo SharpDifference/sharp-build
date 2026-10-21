@@ -113,6 +113,7 @@ import {
   shiftNow
 } from './timetable'
 import { isMoodLustful } from '../prompts/moods'
+import { loreNow } from './loreStore'
 import { textEditsNow } from './promptStudioStore'
 import { sendsSpringBreakNotice } from '../prompts/springBreak'
 import { outingOccasionAt, placeClosedOn } from '../prompts/occasions'
@@ -752,7 +753,8 @@ function textingState(game: ReturnType<typeof useGameStore.getState>, charId: st
     memoryBudget: memoryBudgetsOf(useSettingsStore.getState().settings ?? {}).one,
     secretBudget: secretBudgetOf(useSettingsStore.getState().settings ?? {}),
     history: game.history,
-    globalTextEdits: textEditsNow()?.global
+    globalTextEdits: textEditsNow()?.global,
+    lore: loreNow()
   }
 }
 

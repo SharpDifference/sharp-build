@@ -9,6 +9,7 @@ import { AnimatePresence, motion } from 'motion/react'
 import { presetMacros, type MacroUse } from '@shared/presets/glossary'
 import { hasDynamicMacros } from '@shared/presets/macros'
 import { planPresetRequest } from '@shared/presets/request'
+import { studioPromptsToKeep, withBlockText, type ClassCatalogEdits } from '@shared/presets/studioPrompts'
 import {
   PROTECTED_MARKERS,
   type GameMarker,
@@ -24,7 +25,7 @@ import { CheckField } from '../components/CheckField'
 import { ConfirmModal } from '../components/ConfirmModal'
 import { TitleTab } from '../components/TitleTab'
 import { useModalShell } from '../components/useModalShell'
-import { defaultBlockText, PROMPT_BLOCKS, type PromptBlock } from '../prompts/promptBlocks'
+import { defaultBlockText, isNewGameBlock, PROMPT_BLOCKS, type PromptBlock } from '../prompts/promptBlocks'
 import { useGameStore } from '../stores/gameStore'
 import { usePromptStudioStore } from '../stores/promptStudioStore'
 import { useSettingsStore } from '../stores/settingsStore'
@@ -41,18 +42,22 @@ import {
 } from './motion'
 import { ChevronIcon, PlusIcon } from './screenIcons'
 import {
+  CatalogSizesModal,
   PresetBlockModal,
   PresetImportModal,
   PresetNameModal,
   VariableModal,
   PartExampleModal,
-  FindReplaceModal
+  FindReplaceModal,
+  StudioPill
 } from './PromptStudioModals'
+import { useStudioBackup } from './PromptStudioBackup'
+import { useLorebookTab } from './PromptStudioLorebook'
 import { SystemPromptModal } from './SystemPromptModal'
 import '../vu_styles/Settings.css'
 import '../vu_styles/PromptStudio.css'
 
-type TabId = 'presets' | 'blocks' | 'glossary' | 'scene' | 'other' | 'variables' | 'preview'
+type TabId = 'presets' | 'blocks' | 'glossary' | 'scene' | 'other' | 'newgame' | 'lorebook' | 'variables' | 'preview'
 
 /** Each tab's word, the one line over its page, and whether the page works on the active preset. */
 const TABS: readonly { id: TabId; word: string; intro: string; preset?: true }[] = [
@@ -88,6 +93,18 @@ const TABS: readonly { id: TabId; word: string; intro: string; preset?: true }[]
     intro: "The writer's instructions for everything outside a scene. Every preset shares them."
   },
   {
+    id: 'newgame',
+    word: 'New Game',
+    intro:
+      "The instructions for building a new game's classes, student profiles, calendar events and secrets. A new semester uses them too. They can only be changed from the main menu."
+  },
+  {
+    id: 'lorebook',
+    word: 'Lorebook',
+    intro:
+      "Places and things the writer is told about when a scene mentions them. Characters and classes are added from the save on every call, so they aren't edited here. Changes apply straight away, even in a game."
+  },
+  {
     id: 'variables',
     word: 'Variables',
     intro:
@@ -99,6 +116,14 @@ const TABS: readonly { id: TabId; word: string; intro: string; preset?: true }[]
     intro: 'The last scene request, as this preset would send it now. Rolls and random picks change on every call.',
     preset: true
   }
+]
+
+/** The New Game page's groups, in the order it lists them. */
+const NEW_GAME_GROUPS: readonly { group: PromptBlock['group']; word: string }[] = [
+  { group: 'newgame.classes', word: 'Classes' },
+  { group: 'newgame.profiles', word: 'Profiles' },
+  { group: 'newgame.occasions', word: 'Occasions' },
+  { group: 'newgame.secrets', word: 'Secrets' }
 ]
 
 /** What each source is called beside a preset's name. */
@@ -209,18 +234,6 @@ function withSceneText(preset: Preset, id: SceneTextId, value: string | undefine
   return Object.keys(next).length > 0 ? { ...rest, overrides: next } : rest
 }
 
-/** The settings' global text edits with one set or cleared; an empty map is `undefined`. */
-function withGlobalText(
-  edits: Partial<Record<GlobalTextId, string>> | undefined,
-  id: GlobalTextId,
-  value: string | undefined
-): Partial<Record<GlobalTextId, string>> | undefined {
-  const next = { ...edits }
-  if (value === undefined) delete next[id]
-  else next[id] = value
-  return Object.keys(next).length > 0 ? next : undefined
-}
-
 export interface PromptStudioModalProps {
   /** Drawn by the screen that raised this — a portal inherits neither palette nor state rules. */
   theme: ScreenTheme
@@ -231,9 +244,9 @@ export function PromptStudioModal({ theme, onClose }: PromptStudioModalProps): J
   const presets = usePromptStudioStore((s) => s.presets)
   const activeId = usePromptStudioStore((s) => s.activeId)
   const active = usePromptStudioStore((s) => s.active)
+  const prompts = usePromptStudioStore((s) => s.prompts)
   const lastSceneRequest = usePromptStudioStore((s) => s.lastSceneRequest)
   const settings = useSettingsStore((s) => s.settings)
-  const update = useSettingsStore((s) => s.update)
   const playthroughId = useGameStore((s) => s.playthroughId)
   const presetVars = useGameStore((s) => s.presetVars)
   const playerFirstName = useGameStore((s) => s.playerFirstName)
@@ -250,6 +263,7 @@ export function PromptStudioModal({ theme, onClose }: PromptStudioModalProps): J
   const [varEdit, setVarEdit] = useState<string | null>(null)
   const [varsReset, setVarsReset] = useState(false)
   const [partShown, setPartShown] = useState<GameMarker | null>(null)
+  const [catalogOpen, setCatalogOpen] = useState(false)
   // What the find and replace panel opens on, while it is open.
   const [findReplace, setFindReplace] = useState<string | null>(null)
   // Holds off a second write while the first is in flight, so each reads the preset the last left.
@@ -261,9 +275,12 @@ export function PromptStudioModal({ theme, onClose }: PromptStudioModalProps): J
   }, [])
 
   const { host, overlayProps } = useModalShell(onClose)
+  const lorebook = useLorebookTab(theme)
+  const presetsBackup = useStudioBackup(theme, 'presets')
+  const promptsBackup = useStudioBackup(theme, 'prompts')
 
   const hasGame = playthroughId !== null
-  const tabs = TABS.filter((entry) => entry.id !== 'variables' || hasGame)
+  const tabs = TABS.filter((entry) => (entry.id !== 'variables' || hasGame) && (entry.id !== 'newgame' || !hasGame))
   const shown = tabs.find((entry) => entry.id === tab) ?? tabs[0]
 
   const lessNsfwText = settings?.lessNsfwText ?? false
@@ -311,14 +328,21 @@ export function PromptStudioModal({ theme, onClose }: PromptStudioModalProps): J
       if (!current) return false
       return usePromptStudioStore.getState().save(withSceneText(current, block.id as SceneTextId, value))
     }
-    return update({ promptBlocks: withGlobalText(settings?.promptBlocks, block.id as GlobalTextId, value) })
+    const store = usePromptStudioStore.getState()
+    return store.savePrompts(withBlockText(store.prompts, block.id as GlobalTextId, value))
+  }
+
+  /** Writes the class call's pool sizes. */
+  function saveCatalog(sizes: ClassCatalogEdits): Promise<boolean> {
+    const store = usePromptStudioStore.getState()
+    return store.savePrompts(studioPromptsToKeep({ ...store.prompts, classCatalog: sizes }))
   }
 
   /** The stored edit of a text block, where there is one. */
   function editOf(block: PromptBlock): string | undefined {
     return block.owner === 'preset'
       ? active?.overrides?.[block.id as SceneTextId]
-      : settings?.promptBlocks?.[block.id as GlobalTextId]
+      : prompts.blocks?.[block.id as GlobalTextId]
   }
 
   /** The two texts the next scene would send, or null where no scene has been asked for yet. */
@@ -345,17 +369,7 @@ export function PromptStudioModal({ theme, onClose }: PromptStudioModalProps): J
 
   /** One quiet pill at the end of a row. */
   function pill(id: string, word: string, onClick: () => void): JSX.Element {
-    return (
-      <motion.button
-        id={id}
-        className="vu-pill"
-        type="button"
-        {...gestures(false, quietLift, quietPress)}
-        onClick={onClick}
-      >
-        {word}
-      </motion.button>
-    )
+    return <StudioPill id={id} word={word} onClick={onClick} />
   }
 
   /** A page's lead line, over whatever scrolls. */
@@ -393,6 +407,7 @@ export function PromptStudioModal({ theme, onClose }: PromptStudioModalProps): J
             <PlusIcon size={16} />
             Import preset
           </motion.button>
+          {presetsBackup.actions}
         </div>
         {presets.length === 0 ? (
           <p className="vu-empty vu-empty--flush">Loading presets.</p>
@@ -573,23 +588,60 @@ export function PromptStudioModal({ theme, onClose }: PromptStudioModalProps): J
     )
   }
 
+  /** One row of a page of text blocks. */
+  function textRow(block: PromptBlock): JSX.Element {
+    return (
+      <li key={block.id} className="vu-row vu-studio-row">
+        <span className="vu-studio-body">
+          <span className="vu-studio-name">{block.label}</span>
+          <span className="vu-studio-meta">{block.hint}</span>
+        </span>
+        {editOf(block) !== undefined && <span className="vu-studio-tag">Edited</span>}
+        <span className="vu-studio-tools">
+          {pill(`studio-edit-text-${block.id}`, 'Edit', () => setTextEdit(block))}
+        </span>
+      </li>
+    )
+  }
+
   /** The Scene text and Other prompts pages: one row per editable block. */
   function textPage(owner: PromptBlock['owner']): JSX.Element {
     return page(
-      <ul className="vu-rows">
-        {PROMPT_BLOCKS.filter((block) => block.owner === owner).map((block) => (
-          <li key={block.id} className="vu-row vu-studio-row">
-            <span className="vu-studio-body">
-              <span className="vu-studio-name">{block.label}</span>
-              <span className="vu-studio-meta">{block.hint}</span>
-            </span>
-            {editOf(block) !== undefined && <span className="vu-studio-tag">Edited</span>}
-            <span className="vu-studio-tools">
-              {pill(`studio-edit-text-${block.id}`, 'Edit', () => setTextEdit(block))}
-            </span>
-          </li>
+      <>
+        {owner === 'global' && <div className="vu-studio-actions">{promptsBackup.actions}</div>}
+        <ul className="vu-rows">
+          {PROMPT_BLOCKS.filter((block) => block.owner === owner && !isNewGameBlock(block)).map(textRow)}
+        </ul>
+      </>
+    )
+  }
+
+  /** The New Game page: each call's blocks under its own heading, and the class pool sizes. */
+  function newGamePage(): JSX.Element {
+    const sized = Object.keys(prompts.classCatalog ?? {}).length > 0
+    return page(
+      <>
+        {NEW_GAME_GROUPS.map(({ group, word }) => (
+          <section key={group} className="vu-studio-group">
+            <span className="vu-settings-heading">{word}</span>
+            <ul className="vu-rows">
+              {PROMPT_BLOCKS.filter((block) => block.group === group).map(textRow)}
+              {group === 'newgame.classes' && (
+                <li className="vu-row vu-studio-row">
+                  <span className="vu-studio-body">
+                    <span className="vu-studio-name">Classes: catalog sizes</span>
+                    <span className="vu-studio-meta">How many classes are asked for in each pool.</span>
+                  </span>
+                  {sized && <span className="vu-studio-tag">Edited</span>}
+                  <span className="vu-studio-tools">
+                    {pill('studio-edit-catalog', 'Edit', () => setCatalogOpen(true))}
+                  </span>
+                </li>
+              )}
+            </ul>
+          </section>
         ))}
-      </ul>
+      </>
     )
   }
 
@@ -706,6 +758,8 @@ export function PromptStudioModal({ theme, onClose }: PromptStudioModalProps): J
             {shown.id === 'glossary' && glossaryPage()}
             {shown.id === 'scene' && textPage('preset')}
             {shown.id === 'other' && textPage('global')}
+            {shown.id === 'newgame' && newGamePage()}
+            {shown.id === 'lorebook' && page(lorebook.content)}
             {shown.id === 'variables' && variablesPage()}
             {shown.id === 'preview' && previewPage()}
           </div>
@@ -725,6 +779,9 @@ export function PromptStudioModal({ theme, onClose }: PromptStudioModalProps): J
       </motion.div>
 
       {/* Siblings of the veil and of each other, never its children: each leaves when this panel does. */}
+      {lorebook.panels}
+      {presetsBackup.panel}
+      {promptsBackup.panel}
       <AnimatePresence propagate>
         {textEdit && (
           <SystemPromptModal
@@ -734,9 +791,21 @@ export function PromptStudioModal({ theme, onClose }: PromptStudioModalProps): J
             fieldLabel={textEdit.label}
             discardMessage="This text has not been saved."
             defaultText={textDefault}
+            allowEmpty={textDefault === ''}
             stored={editOf(textEdit) ?? textDefault}
             onSave={(value) => saveText(textEdit, value)}
             onClose={() => setTextEdit(null)}
+          />
+        )}
+      </AnimatePresence>
+      <AnimatePresence propagate>
+        {catalogOpen && (
+          <CatalogSizesModal
+            key="studio-catalog"
+            theme={theme}
+            sizes={prompts.classCatalog ?? {}}
+            onSave={saveCatalog}
+            onClose={() => setCatalogOpen(false)}
           />
         )}
       </AnimatePresence>

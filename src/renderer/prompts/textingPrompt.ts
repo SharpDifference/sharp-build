@@ -34,6 +34,7 @@ import {
   characterLoreForIds,
   classLore,
   type ClassRoster,
+  type EffectiveLore,
   keyPattern,
   lorebookBlock
 } from './lorebook'
@@ -77,6 +78,8 @@ const TEXTING_HISTORY_CAP = 20
 export interface TextingPromptState {
   /** Prompt Studio's edits to the global text blocks; absent with the mod off. */
   globalTextEdits?: TextEdits<GlobalTextId>
+  /** The lorebook as the player has it under Prompt Studio; absent is the shipped one. */
+  lore?: EffectiveLore
   storyMemory?: StorySnapshot
   /** Supplied only while the standalone Breakthrough mod is enabled. */
   breakthrough?: BreakthroughState
@@ -414,7 +417,7 @@ export function buildTextingPrompt(
       state.history,
       state.calendar.season
     )
-  ])
+  ], undefined, state.lore)
 
   // How her cold stands this slot, where she has one that shows.
   const slot = globalSlotOf(state.date, state.time)

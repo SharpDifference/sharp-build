@@ -221,14 +221,223 @@ export function sceneText(
   return blockText(edits, id, SCENE_TEXTS[id])
 }
 
+/** The class call's system prompt. */
+const CLASSES_SYSTEM_TEXT = [
+  'You are a university registrar building a course catalog and enrolling students.',
+  'You return a single JSON object matching the provided schema exactly.',
+  'Course codes follow real university convention: a subject prefix and a three-digit number, like "BIO 210".'
+].join(' ')
+
+/**
+ * The class call's instructions in the runs they are read in. The builder fills the lines it
+ * locks (the major count, the pool sizes, the code rule and the returning-student lines) in
+ * between them.
+ */
+export const CLASS_INSTRUCTION_RUNS = {
+  intro: [
+    'Build a course catalog for a university, then enroll each student below.',
+    '',
+    'FOR EACH STUDENT',
+    'major: the field she studies. Pick one that fits her personality. Collape similar majors like Business Studies and Business Science into a single major like Business Administration.'
+  ],
+  student: [
+    'interestClass: one course this specific student would sign up for out of pure personal interest.',
+    'It should read like something only she would pick.',
+    '',
+    'THE CATALOG'
+  ],
+  gap: [''],
+  course: [
+    'Every course needs a one-sentence description written the way a real course catalog writes them.',
+    '',
+    'EVERY COURSE ALSO NEEDS A KIND',
+    'kind "lecture": the class meets to be taught. The professor lectures, students take notes, and the course is assessed by a midterm and a final exam.',
+    'kind "project": the class is built around producing work. Students spend the term making something, and the course is assessed by showcasing that work instead of by exams.',
+    'Pick whichever genuinely fits the subject — a studio, a workshop or a design course is a project class; a survey, a theory or a history course is a lecture class.',
+    'Physical education classes are neither, so answer "lecture" for those and it will be ignored.'
+  ]
+}
+
+const CLASSES_INSTRUCTIONS_TEXT = [
+  ...CLASS_INSTRUCTION_RUNS.intro,
+  ...CLASS_INSTRUCTION_RUNS.student,
+  ...CLASS_INSTRUCTION_RUNS.gap,
+  ...CLASS_INSTRUCTION_RUNS.course
+].join('\n')
+
+/** The profile calls' system prompt. */
+const PROFILES_SYSTEM_TEXT = [
+  'You are a university student affairs office profiling enrolled students.',
+  'You return a single JSON object matching the provided schema exactly.'
+].join(' ')
+
+/** How many classes she takes, asked of every student profiled in full. */
+const PROFILES_CLASSES_TAKEN_TEXT = [
+  'classesTaken: how many classes she takes. The vast majority of students take 4.',
+  'Give 3 only to a genuine slacker, and 5 or 6 only to a genuine overachiever.'
+].join('\n')
+
+/** Where a first semester's students live. */
+const PROFILES_HOUSING_TEXT = [
+  'dorm: where she lives on campus. lowrise_1 through lowrise_5 are the ordinary apartment-style dorms that house the bulk of students; elysium is Elysium Village, the coveted upperclassman townhouses claimed through a housing lottery.',
+  'Spread the rest across the five Lowrises rather than piling everyone into one building.'
+].join('\n')
+
+/** Her weekly interest, where she does it, and where she eats out. */
+const PROFILES_FREE_TIME_TEXT = [
+  'activity: a specific interest of hers that she pursues somewhere every week, as one short lowercase phrase starting with an -ing verb that names both what she does and where she does it: "sketching at the Whitman Greenhouse", "jogging at Green Hill Park", "practicing cello in the practice rooms under Thorne Auditorium". It has to be something she does over and over, not a one-off, and it must happen at one of the ACTIVITY LOCATIONS. An empty string for a student with no such interest, which is most of them.',
+  'activityLocation: the key of the place activity names, exactly as written below. An empty string when activity is empty.',
+  'meal: one place she eats out at, about once a week. An empty string for somebody who cooks for herself or eats in the dorm kitchens.'
+].join('\n')
+
+/** How her handle is asked for. */
+const PROFILES_HANDLE_TEXT =
+  'handle: the username she posts under. some examples: "GinaHayes", "gina.hayes", "ginahayes12", "gina_says_hay", "gina_hayes", "ghayes", "gina.h".'
+
+/** How her spring break plans are asked for. */
+const PROFILES_SPRING_BREAK_TEXT = [
+  'springBreakPlans: what she does with the week off in March, as one short phrase in the infinitive, ending in a full stop: "Go home to Russia to see her parents.", "Drive down to her aunt\'s place on the coast with her roommate."',
+  'All plans must include leaving campus and don\'t include other students or the reader.'
+].join('\n')
+
+/** What a next semester's new students are. */
+const PROFILES_NEXT_NEWCOMERS_TEXT = 'Every new student is a first-year arriving at the university this semester.'
+
+/** Where a next semester's new students live. */
+const PROFILES_NEXT_HOUSING_TEXT = [
+  'dorm: where she lives on campus. As a first-year she lives in one of the five Lowrises, lowrise_1 through lowrise_5, the ordinary apartment-style dorms that house the bulk of students.',
+  'Spread them across the five Lowrises rather than piling everyone into one building.'
+].join('\n')
+
+/** What a graduate is asked for. */
+const PROFILES_NEXT_GRADUATES_TEXT = [
+  'She has graduated from Venus University and moved away from Veridan.',
+  'pursuing: what she is doing with her life now, as one short lowercase phrase starting with an -ing verb, somewhere other than Veridan: "teaching English in Seoul", "interning at a law firm in Chicago", "backpacking through Patagonia". Where she had one last semester, write where it has led her since rather than repeating it.'
+].join('\n')
+
+/** The occasion call's system prompt, ahead of the setting. */
+const OCCASIONS_SYSTEM_TEXT = [
+  'You invent the events on a university calendar: what the campus and the city put on, and what it is called.',
+  'You return a single JSON object matching the provided schema exactly.',
+  'Everything you invent is set in the world below and nowhere else. Use its real places and institutions by name.'
+].join('\n')
+
+/** What the occasion call is asked to write for each event. */
+const OCCASIONS_INSTRUCTIONS_TEXT = [
+  'EVENTS TO WRITE',
+  'One entry in "events" for each id below, and nothing else. The dates are already decided — do not restate them.',
+  '"title" is a few words, the way it would be printed on a poster or said out loud on campus.',
+  '"description" is one or two sentences of what actually happens: who runs it, where on campus or in the city it is, what a student would see. Present tense.',
+  'Each id carries an inspiration word. Let it colour that one event, loosely — it is a nudge, not a subject.',
+  'Make them different from each other. Spread them across the campus and the city rather than putting everything in the Quad.'
+].join('\n')
+
+/** What the occasion call is asked to write for the small half-day events. */
+const OCCASIONS_FILLERS_TEXT = [
+  'FILLERS',
+  'Each id below is something small happening on campus or in the city for half a day — a club running a table, a market, a screening, a tournament, a protest, a food thing. Ordinary scale. Not a dance, not a gala, not a fair.'
+].join('\n')
+
+/** The four named events' briefs, as the planner hands them out. */
+export const GALA_BRIEF =
+  'A two-night formal gala thrown by the SEB, Saturday and Sunday — the most expensive, most photographed thing the student government does all year. Give it a name students would actually use.'
+export const DANCE_BRIEF =
+  'A one-night formal dance, smaller and cheaper than the gala — a themed dance students dress up for, run in one of the campus venues.'
+export const CAREER_FAIR_BRIEF =
+  'A two-day career fair held during the day — recruiters at tables, free branded junk, and students in interview clothes they own one of. Give it a name and say who is recruiting.'
+export const CONCERT_BRIEF =
+  'A Friday night concert in Thorne Auditorium — one booked act plus student openers, run by the SEB. Say who is playing and what they sound like.'
+
+/** The secrets call's system prompt. */
+const SECRETS_SYSTEM_TEXT = [
+  'You are a novelist inventing secrets for the students of a story set at a university.',
+  'You return a single JSON object matching the provided schema exactly.'
+].join(' ')
+
+/** What a secret is, asked of every tier. */
+const SECRETS_INSTRUCTIONS_TEXT = [
+  'A secret is something true of her that is not already in her description, backstory or love life, and that nobody would guess on first meeting her: either something she hides or something nobody would expect of her.',
+  'It can be mundane, like "Sara is top 10 in the Angry Ducks mobile game.", or core to who she is, like "Sara almost died in a plane crash when she was 17 while flying to Paris."',
+  'Make each one a concrete fact, something she does, has or did or something that happened to her, rather than a feeling on its own, and new rather than a detail of what her backstory already tells.',
+  'Write each as one or two sentences in the third person that name her by her first name. It is already true before she meets the reader, and leaves him and the other students out of it.'
+].join('\n')
+
+/** What each tier's secret is, matched to how close she is to the reader when she tells it. */
+const SECRETS_TIERS_TEXT = [
+  'friendly: what she tells the reader once they are friends. Something light that surprises, a hobby, habit or talent she is a little embarrassed by.',
+  'trusted: what she tells him once she trusts him. Something more personal that she keeps from most people, that she is ashamed of, afraid of or hoping for.',
+  'devoted: what she tells him once she is devoted to him. The deepest of her secrets, one she has told almost nobody because it shaped who she is or still hurts. It is more often something that happened to her than something she did.'
+].join('\n')
+
+/** The ids of the New Game calls' text blocks. */
+export type NewGameTextId = Extract<GlobalTextId, `newgame.${string}`>
+
+/** The ids of the Your additions blocks, which ship empty. */
+export type AdditionsTextId = Extract<NewGameTextId, `${string}.additions`>
+
+/** The shipped text of every New Game block; each Your additions block ships empty. */
+const NEW_GAME_TEXTS: Record<NewGameTextId, string> = {
+  'newgame.classes.system': CLASSES_SYSTEM_TEXT,
+  'newgame.classes.additions': '',
+  'newgame.classes.instructions': CLASSES_INSTRUCTIONS_TEXT,
+  'newgame.profiles.system': PROFILES_SYSTEM_TEXT,
+  'newgame.profiles.additions': '',
+  'newgame.profiles.instructions': PROFILES_CLASSES_TAKEN_TEXT,
+  'newgame.profiles.housing': PROFILES_HOUSING_TEXT,
+  'newgame.profiles.freeTime': PROFILES_FREE_TIME_TEXT,
+  'newgame.profiles.handle': PROFILES_HANDLE_TEXT,
+  'newgame.profiles.springBreak': PROFILES_SPRING_BREAK_TEXT,
+  'newgame.profiles.next.newcomers': PROFILES_NEXT_NEWCOMERS_TEXT,
+  'newgame.profiles.next.housing': PROFILES_NEXT_HOUSING_TEXT,
+  'newgame.profiles.next.graduates': PROFILES_NEXT_GRADUATES_TEXT,
+  'newgame.occasions.system': OCCASIONS_SYSTEM_TEXT,
+  'newgame.occasions.additions': '',
+  'newgame.occasions.instructions': OCCASIONS_INSTRUCTIONS_TEXT,
+  'newgame.occasions.fillers': OCCASIONS_FILLERS_TEXT,
+  'newgame.occasions.gala': GALA_BRIEF,
+  'newgame.occasions.dance': DANCE_BRIEF,
+  'newgame.occasions.careerFair': CAREER_FAIR_BRIEF,
+  'newgame.occasions.concert': CONCERT_BRIEF,
+  'newgame.secrets.system': SECRETS_SYSTEM_TEXT,
+  'newgame.secrets.additions': '',
+  'newgame.secrets.instructions': SECRETS_INSTRUCTIONS_TEXT,
+  'newgame.secrets.tiers': SECRETS_TIERS_TEXT
+}
+
+/** One of the New Game calls' blocks: the edit where there is one, else the shipped text. */
+export function newGameText(edits: TextEdits<GlobalTextId> | undefined, id: NewGameTextId): string {
+  return blockText(edits, id, NEW_GAME_TEXTS[id])
+}
+
+/** A call's system prompt with the player's additions after a blank line, where there are any. */
+export function withAdditions(
+  system: string,
+  edits: TextEdits<GlobalTextId> | undefined,
+  id: AdditionsTextId
+): string {
+  const additions = blockText(edits, id, '')
+  return additions.trim() === '' ? system : `${system}\n\n${additions}`
+}
+
 /** One editable block as the studio lists it; `text` is the shipped default for the unrestricted setting. */
 export interface PromptBlock {
   id: TextBlockId
   owner: 'preset' | 'global'
-  group: 'persona' | 'scene'
+  group:
+    | 'persona'
+    | 'scene'
+    | 'newgame.classes'
+    | 'newgame.profiles'
+    | 'newgame.occasions'
+    | 'newgame.secrets'
   label: string
   hint: string
   text: string
+}
+
+/** Whether a block belongs to a New Game call, and so to the New Game page rather than Other prompts. */
+export function isNewGameBlock(block: PromptBlock): boolean {
+  return block.group.startsWith('newgame.')
 }
 
 /** Every editable block in the order the studio lists them. */
@@ -328,6 +537,206 @@ export const PROMPT_BLOCKS: readonly PromptBlock[] = [
     label: 'Character designer system prompt',
     hint: 'Used when the game designs a new character.',
     text: DESIGNER_PERSONA
+  },
+  {
+    id: 'newgame.classes.system',
+    owner: 'global',
+    group: 'newgame.classes',
+    label: 'Classes: system prompt',
+    hint: 'Who builds the course catalog when a game or a semester starts.',
+    text: NEW_GAME_TEXTS['newgame.classes.system']
+  },
+  {
+    id: 'newgame.classes.instructions',
+    owner: 'global',
+    group: 'newgame.classes',
+    label: 'Classes: instructions',
+    hint: 'What the catalog is asked to hold and how students are enrolled. The pool sizes and the unique-code rule stay fixed, and follow your text once you change it.',
+    text: NEW_GAME_TEXTS['newgame.classes.instructions']
+  },
+  {
+    id: 'newgame.classes.additions',
+    owner: 'global',
+    group: 'newgame.classes',
+    label: 'Classes: your additions',
+    hint: 'Extra lines for the end of the catalog\'s system prompt. Sent only when filled in.',
+    text: NEW_GAME_TEXTS['newgame.classes.additions']
+  },
+  {
+    id: 'newgame.profiles.system',
+    owner: 'global',
+    group: 'newgame.profiles',
+    label: 'Profiles: system prompt',
+    hint: 'Who profiles the students: their work, habits, housing and posts.',
+    text: NEW_GAME_TEXTS['newgame.profiles.system']
+  },
+  {
+    id: 'newgame.profiles.instructions',
+    owner: 'global',
+    group: 'newgame.profiles',
+    label: 'Profiles: classes taken',
+    hint: 'How many classes a student takes. Used for the first semester and every later one.',
+    text: NEW_GAME_TEXTS['newgame.profiles.instructions']
+  },
+  {
+    id: 'newgame.profiles.housing',
+    owner: 'global',
+    group: 'newgame.profiles',
+    label: 'Profiles: housing',
+    hint: 'Where a game\'s first students live.',
+    text: NEW_GAME_TEXTS['newgame.profiles.housing']
+  },
+  {
+    id: 'newgame.profiles.freeTime',
+    owner: 'global',
+    group: 'newgame.profiles',
+    label: 'Profiles: weekly interest and meals',
+    hint: 'How a student\'s weekly interest, its place and where she eats out are asked for. Used for the first semester and every later one.',
+    text: NEW_GAME_TEXTS['newgame.profiles.freeTime']
+  },
+  {
+    id: 'newgame.profiles.handle',
+    owner: 'global',
+    group: 'newgame.profiles',
+    label: 'Profiles: handle',
+    hint: 'How a student\'s username is asked for. Used for the first semester and every later one.',
+    text: NEW_GAME_TEXTS['newgame.profiles.handle']
+  },
+  {
+    id: 'newgame.profiles.springBreak',
+    owner: 'global',
+    group: 'newgame.profiles',
+    label: 'Profiles: spring break',
+    hint: 'How spring break plans are asked for. Used in spring.',
+    text: NEW_GAME_TEXTS['newgame.profiles.springBreak']
+  },
+  {
+    id: 'newgame.profiles.next.newcomers',
+    owner: 'global',
+    group: 'newgame.profiles',
+    label: 'Next semester: new students',
+    hint: 'How the first-years arriving in a later semester are introduced.',
+    text: NEW_GAME_TEXTS['newgame.profiles.next.newcomers']
+  },
+  {
+    id: 'newgame.profiles.next.housing',
+    owner: 'global',
+    group: 'newgame.profiles',
+    label: 'Next semester: housing',
+    hint: 'Where those first-years live.',
+    text: NEW_GAME_TEXTS['newgame.profiles.next.housing']
+  },
+  {
+    id: 'newgame.profiles.next.graduates',
+    owner: 'global',
+    group: 'newgame.profiles',
+    label: 'Next semester: graduates',
+    hint: 'What a student who has graduated and left Veridan is asked for.',
+    text: NEW_GAME_TEXTS['newgame.profiles.next.graduates']
+  },
+  {
+    id: 'newgame.profiles.additions',
+    owner: 'global',
+    group: 'newgame.profiles',
+    label: 'Profiles: your additions',
+    hint: 'Extra lines for the end of the profiles\' system prompt, for the first semester and every later one. Sent only when filled in.',
+    text: NEW_GAME_TEXTS['newgame.profiles.additions']
+  },
+  {
+    id: 'newgame.occasions.system',
+    owner: 'global',
+    group: 'newgame.occasions',
+    label: 'Occasions: system prompt',
+    hint: 'Who invents the events on the calendar. The setting and the places follow it and can\'t be changed here.',
+    text: NEW_GAME_TEXTS['newgame.occasions.system']
+  },
+  {
+    id: 'newgame.occasions.instructions',
+    owner: 'global',
+    group: 'newgame.occasions',
+    label: 'Occasions: instructions',
+    hint: 'What each event is asked to have: a title, a description and a use for its inspiration word.',
+    text: NEW_GAME_TEXTS['newgame.occasions.instructions']
+  },
+  {
+    id: 'newgame.occasions.fillers',
+    owner: 'global',
+    group: 'newgame.occasions',
+    label: 'Occasions: small events',
+    hint: 'What the half-day events are asked to be. The note about the week off follows it.',
+    text: NEW_GAME_TEXTS['newgame.occasions.fillers']
+  },
+  {
+    id: 'newgame.occasions.gala',
+    owner: 'global',
+    group: 'newgame.occasions',
+    label: 'Occasions: gala',
+    hint: 'What the two-night gala is asked to be.',
+    text: NEW_GAME_TEXTS['newgame.occasions.gala']
+  },
+  {
+    id: 'newgame.occasions.dance',
+    owner: 'global',
+    group: 'newgame.occasions',
+    label: 'Occasions: dance',
+    hint: 'What the one-night dance is asked to be.',
+    text: NEW_GAME_TEXTS['newgame.occasions.dance']
+  },
+  {
+    id: 'newgame.occasions.careerFair',
+    owner: 'global',
+    group: 'newgame.occasions',
+    label: 'Occasions: career fair',
+    hint: 'What the two-day career fair is asked to be.',
+    text: NEW_GAME_TEXTS['newgame.occasions.careerFair']
+  },
+  {
+    id: 'newgame.occasions.concert',
+    owner: 'global',
+    group: 'newgame.occasions',
+    label: 'Occasions: concert',
+    hint: 'What the Friday night concert is asked to be.',
+    text: NEW_GAME_TEXTS['newgame.occasions.concert']
+  },
+  {
+    id: 'newgame.occasions.additions',
+    owner: 'global',
+    group: 'newgame.occasions',
+    label: 'Occasions: your additions',
+    hint: 'Extra lines for the end of the calendar\'s system prompt. Sent only when filled in.',
+    text: NEW_GAME_TEXTS['newgame.occasions.additions']
+  },
+  {
+    id: 'newgame.secrets.system',
+    owner: 'global',
+    group: 'newgame.secrets',
+    label: 'Secrets: system prompt',
+    hint: 'Who writes the students\' secrets.',
+    text: NEW_GAME_TEXTS['newgame.secrets.system']
+  },
+  {
+    id: 'newgame.secrets.instructions',
+    owner: 'global',
+    group: 'newgame.secrets',
+    label: 'Secrets: what a secret is',
+    hint: 'What a secret is, and how each one is written.',
+    text: NEW_GAME_TEXTS['newgame.secrets.instructions']
+  },
+  {
+    id: 'newgame.secrets.tiers',
+    owner: 'global',
+    group: 'newgame.secrets',
+    label: 'Secrets: tiers',
+    hint: 'What the friendly, trusted and devoted secrets are each asked to be.',
+    text: NEW_GAME_TEXTS['newgame.secrets.tiers']
+  },
+  {
+    id: 'newgame.secrets.additions',
+    owner: 'global',
+    group: 'newgame.secrets',
+    label: 'Secrets: your additions',
+    hint: 'Extra lines for the end of the secrets\' system prompt. Sent only when filled in.',
+    text: NEW_GAME_TEXTS['newgame.secrets.additions']
   }
 ]
 
@@ -352,6 +761,6 @@ export function defaultBlockText(
     case 'persona.designer':
       return DESIGNER_PERSONA
     default:
-      return SCENE_TEXTS[id]
+      return id in NEW_GAME_TEXTS ? NEW_GAME_TEXTS[id as NewGameTextId] : SCENE_TEXTS[id as keyof typeof SCENE_TEXTS]
   }
 }

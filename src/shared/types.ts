@@ -1,7 +1,7 @@
 import type { ReckoningState } from './reckoning'
 import type { EchoState } from './echo'
 import type { StoryMemory, StoryRecallRequest } from './storyMemory'
-import type { GamePart, GlobalTextId, PresetRequest, SceneSpotTag } from './presets/types'
+import type { GamePart, PresetRequest, SceneSpotTag } from './presets/types'
 import type { BreakthroughState } from './breakthrough'
 import type { MeanwhileStore } from './meanwhile'
 /** Shared on-disk schema and IPC result types. */
@@ -2332,12 +2332,6 @@ export interface Settings {
    * whatever `lessNsfwText` says. Absent is the shipped persona.
    */
   scenePersona?: string
-  /**
-   * Prompt Studio's edits to the game's fixed text shared by every preset, by block id; read only
-   * while the mod is on, and an absent id is the shipped text. Unknown ids and non-string values
-   * stay stored and are ignored.
-   */
-  promptBlocks?: Partial<Record<GlobalTextId, string>>
 }
 
 /** How many memories per character a cast scene's prompt carries, by cast size; absent is the default. */

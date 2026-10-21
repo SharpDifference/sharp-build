@@ -8,6 +8,8 @@ import type { SlotReplay } from '@shared/replays'
 import type { SavedScene } from '@shared/sceneCreator'
 import type { SoundtrackMap } from '@shared/soundtracks'
 import type { Character, GameSave, GrabBags, Settings } from '@shared/types'
+import type { StudioPrompts } from '@shared/presets/studioPrompts'
+import type { LoreBook, LoreIndex } from '@shared/lorebooks/types'
 import type { StoredPresets } from './presets'
 
 /**
@@ -65,6 +67,9 @@ export interface VenusUniversityDb extends DBSchema {
   scenes: { key: string; value: SavedScene }
   replays: { key: [string, string]; value: SlotReplay }
   presets: { key: 'presets'; value: StoredPresets }
+  studioPrompts: { key: 'studioPrompts'; value: StudioPrompts }
+  loreIndex: { key: 'loreIndex'; value: LoreIndex }
+  loreBooks: { key: string; value: LoreBook }
 }
 
 /**
@@ -90,10 +95,13 @@ const STORES = [
   'backgrounds',
   'scenes',
   'replays',
-  'presets'
+  'presets',
+  'studioPrompts',
+  'loreIndex',
+  'loreBooks'
 ] as const
 
-const DB_VERSION = 10
+const DB_VERSION = 11
 
 let opened: Promise<IDBPDatabase<VenusUniversityDb>> | null = null
 

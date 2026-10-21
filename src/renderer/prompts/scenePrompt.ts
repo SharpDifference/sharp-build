@@ -85,6 +85,7 @@ import {
   characterLoreForIds,
   classLore,
   type ClassRoster,
+  type EffectiveLore,
   keyPattern,
   lorebookBlock,
   type LoreRumor,
@@ -368,6 +369,8 @@ export interface PromptState {
   scenePersona?: string
   /** Prompt Studio's edits to the fixed text blocks: the active preset's scene ones and the global ones; absent with the mod off. */
   textEdits?: { scene?: TextEdits<SceneTextId>; global?: TextEdits<GlobalTextId> }
+  /** The lorebook as the player has it under Prompt Studio; absent is the shipped one. */
+  lore?: EffectiveLore
   /** How many memories per character the cast block carries, by cast size. */
   memoryBudgets: Required<MemoryBudgets>
   /** How many of her told secrets each entry carries; absent is the default. */
@@ -1459,7 +1462,7 @@ function workLines(
 function workplaceLore(state: PromptState): string[] {
   const jobId = state.jobId ?? state.visitJobId
   const def = jobId ? jobDefOf(jobId) : undefined
-  const text = def ? loreTextForKey(def.workplaceKey) : null
+  const text = def ? loreTextForKey(def.workplaceKey, state.lore) : null
   return text ? [text] : []
 }
 
@@ -1573,7 +1576,8 @@ function castScenePrompt(
       ...characterLoreFor(scanned, state, cast),
       ...recapLore(scanned, state.date, state.time, state.history, state.calendar.season)
     ],
-    rumor
+    rumor,
+    state.lore
   )
 
   const system = systemParts(cast, state, setting)
@@ -1756,7 +1760,8 @@ export function buildSoloPrompt(
       ...recapLore(scanned, state.date, state.time, state.history, state.calendar.season)
     ],
     // A solo scene is an opening too, and the only one it has.
-    state.slotRumor
+    state.slotRumor,
+    state.lore
   )
 
   const { user, parts } = userOf([

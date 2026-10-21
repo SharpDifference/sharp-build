@@ -281,6 +281,7 @@ import {
   secretBudgetNow,
   stageCast
 } from './loop/promptState'
+import { loreNow } from './loreStore'
 import { textEditsNow } from './promptStudioStore'
 import { forwardOpenOf, interjectOfferOf, replyRowOfferOf, rewindOpenOf } from './loop/playback'
 import {
@@ -1067,10 +1068,11 @@ async function fetchSlotIntro(
   // occasion nor an asker.
   const occasions = occasionsAt(date, time, game.calendar)
   // Drawn before the request, so a retry re-sends the same place and the reply's own sentence
-  // about it can be banked.
+  // about it can be banked. A pool the player has turned entirely off draws nothing.
+  const rumorPool = availableLore(loreNow())
   const rumorPlace =
-    occasions.length === 0 && askers.length === 0
-      ? useGrabBagStore.getState().draw(RUMOR_PLACE_BAG, availableLore(), loreKeyOf)
+    occasions.length === 0 && askers.length === 0 && rumorPool.length > 0
+      ? useGrabBagStore.getState().draw(RUMOR_PLACE_BAG, rumorPool, loreKeyOf)
       : undefined
 
   // Built once and re-sent verbatim on retry; only a hand edit replaces it.

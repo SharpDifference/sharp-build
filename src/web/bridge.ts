@@ -74,6 +74,9 @@ import * as scenes from './db/scenes'
 import { readGrabBags, writeGrabBags } from './db/grabbags'
 import { planPresetRequest, finishPresetReply } from '@shared/presets/request'
 import * as presets from './presets'
+import * as lorebooks from './lorebooks'
+import { readStudioPrompts, writeStudioPrompts } from './studioPrompts'
+import { pickStudioBackup, saveStudioBackup } from './studioBackup'
 import { readModSwitches, writeModSwitches } from './mods'
 import { soundtrackLibrary, pickSoundtrack } from './soundtracks'
 import { getPoseManifest, getQuickstart, readAudio } from './assets'
@@ -192,6 +195,23 @@ export function buildApi(): VenusUniversityApi {
     grabBags: {
       get: () => result('read the grab bags', readGrabBags),
       set: (bags) => result('save the grab bags', () => writeGrabBags(bags))
+    },
+    studioBackup: {
+      save: (name, text) => result('save the backup', () => saveStudioBackup(name, text)),
+      pick: () => result('read the backup', pickStudioBackup)
+    },
+    studioPrompts: {
+      get: () => result('read the studio prompts', readStudioPrompts),
+      set: (record) => result('save the studio prompts', () => writeStudioPrompts(record))
+    },
+    lorebooks: {
+      list: () => result('read the lorebooks', lorebooks.listLorebooks),
+      get: (id) => result('read the lorebook', () => lorebooks.getLorebook(id)),
+      save: (book) => result('save the lorebook', () => lorebooks.saveLorebook(book)),
+      delete: (id) => result('delete the lorebook', () => lorebooks.deleteLorebook(id)),
+      setOn: (ids) => result('choose the lorebooks', () => lorebooks.setLorebooksOn(ids)),
+      saveShipped: (shipped) => result('save the lore edits', () => lorebooks.saveLorebookShipped(shipped)),
+      import: () => result('import the lorebook', lorebooks.pickLorebookFile)
     },
     presets: {
       list: () => result('read the presets', presets.listPresets),

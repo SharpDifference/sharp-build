@@ -73,6 +73,13 @@
   gap: 12px;
 }
 
+/* A heading and the rows under it, one call's blocks on the New Game page. */
+.vu-studio-group {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
 /* A list row with room for a second line under its name, and its tools at the end. */
 .vu-studio-row {
   align-items: center;

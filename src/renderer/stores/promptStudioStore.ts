@@ -1,10 +1,16 @@
 import { create } from 'zustand'
 import { modOn } from '@shared/mods'
 import { PROMPT_STUDIO_MOD, type Preset, type PresetImport, type PresetSummary } from '@shared/presets/types'
+import {
+  EMPTY_STUDIO_PROMPTS,
+  type ClassCatalogEdits,
+  type StudioPrompts
+} from '@shared/presets/studioPrompts'
+import { mergePrompts, type PresetsMerge } from '@shared/presets/studioBackup'
 import type { AppError, StructuredRequest } from '@shared/types'
 import type { PromptState } from '../prompts/scenePrompt'
+import { useLoreStore } from './loreStore'
 import { modIsOn, useModsStore } from './modsStore'
-import { useSettingsStore } from './settingsStore'
 import { useUiStore } from './uiStore'
 
 /** The Prompt Studio presets: the list, the one in force and what the studio previews. */
@@ -15,11 +21,19 @@ interface PromptStudioState {
   activeId?: string
   /** The active preset whole, read by the builders for its scene text edits; absent until one has loaded. */
   active?: Preset
+  /** The game's own prompt edits, as last read; empty until the first load or where the read failed. */
+  prompts: StudioPrompts
   /** The last scene call as its builder made it, before any preset was applied; what the studio's preview shows. */
   lastSceneRequest?: StructuredRequest
 
   /** Reads the list and the active preset. A failure is logged and leaves what was loaded. */
   load: () => Promise<void>
+  /** Replaces the game's own prompt edits. False when the write failed, or the stored record could not be read to be replaced. */
+  savePrompts: (record: StudioPrompts) => Promise<boolean>
+  /** Keeps every preset of a restored backup over those of its ids and puts its active one in force. False when a write failed. */
+  restorePresets: (merge: PresetsMerge) => Promise<boolean>
+  /** Merges a restored backup's record into the stored one, the file winning. False when the write failed, or the stored record could not be read. */
+  restorePrompts: (file: StudioPrompts) => Promise<boolean>
   /** Puts a preset in force. False when the write failed. */
   setActive: (id: string) => Promise<boolean>
   /** Keeps a preset under its own id, replacing one already there. False when the write failed. */
@@ -54,7 +68,7 @@ function report(error: AppError): void {
   useUiStore.getState().showError(error)
 }
 
-export const usePromptStudioStore = create<PromptStudioState>((set) => {
+export const usePromptStudioStore = create<PromptStudioState>((set, get) => {
   /** Reads the list and the active preset into the store; false where either read failed. */
   async function refresh(): Promise<boolean> {
     const listed = await window.api.presets.list()
@@ -73,6 +87,18 @@ export const usePromptStudioStore = create<PromptStudioState>((set) => {
     return true
   }
 
+  /** Reads the game's own prompt edits into the store; false where the read failed, leaving the record empty. */
+  async function refreshPrompts(): Promise<boolean> {
+    const read = await window.api.studioPrompts.get()
+    if (!read.ok) {
+      console.error('[studio] the prompts could not be read', read.error)
+      set({ prompts: EMPTY_STUDIO_PROMPTS })
+      return false
+    }
+    set({ prompts: read.data })
+    return true
+  }
+
   /** Runs one write, then refreshes; a failed write is shown to the player. */
   async function write(call: () => Promise<{ ok: true } | { ok: false; error: AppError }>): Promise<boolean> {
     const result = await call()
@@ -87,11 +113,14 @@ export const usePromptStudioStore = create<PromptStudioState>((set) => {
 
   return {
     presets: [],
+    prompts: EMPTY_STUDIO_PROMPTS,
 
     load: () => {
       loading ??= inLane(async () => {
         try {
           await refresh()
+          await refreshPrompts()
+          await useLoreStore.getState().load()
         } catch (error) {
           console.error('[presets] the presets could not be read', error)
         }
@@ -101,7 +130,49 @@ export const usePromptStudioStore = create<PromptStudioState>((set) => {
       return loading
     },
 
+    savePrompts: (record) =>
+      inLane(async () => {
+        // A record that could not be read is not written over: the file may be one a newer build kept.
+        if (!(await refreshPrompts())) {
+          report({ code: 'STUDIO_PROMPTS_UNREADABLE', message: 'The stored prompt edits could not be read, so nothing was saved.' })
+          return false
+        }
+        const saved = await window.api.studioPrompts.set(record)
+        if (!saved.ok) {
+          report(saved.error)
+          return false
+        }
+        set({ prompts: saved.data })
+        return true
+      }),
+
     setActive: (id) => inLane(() => write(() => window.api.presets.setActive(id))),
+
+    restorePresets: (merge) =>
+      inLane(() =>
+        write(async () => {
+          for (const preset of merge.save) {
+            const saved = await window.api.presets.save(preset)
+            if (!saved.ok) return saved
+          }
+          return window.api.presets.setActive(merge.active)
+        })
+      ),
+
+    restorePrompts: (file) =>
+      inLane(async () => {
+        if (!(await refreshPrompts())) {
+          report({ code: 'STUDIO_PROMPTS_UNREADABLE', message: 'The stored prompt edits could not be read, so nothing was restored.' })
+          return false
+        }
+        const saved = await window.api.studioPrompts.set(mergePrompts(get().prompts, file))
+        if (!saved.ok) {
+          report(saved.error)
+          return false
+        }
+        set({ prompts: saved.data })
+        return true
+      }),
 
     save: (preset) => inLane(() => write(() => window.api.presets.save(preset))),
 
@@ -150,12 +221,21 @@ useModsStore.subscribe((state, previous) => {
 
 /**
  * Prompt Studio's edits to the fixed text blocks — the active preset's scene text and the
- * settings' global text — or absent while the mod is off.
+ * studio's global text — or absent while the mod is off.
  */
 export function textEditsNow(): PromptState['textEdits'] {
   if (!modIsOn(PROMPT_STUDIO_MOD)) return undefined
   return {
     scene: usePromptStudioStore.getState().active?.overrides,
-    global: useSettingsStore.getState().settings?.promptBlocks
+    global: usePromptStudioStore.getState().prompts.blocks
   }
+}
+
+/**
+ * The player's class call pool sizes, or absent while the mod is off. With it on, a size the
+ * player has not changed is left undefined for the builder to fill with its shipped one.
+ */
+export function classCatalogNow(): ClassCatalogEdits | undefined {
+  if (!modIsOn(PROMPT_STUDIO_MOD)) return undefined
+  return usePromptStudioStore.getState().prompts.classCatalog ?? {}
 }

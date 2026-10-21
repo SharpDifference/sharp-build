@@ -8,6 +8,13 @@ import { useState, type JSX, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { motion } from 'motion/react'
 import { countMatches, presetWithReplacement } from '@shared/presets/glossary'
+import {
+  CLASS_CATALOG_RANGES,
+  DEFAULT_CLASS_CATALOG,
+  studioPromptsToKeep,
+  type ClassCatalogEdits,
+  type ClassCatalogKey
+} from '@shared/presets/studioPrompts'
 import type { Preset, PresetBlock } from '@shared/presets/types'
 import { SelectField } from '../components/SelectField'
 import { TextField } from '../components/TextField'
@@ -36,8 +43,25 @@ interface FormFrameProps {
   children: ReactNode
 }
 
-/** The frame the four panels share: veil, panel under its tab, body and the Cancel and primary foot. */
-function FormFrame({
+/** One quiet pill, at the end of a row or in an action bar. */
+export function StudioPill({
+  id,
+  word,
+  onClick
+}: {
+  id: string
+  word: string
+  onClick: () => void
+}): JSX.Element {
+  return (
+    <motion.button id={id} className="vu-pill" type="button" {...gestures(false, quietLift, quietPress)} onClick={onClick}>
+      {word}
+    </motion.button>
+  )
+}
+
+/** The frame the small panels share: veil, panel under its tab, body and the Cancel and primary foot. */
+export function FormFrame({
   id,
   theme,
   title,
@@ -332,6 +356,88 @@ export function VariableModal({ theme, name, value, onSave, onClose }: VariableM
       }}
     >
       <TextField id="preset-variable-value" label={name} value={text} onChange={setText} multiline autoFocus />
+    </FormFrame>
+  )
+}
+
+/** What each class pool size is called, and what is said under it. */
+const CATALOG_FIELDS: readonly { key: ClassCatalogKey; label: string; hint: string }[] = [
+  {
+    key: 'pe',
+    label: 'Physical education classes',
+    hint: 'From 1 to 20. A small pool can leave some students without a PE class.'
+  },
+  {
+    key: 'filler',
+    label: 'Humanities, arts and miscellaneous',
+    hint: 'From 0 to 15 of each. 0 asks for none of that kind.'
+  },
+  { key: 'perMajor', label: 'Classes for each major', hint: 'From 1 to 8, for every major a student is given.' }
+]
+
+export interface CatalogSizesModalProps {
+  theme: ScreenTheme
+  /** The sizes in force; an absent one is the shipped size. */
+  sizes: ClassCatalogEdits
+  /** Keeps the sizes, each one that is left out reset to its shipped size. False when the write failed, which leaves the panel open. */
+  onSave: (sizes: ClassCatalogEdits) => Promise<boolean>
+  onClose: () => void
+}
+
+/** How many classes the catalog is asked for in each pool. */
+export function CatalogSizesModal({ theme, sizes, onSave, onClose }: CatalogSizesModalProps): JSX.Element | null {
+  const [texts, setTexts] = useState<Record<ClassCatalogKey, string>>({
+    pe: sizes.pe === undefined ? '' : String(sizes.pe),
+    filler: sizes.filler === undefined ? '' : String(sizes.filler),
+    perMajor: sizes.perMajor === undefined ? '' : String(sizes.perMajor)
+  })
+  const [busy, setBusy] = useState(false)
+
+  /** Keeps the sizes: a blank or shipped one is dropped, and the rest are brought into range. */
+  async function submit(): Promise<void> {
+    if (busy) return
+    const typed: ClassCatalogEdits = {}
+    for (const { key } of CATALOG_FIELDS) {
+      const text = texts[key].trim()
+      if (text !== '' && Number.isFinite(Number(text))) typed[key] = Number(text)
+    }
+    const kept = studioPromptsToKeep({ classCatalog: typed }).classCatalog ?? {}
+    const changed: ClassCatalogEdits = {}
+    for (const key of Object.keys(kept) as ClassCatalogKey[]) {
+      if (kept[key] !== DEFAULT_CLASS_CATALOG[key]) changed[key] = kept[key]
+    }
+    setBusy(true)
+    const ok = await onSave(changed)
+    setBusy(false)
+    if (ok) onClose()
+  }
+
+  return (
+    <FormFrame
+      id="catalog-sizes"
+      theme={theme}
+      title="Catalog sizes"
+      confirm="Save"
+      onClose={onClose}
+      onConfirm={() => void submit()}
+    >
+      <p className="vu-studio-note">
+        A bigger catalog is more for the writer to produce. It costs more output tokens, and a reply that runs too
+        long can be cut off, which means retrying the start. Leave a field empty for the shipped size.
+      </p>
+      {CATALOG_FIELDS.map(({ key, label, hint }, index) => (
+        <TextField
+          key={key}
+          id={`catalog-sizes-${key}`}
+          label={label}
+          hint={`${hint} Shipped: ${DEFAULT_CLASS_CATALOG[key]}.`}
+          value={texts[key]}
+          onChange={(value) => setTexts((current) => ({ ...current, [key]: value.replace(/[^0-9]/g, '') }))}
+          placeholder={String(DEFAULT_CLASS_CATALOG[key])}
+          maxLength={String(CLASS_CATALOG_RANGES[key].max).length}
+          autoFocus={index === 0}
+        />
+      ))}
     </FormFrame>
   )
 }
