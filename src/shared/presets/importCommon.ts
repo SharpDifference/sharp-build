@@ -1,4 +1,4 @@
-import { gamePartBlock, withGameParts } from './gameParts'
+import { bySection, gamePartBlock, withGameParts } from './gameParts'
 import { KNOWN_MACROS, macroNames } from './macros'
 import type { GameMarker, Preset, PresetBlock, PresetSampling, PresetSource, RegexScript } from './types'
 
@@ -163,11 +163,12 @@ export function samplingFrom(raw: {
 /**
  * The preset's rows with the game's parts filled in: each part the preset mentions keeps its
  * place, the rest are added, and the main block (when there is one) sits right after the persona.
+ * The rows come back grouped by section.
  */
 export function finishBlocks(blocks: PresetBlock[], main: PresetBlock | null): PresetBlock[] {
   const all = withGameParts(blocks)
   if (main) all.splice(all.findIndex((b) => b.marker === 'persona') + 1, 0, main)
-  return all
+  return bySection(all)
 }
 
 /** The marker rows a foreign marker becomes, skipping parts a row already stands for. */

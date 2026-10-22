@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { applyPreset, type PresetContext, type PresetInput } from '../src/shared/presets/assemble'
-import { gamePartBlock, nativeDefaultPreset } from '../src/shared/presets/gameParts'
+import { gamePartBlock, nativeDefaultPreset, sectionOf } from '../src/shared/presets/gameParts'
 import type { GameMarker, GamePart, Preset, PresetBlock } from '../src/shared/presets/types'
 
 /**
@@ -166,6 +166,18 @@ describe('macros', () => {
     expect(out.system).toContain('the quad\n\nmood is wry, Ada')
     expect(out.user).toContain('READER {{user}}')
     expect(out.vars).toEqual({ keep: '1', mood: 'wry' })
+  })
+
+  it('run system blocks first, so a row\'s place across sides changes nothing', () => {
+    const userBlock = block('u', 'saw {{getvar::mood}}', { role: 'user' })
+    const systemBlock = block('s', '{{setvar::mood::wry}}set')
+    const grouped = preset({ setting: [systemBlock], now: [userBlock] })
+    const userFirst = [...grouped.blocks.filter((b) => sectionOf(b) !== 'system'), ...grouped.blocks.filter((b) => sectionOf(b) === 'system')]
+    const interleaved = { ...grouped, blocks: userFirst }
+    const a = applyPreset(input(), grouped, {}, ctx)
+    const b = applyPreset(input(), interleaved, {}, ctx)
+    expect(b).toEqual(a)
+    expect(a.user).toContain('saw wry')
   })
 
   it('does not run a disabled block\'s macros', () => {

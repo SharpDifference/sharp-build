@@ -27,6 +27,9 @@ export type GameMarker = (typeof GAME_MARKERS)[number]
 /** Parts a preset can neither disable nor move out of `system`: the reply contract. */
 export const PROTECTED_MARKERS: readonly GameMarker[] = ['jsonRules']
 
+/** The parts the builders put in `system`; every other part goes in `user`. */
+export const SYSTEM_MARKERS: readonly GameMarker[] = ['persona', 'jsonRules', 'setting']
+
 /** One game part as a scene builder emits it, its text already carrying any edits. */
 export interface GamePart {
   id: GameMarker

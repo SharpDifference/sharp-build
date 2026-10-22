@@ -1,8 +1,9 @@
-import { withGameParts } from './gameParts'
+import { bySection, withGameParts } from './gameParts'
 import { resolveMacros } from './macros'
 import {
   GAME_MARKERS,
   PROTECTED_MARKERS,
+  SYSTEM_MARKERS,
   type GameMarker,
   type GamePart,
   type Preset,
@@ -217,7 +218,7 @@ function arrangeWhole(
   depthBlocks: readonly PresetBlock[],
   unitOf: (block: PresetBlock) => Unit
 ): { system: string; user: string } {
-  const systemSide: ReadonlySet<GameMarker> = new Set(['persona', 'jsonRules', 'setting'])
+  const systemSide: ReadonlySet<GameMarker> = new Set(SYSTEM_MARKERS)
   const sides = {
     system: { before: [] as Unit[], after: [] as Unit[] },
     user: { before: [] as Unit[], after: [] as Unit[] }
@@ -244,7 +245,8 @@ function arrangeWhole(
 }
 
 /**
- * Applies `preset` to one scene request. Preset blocks resolve their macros in order against
+ * Applies `preset` to one scene request, its rows taken system first, then user, then depth, so
+ * their order across sides counts for nothing. Preset blocks resolve their macros in that order against
  * `vars` (never the game's own text); `jsonRules` is always kept and stays in `system`; with
  * `mainReplacesPersona` and its main block present the persona part is dropped. A part the preset
  * turns off takes the text mods pinned after it along. When `parts` is absent or cannot be found in
@@ -257,11 +259,11 @@ export function applyPreset(
   vars: Readonly<Record<string, string>>,
   ctx: PresetContext
 ): PresetOutput {
-  const blocks = withGameParts(preset.blocks)
+  const blocks = bySection(withGameParts(preset.blocks))
   const rows = partRows(blocks)
   const map = new Map(Object.entries(vars))
 
-  // Macros run in preset order across every enabled block, so a later block reads an earlier one's variables.
+  // Macros run in section order across every enabled block, so a later block reads an earlier one's variables.
   const rendered = new Map<PresetBlock, string>()
   for (const block of blocks) {
     if (block.marker || !block.enabled) continue

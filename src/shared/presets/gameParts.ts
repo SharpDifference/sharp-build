@@ -1,4 +1,28 @@
-import { GAME_MARKERS, type GameMarker, type Preset, type PresetBlock } from './types'
+import { GAME_MARKERS, SYSTEM_MARKERS, type GameMarker, type Preset, type PresetBlock } from './types'
+
+/** The three lists a preset's rows stand in: sent in `system`, in order in `user`, and placed by depth. */
+export type BlockSection = 'system' | 'user' | 'depth'
+export const BLOCK_SECTIONS: readonly BlockSection[] = ['system', 'user', 'depth']
+
+/** The list a row stands in: a game part's is where the builders send it, a preset block's its place and role. */
+export function sectionOf(block: PresetBlock): BlockSection {
+  if (block.marker) return SYSTEM_MARKERS.includes(block.marker) ? 'system' : 'user'
+  if (block.position === 'depth') return 'depth'
+  return block.role === 'system' ? 'system' : 'user'
+}
+
+/** The rows grouped by section, system first, each section keeping its own order. */
+export function bySection(blocks: readonly PresetBlock[]): PresetBlock[] {
+  return BLOCK_SECTIONS.flatMap((section) => blocks.filter((block) => sectionOf(block) === section))
+}
+
+/** The rows with `block` taken out and put back last in its section. */
+export function atSectionEnd(blocks: readonly PresetBlock[], block: PresetBlock): PresetBlock[] {
+  const rest = bySection(blocks.filter((b) => b.id !== block.id))
+  const rank = BLOCK_SECTIONS.indexOf(sectionOf(block))
+  const at = rest.filter((b) => BLOCK_SECTIONS.indexOf(sectionOf(b)) <= rank).length
+  return [...rest.slice(0, at), block, ...rest.slice(at)]
+}
 
 /** What each game part's row is called until the player renames it. */
 const MARKER_NAMES: Record<GameMarker, string> = {

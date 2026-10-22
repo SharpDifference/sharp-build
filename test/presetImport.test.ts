@@ -59,7 +59,7 @@ describe('SillyTavern import', () => {
     expect([...markers(preset)].sort()).toEqual([...GAME_MARKERS].sort())
     expect(preset.blocks[0].marker).toBe('persona')
     expect(preset.blocks[2].marker).toBe('jsonRules')
-    expect(preset.blocks[preset.blocks.length - 1].marker).toBe('yourTurn')
+    expect(markers(preset).at(-1)).toBe('yourTurn')
   })
 
   it('turns off blocks that conflict, with a reason, and keeps the ones that fit', () => {

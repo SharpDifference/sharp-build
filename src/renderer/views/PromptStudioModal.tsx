@@ -6,6 +6,7 @@
 import { useEffect, useMemo, useRef, useState, type JSX, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { AnimatePresence, motion, Reorder, useDragControls } from 'motion/react'
+import { atSectionEnd, BLOCK_SECTIONS, bySection, sectionOf, type BlockSection } from '@shared/presets/gameParts'
 import { presetMacros, type MacroUse } from '@shared/presets/glossary'
 import { hasDynamicMacros } from '@shared/presets/macros'
 import { planPresetRequest } from '@shared/presets/request'
@@ -221,6 +222,22 @@ function newBlock(): PresetBlock {
   }
 }
 
+/** What heads each list on the Blocks page. */
+const SECTION_WORDS: Record<BlockSection, string> = {
+  system: 'System',
+  user: 'User',
+  depth: 'Near the end'
+}
+
+/** Where a preset block lands, for the rows whose list alone does not say. */
+function whereSent(block: PresetBlock): string | undefined {
+  const assistant = block.role === 'assistant'
+  if (block.position !== 'depth') return assistant ? "Assistant: sent with the scene's request, marked [assistant]." : undefined
+  if (block.role === 'system') return "System: at the end of the writer's instructions."
+  const back = block.depth === 0 ? 'at the very end' : block.depth === 1 ? '1 section back' : `${block.depth} sections back`
+  return assistant ? `Assistant: ${back}, marked [assistant].` : `User: ${back}.`
+}
+
 /** The blocks in the order `ids` names; any it does not name follow, in their own order. */
 function inOrder(blocks: readonly PresetBlock[], ids: readonly string[]): PresetBlock[] {
   const at = new Map(ids.map((id, index) => [id, index]))
@@ -352,16 +369,26 @@ export function PromptStudioModal({ theme, onClose }: PromptStudioModalProps): J
     }
   }
 
-  /** Moves one row a step; the first and last rows have nowhere further to go. */
+  /** Moves one row a step within its list; the first and last rows of a list have nowhere further to go. */
   function move(id: string, by: -1 | 1): void {
     void commit((preset) => {
-      const blocks = [...preset.blocks]
+      const blocks = bySection(preset.blocks)
       const index = blocks.findIndex((block) => block.id === id)
       const to = index + by
-      if (index < 0 || to < 0 || to >= blocks.length) return preset
+      if (index < 0 || to < 0 || to >= blocks.length || sectionOf(blocks[to]) !== sectionOf(blocks[index])) return preset
       ;[blocks[index], blocks[to]] = [blocks[to], blocks[index]]
       return { ...preset, blocks }
     })
+  }
+
+  /** Holds one list's dragged order, the other lists standing as they are. */
+  function reorder(section: BlockSection, order: string[]): void {
+    const current = usePromptStudioStore.getState().active
+    if (!current) return
+    const rows = bySection(dragOrder ? inOrder(current.blocks, dragOrder) : current.blocks)
+    const full = BLOCK_SECTIONS.flatMap((s) => (s === section ? order : rows.filter((b) => sectionOf(b) === s).map((b) => b.id)))
+    dragged.current = full
+    setDragOrder(full)
   }
 
   /** Writes the order a drag left; the rows go back where they were if the write is refused. */
@@ -502,13 +529,13 @@ export function PromptStudioModal({ theme, onClose }: PromptStudioModalProps): J
     )
   }
 
-  /** One row of the Blocks page. */
-  function blockRow(preset: Preset, block: PresetBlock, index: number): JSX.Element {
+  /** One row of the Blocks page; `first` and `last` are its place in its own list. */
+  function blockRow(preset: Preset, block: PresetBlock, first: boolean, last: boolean): JSX.Element {
     const marker = block.marker
     const replaced = marker === 'persona' && preset.mainReplacesPersona === true && mainBlockOf(preset) !== undefined
     const fixed = marker !== undefined && PROTECTED_MARKERS.includes(marker)
     const label = marker ? GAME_ROWS[marker].word : block.name
-    const hint = marker ? GAME_ROWS[marker].hint : undefined
+    const hint = marker ? GAME_ROWS[marker].hint : whereSent(block)
     // What the last scene sent under this row, where it sent anything.
     const example = marker ? lastSceneRequest?.parts?.find((part) => part.id === marker) : undefined
     const uncached = !marker && block.role === 'system' && block.enabled && hasDynamicMacros(block.content)
@@ -521,7 +548,7 @@ export function PromptStudioModal({ theme, onClose }: PromptStudioModalProps): J
         onDrop={drop}
       >
         <span className="vu-studio-moves">
-          {index > 0 ? (
+          {!first ? (
             <motion.button
               className="vu-square vu-square--step vu-studio-up"
               type="button"
@@ -534,7 +561,7 @@ export function PromptStudioModal({ theme, onClose }: PromptStudioModalProps): J
           ) : (
             <span className="vu-studio-gap" />
           )}
-          {index < preset.blocks.length - 1 && (
+          {!last && (
             <motion.button
               className="vu-square vu-square--step"
               type="button"
@@ -595,7 +622,7 @@ export function PromptStudioModal({ theme, onClose }: PromptStudioModalProps): J
   function blocksPage(): JSX.Element {
     if (!active) return page(<p className="vu-empty vu-empty--flush">Loading presets.</p>)
     const main = mainBlockOf(active)
-    const rows = dragOrder ? inOrder(active.blocks, dragOrder) : active.blocks
+    const rows = bySection(dragOrder ? inOrder(active.blocks, dragOrder) : active.blocks)
     return page(
       <>
         <div className="vu-studio-actions">
@@ -620,18 +647,27 @@ export function PromptStudioModal({ theme, onClose }: PromptStudioModalProps): J
             onChange={(on) => void commit((current) => ({ ...current, mainReplacesPersona: on }))}
           />
         )}
-        <Reorder.Group
-          as="ul"
-          axis="y"
-          className="vu-rows"
-          values={rows.map((block) => block.id)}
-          onReorder={(order: string[]) => {
-            dragged.current = order
-            setDragOrder(order)
-          }}
-        >
-          {rows.map((block, index) => blockRow(active, block, index))}
-        </Reorder.Group>
+        {BLOCK_SECTIONS.map((section) => {
+          const listed = rows.filter((block) => sectionOf(block) === section)
+          return (
+            <section key={section} className="vu-studio-group">
+              <span className="vu-settings-heading">{SECTION_WORDS[section]}</span>
+              {listed.length === 0 ? (
+                <p className="vu-empty vu-empty--flush">No blocks sit near the end.</p>
+              ) : (
+                <Reorder.Group
+                  as="ul"
+                  axis="y"
+                  className="vu-rows"
+                  values={listed.map((block) => block.id)}
+                  onReorder={(order: string[]) => reorder(section, order)}
+                >
+                  {listed.map((block, index) => blockRow(active, block, index === 0, index === listed.length - 1))}
+                </Reorder.Group>
+              )}
+            </section>
+          )
+        })}
       </>
     )
   }
@@ -894,14 +930,18 @@ export function PromptStudioModal({ theme, onClose }: PromptStudioModalProps): J
             isNew={blockEdit.isNew}
             onSave={(saved) =>
               void commit((current) => {
-                if (!blockEdit.isNew) {
-                  return { ...current, blocks: current.blocks.map((b) => (b.id === saved.id ? saved : b)) }
+                const was = current.blocks.find((b) => b.id === saved.id)
+                if (was && sectionOf(was) === sectionOf(saved)) {
+                  return { ...current, blocks: bySection(current.blocks.map((b) => (b.id === saved.id ? saved : b))) }
                 }
-                // A new block stands ahead of the game's own instructions.
-                const at = current.blocks.findIndex((b) => b.marker === 'yourTurn')
-                const blocks = [...current.blocks]
-                blocks.splice(at < 0 ? blocks.length : at, 0, saved)
-                return { ...current, blocks }
+                // A new user block stands ahead of the game's own instructions; any other block goes last in its list.
+                if (!was && sectionOf(saved) === 'user') {
+                  const blocks = bySection(current.blocks)
+                  const at = blocks.findIndex((b) => b.marker === 'yourTurn')
+                  blocks.splice(at < 0 ? blocks.length : at, 0, saved)
+                  return { ...current, blocks: bySection(blocks) }
+                }
+                return { ...current, blocks: atSectionEnd(current.blocks, saved) }
               })
             }
             onClose={() => setBlockEdit(null)}
