@@ -152,6 +152,22 @@
   justify-content: flex-end;
 }
 
+/* A Blocks row starts with its grip, which sits nearer the steps than the gap between parts. */
+.vu-studio-row--block {
+  padding-left: 18px;
+}
+
+/* The grip a Blocks row is dragged by, the whole height of the row; a touch on it drags the row, not the page. */
+.vu-studio-grip {
+  display: flex;
+  flex: none;
+  align-items: center;
+  align-self: stretch;
+  margin-right: -8px;
+  color: var(--vu-text-muted);
+  touch-action: none;
+}
+
 /* The two steps that move a row, held at the width of both so the rows' names line up. */
 .vu-studio-moves {
   display: flex;

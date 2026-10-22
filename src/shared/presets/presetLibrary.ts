@@ -2,6 +2,7 @@ import { appError } from '../errors'
 import { nativeDefaultPreset } from './gameParts'
 import { importPreset, type ImportResult } from './detect'
 import { isSafePresetId, toPresetFile, validatePreset, type PresetFile } from './presetRules'
+import { presetFromBackup } from './studioBackup'
 import type { Preset, PresetListing, PresetSummary } from './types'
 
 /**
@@ -101,6 +102,12 @@ export function importPresetText(text: string, fileName: string, newId: string):
     json = JSON.parse(text)
   } catch {
     throw appError('PRESET_IMPORT_FAILED', 'That file is not valid JSON.')
+  }
+  // A preset exported from Prompt Studio comes in as a copy, as a foreign one does.
+  const own = presetFromBackup(text, newId)
+  if (own) {
+    if (!own.ok) throw appError('PRESET_IMPORT_FAILED', own.error)
+    return { ok: true, preset: own.preset, warnings: [] }
   }
   const result = importPreset(json, fileName, newId)
   if (!result.ok) throw appError('PRESET_IMPORT_FAILED', result.error)

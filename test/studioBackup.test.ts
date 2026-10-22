@@ -7,7 +7,8 @@ import {
   mergeLorebooks,
   mergePresets,
   mergePrompts,
-  parseStudioBackup
+  parseStudioBackup,
+  presetFromBackup
 } from '../src/shared/presets/studioBackup'
 
 const lorebook = (id: string, text = 'Lore.') => ({
@@ -32,6 +33,16 @@ describe('a presets backup', () => {
     const broken = { ...good, presets: [{ ...good.presets[0], blocks: 'no' }] }
     expect(parseStudioBackup('presets', JSON.stringify(broken)).ok).toBe(false)
     expect(parseStudioBackup('presets', JSON.stringify({ ...good, active: 'zzz' })).ok).toBe(false)
+  })
+
+  it('of one preset imports as a copy under a fresh id, and one of several is refused', () => {
+    const one = buildPresetsBackup([{ ...nativeDefaultPreset('a'), name: 'Mine' }], 'a')
+    const imported = presetFromBackup(JSON.stringify(one), 'fresh')
+    expect(imported).toMatchObject({ ok: true, preset: { id: 'fresh', name: 'Mine' } })
+    expect(imported?.ok && 'schemaVersion' in imported.preset).toBe(false)
+    const several = buildPresetsBackup([nativeDefaultPreset('a'), nativeDefaultPreset('b')], 'a')
+    expect(presetFromBackup(JSON.stringify(several), 'fresh')?.ok).toBe(false)
+    expect(presetFromBackup(JSON.stringify({ prompts: [] }), 'fresh')).toBeNull()
   })
 })
 

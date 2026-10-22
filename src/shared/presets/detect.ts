@@ -30,7 +30,7 @@ function nameFromFile(fileName: string): string {
 export function importPreset(json: unknown, fileName: string, newId: string): ImportResult {
   try {
     const format = detectPresetFormat(json)
-    if (format === null) return { ok: false, error: 'That file is not a SillyTavern or Marinara preset.' }
+    if (format === null) return { ok: false, error: 'That file is not a SillyTavern, Marinara or Prompt Studio preset.' }
     const root = json as Record<string, unknown>
     if (format === 'sillytavern') return importSillyTavern(root, nameFromFile(fileName), newId)
     const data = root.data as { preset?: { name?: unknown } } | undefined

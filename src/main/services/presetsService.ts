@@ -170,7 +170,7 @@ export async function loadActivePreset(): Promise<Preset | null> {
   return preset
 }
 
-/** `presets:import` — reads the SillyTavern or Marinara file at `path` into a preset under a fresh id; nothing is kept. */
+/** `presets:import` — reads the SillyTavern, Marinara or exported Prompt Studio file at `path` into a preset under a fresh id; nothing is kept. */
 export async function importPresetFromFile(path: string): Promise<PresetImport> {
   let text: string
   try {

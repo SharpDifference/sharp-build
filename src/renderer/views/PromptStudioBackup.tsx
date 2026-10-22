@@ -1,6 +1,7 @@
 /**
- * The export and restore buttons of one Prompt Studio section, and the confirmation a restore
- * waits behind. Restoring merges the file into what the player has and writes only that section.
+ * The export and restore buttons of one Prompt Studio section, one preset's export, and the
+ * confirmation a restore waits behind. Restoring merges the file into what the player has and
+ * writes only that section.
  */
 import { useRef, useState, type JSX } from 'react'
 import { AnimatePresence } from 'motion/react'
@@ -11,12 +12,12 @@ import {
   mergeLorebooks,
   mergePresets,
   parseStudioBackup,
+  presetExportName,
   studioBackupName,
   studioBackupWord,
   type StudioBackupKind,
   type StudioBackupOf
 } from '@shared/presets/studioBackup'
-import type { Preset } from '@shared/presets/types'
 import { ConfirmModal } from '../components/ConfirmModal'
 import { useLoreStore } from '../stores/loreStore'
 import { usePromptStudioStore } from '../stores/promptStudioStore'
@@ -37,30 +38,13 @@ function refuse(message: string): void {
   useUiStore.getState().showError({ code: 'STUDIO_BACKUP_INVALID', message })
 }
 
-/** The section as a backup file's text, or null where it could not be read (the player has been told). */
-async function backupText(kind: StudioBackupKind): Promise<string | null> {
+/** A section's backup file's text; presets are exported one at a time instead. */
+function backupText(kind: Exclude<StudioBackupKind, 'presets'>): string {
   if (kind === 'prompts') {
     return JSON.stringify(buildPromptsBackup(usePromptStudioStore.getState().prompts), null, 2)
   }
-  if (kind === 'lorebooks') {
-    const { index, books } = useLoreStore.getState()
-    return JSON.stringify(buildLorebooksBackup(index, Object.values(books)), null, 2)
-  }
-  const listed = await window.api.presets.list()
-  if (!listed.ok) {
-    useUiStore.getState().showError(listed.error)
-    return null
-  }
-  const reads = await Promise.all(listed.data.presets.map((summary) => window.api.presets.get(summary.id)))
-  const presets: Preset[] = []
-  for (const read of reads) {
-    if (!read.ok) {
-      useUiStore.getState().showError(read.error)
-      return null
-    }
-    presets.push(read.data)
-  }
-  return JSON.stringify(buildPresetsBackup(presets, listed.data.active), null, 2)
+  const { index, books } = useLoreStore.getState()
+  return JSON.stringify(buildLorebooksBackup(index, Object.values(books)), null, 2)
 }
 
 /** The parts that are not nothing, joined into one sentence, or `none` where every part is. */
@@ -120,25 +104,44 @@ function describe(pending: Pending): string[] {
   ]
 }
 
-/** The two buttons for one section and the confirmation they open. */
-export function useStudioBackup(theme: ScreenTheme, kind: StudioBackupKind): { actions: JSX.Element; panel: JSX.Element } {
+/**
+ * The buttons for one section and the confirmation they open. Presets have Restore alone, each
+ * preset being exported from its own row through `exportPreset`.
+ */
+export function useStudioBackup(
+  theme: ScreenTheme,
+  kind: StudioBackupKind
+): { actions: JSX.Element; panel: JSX.Element; exportPreset: (id: string) => void } {
   const [pending, setPending] = useState<Pending | null>(null)
   const [busy, setBusy] = useState(false)
   const working = useRef(false)
   const word = studioBackupWord(kind)
 
-  /** Saves the section to a file the player chooses. */
-  async function exportFile(): Promise<void> {
+  /** Saves what `compose` answers to a file the player chooses; null from it saves nothing. */
+  async function saveFile(compose: () => Promise<{ name: string; text: string } | null>): Promise<void> {
     if (working.current) return
     working.current = true
     try {
-      const text = await backupText(kind)
-      if (text === null) return
-      const saved = await window.api.studioBackup.save(studioBackupName(kind), text)
+      const file = await compose()
+      if (file === null) return
+      const saved = await window.api.studioBackup.save(file.name, file.text)
       if (!saved.ok) useUiStore.getState().showError(saved.error)
     } finally {
       working.current = false
     }
+  }
+
+  /** Saves one preset, read whole, as a presets file holding it alone. */
+  function exportPreset(id: string): void {
+    void saveFile(async () => {
+      const read = await window.api.presets.get(id)
+      if (!read.ok) {
+        useUiStore.getState().showError(read.error)
+        return null
+      }
+      const text = JSON.stringify(buildPresetsBackup([read.data], read.data.id), null, 2)
+      return { name: presetExportName(read.data.name), text }
+    })
   }
 
   /** Reads a file the player picks, checks it whole, then opens the confirmation. */
@@ -183,7 +186,13 @@ export function useStudioBackup(theme: ScreenTheme, kind: StudioBackupKind): { a
 
   const actions = (
     <>
-      <StudioPill id={`studio-export-${kind}`} word={`Export ${word}`} onClick={() => void exportFile()} />
+      {kind !== 'presets' && (
+        <StudioPill
+          id={`studio-export-${kind}`}
+          word={`Export ${word}`}
+          onClick={() => void saveFile(async () => ({ name: studioBackupName(kind), text: backupText(kind) }))}
+        />
+      )}
       <StudioPill id={`studio-restore-${kind}`} word={`Restore ${word}`} onClick={() => void pickFile()} />
     </>
   )
@@ -208,5 +217,5 @@ export function useStudioBackup(theme: ScreenTheme, kind: StudioBackupKind): { a
     </AnimatePresence>
   )
 
-  return { actions, panel }
+  return { actions, panel, exportPreset }
 }

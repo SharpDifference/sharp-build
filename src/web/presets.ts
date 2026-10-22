@@ -85,7 +85,7 @@ export async function loadActivePreset(): Promise<Preset | null> {
   }
 }
 
-/** `presets.import` — reads the SillyTavern or Marinara file the player picks into a preset under a fresh id; nothing is kept, and null where nothing was picked. */
+/** `presets.import` — reads the SillyTavern, Marinara or exported Prompt Studio file the player picks into a preset under a fresh id; nothing is kept, and null where nothing was picked. */
 export async function importPreset(): Promise<PresetImport | null> {
   const file = await pickFile('.json,.marinara,application/json')
   if (!file) return null

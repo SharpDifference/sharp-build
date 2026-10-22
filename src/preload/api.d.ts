@@ -172,7 +172,7 @@ export interface VenusUniversityApi {
     /** Puts a preset in force. */
     setActive: (id: string) => Promise<Result<void>>
     /**
-     * Reads a SillyTavern or Marinara file the player picks into a preset under a fresh id, with
+     * Reads a SillyTavern, Marinara or exported Prompt Studio file the player picks into a preset under a fresh id, with
      * what the import left behind. Nothing is kept: the caller saves it. `null` where nothing was picked.
      */
     import: () => Promise<Result<PresetImport | null>>

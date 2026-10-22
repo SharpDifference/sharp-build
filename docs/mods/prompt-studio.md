@@ -8,8 +8,9 @@ ones say.
 
 ## What the player can do
 
-The editor has nine tabs. **Presets** lists them: import, duplicate, rename, delete, and pick
-the one in force. **Blocks** is the order a scene request is read in. **Glossary** lists every
+The editor has nine tabs. **Presets** lists them: import, duplicate, rename, export, delete, and
+pick the one in force. **Blocks** is the order a scene request is read in: drag a row by its
+grip, or step it with its arrows. **Glossary** lists every
 `{{…}}` macro the active preset writes, what each becomes when a scene is sent, how many blocks
 use it and the variables it names. **Scene text** and **Other prompts** rewrite the game's
 instructions. **New Game** rewrites the calls that build a semester, and appears only on the
@@ -141,7 +142,8 @@ Advanced tab, and never to Gemini.
 
 ## Importing
 
-**Import preset** reads a SillyTavern or Marinara preset file of up to 8 MiB. The player names
+**Import preset** reads a SillyTavern or Marinara preset file of up to 8 MiB, or one preset
+exported from Prompt Studio, which comes in whole as a copy under a new id. The player names
 it and may swap a word everywhere, since presets often address the model by a name of their
 own. Before anything is kept the import lists what it did.
 
@@ -168,10 +170,12 @@ game wrote it. The variables travel with the saves.
 
 ## Backups
 
-Presets, prompts and lorebooks each have their own **Export** and **Restore**, on the Presets,
-Other prompts and Lorebook tabs. An export is one file holding that section whole: every
-preset and which is in force; every text edit and the catalog sizes; every book and the edits
-to the game's entries. A restore refuses a file from another section and names what it is,
+Presets, prompts and lorebooks each have their own **Restore**, on the Presets, Other prompts
+and Lorebook tabs. Prompts and lorebooks each have an **Export** beside it, one file holding
+that section whole: every text edit and the catalog sizes; every book and the edits to the
+game's entries. Presets are exported one at a time, from each preset's row, into a file holding
+that preset as the one in force. Restore presets still reads a file of several, from an earlier
+build. A restore refuses a file from another section and names what it is,
 checks the whole file before writing anything, says what it will add and replace, and then
 merges it:
 

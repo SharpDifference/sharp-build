@@ -89,6 +89,12 @@ export function studioBackupName(kind: StudioBackupKind, at = new Date()): strin
   return `prompt-studio-${kind}-${date}.json`
 }
 
+/** What one exported preset is called: its name, without the characters a file name cannot hold. */
+export function presetExportName(name: string): string {
+  const safe = name.replace(/[\\/:*?"<>|\u0000-\u001f]/g, '').replace(/\s+/g, ' ').trim().replace(/\.+$/, '')
+  return `${safe === '' ? 'preset' : safe}.json`
+}
+
 /** The presets backup of a library. */
 export function buildPresetsBackup(presets: readonly Preset[], active: string): PresetsBackup {
   return {
@@ -239,6 +245,27 @@ export function parseStudioBackup<K extends StudioBackupKind>(kind: K, text: str
   const checked =
     kind === 'presets' ? checkPresets(json) : kind === 'prompts' ? checkPrompts(json) : checkLorebooks(json)
   return checked as Checked<K>
+}
+
+/**
+ * The one preset an exported presets file holds, under `newId`, for Import preset; null where the
+ * text is no presets backup. A backup of several presets is refused: Restore presets brings those in.
+ */
+export function presetFromBackup(text: string, newId: string): { ok: true; preset: Preset } | { ok: false; error: string } | null {
+  let json: unknown
+  try {
+    json = JSON.parse(text)
+  } catch {
+    return null
+  }
+  if (!isRecord(json) || json.kind !== KINDS.presets.marker) return null
+  const checked = parseStudioBackup('presets', text)
+  if (!checked.ok) return checked
+  if (checked.backup.presets.length !== 1) {
+    return { ok: false, error: 'That file holds several presets. Restore presets brings them all in.' }
+  }
+  const { schemaVersion: _version, ...preset } = checked.backup.presets[0]
+  return { ok: true, preset: { ...preset, id: newId } }
 }
 
 /** What restoring a presets backup writes: every preset in the file, and the file's active one in force. */

@@ -5,7 +5,7 @@
  */
 import { useEffect, useMemo, useRef, useState, type JSX, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
-import { AnimatePresence, motion } from 'motion/react'
+import { AnimatePresence, motion, Reorder, useDragControls } from 'motion/react'
 import { presetMacros, type MacroUse } from '@shared/presets/glossary'
 import { hasDynamicMacros } from '@shared/presets/macros'
 import { planPresetRequest } from '@shared/presets/request'
@@ -37,10 +37,11 @@ import {
   press,
   quietLift,
   quietPress,
+  rowReorder,
   toggleLift,
   veilIn
 } from './motion'
-import { ChevronIcon, PlusIcon } from './screenIcons'
+import { ChevronIcon, GripIcon, PlusIcon } from './screenIcons'
 import {
   CatalogSizesModal,
   PresetBlockModal,
@@ -220,6 +221,44 @@ function newBlock(): PresetBlock {
   }
 }
 
+/** The blocks in the order `ids` names; any it does not name follow, in their own order. */
+function inOrder(blocks: readonly PresetBlock[], ids: readonly string[]): PresetBlock[] {
+  const at = new Map(ids.map((id, index) => [id, index]))
+  return [...blocks].sort((a, b) => (at.get(a.id) ?? ids.length) - (at.get(b.id) ?? ids.length))
+}
+
+interface BlockItemProps {
+  id: string
+  className: string
+  onDrop: () => void
+  children: ReactNode
+}
+
+/**
+ * A Blocks row dragged by its grip alone, so the rest of the row keeps its clicks. The grip is
+ * the pointer's way to move a row; the steps beside it are the keyboard's.
+ */
+function BlockItem({ id, className, onDrop, children }: BlockItemProps): JSX.Element {
+  const controls = useDragControls()
+  return (
+    <Reorder.Item
+      as="li"
+      value={id}
+      className={className}
+      layout="position"
+      dragListener={false}
+      dragControls={controls}
+      transition={rowReorder}
+      onDragEnd={onDrop}
+    >
+      <span className="vu-studio-grip" data-cursor="move" aria-hidden="true" onPointerDown={(event) => controls.start(event)}>
+        <GripIcon />
+      </span>
+      {children}
+    </Reorder.Item>
+  )
+}
+
 /** The preset's main block, where it names one that is still there. */
 function mainBlockOf(preset: Preset): PresetBlock | undefined {
   return preset.mainBlockId ? preset.blocks.find((block) => block.id === preset.mainBlockId) : undefined
@@ -266,6 +305,9 @@ export function PromptStudioModal({ theme, onClose }: PromptStudioModalProps): J
   const [catalogOpen, setCatalogOpen] = useState(false)
   // What the find and replace panel opens on, while it is open.
   const [findReplace, setFindReplace] = useState<string | null>(null)
+  // The Blocks page's order by id while a row is dragged, until the drop is written.
+  const [dragOrder, setDragOrder] = useState<string[] | null>(null)
+  const dragged = useRef<string[] | null>(null)
   // Holds off a second write while the first is in flight, so each reads the preset the last left.
   const writing = useRef(false)
   const picking = useRef(false)
@@ -311,14 +353,27 @@ export function PromptStudioModal({ theme, onClose }: PromptStudioModalProps): J
   }
 
   /** Moves one row a step; the first and last rows have nowhere further to go. */
-  function move(index: number, by: -1 | 1): void {
+  function move(id: string, by: -1 | 1): void {
     void commit((preset) => {
       const blocks = [...preset.blocks]
+      const index = blocks.findIndex((block) => block.id === id)
       const to = index + by
-      if (to < 0 || to >= blocks.length) return preset
+      if (index < 0 || to < 0 || to >= blocks.length) return preset
       ;[blocks[index], blocks[to]] = [blocks[to], blocks[index]]
       return { ...preset, blocks }
     })
+  }
+
+  /** Writes the order a drag left; the rows go back where they were if the write is refused. */
+  function drop(): void {
+    const order = dragged.current
+    dragged.current = null
+    const current = usePromptStudioStore.getState().active
+    if (!order || !current || order.every((id, index) => current.blocks[index]?.id === id)) {
+      setDragOrder(null)
+      return
+    }
+    void commit((preset) => ({ ...preset, blocks: inOrder(preset.blocks, order) })).finally(() => setDragOrder(null))
   }
 
   /** Writes one text block's edit to where its owner keeps it. */
@@ -385,7 +440,10 @@ export function PromptStudioModal({ theme, onClose }: PromptStudioModalProps): J
         )}
         <p className="vu-studio-intro">{shown.intro}</p>
         <div className="vu-scroll-box">
-          <div className="vu-studio-scroll">{children}</div>
+          {/* Measured with its scroll, so a dragged row lands true in a scrolled page. */}
+          <motion.div className="vu-studio-scroll" layoutScroll>
+            {children}
+          </motion.div>
           <div className="vu-scroll-fade" />
         </div>
       </div>
@@ -431,6 +489,7 @@ export function PromptStudioModal({ theme, onClose }: PromptStudioModalProps): J
                     {pill(`studio-duplicate-${entry.id}`, 'Duplicate', () =>
                       void usePromptStudioStore.getState().duplicate(entry.id)
                     )}
+                    {pill(`studio-export-preset-${entry.id}`, 'Export', () => presetsBackup.exportPreset(entry.id))}
                     {presets.length > 1 &&
                       pill(`studio-delete-${entry.id}`, 'Delete', () => setPresetDelete(entry))}
                   </span>
@@ -455,7 +514,12 @@ export function PromptStudioModal({ theme, onClose }: PromptStudioModalProps): J
     const uncached = !marker && block.role === 'system' && block.enabled && hasDynamicMacros(block.content)
 
     return (
-      <li key={block.id} className={`vu-row vu-studio-row${replaced ? ' vu-studio-row--replaced' : ''}`}>
+      <BlockItem
+        key={block.id}
+        id={block.id}
+        className={`vu-row vu-studio-row vu-studio-row--block${replaced ? ' vu-studio-row--replaced' : ''}`}
+        onDrop={drop}
+      >
         <span className="vu-studio-moves">
           {index > 0 ? (
             <motion.button
@@ -463,7 +527,7 @@ export function PromptStudioModal({ theme, onClose }: PromptStudioModalProps): J
               type="button"
               aria-label={`Move ${label} up`}
               {...gestures(false, quietLift, quietPress)}
-              onClick={() => move(index, -1)}
+              onClick={() => move(block.id, -1)}
             >
               <ChevronIcon down />
             </motion.button>
@@ -476,7 +540,7 @@ export function PromptStudioModal({ theme, onClose }: PromptStudioModalProps): J
               type="button"
               aria-label={`Move ${label} down`}
               {...gestures(false, quietLift, quietPress)}
-              onClick={() => move(index, 1)}
+              onClick={() => move(block.id, 1)}
             >
               <ChevronIcon down />
             </motion.button>
@@ -523,7 +587,7 @@ export function PromptStudioModal({ theme, onClose }: PromptStudioModalProps): J
           {!marker && pill(`studio-edit-${block.id}`, 'Edit', () => setBlockEdit({ block, isNew: false }))}
           {!marker && pill(`studio-remove-${block.id}`, 'Delete', () => setBlockDelete(block))}
         </span>
-      </li>
+      </BlockItem>
     )
   }
 
@@ -531,6 +595,7 @@ export function PromptStudioModal({ theme, onClose }: PromptStudioModalProps): J
   function blocksPage(): JSX.Element {
     if (!active) return page(<p className="vu-empty vu-empty--flush">Loading presets.</p>)
     const main = mainBlockOf(active)
+    const rows = dragOrder ? inOrder(active.blocks, dragOrder) : active.blocks
     return page(
       <>
         <div className="vu-studio-actions">
@@ -555,7 +620,18 @@ export function PromptStudioModal({ theme, onClose }: PromptStudioModalProps): J
             onChange={(on) => void commit((current) => ({ ...current, mainReplacesPersona: on }))}
           />
         )}
-        <ul className="vu-rows">{active.blocks.map((block, index) => blockRow(active, block, index))}</ul>
+        <Reorder.Group
+          as="ul"
+          axis="y"
+          className="vu-rows"
+          values={rows.map((block) => block.id)}
+          onReorder={(order: string[]) => {
+            dragged.current = order
+            setDragOrder(order)
+          }}
+        >
+          {rows.map((block, index) => blockRow(active, block, index))}
+        </Reorder.Group>
       </>
     )
   }
