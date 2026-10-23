@@ -1,8 +1,8 @@
-/* A page between the two tall arrows that turn it, and a dot per page under them. One object
-   with two callers, the save pages and the CG picker; the page itself is the caller's.
-   Imported from the component, never from index.css. */
+/* A page between the two tall arrows that turn it, and where it stands in the run under them.
+   One object with four callers, the save pages, the CG picker and the two custom panels; the
+   page itself is the caller's. Imported from the component, never from index.css. */
 
-/* The page over its dots. */
+/* The page over its count. */
 .vu-pages {
   display: flex;
   flex-direction: column;
@@ -31,24 +31,17 @@
   color: var(--vu-accent);
 }
 
-/* One dot per page, in a row under the page. */
-.vu-pages-dots {
-  display: flex;
-  justify-content: center;
-  gap: 10px;
+/* An arrow's seat while there is nowhere to turn, held at its width so the page never moves
+   as the arrows come and go. */
+.vu-pages-seat {
+  flex: none;
+  width: 80px;
 }
 
-/* A page's dot: a small pill the click turns to. */
-.vu-pages-dot {
-  width: 10px;
-  height: 10px;
-  padding: 0;
-  border: 0;
-  border-radius: 999px;
-  background: var(--vu-border);
-}
-
-/* The page on screen. */
-.vu-pages-dot--on {
-  background: var(--vu-accent);
+/* Which page is on screen of how many, centred under the page in the state voice. */
+.vu-pages-count {
+  align-self: center;
+  color: var(--vu-text-muted);
+  font: 700 12px var(--font-mono);
+  letter-spacing: 0.12em;
 }

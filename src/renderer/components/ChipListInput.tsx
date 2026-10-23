@@ -7,11 +7,23 @@ export interface ChipListInputProps {
   placeholder?: string
   /** Takes focus when the well mounts — a form modal's first field. */
   autoFocus?: boolean
+  /**
+   * Keeps each chip's spaces — trimmed, every run one space — rather than closing them up into
+   * underscores, and drops a chip that differs from one already listed only in case.
+   */
+  phrases?: boolean
+  /** Hears the half-typed text after every keystroke, so a caller can commit it without a blur. */
+  onDraft?: (text: string) => void
 }
 
 /** Turns typed text into a booru tag: trimmed, whitespace runs closed up into underscores. */
 function tagOf(value: string): string {
   return value.trim().replace(/\s+/g, '_')
+}
+
+/** Turns typed text into a phrase: trimmed, whitespace runs made one space. */
+function phraseOf(value: string): string {
+  return value.trim().replace(/\s+/g, ' ')
 }
 
 /**
@@ -23,24 +35,35 @@ export function ChipListInput({
   values,
   onChange,
   placeholder,
-  autoFocus
+  autoFocus,
+  phrases,
+  onDraft: heardDraft
 }: ChipListInputProps): JSX.Element {
-  const [draft, setDraft] = useState('')
+  const [draft, setDraftState] = useState('')
+
+  /** Holds the draft and tells the caller what it now reads. */
+  const setDraft = (text: string): void => {
+    setDraftState(text)
+    heardDraft?.(text)
+  }
 
   /** Appends every tag in `text`, dropping blanks and ones already listed. */
   const commit = (text: string): void => {
+    const clean = phrases ? phraseOf : tagOf
+    // Two phrases differing only in case are one phrase.
+    const key = (tag: string): string => (phrases ? tag.toLowerCase() : tag)
     const added = text
       .split(',')
-      .map(tagOf)
-      .filter((tag) => tag.length > 0 && !values.includes(tag))
+      .map(clean)
+      .filter((tag) => tag.length > 0 && !values.some((value) => key(value) === key(tag)))
     // Deduped against itself too: "a, a" is one tag, by the same rule.
     const next = [...values]
-    for (const tag of added) if (!next.includes(tag)) next.push(tag)
+    for (const tag of added) if (!next.some((value) => key(value) === key(tag))) next.push(tag)
     if (next.length !== values.length) onChange(next)
   }
 
   /** A comma ends a tag: everything before the last one commits as the change lands. */
-  const onDraft = (text: string): void => {
+  const onType = (text: string): void => {
     if (!text.includes(',')) {
       setDraft(text)
       return
@@ -90,7 +113,7 @@ export function ChipListInput({
         value={draft}
         placeholder={values.length === 0 ? placeholder : undefined}
         autoFocus={autoFocus}
-        onChange={(e) => onDraft(e.target.value)}
+        onChange={(e) => onType(e.target.value)}
         onKeyDown={onKeyDown}
         // Commits a half-typed tag on blur, so a Save click does not lose it.
         onBlur={() => {

@@ -2,10 +2,12 @@ import { base64ToBytes, bytesToBase64 } from '@shared/base64'
 import {
   baseRel,
   cgRel,
+  CUSTOM_CGS_DIR,
   expressionRel,
   isCharFileRel,
   layerRel,
   outfitRel,
+  OUTFITS_DIR,
   profileRel,
   REFERENCE_NAME,
   roomRel,
@@ -26,8 +28,8 @@ import { assertPng, imageTypeOf } from '@shared/imageBytes'
 import { enqueue } from '@shared/jobQueue'
 import { LINEUP_MIME_TYPE } from '@shared/lineup'
 import { generateImage } from '@shared/llm/cloudImage'
-import { OUTFIT_SETS } from '@shared/outfits'
-import { isCustomCgSlot, POSITIONS } from '@shared/positions'
+import { customOutfitSlotsIn, isCustomOutfitSlot, STOCK_OUTFIT_SETS } from '@shared/outfits'
+import { afterOf, customCgSlotsIn, isCustomCgSlot, STOCK_POSITIONS } from '@shared/positions'
 import { dayRoomPrompt, isRoomVariant, NIGHT_ROOM_PROMPT, ROOM_VARIANTS } from '@shared/room'
 import type { RoomVariant } from '@shared/room'
 import { assertRoomPicture } from '@shared/roomPicture'
@@ -249,21 +251,41 @@ export async function getExpressionStatus(charId: string): Promise<Record<Emotio
   return scanPresent(await imageRels(charId), EMOTIONS, expressionRel)
 }
 
-/** Reports which CG files exist, stock and custom. */
-export async function getCgStatus(charId: string): Promise<Record<Position, boolean>> {
-  assertSafeCharId(charId)
-  return scanPresent(await imageRels(charId), POSITIONS, cgRel)
+/** The names of the folders a character's live files stand in directly under `dir`. */
+function foldersIn(rels: ReadonlySet<string>, dir: string): string[] {
+  const names: string[] = []
+  for (const rel of rels) {
+    const segments = rel.split('/')
+    if (segments.length === 3 && segments[0] === dir) names.push(segments[1])
+  }
+  return names
 }
 
-/** Reports which alternate-outfit sprites exist, per set and emotion. */
+/**
+ * Reports which CG files exist: every stock one, and both images of each custom slot that has
+ * a file.
+ */
+export async function getCgStatus(charId: string): Promise<Record<Position, boolean>> {
+  assertSafeCharId(charId)
+  const rels = await imageRels(charId)
+  const slots = customCgSlotsIn(foldersIn(rels, CUSTOM_CGS_DIR))
+  const positions = [...STOCK_POSITIONS, ...slots.flatMap((slot) => [slot, afterOf(slot)])]
+  return scanPresent(rels, positions, cgRel)
+}
+
+/**
+ * Reports which alternate-outfit sprites exist, per set and emotion: every stock set, and each
+ * custom slot that has a file.
+ */
 export async function getOutfitStatus(
   charId: string
 ): Promise<Record<OutfitSet, Record<Emotion, boolean>>> {
   assertSafeCharId(charId)
   const rels = await imageRels(charId)
+  const customs = customOutfitSlotsIn(foldersIn(rels, OUTFITS_DIR))
 
   const status = {} as Record<OutfitSet, Record<Emotion, boolean>>
-  for (const set of OUTFIT_SETS) {
+  for (const set of [...STOCK_OUTFIT_SETS, ...customs]) {
     status[set] = scanPresent(rels, EMOTIONS, (emotion) => outfitRel(set, emotion))
   }
   return status
@@ -309,6 +331,9 @@ export async function deleteCustomSet(
   charId: string,
   slot: CustomOutfitSlot | CustomCgSlot
 ): Promise<void> {
+  if (!isCustomCgSlot(slot) && !isCustomOutfitSlot(slot)) {
+    throw appError('OUTFIT_SET_UNKNOWN', `"${String(slot)}" is not a custom set.`)
+  }
   await claimCharacter(charId)
   await db.deleteSet(charId, slot)
   forgetImages(charId)

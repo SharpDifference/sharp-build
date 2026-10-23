@@ -2,7 +2,7 @@ import { useRef, useState } from 'react'
 import { endpointProblem, normalizeEndpoint, normalizeImageEndpoint } from '@shared/endpoint'
 import { imageFieldsProblem } from '@shared/settingsRules'
 
-import type { ThinkingLevel } from '@shared/providers'
+import type { EndpointServiceTier, ThinkingLevel } from '@shared/providers'
 import type { AppError } from '@shared/types'
 import { useSettingsStore } from '../stores/settingsStore'
 
@@ -18,6 +18,8 @@ export interface EndpointProbeInput {
   /** The model id as it would be saved (already trimmed). */
   modelId: string
   reasoningEffort: ThinkingLevel
+  /** Absent sends none. */
+  endpointServiceTier?: EndpointServiceTier
 }
 
 export interface EndpointProbe {
@@ -84,6 +86,7 @@ export function useEndpointProbe(input: EndpointProbeInput): EndpointProbe {
       endpointModel: input.modelId,
       endpointUrl: normalizeEndpoint(input.endpointUrl),
       reasoningEffort: input.reasoningEffort,
+      endpointServiceTier: input.endpointServiceTier,
       endpointApiKey: input.endpointKey.trim() || undefined
     })
     setTest(result.ok ? 'ok' : { error: result.error })

@@ -23,7 +23,7 @@ import {
   writerModelOf,
   writerReady
 } from '@shared/settingsRules'
-import { defaultModelFor, defaultSecondaryModelFor } from '@shared/providers'
+import { defaultModelFor, defaultSecondaryModelFor, serviceTierToSend } from '@shared/providers'
 import type { Settings, SettingsPatch } from '@shared/types'
 
 /**
@@ -119,21 +119,24 @@ describe('mergePatch — the two keys', () => {
     expect(samePath.endpointApiKey).toBe('endpoint-key')
   })
 
-  it('carries the endpoint URL, reasoning effort and reply cap from the patch', () => {
+  it('carries the endpoint URL, reasoning effort, tier and reply cap from the patch', () => {
     const next = mergePatch(
       settings(),
       settingsPatch({
         apiProvider: 'openai',
         endpointUrl: 'https://example.com/v1',
         reasoningEffort: 'high',
+        endpointServiceTier: 'flex',
         maxOutputTokens: 8000
       })
     )
     expect(next.endpointUrl).toBe('https://example.com/v1')
     expect(next.reasoningEffort).toBe('high')
+    expect(next.endpointServiceTier).toBe('flex')
     expect(next.maxOutputTokens).toBe(8000)
 
     const cleared = mergePatch(next, settingsPatch({ apiProvider: 'openai' }))
+    expect(cleared.endpointServiceTier).toBeUndefined()
     expect(cleared.maxOutputTokens).toBeUndefined()
   })
 })
@@ -373,6 +376,26 @@ describe('samplingOf', () => {
       topK: 1.5
     })
     expect(samplingOf(openai)).toEqual({ temperature: 0.8, repetition_penalty: 1.1, top_p: 0.9 })
+  })
+})
+
+describe('serviceTierToSend', () => {
+  it("reads each provider's own tier, a custom endpoint's absent or junk one sending none", () => {
+    expect(serviceTierToSend(settings({ apiProvider: 'gemini' }))).toBe('priority')
+    expect(
+      serviceTierToSend(settings({ apiProvider: 'gemini', endpointServiceTier: 'auto' }))
+    ).toBe('priority')
+    // Gemini's pick never rides to a custom endpoint.
+    expect(serviceTierToSend(settings({ apiProvider: 'openai', serviceTier: 'flex' }))).toBe(
+      undefined
+    )
+    expect(
+      serviceTierToSend(settings({ apiProvider: 'openai', endpointServiceTier: 'default' }))
+    ).toBe('default')
+    // Hand-editable, so a value this build does not offer reads as none.
+    const junk = settings({ apiProvider: 'openai' })
+    ;(junk as unknown as Record<string, unknown>).endpointServiceTier = 'turbo'
+    expect(serviceTierToSend(junk)).toBe(undefined)
   })
 })
 

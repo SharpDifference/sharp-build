@@ -29,6 +29,7 @@ export interface PlaybackSlice {
   classes: Readonly<Record<string, ClassEntry>>
   sceneEvent: SceneEvent | null
   sceneReceivedGift: ReceivedGift | null
+  sceneSecret: string | null
   sceneQuiz: QuizState | null
   sceneEnding: boolean
   statusShown: boolean
@@ -109,11 +110,14 @@ export type InterjectOffer = 'none' | 'open' | 'locked'
 
 /**
  * What holds the scene's opening reply shut, or null: a lecture in session, one the professor has
- * not called off, or a girl with a present still to hand him.
+ * not called off, a girl with a present still to hand him, or a girl with a secret to tell him.
  */
 export function openingLockOf(
-  s: Pick<PlaybackSlice, 'sceneClass' | 'classes' | 'sceneEvent' | 'sceneReceivedGift'>
-): 'class' | 'gift' | null {
+  s: Pick<
+    PlaybackSlice,
+    'sceneClass' | 'classes' | 'sceneEvent' | 'sceneReceivedGift' | 'sceneSecret'
+  >
+): 'class' | 'gift' | 'secret' | null {
   const entry = s.sceneClass !== null ? s.classes[s.sceneClass] : undefined
   if (
     entry !== undefined &&
@@ -123,7 +127,8 @@ export function openingLockOf(
   ) {
     return 'class'
   }
-  return s.sceneReceivedGift !== null ? 'gift' : null
+  if (s.sceneReceivedGift !== null) return 'gift'
+  return s.sceneSecret !== null ? 'secret' : null
 }
 
 /**

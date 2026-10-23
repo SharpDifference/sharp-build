@@ -3,11 +3,13 @@ import type {
   CharInfo,
   ClassEntry,
   ClassRecord,
+  CourseEntry,
   ProjectSession
 } from '@shared/types'
 import { studentsOf } from '@shared/classes'
 import type { SemesterCalendar } from '@shared/semesters'
 import {
+  aceShortfall,
   isCourse,
   kindOf,
   midtermRecapSummary,
@@ -264,6 +266,55 @@ export function projectSceneContextOf(
   return {
     ...(last ? { lastSession: last } : {}),
     progress: projectProgress(sessions.length, period.needed)
+  }
+}
+
+/**
+ * Where one of the reader's courses stands for Venus's grade check, never giving a score away:
+ * a lecture by the exam he sits next, a project by the one he is building now.
+ */
+export type CourseStanding =
+  | { kind: 'lecture'; exam: ExamPeriod; shortfall: number }
+  | { kind: 'project'; worked: number; needed: number; lastSession?: ProjectSession }
+  | { kind: 'lecture-done' }
+  | { kind: 'project-done' }
+  | { kind: 'project-unassigned' }
+
+/** A course's {@link CourseStanding} on `date`, read against the reader's Brain points. */
+export function courseStandingOf(
+  entry: CourseEntry,
+  date: number,
+  record: ClassRecord | undefined,
+  brain: number,
+  calendar: SemesterCalendar
+): CourseStanding {
+  // A frozen score is a paper sat, so the next one is whichever has none yet.
+  const next: ExamPeriod | null =
+    typeof record?.midtermScore !== 'number'
+      ? 'midterm'
+      : typeof record?.finalScore !== 'number'
+        ? 'final'
+        : null
+
+  if (entry.kind === 'lecture') {
+    return next === null
+      ? { kind: 'lecture-done' }
+      : { kind: 'lecture', exam: next, shortfall: aceShortfall(brain, entry.difficulty, next) }
+  }
+
+  if (next === null) return { kind: 'project-done' }
+  const period = projectPeriodOf(entry, date, calendar)
+  // The showcase's own day still reads as the project it just presented, whose score is in.
+  if (!period || period.exam !== next || !projectAssigned(record, period)) {
+    return { kind: 'project-unassigned' }
+  }
+  const sessions = sessionsOf(record, period.exam)
+  const last = sessions[sessions.length - 1]
+  return {
+    kind: 'project',
+    worked: sessions.length,
+    needed: period.needed,
+    ...(last ? { lastSession: last } : {})
   }
 }
 

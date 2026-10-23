@@ -6,7 +6,7 @@ import type { PromptEdit } from '@shared/imagePrompt'
 import { PROMPT_GROUPS, type PromptGroup } from '@shared/regenTags'
 import type { CgSfx, CgVoice } from '@shared/types'
 import { CheckField } from '../components/CheckField'
-import { ChipListInput } from '../components/ChipListInput'
+import { ChipField, useCopyMark } from '../components/ChipField'
 import { SelectField } from '../components/SelectField'
 import { TextField } from '../components/TextField'
 import { useModalShell } from '../components/useModalShell'
@@ -100,6 +100,14 @@ export interface CgSounds {
   sfx: CgSfx
 }
 
+/** A set copied from another, as the form that makes a new one fills itself from it. */
+export interface PastedSet {
+  tags: readonly string[]
+  name?: string
+  instructions?: string
+  sounds?: CgSounds
+}
+
 export interface RegenerateModalProps {
   id: string
   theme: 'day' | 'night'
@@ -121,6 +129,12 @@ export interface RegenerateModalProps {
   sounds?: CgSounds
   /** A group the render cannot be sent without: the submit is dead while its well is empty. */
   requireGroup?: PromptGroup
+  /**
+   * The button that fills the form from the last set of its kind copied: the copied tags into
+   * `group`, and the name, instructions and loops into whichever of those the form asks for.
+   * Dead while nothing has been copied.
+   */
+  paste?: { label: string; group: PromptGroup; from: PastedSet | null }
   /** The primary's words, where the render is not a replacement. */
   submitLabel?: string
   /** The groups as the player left them, the seed — `null` asks for a new random one — the
@@ -149,6 +163,7 @@ export function RegenerateModal({
   instructions,
   sounds,
   requireGroup,
+  paste,
   submitLabel = 'Regenerate',
   onConfirm,
   onCancel
@@ -166,6 +181,8 @@ export function RegenerateModal({
   const [instructionsText, setInstructionsText] = useState(() => instructions?.value ?? '')
   const [voice, setVoice] = useState<CgVoice>(() => sounds?.voice ?? DEFAULT_CG_VOICE)
   const [sfx, setSfx] = useState<CgSfx>(() => sounds?.sfx ?? DEFAULT_CG_SFX)
+  // Which well's copy mark wears the check.
+  const copyMark = useCopyMark()
 
   // A typed seed the player has emptied is no seed at all, and a group the render cannot be
   // sent without is the same kind of gap. Neither box says anything about it.
@@ -184,6 +201,20 @@ export function RegenerateModal({
       for (const key of keys) next[key] = [...(defaultGroups[key] ?? [])]
       return next
     })
+
+  /** Replaces the pasted group and every box the form asks for with the copied set's own. */
+  const pasteSet = (): void => {
+    const from = paste?.from
+    if (!paste || !from) return
+    setValues((prev) => ({ ...prev, [paste.group]: [...from.tags] }))
+    if (name) setNameText(from.name ?? '')
+    if (instructions) setInstructionsText(from.instructions ?? '')
+    if (sounds && from.sounds) {
+      setVoice(from.sounds.voice)
+      setSfx(from.sounds.sfx)
+    }
+  }
+  const pasteDead = !paste?.from
 
   /** The foot's answer, dead where the button is. */
   function submit(): void {
@@ -236,16 +267,16 @@ export function RegenerateModal({
         <div className="vu-scroll-box">
           <div className="vu-regen-body">
             {keys.map((key, i) => (
-              <label key={key} className="vu-field" htmlFor={`${id}-${key}`}>
-                <span className="vu-field-label">{LABELS[key]}</span>
-                <ChipListInput
-                  id={`${id}-${key}`}
-                  values={values[key]}
-                  onChange={(next) => setValues((prev) => ({ ...prev, [key]: next }))}
-                  placeholder="Enter or comma to add a tag"
-                  autoFocus={i === 0}
-                />
-              </label>
+              <ChipField
+                key={key}
+                id={`${id}-${key}`}
+                label={LABELS[key]}
+                values={values[key]}
+                onChange={(next) => setValues((prev) => ({ ...prev, [key]: next }))}
+                placeholder="Enter or comma to add a tag"
+                autoFocus={i === 0}
+                mark={copyMark}
+              />
             ))}
           </div>
           <div className="vu-scroll-fade" />
@@ -354,6 +385,18 @@ export function RegenerateModal({
           >
             Reset to default tags
           </motion.button>
+          {paste && (
+            <motion.button
+              id={`${id}-paste`}
+              className="vu-btn vu-btn--quiet"
+              type="button"
+              disabled={pasteDead}
+              {...gestures(pasteDead, quietLift, quietPress)}
+              onClick={pasteSet}
+            >
+              {paste.label}
+            </motion.button>
+          )}
           <motion.button
             id={`${id}-submit`}
             className="vu-btn vu-btn--primary vu-btn--panel vu-paper"

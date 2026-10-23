@@ -10,6 +10,7 @@ import {
 } from './customBackgrounds'
 import { appError } from './errors'
 import type { ValidateRecordOptions } from './jsonValidate'
+import { readLorebookRecord, type LorebookRecord } from './lorebookRecord'
 import type { PhotoMeta } from './photos'
 import { REPLAY_ID, replayIdsOf, validateReplay, type SlotReplay } from './replays'
 import { SAFE_NUMERIC_ID } from './saveRules'
@@ -91,6 +92,8 @@ export interface BackupFile {
   scenes?: SavedScene[]
   /** Every replay a carried save names; absent in backups from before them. */
   replays?: BackupReplay[]
+  /** Each playthrough's own lorebook, by playthrough id; absent in backups from before them. */
+  lorebooks?: Record<string, LorebookRecord>
   characters: Character[]
 }
 
@@ -340,4 +343,27 @@ export function replaysFromBackup(record: BackupFile): BackupReplay[] {
     seen.add(key)
     return { playthroughId, replayId, replay: validateReplay(replay, where) }
   })
+}
+
+/**
+ * The lorebooks a backup carries, each checked as its own file is, under a playthrough id that
+ * can name a path; refuses the backup before anything is written.
+ */
+export function lorebooksFromBackup(record: BackupFile): Record<string, LorebookRecord> {
+  const carried: unknown = record.lorebooks ?? {}
+  if (typeof carried !== 'object' || carried === null || Array.isArray(carried)) {
+    throw appError(BACKUP_READ.malformed.code, BACKUP_READ.malformed.message, 'lorebooks')
+  }
+  const lorebooks: Record<string, LorebookRecord> = {}
+  for (const [playthroughId, lorebook] of Object.entries(carried)) {
+    if (!SAFE_NUMERIC_ID.test(playthroughId)) {
+      throw appError(BACKUP_READ.malformed.code, BACKUP_READ.malformed.message, playthroughId)
+    }
+    lorebooks[playthroughId] = readLorebookRecord(
+      lorebook,
+      `lorebooks.${playthroughId}`,
+      BACKUP_READ.malformed
+    )
+  }
+  return lorebooks
 }

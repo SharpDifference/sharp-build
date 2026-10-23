@@ -7,7 +7,6 @@ import { ConfirmModal } from '../components/ConfirmModal'
 import {
   SAVE_PAGE_CELLS,
   SavePagesGrid,
-  wrapPage,
   type SaveGridCard,
   type SaveGridEmpty
 } from '../components/SavePagesGrid'
@@ -19,11 +18,11 @@ import { writeManualSave } from '../stores/gameLoop'
 import { useGameStore } from '../stores/gameStore'
 import { runningReplayIds } from '../stores/loop/replay'
 import { useSaveStore, type ResolvedSave } from '../stores/saveStore'
-import { pageEntriesOf, writtenAt } from './LoadGameModal'
+import { manualPagesOf, pageEntriesOf, writtenAt } from './LoadGameModal'
 import { gestures, lift, panelUnderTab, press, veilIn } from './motion'
 
-/** Pages of manual slots, ten to a page. */
-const SAVE_PAGES = MANUAL_SAVE_SLOTS / SAVE_PAGE_CELLS
+/** The page holding the last manual slot, past which no page opens. */
+const LAST_SAVE_PAGE = MANUAL_SAVE_SLOTS / SAVE_PAGE_CELLS - 1
 
 /** The page holding the manual save written last, or the first page where there is none. */
 function latestPageOf(saves: readonly ResolvedSave[]): number {
@@ -43,8 +42,9 @@ export interface SaveGameModalProps {
 }
 
 /**
- * The Game menu's Save Game: the running playthrough's manual slots a page at a time. A gap is
- * written on a click, a save already there only once the player has said to overwrite it.
+ * The Game menu's Save Game: the running playthrough's manual slots a page at a time, as many
+ * pages as reach its last save and a blank one past them for every turn beyond. A gap is written
+ * on a click, a save already there only once the player has said to overwrite it.
  */
 export function SaveGameModal({ theme, onClose }: SaveGameModalProps): JSX.Element | null {
   const listSavesOf = useSaveStore((s) => s.listSavesOf)
@@ -56,6 +56,8 @@ export function SaveGameModal({ theme, onClose }: SaveGameModalProps): JSX.Eleme
   const [saves, setSaves] = useState<ResolvedSave[]>([])
   const [loaded, setLoaded] = useState(false)
   const [page, setPage] = useState(0)
+  // The furthest page turned to while the panel stands, which keeps a blank page it opened.
+  const [reached, setReached] = useState(0)
   // A write or a delete is running, and every slot waits for it.
   const [busy, setBusy] = useState(false)
   // The save waiting on the player's yes before it is written over.
@@ -93,11 +95,20 @@ export function SaveGameModal({ theme, onClose }: SaveGameModalProps): JSX.Eleme
   /** Whether a question stands over the panel, which then answers no key of its own. */
   const asking = Boolean(overwriting || deleting)
 
+  /** Turns to a page, holding every page up to it open until the panel closes. */
+  function turn(to: number): void {
+    setPage(to)
+    setReached((current) => Math.max(current, to))
+  }
+
+  // Every page up to the last save, the one on screen and any blank one turned to past them.
+  const pageCount = Math.max(1, manualPagesOf(saves), page + 1, reached + 1)
+
   /** The arrow keys turn the page, as the arrows beside it do. */
   useWindowKeydown((event) => {
     if (!loaded || busy || covered || asking || typingIn(event)) return
-    if (event.key === 'ArrowLeft') setPage((current) => wrapPage(current - 1, SAVE_PAGES))
-    else if (event.key === 'ArrowRight') setPage((current) => wrapPage(current + 1, SAVE_PAGES))
+    if (event.key === 'ArrowLeft' && page > 0) turn(page - 1)
+    else if (event.key === 'ArrowRight' && page < LAST_SAVE_PAGE) turn(page + 1)
   })
 
   const { host, overlayProps } = useModalShell(onClose)
@@ -135,8 +146,11 @@ export function SaveGameModal({ theme, onClose }: SaveGameModalProps): JSX.Eleme
             mode="save"
             entries={pageEntriesOf(saves, page + 1)}
             page={page}
-            pageCount={SAVE_PAGES}
-            onPage={setPage}
+            pageCount={pageCount}
+            onPage={turn}
+            ring={false}
+            open={page < LAST_SAVE_PAGE}
+            count={`${page + 1} / ${pageCount}`}
             busy={busy}
             onPickEmpty={(empty: SaveGridEmpty) => {
               void settleWith(() => writeManualSave(empty.slot))

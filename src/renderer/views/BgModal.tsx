@@ -87,6 +87,8 @@ export interface BgPickerProps {
    * absent, the game's roster with its names as the reader knows them.
    */
   rooms?: Readonly<Record<string, Character>>
+  /** Offers the rooms shelf; false for a pick the writer is only ever shown by name. Default true. */
+  withRooms?: boolean
   onClose: () => void
 }
 
@@ -136,6 +138,7 @@ export function BgPicker({
   dead,
   header,
   rooms: roomsOf,
+  withRooms = true,
   onClose
 }: BgPickerProps): JSX.Element | null {
   const gameCharacters = useGameStore((s) => s.characters)
@@ -150,6 +153,7 @@ export function BgPicker({
   const [rooms, setRooms] = useState<Record<string, boolean> | null>(null)
 
   useEffect(() => {
+    if (!withRooms) return
     let cancelled = false
     const loadRoomStatus = useCharacterStore.getState().loadRoomStatus
     void Promise.all(
@@ -164,7 +168,7 @@ export function BgPicker({
     return () => {
       cancelled = true
     }
-  }, [characters])
+  }, [characters, withRooms])
 
   const tiles = useMemo<BgTile[]>(() => {
     if (tab === 'rooms') {
@@ -214,7 +218,7 @@ export function BgPicker({
 
         <div className="vu-bgpick-body">
           <div className="vu-bgpick-rail">
-            {TABS.map((entry) => {
+            {TABS.filter((entry) => withRooms || entry.id !== 'rooms').map((entry) => {
               const on = entry.id === tab
               return (
                 <motion.button

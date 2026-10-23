@@ -164,6 +164,13 @@ const api: VenusUniversityApi = {
     delete: (playthroughId, photoId) => ipcRenderer.invoke('photos:delete', playthroughId, photoId),
     export: (playthroughId, photoId) => ipcRenderer.invoke('photos:export', playthroughId, photoId)
   },
+  lorebook: {
+    read: (playthroughId) => ipcRenderer.invoke('lorebook:read', playthroughId),
+    write: (playthroughId, lorebook) =>
+      ipcRenderer.invoke('lorebook:write', playthroughId, lorebook),
+    import: () => ipcRenderer.invoke('lorebook:import'),
+    export: (world) => ipcRenderer.invoke('lorebook:export', world)
+  },
   comfy: {
     start: () => ipcRenderer.invoke('comfy:start'),
     stop: () => ipcRenderer.invoke('comfy:stop'),

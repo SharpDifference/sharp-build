@@ -11,6 +11,7 @@ import {
   charFileEntry,
   classifyBackupEntry,
   endingArtEntry,
+  lorebooksFromBackup,
   namedReplays,
   photoEntry,
   profilePictureEntry,
@@ -30,6 +31,7 @@ import { CHARACTER_NOT_FOUND, SAFE_CHAR_ID } from '@shared/characterRules'
 import { BG_VARIANTS, type BgVariant, type CustomBackground } from '@shared/customBackgrounds'
 import { appError, messageOf } from '@shared/errors'
 import { imageTypeOf } from '@shared/imageBytes'
+import type { LorebookRecord } from '@shared/lorebookRecord'
 import { REPLAY_NOT_FOUND } from '@shared/replays'
 import { SCENE_NOT_FOUND, type SavedScene } from '@shared/sceneCreator'
 import {
@@ -52,6 +54,7 @@ import {
   getCharactersPath,
   getEndingArtPath,
   getEnrollmentPath,
+  getLorebookPath,
   getPhotoMetaPath,
   getPhotoPath,
   getPhotosPath,
@@ -81,6 +84,7 @@ import { endingArtSemesters, readEndingArt } from './endingArtService'
 import { getGrabBags, setGrabBags } from './grabBagService'
 import { dropImageTwins, sniffImageFile } from './imageFiles'
 import { readValidatedJson, writeAtomicJson } from './jsonFile'
+import { readLorebook } from './lorebookService'
 import { listPhotos, readPhoto } from './photoService'
 import { readProfilePicture } from './profilePictureService'
 import { readReplay } from './replayService'
@@ -247,9 +251,19 @@ export async function exportBackup(targetPath: string): Promise<void> {
     const semesterEndingArt: SemesterPicture[] = []
     const profilePictures: string[] = []
     const photos: BackupPhoto[] = []
+    const lorebooks: Record<string, LorebookRecord> = {}
 
     for (const playthroughId of await playthroughIds()) {
       playthroughs[playthroughId] = await backupPlaythrough(playthroughId)
+
+      // A lorebook the game would refuse is left out rather than carried into a backup a
+      // restore would refuse.
+      try {
+        const lorebook = await readLorebook(playthroughId)
+        if (lorebook) lorebooks[playthroughId] = lorebook
+      } catch (err) {
+        console.warn(`[backup] leaving out ${playthroughId}'s lorebook:`, err)
+      }
 
       for (const saveId of listedSaveIds(await saveIdsOf(playthroughId))) {
         const save = await optional(`save ${playthroughId}/${saveId}`, SAVE_NOT_FOUND.code, () =>
@@ -341,6 +355,7 @@ export async function exportBackup(targetPath: string): Promise<void> {
       backgrounds,
       scenes,
       replays,
+      ...(Object.keys(lorebooks).length > 0 ? { lorebooks } : {}),
       characters
     }
     await writeAtomicJson(join(scratch, BACKUP_NAME), record, {
@@ -404,7 +419,8 @@ async function restoreSaves(
   scratch: string,
   record: BackupFile,
   replays: readonly BackupReplay[],
-  semesterPictures: readonly SemesterPicture[]
+  semesterPictures: readonly SemesterPicture[],
+  lorebooks: Readonly<Record<string, LorebookRecord>>
 ): Promise<void> {
   const staged = scratchDir('saves')
 
@@ -493,6 +509,11 @@ async function restoreSaves(
             await writeAtomicJson(metaPath, entry.meta, RESTORE_FAILED)
           }
         }
+      }
+
+      if (Object.hasOwn(lorebooks, playthroughId)) {
+        const path = join(folder, basename(getLorebookPath(playthroughId)))
+        await writeAtomicJson(path, lorebooks[playthroughId], RESTORE_FAILED)
       }
 
       const ownReplays = replays.filter((entry) => entry.playthroughId === playthroughId)
@@ -600,10 +621,11 @@ export async function importBackup(archivePath: string): Promise<void> {
     const scenes = scenesFromBackup(record)
     const replays = replaysFromBackup(record)
     const semesterPictures = semesterPicturesFromBackup(record)
+    const lorebooks = lorebooksFromBackup(record)
 
     await replaceSettings(settings)
     await setGrabBags(record.grabbags)
-    await restoreSaves(scratch, record, replays, semesterPictures)
+    await restoreSaves(scratch, record, replays, semesterPictures, lorebooks)
     await restoreCharacters(scratch, record)
     await restoreBackgrounds(scratch, backgrounds)
     await restoreScenes(scenes)

@@ -1,6 +1,7 @@
 import { globalSlotOf } from '@shared/jobs'
 import { MIN_PLAYER_COURSES, MAX_PLAYER_CLASSES } from '@shared/classes'
 import type { Season } from '@shared/types'
+import type { CourseStanding } from './classProgress'
 import { formatDatePart, formatGameDate } from './gameDate'
 import { ADD_DROP_DATE, FINALS_WEEK, midtermWeekOf, staticOccasionsOf } from './occasions'
 
@@ -162,6 +163,52 @@ export function venusColdTipTexts(playerFirstName: string): readonly string[] {
     `You can buy ColdStop lozenges from Veridan Delivery and take them from the "My stuff" menu.`,
     `Stay healthy! Concordia et Prosperitas.`
   ]
+}
+
+/** What the reader sends when he asks Venus for his grades. */
+export const VENUS_GRADES_ASK = 'Check grades'
+
+/** Where one course stands, as the line under its name in the grade report. */
+function gradeStandingLine(standing: CourseStanding, season: Season): string {
+  switch (standing.kind) {
+    case 'lecture': {
+      const readiness =
+        standing.shortfall === 0
+          ? 'Doing good'
+          : standing.shortfall === 1
+            ? 'Need a bit more Brain'
+            : 'Need lots more Brain'
+      return `${standing.exam === 'midterm' ? 'Midterm' : 'Final'}: ${readiness}`
+    }
+    case 'project': {
+      const percent = Math.round(Math.min(1, standing.worked / standing.needed) * 100)
+      const last = standing.lastSession
+        ? `last progress on ${formatGameDate(standing.lastSession.date, season)}`
+        : 'not started yet'
+      return `Progress: ${percent}% (${last})`
+    }
+    case 'lecture-done':
+      return 'Final: Done'
+    case 'project-done':
+      return 'Final showcase: Done'
+    case 'project-unassigned':
+      return 'Next project: Not assigned yet'
+  }
+}
+
+/**
+ * Venus's answer to {@link VENUS_GRADES_ASK}: one bubble, his GPA and then each course's name
+ * over where it stands, a blank line between them.
+ */
+export function venusGradeReport(
+  gpa: number,
+  courses: readonly { name: string; standing: CourseStanding }[],
+  season: Season
+): string {
+  return [
+    `Your current GPA: ${gpa.toFixed(2)}`,
+    ...courses.map((course) => `${course.name}\n${gradeStandingLine(course.standing, season)}`)
+  ].join('\n\n')
 }
 
 /** What Venus says back when the player finalizes a change. */

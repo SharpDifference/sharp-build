@@ -210,7 +210,7 @@ async function castHangout(
   // haunt is the crash-the-party roll, except for whoever she is out with this slot.
   const meeting = meetingKindOf(actionType)
   const composed = composeMeeting(
-    { called: [...attendees, ...mentioned], required: charId, attendees, inPublic, sceneLocation },
+    { called: [...attendees, ...mentioned], required: charId, inPublic, sceneLocation },
     meeting
   )
   const { cast, passerby } = composed

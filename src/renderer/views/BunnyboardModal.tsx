@@ -30,6 +30,7 @@ import { PROFILE_PICTURE_TYPES } from '@shared/profilePicture'
 import { formatTokens } from '@shared/tallies'
 import { affectionFor, emptyFlags, relationshipTagOf } from '@shared/relationship'
 import { ConfirmModal } from '../components/ConfirmModal'
+import { DeadNote } from '../components/DeadNote'
 import { promptEditable } from '../components/LlmFailureModal'
 import { TextField } from '../components/TextField'
 import { useModalShell } from '../components/useModalShell'
@@ -45,7 +46,7 @@ import { handedBackAcedCount } from '../prompts/classProgress'
 import { isHomecomingVisit } from '../prompts/homecoming'
 import { ADD_DROP_DATE } from '../prompts/occasions'
 import { profileDescriptionOf, readerYearLine } from '../prompts/setting'
-import { isVenusChat, VENUS_EMOJI, VENUS_NAME, VENUS_TITLE } from '../prompts/venus'
+import { isVenusChat, VENUS_CHAT_ID, VENUS_EMOJI, VENUS_NAME, VENUS_TITLE } from '../prompts/venus'
 import { isBunnybotChat, BUNNYBOT_EMOJI, BUNNYBOT_NAME, BUNNYBOT_TITLE } from '../prompts/bunnybot'
 import { useBunnyboardStore, type BunnyboardTab } from '../stores/bunnyboardStore'
 import { profileUrl, useSpriteVersion } from '../stores/characterStore'
@@ -58,6 +59,7 @@ import { useSettingsStore } from '../stores/settingsStore'
 import {
   acceptFriendRequest,
   answerHangout,
+  askVenusForGrades,
   beginHangout,
   blockedThreadHidden,
   dismissFailedMessage,
@@ -80,6 +82,7 @@ import {
   shiftNow
 } from '../stores/timetable'
 import { ContactPage } from './ContactPage'
+import { LorebookPage } from './LorebookPage'
 import { PhotosPage } from './PhotosPage'
 import { EditPromptModal } from './EditPromptModal'
 import { RescheduleModal } from './RescheduleModal'
@@ -181,7 +184,7 @@ function chatIdentityOf(charId: string, character: Character | undefined): ChatI
   }
 }
 
-/* ---- the rail's four marks ------------------------------------------------- */
+/* ---- the rail's six marks -------------------------------------------------- */
 /* The rail's own marks: single-screen, so they stay local rather than move to `screenIcons.tsx`. */
 
 const RAIL_MARK = {
@@ -243,13 +246,22 @@ function PhotosIcon(): JSX.Element {
   )
 }
 
-/** The five destinations, in rail order. */
+function LorebookIcon(): JSX.Element {
+  return (
+    <svg {...RAIL_MARK}>
+      <path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H19a1 1 0 0 1 1 1v18a1 1 0 0 1-1 1H6.5a1 1 0 0 1 0-5H20" />
+    </svg>
+  )
+}
+
+/** The six destinations, in rail order. */
 const TABS: ReadonlyArray<{ id: BunnyboardTab; word: string; Mark: () => JSX.Element }> = [
   { id: 'chats', word: 'CHATS', Mark: ChatsIcon },
   { id: 'friends', word: 'FRIENDS', Mark: FriendsIcon },
   { id: 'updates', word: 'UPDATES', Mark: UpdatesIcon },
   { id: 'profile', word: 'PROFILE', Mark: ProfileIcon },
-  { id: 'photos', word: 'PHOTOS', Mark: PhotosIcon }
+  { id: 'photos', word: 'PHOTOS', Mark: PhotosIcon },
+  { id: 'lorebook', word: 'LOREBOOK', Mark: LorebookIcon }
 ]
 
 /** The composer's quick-bar: one tap each, short enough to sit under the field unwrapped. */
@@ -263,8 +275,8 @@ const LIST_DEAL = dealt(0, 0.03)
 const NOT_NOW = 'Not now.'
 
 /**
- * The Bunnyboard: Chats, Friends and Updates behind one app, and a contact's page over the
- * whole stage. Persisted state lives in `gameStore.bunnyboard`; which screen is showing, in
+ * The Bunnyboard: Chats, Friends, Updates, Profile, Photos and Lorebook behind one app, and a
+ * contact's page over the whole stage. Persisted state lives in `gameStore.bunnyboard`; which screen is showing, in
  * `bunnyboardStore`.
  */
 export function BunnyboardModal({
@@ -406,6 +418,7 @@ export function BunnyboardModal({
                 {tab === 'updates' && <UpdatesFeed />}
                 {tab === 'profile' && <ProfilePage />}
                 {tab === 'photos' && <PhotosPage theme={theme} />}
+                {tab === 'lorebook' && <LorebookPage theme={theme} />}
               </div>
             </div>
           </motion.div>
@@ -584,7 +597,7 @@ function ChatList(): JSX.Element {
     })
 
   return (
-    <div className="vu-bb-chats">
+    <div className="vu-bb-side">
       <div className="vu-title vu-bb-title">
         <h2 className="vu-title-text">Chats</h2>
       </div>
@@ -802,6 +815,8 @@ function VenusActions({
   const jobIntroSent = useGameStore((s) => s.venusJobIntroSent)
   const sceneActive = useGameStore(sceneActiveOf)
   const epilogue = useGameStore(epilogueOf)
+  // Her answer to the last ask, from its beat to its landing.
+  const answering = useBunnyboardStore((s) => s.busyCharIds.includes(VENUS_CHAT_ID))
 
   if (sceneActive) return <BotBusyRow text="You should probably focus right now." />
   if (epilogue) return <BotBusyRow text={NOT_NOW} />
@@ -811,16 +826,28 @@ function VenusActions({
 
   return (
     <div className="vu-bb-answers">
-      {!open && <span className="vu-bb-answers-text">The add/drop period has ended.</span>}
       <div className="vu-bb-answers-row">
-        <PrimaryButton id="bb-venus-schedule" dead={!open || !ready} onClick={onChangeSchedule}>
-          Change schedule
-        </PrimaryButton>
-        {jobIntroSent && (
-          <PrimaryButton id="bb-venus-jobs" dead={job !== null || !ready} onClick={onOpenJobs}>
-            Apply for a part-time job
+        <DeadNote note={open ? null : 'Add/drop period has ended'} align="center">
+          <PrimaryButton id="bb-venus-schedule" dead={!open || !ready} onClick={onChangeSchedule}>
+            Change schedule
           </PrimaryButton>
+        </DeadNote>
+        {jobIntroSent && (
+          <DeadNote note={job !== null ? 'Already have a job' : null} align="center">
+            <PrimaryButton id="bb-venus-jobs" dead={job !== null || !ready} onClick={onOpenJobs}>
+              Apply for a part-time job
+            </PrimaryButton>
+          </DeadNote>
         )}
+        {/* Last, so a row too narrow for three wraps this one alone: the two above it keep their
+            notes hanging into the thread rather than over a button. */}
+        <PrimaryButton
+          id="bb-venus-grades"
+          dead={answering}
+          onClick={() => void askVenusForGrades()}
+        >
+          Check grades
+        </PrimaryButton>
       </div>
     </div>
   )
@@ -937,10 +964,16 @@ function ConversationView({
   const pendingHangout = conversation?.pendingHangout
   const askingOut = Boolean(pendingHangout && !pendingHangout.dismissed)
   const armedHere = armed?.charId === charId
-  // Reschedule needs a real `CalendarEvent` to move and an hour already spoken for.
+  // Reschedule needs a real `CalendarEvent` to move and an hour already spoken for: his class,
+  // his shift or another plan, which drops the button once that plan has moved off the hour.
   const plan = bot ? null : plannedWith(charId, date, time, events)
+  const doubleBooked =
+    plan !== null &&
+    events.some((other) => other.id !== plan.id && other.date === date && other.time === time)
   const canReschedule =
-    askingOut && plan !== null && (playerClassNow() !== null || shiftNow() !== null)
+    askingOut &&
+    plan !== null &&
+    (playerClassNow() !== null || shiftNow() !== null || doubleBooked)
   const [rescheduling, setRescheduling] = useState(false)
   // She has him blocked: readable to the end of the slot, nothing sendable.
   const blocked = useGameStore((s) => s.charInfo[charId]?.flags?.blocked === true)

@@ -10,6 +10,7 @@ import {
   charFileOf,
   classifyBackupEntry,
   endingArtEntry,
+  lorebooksFromBackup,
   namedReplays,
   photoEntry,
   profilePictureEntry,
@@ -35,6 +36,7 @@ import {
 } from '@shared/customBackgrounds'
 import { imageTypeOf } from '@shared/imageBytes'
 import { validateRecord } from '@shared/jsonValidate'
+import { readLorebookRecord, type LorebookRecord } from '@shared/lorebookRecord'
 import { assertSafePhotoId } from '@shared/photos'
 import { validateReplay } from '@shared/replays'
 import { validateSavedScene, type SavedScene } from '@shared/sceneCreator'
@@ -188,6 +190,16 @@ export async function exportBackup(): Promise<string> {
       }
     }
 
+    // A lorebook a restore would refuse would cost the whole backup, so it costs only itself.
+    const lorebooks: Record<string, LorebookRecord> = {}
+    for (const key of await db.getAllKeys('lorebooks')) {
+      try {
+        lorebooks[key] = readLorebookRecord(await db.get('lorebooks', key), `lorebooks/${key}`)
+      } catch (err) {
+        console.warn(`[backup] leaving out lorebook ${key}:`, err)
+      }
+    }
+
     const backup: BackupFile = {
       schemaVersion: BACKUP_SCHEMA_VERSION,
       settings: await rendererSettings(),
@@ -201,6 +213,7 @@ export async function exportBackup(): Promise<string> {
       backgrounds,
       scenes,
       replays,
+      ...(Object.keys(lorebooks).length > 0 ? { lorebooks } : {}),
       characters: (await db.getAll('characters')).filter(
         (character) => !isPackRead(character.charId)
       )
@@ -250,6 +263,7 @@ export async function importBackup(): Promise<boolean> {
   })
   const scenes = scenesFromBackup(record)
   const replays = replaysFromBackup(record)
+  const lorebooks = lorebooksFromBackup(record)
   const semesterPictures = semesterPicturesFromBackup(record)
   // Nothing the backup does not name is written: an entry naming a path of its own choosing
   // would put a file where this build never looks for one.
@@ -270,7 +284,8 @@ export async function importBackup(): Promise<boolean> {
         'charFiles',
         'backgrounds',
         'scenes',
-        'replays'
+        'replays',
+        'lorebooks'
       ],
       'readwrite'
     )
@@ -297,6 +312,14 @@ export async function importBackup(): Promise<boolean> {
       // A replay goes back only beside a playthrough the backup restores.
       if (!Object.hasOwn(record.playthroughs, entry.playthroughId)) continue
       void keptReplays.put(entry.replay, [entry.playthroughId, entry.replayId])
+    }
+
+    const keptLorebooks = tx.objectStore('lorebooks')
+    void keptLorebooks.clear()
+    for (const [playthroughId, lorebook] of Object.entries(lorebooks)) {
+      // A lorebook goes back only beside a playthrough the backup restores.
+      if (!Object.hasOwn(record.playthroughs, playthroughId)) continue
+      void keptLorebooks.put(lorebook, playthroughId)
     }
 
     const art = tx.objectStore('endingArt')

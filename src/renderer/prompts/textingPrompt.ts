@@ -32,6 +32,7 @@ import {
   classLore,
   type ClassRoster,
   keyPattern,
+  type BookEntry,
   lorebookBlock
 } from './lorebook'
 import { occasionLoreLines } from './occasions'
@@ -91,6 +92,8 @@ export interface TextingPromptState {
    * excluded at the source so no entry can restate the `CHARACTER` block.
    */
   roster: readonly Character[]
+  /** The playthrough's lorebook: the shipped entries as the player has them, then his own. */
+  lorebook: readonly BookEntry[]
   /** Per-character save state, keyed by charId — read for the roster's entries. */
   charInfo: Record<string, CharInfo>
   /**
@@ -364,7 +367,8 @@ export function buildTextingPrompt(
   const ambient = ambientLoreCharacters(state.roster, [character], state.npcRelationships).filter(
     (other) => !new RegExp(keyPattern(other.firstName, false), 'iu').test(scan)
   )
-  const lore = lorebookBlock(scan, today, [
+  // A thread sets no background, so no entry points at one.
+  const paragraphs = [
     ...classLore(scan, {
       classes: state.classes,
       rosters: state.classRosters,
@@ -399,7 +403,8 @@ export function buildTextingPrompt(
       state.history,
       state.calendar.season
     )
-  ])
+  ]
+  const lore = lorebookBlock(scan, { book: state.lorebook, always: today, paragraphs })
 
   // How her cold stands this slot, where she has one that shows.
   const slot = globalSlotOf(state.date, state.time)

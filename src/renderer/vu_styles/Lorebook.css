@@ -1,0 +1,69 @@
+/* The Bunnyboard's Lorebook tab: the entries down the list column the Chats tab stands, and the
+   one picked open beside it. The column, the scroller, the rows' voice and the fields are
+   Bunnyboard.css's and base.css's. */
+
+/* The column's own furniture: the new-entry pill under the title, and the file pills at its
+   foot. */
+.vu-lore-new {
+  flex: none;
+  align-self: flex-start;
+}
+
+.vu-lore-tools {
+  display: flex;
+  flex: none;
+  gap: 12px;
+  margin-top: auto;
+}
+
+/* Room over the first row for the sticker riding its corner, given back by the margin so the
+   section heading still lines up under the title. */
+.vu-lore-scroll {
+  margin-top: -16px;
+  padding-top: 16px;
+}
+
+.vu-lore-item {
+  position: relative;
+}
+
+/* An entry: `.vu-row` lifted to the surface tone, as a chat row is. The border is on every row
+   and transparent on most, so opening one moves no layout. */
+.vu-lore-row {
+  border: 2.5px solid transparent;
+  background: var(--vu-surface);
+}
+
+.vu-lore-row--on {
+  border-color: var(--vu-accent);
+}
+
+.vu-lore-title {
+  min-width: 0;
+}
+
+/* A shipped entry the player has changed, said on its corner. */
+.vu-lore-sticker {
+  right: 18px;
+}
+
+/* The editor: the fields scrolling under each other, the status line and the entry's one answer
+   at its foot. */
+.vu-lore-pane {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 18px;
+  min-width: 0;
+  padding: 40px 56px 34px 40px;
+}
+
+.vu-lore-fields {
+  gap: 22px;
+}
+
+/* A shipped entry's background is the build's: read out by name, not offered. */
+.vu-lore-bg-reading {
+  color: var(--vu-text-body);
+  font: 500 14px var(--font-mono);
+}

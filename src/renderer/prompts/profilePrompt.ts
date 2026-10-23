@@ -109,7 +109,7 @@ function normalizeActivity(raw: unknown): string {
 function namesLocation(phrase: string, locationId: string): boolean {
   const keys = loreEntryById(locationId)?.keys ?? []
   if (keys.length === 0) return false
-  return new RegExp(keys.map((key) => keyPattern(key)).join('|'), 'i').test(phrase)
+  return new RegExp(keys.map((key) => keyPattern(key)).join('|'), 'iu').test(phrase)
 }
 
 /** Thrown as an `AppError` when the reply cannot be used. */

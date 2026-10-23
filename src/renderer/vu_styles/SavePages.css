@@ -1,7 +1,7 @@
 /* A page of saves: two columns of quiet cards. One object with two callers, the Load Game and
    Save Game panels. Imported from the component, never from index.css.
 
-   The arrows and dots either side of it are PageArrows.css's; the sticker, the ✕ and the
+   The arrows either side of it and the count under it are PageArrows.css's; the sticker, the ✕ and the
    crop's picture are base.css's. */
 
 /* Two columns of five cells at a fixed height, filled down the first column and then the second,
