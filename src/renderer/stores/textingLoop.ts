@@ -96,11 +96,8 @@ import {
 import { useBunnyboardStore } from './bunnyboardStore'
 import { useGameStore } from './gameStore'
 import { afterDmReply, afterReachOut } from '../mods/hooks'
-<<<<<<< HEAD
 import { INCOMING_TEXTS } from '@shared/modEntries/incoming-texts'
-=======
 import { lorebookNow } from './lorebookStore'
->>>>>>> update/core-0.6.0
 import { prefetchHangoutScene, startHangoutScene } from './loop/hooks'
 import { createRetryGate } from './retryGate'
 import { createTextExtractor } from './textingStream'
@@ -582,53 +579,8 @@ async function sendText(charId: string, text: string, incoming: boolean): Promis
       character,
       game.charInfo[charId],
       conversation,
-<<<<<<< HEAD
       incoming ? '' : trimmed,
       textingState(game, charId),
-=======
-      trimmed,
-      {
-        date: game.date,
-        time: game.time,
-        stats: game.stats,
-        roster: others,
-        lorebook: lorebookNow(),
-        charInfo: game.charInfo,
-        npcRelationships: game.npcRelationships,
-        classes: game.classes,
-        playerSchedule: game.playerSchedule,
-        classRosters: classRostersOf(
-          game.classes,
-          game.chars,
-          game.characters,
-          game.charInfo,
-          game.classRecords
-        ),
-        playerJob: game.job,
-        calendar: game.calendar,
-        weather: game.weather,
-        // Where she is texting from; never a class or shift, as the composer is shut then.
-        charLocation: charHiddenLocationNow(charId),
-        // Who is with her: the same group the location came from.
-        charCompanions: companionsOf(charId),
-        // What she is there for, on a slot she is standing at her own haunt.
-        charHaunt: charStandingHauntNow(charId),
-        // The one absence a thread survives, so her block has to say it.
-        springBreakAway: game.springBreakAway,
-        // The one day a graduate's thread is from somebody in town.
-        ...(visitor ? { homecomingVisitor: visitor } : {}),
-        // From this slot on: texting comes before the slot's scene, so its own plan is still ahead.
-        upcomingPlans: upcomingPlanLines(
-          game.events,
-          game.characters,
-          globalSlotOf(game.date, game.time),
-          game.calendar.season
-        ),
-        memoryBudget: memoryBudgetsOf(useSettingsStore.getState().settings ?? {}).one,
-        secretBudget: secretBudgetOf(useSettingsStore.getState().settings ?? {}),
-        history: game.history
-      },
->>>>>>> update/core-0.6.0
       // The same reader block a scene gets, grades and all.
       readerBlockOf(game),
       incoming ? trimmed : undefined
@@ -793,6 +745,7 @@ function textingState(game: ReturnType<typeof useGameStore.getState>, charId: st
     stats: game.stats,
     breakthrough: modIsOn(BREAKTHROUGH_MOD) ? game.exBreakthrough : undefined,
     roster: others,
+    lorebook: lorebookNow(),
     charInfo: game.charInfo,
     exCharacterDynamics: game.exCharacterDynamics,
     npcRelationships: game.npcRelationships,

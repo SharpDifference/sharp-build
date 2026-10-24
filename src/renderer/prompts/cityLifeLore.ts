@@ -1,6 +1,7 @@
-import type { LoreEntry } from './lorebook'
-export const CITY_LIFE_LORE: readonly LoreEntry[] = [
+import type { ShippedLoreEntry } from './lorebook'
+export const CITY_LIFE_LORE: readonly ShippedLoreEntry[] = [
   {
+    "ref": "city_life_bowling_alley",
     "id": "bowling_alley",
     "keys": [
       "Lucky Strike Lanes",
@@ -10,6 +11,7 @@ export const CITY_LIFE_LORE: readonly LoreEntry[] = [
     "text": "Lucky Strike Lanes is a casual Downtown bowling alley near the cheap food and entertainment district. It opens every day and evening, with rental shoes, polished lanes, ball returns, comfortable seats and a snack counter. Friends can play friendly games, practice alone or arrange a low-pressure bowling date. Background: bowling_alley. Keep bowling scores and outcomes plausible; no automatic victories or affection rewards. Admission and rental prices are descriptive unless the player explicitly purchases something through an existing supported transaction; do not invent automatic money deductions."
   },
   {
+    "ref": "city_life_roller_rink",
     "id": "roller_rink",
     "keys": [
       "Starlight Roller Rink",
@@ -20,6 +22,7 @@ export const CITY_LIFE_LORE: readonly LoreEntry[] = [
     "text": "Starlight Roller Rink is a retro indoor roller-skating venue in Downtown, open every day and evening. It has a smooth maple rink, rental quad skates, benches, a snack lounge, pastel neon and a disco ball. Beginners can practice near the rail while experienced skaters enjoy laps and music. Friends, solo visitors and dates are welcome; offer encouragement and realistic stumbles without forcing touch, romance or success. Background: roller_rink. Admission and rental prices are descriptive unless explicitly purchased through an existing supported transaction; do not invent automatic money deductions."
   },
   {
+    "ref": "city_life_cat_cafe",
     "id": "cat_cafe",
     "keys": [
       "Purr & Pour",

@@ -82,10 +82,6 @@ import { sendsSpringBreakNotice } from '../prompts/springBreak'
 import {
   ambientLoreCharacters,
   characterLoreForIds,
-<<<<<<< HEAD
-  availableLore,
-=======
->>>>>>> update/core-0.6.0
   loreKeyOf,
   RUMOR_PLACE_BAG,
   rumorPoolOf,
@@ -1086,11 +1082,7 @@ async function fetchSlotIntro(
   // about it can be banked.
   const rumorPlace =
     occasions.length === 0 && askers.length === 0
-<<<<<<< HEAD
-      ? useGrabBagStore.getState().draw(RUMOR_PLACE_BAG, availableLore(), loreKeyOf)
-=======
       ? useGrabBagStore.getState().draw(RUMOR_PLACE_BAG, rumorPoolOf(lorebookNow()), loreKeyOf)
->>>>>>> update/core-0.6.0
       : undefined
 
   // Built once and re-sent verbatim on retry; only a hand edit replaces it.
