@@ -8,7 +8,8 @@ export interface LandscapeTileProps {
   title: string
   /** The count in the header — the staged one while the set is being replaced. */
   shownDone: number
-  total: number
+  /** What a whole set counts to; omitted where the set has no end, and the count stands alone. */
+  total?: number
   /** A peek at the set: a URL per still, `null` where there is no image yet. Omitted where
    *  looking at the set is the gallery's job alone. */
   thumbs?: ReadonlyArray<string | null>
@@ -50,14 +51,21 @@ export function LandscapeTile({
   hug = false
 }: LandscapeTileProps): JSX.Element {
   const circleLabel = label ?? (showLocked ? (showLockedReason ?? `Show ${what}`) : `Show ${what}`)
+  // A count with nothing to be short of is no state, and reads in the accent.
+  const tone =
+    total === undefined
+      ? 'accent'
+      : showLocked
+        ? 'muted'
+        : shownDone === total
+          ? 'good'
+          : 'warn'
 
   return (
     <div className={`vu-landscape${auto ? ' vu-landscape--auto' : ''}${hug ? ' vu-landscape--hug' : ''}`}>
       <span className="vu-landscape-title">{title}</span>
-      <span
-        className={`vu-count vu-count--${showLocked ? 'muted' : shownDone === total ? 'good' : 'warn'}`}
-      >
-        {shownDone}/{total}
+      <span className={`vu-count vu-count--${tone}`}>
+        {total === undefined ? shownDone : `${shownDone}/${total}`}
       </span>
 
       {thumbs && (

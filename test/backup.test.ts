@@ -55,6 +55,7 @@ const {
 } = await import('../src/main/services/backgroundService')
 const { listScenes, readScene, writeScene } = await import('../src/main/services/sceneService')
 const { listPhotos, readPhoto, writePhoto } = await import('../src/main/services/photoService')
+const { readLorebook, writeLorebook } = await import('../src/main/services/lorebookService')
 const { createZip, extractZip, listZip } = await import('../src/main/services/archiveService')
 const {
   BACKUP_NAME,
@@ -344,6 +345,28 @@ describe('importBackup', () => {
       Buffer.from(later)
     )
     expect(await readFile(getEndingArtPath(playthroughId))).toEqual(Buffer.from(ENDING_ART))
+  })
+
+  it("carries a playthrough's lorebook out and back", async () => {
+    await seedSettings()
+    const { playthroughId } = await seedPlaythrough()
+    const lorebook = {
+      schemaVersion: 1,
+      edits: { front_gate: { text: 'Locked after dark.' } },
+      custom: [{ id: 'custom1', keys: ['kettle'], text: 'It never boils.' }]
+    }
+    await writeLorebook(playthroughId, lorebook)
+    const archive = join(root, 'lorebook.zip')
+    await exportBackup(archive)
+
+    const backup = JSON.parse(
+      new TextDecoder().decode((await entriesOf(archive))[BACKUP_NAME])
+    ) as BackupFile
+    expect(backup.lorebooks).toEqual({ [playthroughId]: lorebook })
+
+    await rm(getSavesPath(), { recursive: true, force: true })
+    await importBackup(archive)
+    expect(await readLorebook(playthroughId)).toEqual(lorebook)
   })
 
   it('puts a backup back and keeps the stored key', async () => {

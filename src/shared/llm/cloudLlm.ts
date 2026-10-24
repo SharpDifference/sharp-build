@@ -1,5 +1,5 @@
 import { appError, isAppError, messageOf, tailOf, truncate } from '../errors'
-import { modelFor, providerToRun, reasoningToSend, serviceTierFor } from '../providers'
+import { modelFor, providerToRun, reasoningToSend, serviceTierToSend } from '../providers'
 import type { ModelConfig } from '../providers'
 import { DEFAULT_SECONDARY_KINDS, isPromptKind, type PromptKind } from '../promptKinds'
 import {
@@ -201,8 +201,8 @@ export async function completeStructured<T>(
   // Against the model that will actually run, so a secondary that takes fewer levels than the
   // primary falls to its own default rather than 400ing.
   const thinkingLevel = reasoningToSend(settings, model.id, request.minThinking)
-  // Absent is the provider's first tier: `priority` under Gemini.
-  const serviceTier = serviceTierFor(settings.apiProvider, settings.serviceTier)
+  // Absent is `priority` under Gemini, and none at all for a custom endpoint.
+  const serviceTier = serviceTierToSend(settings)
   // The player's own cap where a custom endpoint names one, else the pinned ceiling.
   const maxOutputTokens = maxOutputTokensOf(settings) ?? MAX_OUTPUT_TOKENS
   // `{}` under Gemini; a custom endpoint's stored sampling values, under their wire keys.
@@ -235,7 +235,7 @@ export async function completeStructured<T>(
       .map(([wire, value]) => `${wire}=${value}`)
       .join(',')
     console.log(
-      `[llm] → ${log.what} (thinking=${thinkingLevel}, tier=${serviceTier}` +
+      `[llm] → ${log.what} (thinking=${thinkingLevel}, tier=${serviceTier ?? 'none'}` +
         `, maxTokens=${maxOutputTokens}` +
         `, schema=${request.schema.name}` +
         `${request.cacheKey ? `, cacheKey=${request.cacheKey}` : ''}` +

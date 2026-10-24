@@ -3,6 +3,7 @@ import { APP_ID } from '@shared/appId'
 import type { BackupPlaythrough } from '@shared/backup'
 import type { BgVariant, CustomBackground } from '@shared/customBackgrounds'
 import { appError, messageOf } from '@shared/errors'
+import type { LorebookRecord } from '@shared/lorebookRecord'
 import type { PhotoMeta } from '@shared/photos'
 import type { SlotReplay } from '@shared/replays'
 import type { SavedScene } from '@shared/sceneCreator'
@@ -58,6 +59,7 @@ export interface VenusUniversityDb extends DBSchema {
   backgrounds: { key: string; value: StoredBackground }
   scenes: { key: string; value: SavedScene }
   replays: { key: [string, string]; value: SlotReplay }
+  lorebooks: { key: string; value: LorebookRecord }
 }
 
 /**
@@ -78,10 +80,11 @@ const STORES = [
   'photos',
   'backgrounds',
   'scenes',
-  'replays'
+  'replays',
+  'lorebooks'
 ] as const
 
-const DB_VERSION = 7
+const DB_VERSION = 8
 
 let opened: Promise<IDBPDatabase<VenusUniversityDb>> | null = null
 

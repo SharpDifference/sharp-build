@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { emptyFlags } from '@shared/relationship'
-import type { CharInfo } from '@shared/types'
+import type { CalendarEvent, CharInfo } from '@shared/types'
 import { WEATHER_SLOTS, type Weather } from '@shared/weather'
 import {
   admitLocals,
@@ -14,6 +14,7 @@ import {
   workersAtLocation,
   workingHereNote
 } from '../src/renderer/stores/loop/casting'
+import { composeMeeting, NO_KIND } from '../src/renderer/stores/loop/meetings'
 import { PORTRAIT_SLOTS, useGameStore } from '../src/renderer/stores/gameStore'
 import { SPRING_BREAK_LEAVE } from '../src/renderer/prompts/springBreak'
 import { character, charactersById, charInfo } from './fixtures'
@@ -129,6 +130,40 @@ describe('resolveAttendance', () => {
       cast: ['a', 'b'],
       notes: ["Kira is busy and couldn't come."]
     })
+  })
+})
+
+describe('composeMeeting', () => {
+  it('brings a girl past her class for any plan on the hour, not only the one begun', () => {
+    // Two plans landed on one slot and he means to keep both: Mina's plan is not the button he
+    // pressed, but a scene without her would ghost her for a date he showed up to.
+    const contact = { ...emptyFlags(), gaveContactInfo: true }
+    seed({
+      a: { flags: contact },
+      b: { flags: contact, schedule: { 0: 'BIO 210' } },
+      c: { schedule: { 0: 'BIO 210' } }
+    })
+    const plan = (id: string, charId: string): CalendarEvent => ({
+      id,
+      date: MONDAY,
+      time: 0,
+      title: id,
+      description: id,
+      charIds: [charId],
+      madeOn: { date: MONDAY - 1, time: 1 }
+    })
+    useGameStore.setState({ events: [plan('lunch', 'a'), plan('study', 'b')] })
+
+    const { cast, notes } = composeMeeting(
+      { called: ['a', 'b', 'c'], inPublic: false, sceneLocation: '' },
+      NO_KIND
+    )
+    expect(cast).toEqual(['a', 'b'])
+    // Kira has no plan with him, so her class still keeps her away.
+    expect(notes).toEqual([
+      "Kira is busy and couldn't come.",
+      'Mina either has her BIO 210 class after this or is just coming from it. Choose what makes the most sense.'
+    ])
   })
 })
 

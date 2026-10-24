@@ -220,6 +220,7 @@ export const openaiAdapter: LlmAdapter = {
     model,
     apiKey,
     thinkingLevel,
+    serviceTier,
     maxOutputTokens,
     streaming,
     sampling
@@ -256,6 +257,8 @@ export const openaiAdapter: LlmAdapter = {
           json_schema: { name: request.schema.name, schema: request.schema.schema, strict: false }
         },
         reasoning_effort: thinkingLevel,
+        // Top level, and only where the player picked one: a server that knows no tiers may refuse it.
+        ...(serviceTier ? { service_tier: serviceTier } : {}),
         // A chat-completions server that names no cap of its own answers in a few hundred
         // tokens; sent so a reply that ran out of room is unambiguous when read back, and the
         // player's own cap where one is set.

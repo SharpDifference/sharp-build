@@ -3,9 +3,10 @@ import { create } from 'zustand'
 /**
  * Which Bunnyboard tab is showing. Profile is the reader's own page — his picture, the
  * description the prompts carry of him, his bio and the semester's tallies — and it never
- * repeats the decision landing's balance or stat tiers. Photos is the playthrough's camera roll.
+ * repeats the decision landing's balance or stat tiers. Photos is the playthrough's camera roll,
+ * and Lorebook the playthrough's own lorebook.
  */
-export type BunnyboardTab = 'chats' | 'friends' | 'updates' | 'profile' | 'photos' | (string & {})
+export type BunnyboardTab = 'chats' | 'friends' | 'updates' | 'profile' | 'photos' | 'lorebook' | (string & {})
 
 /** An agreed hangout waiting on the player's "Begin hangout". */
 interface ArmedHangout {

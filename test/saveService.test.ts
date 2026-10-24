@@ -3,7 +3,13 @@ import { tmpdir } from 'os'
 import { join } from 'path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { replayIdOf, type GameReplays, type SlotReplay } from '@shared/replays'
-import { AUTOSAVE_ID, MAX_SLOT_SAVES, type SaveDraft, type SemesterRecord } from '@shared/types'
+import {
+  AUTOSAVE_ID,
+  MANUAL_SAVE_SLOTS,
+  MAX_SLOT_SAVES,
+  type SaveDraft,
+  type SemesterRecord
+} from '@shared/types'
 import { useGameStore } from '../src/renderer/stores/gameStore'
 import { enrollment, record } from './fixtures'
 
@@ -92,7 +98,7 @@ describe('id validation', () => {
   })
 
   it('refuses a save id that names no kind of save', async () => {
-    for (const id of ['..', '../autosave', '', 'settings', 'manual91', '../manual01']) {
+    for (const id of ['..', '../autosave', '', 'settings', 'manual0091', '../manual01']) {
       await expect(saveService.loadSave('1', id)).rejects.toMatchObject({ code: 'SAVE_ID_INVALID' })
     }
   })
@@ -206,8 +212,20 @@ describe('writeManualSave', () => {
     await expect(saveService.loadSave('1', 'manual07')).resolves.toMatchObject({ date: 2 })
   })
 
+  it('names a slot past two digits by its number alone and lists it after the rest', async () => {
+    await saveService.writeManualSave('1', 100, draft({ date: 3 }))
+    await saveService.writeManualSave('1', 9, draft({ date: 1 }))
+
+    const entries = await readdir(getPlaythroughPath('1'))
+    expect(entries.filter((name) => name.startsWith('manual')).sort()).toEqual([
+      'manual09.json',
+      'manual100.json'
+    ])
+    expect((await saveService.saveIdsOf('1')).manual).toEqual(['manual09', 'manual100'])
+  })
+
   it('refuses a slot outside the range, writing nothing', async () => {
-    for (const slot of [0, 91, 1.5]) {
+    for (const slot of [0, MANUAL_SAVE_SLOTS + 1, 1.5]) {
       await expect(saveService.writeManualSave('1', slot, draft())).rejects.toMatchObject({
         code: 'SAVE_SLOT_INVALID'
       })

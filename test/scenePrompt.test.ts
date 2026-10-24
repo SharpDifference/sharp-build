@@ -15,6 +15,7 @@ import { calendarOf } from '@shared/semesters'
 import { DEFAULT_MEMORY_BUDGETS } from '@shared/settingsRules'
 import { READER_SPEAKER, type SceneLine, type TimeSlot } from '@shared/types'
 import { character, charactersById } from './fixtures'
+import { SHIPPED_BOOK } from '../src/renderer/prompts/lorebook'
 
 /**
  * The transforms a blocked request is resent through, the ledger's STATS branches, and the
@@ -33,6 +34,7 @@ function promptState() {
     date: 0,
     time: 0 as TimeSlot,
     backgrounds: { interior: ['library'], exterior: ['quad'] },
+    lorebook: SHIPPED_BOOK,
     charInfo: {},
     npcRelationships: {},
     roster: [],

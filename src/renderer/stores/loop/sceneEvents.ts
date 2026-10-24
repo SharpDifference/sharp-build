@@ -16,7 +16,7 @@ import { moodIndexOf } from '../../prompts/moods'
 import { useGameStore, type SceneKind } from '../gameStore'
 import { nameOf } from './cast'
 import { resolveLocationId } from './casting'
-import { lessNsfwTextNow } from './promptState'
+import { lessNsfwTextNow, secretToTell } from './promptState'
 import type { TurnSnapshot } from './state'
 
 /**
@@ -164,7 +164,8 @@ function stillCast(roll: SceneEventRoll, cast: readonly string[]): SceneEventRol
 
 /**
  * The scene-kind fields a cast scene opens with: rolled the first time this turn casts, and the
- * same roll on every retry of it. A scene with nobody in it opens on nothing.
+ * same roll on every retry of it. A scene with nobody in it opens on nothing, and one that tells
+ * a secret on no curveball.
  */
 export function sceneEventsFor(
   snapshot: TurnSnapshot,
@@ -173,7 +174,9 @@ export function sceneEventsFor(
   host?: string
 ): Pick<SceneKind, 'event' | 'receivedGift'> {
   if (cast.length === 0) return {}
-  const roll = snapshot.sceneEvents ? stillCast(snapshot.sceneEvents, cast) : rollFor(cast, scene, host)
+  const kept = snapshot.sceneEvents ? stillCast(snapshot.sceneEvents, cast) : rollFor(cast, scene, host)
+  // A girl alone with a secret to tell opens on it, with no curveball beside it.
+  const roll = secretToTell(cast) ? { ...kept, event: null } : kept
   snapshot.sceneEvents = roll
   if (roll.event) {
     const who = roll.event.charId ? ` → ${nameOf(roll.event.charId)}` : ''

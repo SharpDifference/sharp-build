@@ -369,6 +369,11 @@ body {
   color: var(--vu-text-muted);
 }
 
+/* A count with nothing to be short of, which is no state: how many of a set without an end. */
+.vu-count--accent {
+  color: var(--vu-accent);
+}
+
 /* A bar with a count behind it: the share done, as a recessed pill with an accent fill that
    grows under `FILL`. A caller states only its own height. */
 .vu-track {
@@ -831,6 +836,37 @@ body {
   font: 700 12px var(--font-mono);
   letter-spacing: 0.1em;
   text-transform: uppercase;
+}
+
+/* A label with a mark after its words: a chip well's, whose mark copies its tags. */
+.vu-field-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 22px;
+}
+
+/* The copy mark, bare at the label's size, and the check it turns to once copied. */
+.vu-field-copy {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: 0;
+  border-radius: 999px;
+  background: none;
+  color: var(--vu-text-muted);
+}
+
+.vu-field-copy svg {
+  width: 14px;
+  height: 14px;
+}
+
+.vu-field-copy--done {
+  color: var(--vu-good);
 }
 
 /* The label's second line: a placeholder-toned aside on the shape of text the

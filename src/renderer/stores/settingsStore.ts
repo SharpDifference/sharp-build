@@ -147,12 +147,13 @@ export function patchOf(settings: RendererSettings): SettingsPatch {
     apiModel: settings.apiModel,
     thinkingLevel: settings.thinkingLevel,
     // Carried, or a save made from anywhere else would drop the custom endpoint the writer
-    // runs on, the endpoint's models, the effort it runs at, the reply cap it is sent and where
-    // its pictures are drawn.
+    // runs on, the endpoint's models, the effort and tier it runs at, the reply cap it is sent
+    // and where its pictures are drawn.
     endpointUrl: settings.endpointUrl,
     endpointModel: settings.endpointModel,
     endpointSecondaryModel: settings.endpointSecondaryModel,
     reasoningEffort: settings.reasoningEffort,
+    endpointServiceTier: settings.endpointServiceTier,
     maxOutputTokens: settings.maxOutputTokens,
     imageEndpointUrl: settings.imageEndpointUrl,
     imageModel: settings.imageModel,

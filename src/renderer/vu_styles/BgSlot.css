@@ -1,0 +1,29 @@
+/* The background's slot: the add pill alone, or the picture beside its change pill and ✕. Held at
+   the picture's height, so neither state moves anything around it. Imported from the component,
+   never from index.css. */
+
+.vu-bg-slot {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 12px;
+  height: 54px;
+}
+
+/* The picture, small and quiet: a reading, not a control. */
+.vu-bg-slot-thumb {
+  display: block;
+  flex: none;
+  width: 96px;
+  height: 54px;
+  overflow: hidden;
+  border-radius: 14px;
+  background: var(--vu-recessed);
+}
+
+.vu-bg-slot-img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
