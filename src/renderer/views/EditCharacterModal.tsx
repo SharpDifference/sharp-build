@@ -1611,23 +1611,12 @@ export function EditCharacterModal({
                           />
                         ))}
 
-<<<<<<< HEAD
                         <BodyFieldsSection
                           body={form.body}
                           baseAppearance={form.baseAppearance}
                           onChange={(body) => setForm((current) => ({ ...current, body }))}
                         />
 
-                        <label className="vu-field" htmlFor="edit-negative-tags">
-                          <span className="vu-field-label">Additional Negative Prompts</span>
-                          <ChipListInput
-                            id="edit-negative-tags"
-                            values={form.negativeTags}
-                            onChange={setField('negativeTags')}
-                            placeholder="Discourages generation of certain elements"
-                          />
-                        </label>
-=======
                         <ChipField
                           id="edit-negative-tags"
                           label="Additional Negative Prompts"
@@ -1636,7 +1625,6 @@ export function EditCharacterModal({
                           placeholder="Discourages generation of certain elements"
                           mark={copyMark}
                         />
->>>>>>> update/core-0.6.0
                       </>
                     )}
 
