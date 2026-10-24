@@ -13,6 +13,7 @@ import type { FeedThreadsResponse } from '@shared/bunnyfeeds'
 import type { PromptEdit } from '@shared/imagePrompt'
 import type { ModSwitches } from '@shared/mods'
 import type { SoundtracksApi } from '@shared/soundtracks'
+import type { LorebookRecord, WorldInfoFile, WorldInfoImport } from '@shared/lorebookRecord'
 import type {
   PhotoEntry,
   PhotoMeta,
@@ -476,6 +477,26 @@ export interface VenusUniversityApi {
      * when dismissed; the download panel in the browser, answering `null`.
      */
     export: (playthroughId: string, photoId: string) => Promise<Result<string | null>>
+  }
+  lorebook: {
+    /** The lorebook kept beside the playthrough, or `null` where it keeps none. */
+    read: (playthroughId: string) => Promise<Result<LorebookRecord | null>>
+    /**
+     * Keeps the lorebook beside a playthrough that still exists, whole; refused, and nothing
+     * created, where it does not.
+     */
+    write: (playthroughId: string, lorebook: LorebookRecord) => Promise<Result<void>>
+    /**
+     * Has the player pick a SillyTavern lorebook — the native dialog on the desktop, the
+     * browser's own picker in the browser — and answers its usable entries, or `null` when
+     * dismissed. Writes nothing.
+     */
+    import: () => Promise<Result<WorldInfoImport | null>>
+    /**
+     * Hands the player the lorebook as a file: the native dialog on the desktop, answering the
+     * path or `null` when dismissed; the download panel in the browser, answering `null`.
+     */
+    export: (world: WorldInfoFile) => Promise<Result<string | null>>
   }
   comfy: {
     /** Starts the app's own server, or checks the player's own one answers. */

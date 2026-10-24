@@ -98,8 +98,11 @@ export interface SceneChromeProps {
    * all while the scene will not be interrupted — `'locked'`. Null for the turn's own row.
    */
   interject: 'open' | 'locked' | null
-  /** What holds a locked row shut, which the divider says: a class in session or her present. */
-  lockedBy: 'class' | 'gift'
+  /**
+   * What holds a locked row shut, which the divider says: a class in session, her present or her
+   * secret.
+   */
+  lockedBy: 'class' | 'gift' | 'secret'
   /** The scene has resolved: its closing is coming or playing, which the divider says. */
   ending: boolean
   /** The current question's answers while an exam is being sat, which the row stands in for. */
@@ -213,9 +216,9 @@ export function SceneChrome(props: SceneChromeProps): JSX.Element {
     dividerWord.current = props.ending
       ? 'ending'
       : rowInterject === 'locked'
-        ? props.lockedBy === 'gift'
-          ? 'gift'
-          : 'locked'
+        ? props.lockedBy === 'class'
+          ? 'locked'
+          : 'unavailable'
         : 'hover'
   }
 
@@ -660,21 +663,21 @@ function SceneTips({ live, shown }: { live: boolean; shown: boolean }): JSX.Elem
 }
 
 /** Which state word the divider says. */
-type DividerWord = 'hover' | 'locked' | 'gift' | 'ending'
+type DividerWord = 'hover' | 'locked' | 'unavailable' | 'ending'
 
 const DIVIDER_WORDS: Record<DividerWord, string> = {
   hover: 'HOVER TO SHOW ACTION BOX',
   locked: 'CLASS IN SESSION',
-  gift: 'ACTION UNAVAILABLE',
+  unavailable: 'ACTION UNAVAILABLE',
   ending: 'SCENE IS ENDING'
 }
 
 /**
  * What stands in the well's place while a reply is being read: a rule either side of a state word
- * saying how to bring the well out, that the class or her present will not be interrupted yet, or
- * that the scene has resolved and is heading into or playing its closing. It is the row's one
- * hover target while the well is away (`Scene.css`), and the well's box it sits in hears the move
- * that swaps the two as the strip's events bubble up to it.
+ * saying how to bring the well out, that the class, her present or her secret will not be
+ * interrupted yet, or that the scene has resolved and is heading into or playing its closing. It
+ * is the row's one hover target while the well is away (`Scene.css`), and the well's box it sits
+ * in hears the move that swaps the two as the strip's events bubble up to it.
  */
 export function SceneDivider({
   state,

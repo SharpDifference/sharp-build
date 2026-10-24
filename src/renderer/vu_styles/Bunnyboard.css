@@ -15,8 +15,8 @@
 
 /* ---- the rail ------------------------------------------------------------- */
 
-/* The way out on top, then the five destinations, stepping down the -2° diagonal the tiles are
-   tilted at, at 10px a seat. */
+/* The way out on top, then the six destinations, stepping down the -2° diagonal the tiles are
+   tilted at, at 8px a seat. */
 .vu-bb-rail {
   display: flex;
   flex: none;
@@ -26,11 +26,11 @@
   width: 126px;
 }
 
-/* The step itself, which is an index rather than a state: each seat sits 10px left of the one
-   above it, so the column runs down the -2° the tiles are tilted at. Six seats — the back
-   button and five tiles — so the last one's margin is the implicit 0 nothing here overrides. */
+/* The step itself, which is an index rather than a state: each seat sits 8px left of the one
+   above it, so the column runs down the -2° the tiles are tilted at. Seven seats — the back
+   button and six tiles — so the last one's margin is the implicit 0 nothing here overrides. */
 .vu-bb-rail > :nth-child(1) {
-  margin-left: 50px;
+  margin-left: 48px;
 }
 
 .vu-bb-rail > :nth-child(2) {
@@ -38,15 +38,19 @@
 }
 
 .vu-bb-rail > :nth-child(3) {
-  margin-left: 30px;
+  margin-left: 32px;
 }
 
 .vu-bb-rail > :nth-child(4) {
-  margin-left: 20px;
+  margin-left: 24px;
 }
 
 .vu-bb-rail > :nth-child(5) {
-  margin-left: 10px;
+  margin-left: 16px;
+}
+
+.vu-bb-rail > :nth-child(6) {
+  margin-left: 8px;
 }
 
 .vu-bb-tile {
@@ -302,10 +306,11 @@
 
 /* ---- Chats (D1) ----------------------------------------------------------- */
 
-/* The list column, one tone below the panel's own face so the rows on it read as sheets. Its
-   left padding is what clears the panel's 120px round end: at the title's own height the curve
-   still reaches some 30px in, and a row's round cap has to start clear of it. */
-.vu-bb-chats {
+/* The list column beside a pane, the Chats tab's and the Lorebook's: one tone below the panel's
+   own face so the rows on it read as sheets. Its left padding is what clears the panel's 120px
+   round end: at the title's own height the curve still reaches some 30px in, and a row's round
+   cap has to start clear of it. */
+.vu-bb-side {
   display: flex;
   flex: none;
   flex-direction: column;
@@ -639,7 +644,9 @@
   gap: 30px;
 }
 
-.vu-bb-answers-row > button {
+/* An answer worn inside the wrapper that hears the pointer for its note pivots the same. */
+.vu-bb-answers-row > button,
+.vu-bb-answers-row > .vu-deadnote > button {
   transform-origin: center;
 }
 

@@ -5,6 +5,7 @@ import { useGameStore } from '../src/renderer/stores/gameStore'
 import { openingScene } from '../src/renderer/stores/loop/saves'
 import { loopState, resetLoopState } from '../src/renderer/stores/loop/state'
 import { playthroughRecord, restoreApi, sceneLines, stubApi } from './fixtures'
+import type { LorebookRecord } from '../src/shared/lorebookRecord'
 
 /**
  * The game a calendar replay is read over is held in memory and entered again afterwards. A
@@ -55,6 +56,9 @@ beforeEach(() => {
       readProfilePicture: vi.fn(
         async (): Promise<Result<Uint8Array<ArrayBuffer> | null>> => ({ ok: true, data: null })
       )
+    },
+    lorebook: {
+      read: vi.fn(async (): Promise<Result<LorebookRecord | null>> => ({ ok: true, data: null }))
     }
   })
 })

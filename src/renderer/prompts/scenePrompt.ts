@@ -29,6 +29,7 @@ import {
   loveLifeBlurb,
   overTextDesc
 } from '@shared/relationship'
+import { withSecretTold } from '@shared/secrets'
 import { DEFAULT_SECRET_BUDGET, memoryBudgetFor } from '@shared/settingsRules'
 import { OUTFIT_SKIN_EXPOSURE } from '@shared/tags'
 import { hasTrait } from '@shared/traits'
@@ -86,10 +87,11 @@ import {
   classLore,
   type ClassRoster,
   keyPattern,
+  type BookEntry,
   lorebookBlock,
+  loreParagraph,
   type LoreRumor,
-  loreEntryById,
-  loreTextForKey
+  placeEntryOf
 } from './lorebook'
 import { farewellNowLines, graduationCastLines } from './graduation'
 import { herColdLine } from './colds'
@@ -183,6 +185,8 @@ export interface PromptState {
   time: TimeSlot
   /** Available background base names, sorted, suffixes already stripped, by category. */
   backgrounds: BackgroundSets
+  /** The playthrough's lorebook: the shipped entries as the player has them, then his own. */
+  lorebook: readonly BookEntry[]
   /** Per-character save state, keyed by charId. */
   charInfo: Record<string, CharInfo>
   /** What the roster thinks of each other, keyed by `pairKeyOf`. */
@@ -200,8 +204,9 @@ export interface PromptState {
    */
   sceneLocation?: string | null
   /**
-   * The secret the scene's one girl is telling the reader in it, or null when she tells none;
-   * read **only on the turn that opens the scene**.
+   * The secret the scene's one girl is telling the reader in it, or null when she tells none:
+   * a fact to establish on the turn that opens the scene, and one she has told on every later
+   * turn of it.
    */
   sceneSecret?: string | null
   /**
@@ -640,14 +645,22 @@ function wardrobeProse(tags: readonly string[]): string {
 /**
  * Renders a cast character's block: who she is and what she looks like, then personality
  * and relationship, then her week and what she remembers. `secret` is the one her scene
- * tells, passed by the call that opens it alone.
+ * tells, passed by the call that opens it alone; every later call lists it as told.
  */
 function castBlock(
   cast: readonly Character[],
   state: PromptState,
   secret?: string | null
 ): string[] {
-  const { charInfo, classes } = state
+  const { classes } = state
+  // Past the opening, the scene's secret stands as told, as its boundary will file it.
+  const charInfo = secret
+    ? state.charInfo
+    : withSecretTold(
+        state.charInfo,
+        cast.map((member) => member.charId),
+        state.sceneSecret
+      )
   const lines: string[] = ['CAST']
   if (cast.length === 0) {
     lines.push('No other characters.')
@@ -806,7 +819,7 @@ function castBlock(
       )
     )
     // What she has told him, and, on the opening call, the secret she tells him in this scene
-    // when she is alone in it.
+    // when she is alone in it; later calls count that one among what she has told.
     lines.push(...secretLines(info?.toldSecrets, state.secretBudget))
     if (secret && cast.length === 1) lines.push(establishLine(secret))
 
@@ -1080,7 +1093,7 @@ export function secretLines(
   budget = DEFAULT_SECRET_BUDGET
 ): string[] {
   const shown = budget > 0 ? (told ?? []).slice(-budget) : []
-  return shown.length > 0 ? [`Secrets: ${shown.join(' ')}`] : []
+  return shown.length > 0 ? [`Secrets the reader knows: ${shown.join(' ')}`] : []
 }
 
 /** The line that has the scene establish the secret she tells in it. */
@@ -1144,6 +1157,12 @@ function castRoomBgs(cast: readonly Character[], state: PromptState): string[] {
 }
 
 /**
+ * The most stage instructions a scene schema lists as an enum, under the size Gemini refuses a
+ * schema at; past it a call's actions are left free and the sanitizer is their only guard.
+ */
+const ACTION_ENUM_MAX = 1200
+
+/**
  * Builds the `SceneResponse` schema, omitting summary/end fields when a
  * call should not be able to produce them.
  */
@@ -1161,7 +1180,15 @@ function sceneSchema(
   const lineProperties: Record<string, unknown> = {
     speaker: { type: 'string', enum: ['', ...charKeys] },
     ...(actions.length > 0
-      ? { actions: { type: 'array', items: { type: 'string', enum: actions } } }
+      ? {
+          actions: {
+            type: 'array',
+            items:
+              actions.length > ACTION_ENUM_MAX
+                ? { type: 'string' }
+                : { type: 'string', enum: actions }
+          }
+        }
       : {}),
     // Cast room ids ride on the enum, never on the cached-prefix background lines.
     bg: { type: 'string', enum: ['', ...allBackgrounds(backgrounds), ...castRoomBgs(cast, state)] },
@@ -1518,11 +1545,10 @@ function workLines(
  * Where a shift is worked — the reader's own, or the one a character is behind
  * the counter of when he walks in.
  */
-function workplaceLore(state: PromptState): string[] {
+function workplaceEntry(state: PromptState): BookEntry | null {
   const jobId = state.jobId ?? state.visitJobId
   const def = jobId ? jobDefOf(jobId) : undefined
-  const text = def ? loreTextForKey(def.workplaceKey) : null
-  return text ? [text] : []
+  return def ? placeEntryOf(state.lorebook, def.locationId) : null
 }
 
 /** A paragraph per gift handed over this scene. */
@@ -1530,9 +1556,41 @@ function giftLore(state: PromptState): string[] {
   return [...state.giftNotes]
 }
 
-/** Every always-on source, in the order the `LOREBOOK` block prints them. */
-function alwaysLore(state: PromptState): string[] {
-  return [...occasionLore(state), ...projectLore(state), ...workplaceLore(state), ...giftLore(state)]
+/**
+ * Every always-on source, in the order the `LOREBOOK` block prints them; the workplace's entry
+ * points at its background as a matched one would.
+ */
+function alwaysLore(state: PromptState, backgrounds: ReadonlySet<string>): string[] {
+  const workplace = workplaceEntry(state)
+  return [
+    ...occasionLore(state),
+    ...projectLore(state),
+    ...(workplace ? [loreParagraph(workplace, backgrounds)] : []),
+    ...giftLore(state)
+  ]
+}
+
+/**
+ * A scene call's `LOREBOOK` block: the always-on sources, the entries `scanned` triggers and the
+ * `paragraphs` built for it, each entry pointing at its background — scene calls being the only
+ * ones that set one.
+ */
+function sceneLorebook(
+  scanned: string,
+  state: PromptState,
+  paragraphs: readonly string[],
+  rumor?: LoreRumor
+): string[] {
+  const backgrounds = new Set(allBackgrounds(state.backgrounds))
+  const workplace = workplaceEntry(state)
+  return lorebookBlock(scanned, {
+    book: state.lorebook,
+    always: alwaysLore(state, backgrounds),
+    stated: workplace ? [workplace.handle] : [],
+    paragraphs,
+    rumor,
+    backgrounds
+  })
 }
 
 /**
@@ -1597,7 +1655,7 @@ function classLoreFor(scanned: string, state: PromptState): string[] {
  */
 function loreScan(scanned: string, state: PromptState): string {
   if (!state.sceneLocation) return scanned
-  const entry = loreEntryById(state.sceneLocation)
+  const entry = placeEntryOf(state.lorebook, state.sceneLocation)
   return `${scanned}\n${entry ? entry.keys[0] : state.sceneLocation}`
 }
 
@@ -1625,9 +1683,9 @@ function castScenePrompt(
   secret?: string | null
 ): StructuredRequest {
   const scanned = loreScan(scan, state)
-  const lore = lorebookBlock(
+  const lore = sceneLorebook(
     scanned,
-    alwaysLore(state),
+    state,
     [
       ...classLoreFor(scanned, state),
       ...characterLoreFor(scanned, state, cast),
@@ -1748,8 +1806,9 @@ export function buildScenePrompt(
     `Reader's action: ${action}`
   ]
 
-  // Nothing has been written yet, so the action is the whole scan. The slot's rumor and the
-  // secret she tells ride this call alone — the continuation and the closing pass neither.
+  // Nothing has been written yet, so the action is the whole scan. The slot's rumor rides this
+  // call alone, and the secret she tells is established on it alone — the continuation and the
+  // closing pass neither, the secret reaching them as one she has told.
   return castScenePrompt(
     cast,
     state,
@@ -1783,9 +1842,9 @@ export function buildSoloPrompt(
   // Nothing written yet: the action plus the classifier's location is the whole scan.
   const scanned = loreScan(action, state)
   // The only people a solo scene describes: the classifier's mentions.
-  const lore = lorebookBlock(
+  const lore = sceneLorebook(
     scanned,
-    alwaysLore(state),
+    state,
     [
       ...classLoreFor(scanned, state),
       ...characterLoreForIds(

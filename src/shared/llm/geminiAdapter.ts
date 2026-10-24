@@ -300,7 +300,7 @@ export const geminiAdapter: LlmAdapter & ImageAdapter = {
       },
       body: {
         // Top level and snake_case; omitted on `standard`, which the API assumes.
-        ...(serviceTier !== 'standard' ? { service_tier: serviceTier } : {}),
+        ...(serviceTier && serviceTier !== 'standard' ? { service_tier: serviceTier } : {}),
         // An empty system instruction is a 400; the hangout classifier sends none.
         ...(request.system ? { systemInstruction: { parts: [{ text: request.system }] } } : {}),
         contents: [

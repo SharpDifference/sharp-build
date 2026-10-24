@@ -21,6 +21,7 @@ import {
   type BgVariant
 } from '@shared/customBackgrounds'
 import { appError } from '@shared/errors'
+import { LOREBOOK_FILE_NAME } from '@shared/lorebookRecord'
 import { photoImageName, photoMetaName, photoThumbName, PHOTOS_DIR } from '@shared/photos'
 import { REPLAYS_DIR } from '@shared/replays'
 import type { RoomVariant } from '@shared/room'
@@ -294,6 +295,11 @@ export function endingArtSemesterOf(fileName: string): string | null {
 /** `/data/saves/{playthroughId}/profile.png` — the reader's own picture. */
 export function getProfilePicturePath(playthroughId: string): string {
   return join(getPlaythroughPath(playthroughId), 'profile.png')
+}
+
+/** `/data/saves/{playthroughId}/lorebook.json` — the playthrough's own lorebook. */
+export function getLorebookPath(playthroughId: string): string {
+  return join(getPlaythroughPath(playthroughId), LOREBOOK_FILE_NAME)
 }
 
 /** `/data/saves/{playthroughId}/photos` — the Bunnyboard's photos. */

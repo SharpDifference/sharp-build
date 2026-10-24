@@ -1,5 +1,5 @@
 import type { ClassEntry, ClassRecord, CourseEntry } from './types'
-import { MAX_TIER, pointsForTier } from './playerStats'
+import { MAX_TIER, pointsForTier, tierOf } from './playerStats'
 import type { StatTier } from './playerStats'
 import { pick } from './shuffle'
 
@@ -136,6 +136,18 @@ const REQUIRED_TIERS: Record<ClassDifficulty, Record<ExamPeriod, StatTier>> = {
 /** The Brain tier `difficulty` expects by `exam`. */
 function requiredTier(difficulty: ClassDifficulty, exam: ExamPeriod): StatTier {
   return REQUIRED_TIERS[difficulty][exam]
+}
+
+/**
+ * How many Brain tiers short of acing `exam` the reader stands: 0 at or above the tier it asks,
+ * where a paper with every answer right scores 100.
+ */
+export function aceShortfall(
+  points: number,
+  difficulty: ClassDifficulty,
+  exam: ExamPeriod
+): number {
+  return Math.max(0, requiredTier(difficulty, exam) - tierOf(points))
 }
 
 /**

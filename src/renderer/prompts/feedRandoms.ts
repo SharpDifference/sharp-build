@@ -101,7 +101,8 @@ const FEED_HANDLES: readonly string[] = [
   'imogenzz',
   'DiamondDogs80',
   'tallulah_playable',
-  'jill.stingray'
+  'jill.stingray',
+  'r_gosling',
 ]
 
 /** The handle bag: the generated names, with every supporter's marbles spread among them. */
@@ -252,6 +253,12 @@ export const FEED_MESSAGES: readonly FeedMessage[] = [
   'Out, out, brief candle! A freshman is but a walking shadow, a poor player that struts and frets his hour upon the podium and is heard no more...',
   'with this treasure i summon... eight-spice eastern buffet general tsos chicken',
   'da da da it is good day to be not dead',
+  'you look lonely... i probably cant fix that...',
+  'Oh no, not me... I never lost control... you\'re face to face with the man who sold VU...',
+  'I pray for the grades of all VU students, even freshmen, but we can\'t expect God to do all the work',
+  'you take a sip from your trusty VU store water bottle...',
+  'to the town of veridan came a stranger one fine day',
+  'oh well im the type of guy who will never settle down'
 ]
 
 /** Faces the campus posts under — an emoji stands in for a photo. */

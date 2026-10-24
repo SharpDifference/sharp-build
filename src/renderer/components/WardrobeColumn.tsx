@@ -11,7 +11,9 @@ import {
   quietPress,
   revealed,
   rowPress,
-  spin
+  spin,
+  toggleLift,
+  yielded
 } from '../views/motion'
 import { EyeOffIcon, PlusIcon } from '../views/screenIcons'
 import { DeadNote } from './DeadNote'
@@ -66,7 +68,14 @@ export interface WardrobeColumnProps {
   /** Throws the whole set away; absent where the column does not offer that. */
   onDelete?: () => void
   deleteDisabled?: boolean
+  /** Holds the set's record as the copied outfit; absent where the column offers no copy. */
+  onCopy?: () => void
+  /** The copy has been taken from this column while its panel stands, so its pill says so. */
+  copied?: boolean
 }
+
+/** Which pill of a stack over the sprite holds the focus. */
+type PillKey = 'regenerate' | 'copy'
 
 /** What a column with nothing being re-rolled reads, minted once rather than on every render. */
 const NO_LIVE: ReadonlySet<Emotion> = new Set()
@@ -102,7 +111,9 @@ export function WardrobeColumn({
   rename,
   onInstructions,
   onDelete,
-  deleteDisabled = false
+  deleteDisabled = false,
+  onCopy,
+  copied = false
 }: WardrobeColumnProps): JSX.Element {
   const [shown, setShown] = useState(false)
   // A lock arriving over a panel already revealed puts the cover back.
@@ -131,6 +142,39 @@ export function WardrobeColumn({
   /* A set with nothing in it at all is an offer rather than a gap: the plus stands in the
      empty crop where the word would, and it is on the picture and not on the archway. */
   const addable = onAdd !== undefined && !covered && shownDone === 0 && present?.[emotion] !== true
+  // A set with a record can be copied from over its picture or its gap, never through a cover.
+  const copyable = onCopy !== undefined && !covered && !addable
+
+  /* Two controls stand as a stack of pills over the picture; one is the picture itself. The
+     focus a stack's pill held is let go of when the column changes form, since a pill that
+     leaves under the focus reports no blur. */
+  const form = offered && copyable ? 'stack' : offered || copyable ? 'single' : 'none'
+  const [focusedPill, setFocusedPill] = useState<PillKey | null>(null)
+  const [focusForm, setFocusForm] = useState(form)
+  if (focusForm !== form) {
+    setFocusForm(form)
+    setFocusedPill(null)
+  }
+  const raised = over || focusedPill !== null
+
+  const regenerate = {
+    ariaLabel: live ? `Cancel ${emotion}` : `Regenerate ${emotion}`,
+    pill: live ? (
+      <>
+        <motion.span className="vu-ring" animate={spin} />
+        Cancel
+      </>
+    ) : (
+      '↻ Regenerate'
+    ),
+    onAct: () => (live ? onCancelExpression?.(emotion) : onRegenerateExpression?.(emotion))
+  }
+  const copy = {
+    ariaLabel: `Copy ${title}`,
+    pill: copied ? 'Copied' : 'Copy outfit',
+    onAct: () => onCopy?.()
+  }
+  const single = offered ? regenerate : copy
 
   const sprite = present?.[emotion] ? (
     <img
@@ -150,7 +194,14 @@ export function WardrobeColumn({
       <PlusIcon size={30} />
     </motion.button>
   ) : (
-    <span className="vu-wardrobe-empty">NOT GENERATED</span>
+    // The word gives way to a pill raised over it, which would otherwise sit on top of it.
+    <motion.span
+      className="vu-wardrobe-empty"
+      variants={form === 'none' ? undefined : yielded}
+      initial={false}
+    >
+      NOT GENERATED
+    </motion.span>
   )
 
   return (
@@ -185,32 +236,64 @@ export function WardrobeColumn({
 
       <div className={`vu-arch vu-wardrobe-arch${weighted ? ' vu-paper' : ''}`}>
         <div className={`vu-crop vu-wardrobe-crop${addable ? ' vu-wardrobe-crop--empty' : ''}`}>
-          {offered ? (
+          {form === 'stack' ? (
+            <motion.div
+              key="stack"
+              className="vu-wardrobe-pic"
+              animate={live || raised ? 'shown' : 'hidden'}
+              onHoverStart={() => setOver(true)}
+              onHoverEnd={() => setOver(false)}
+            >
+              {sprite}
+              <div className="vu-wardrobe-pills">
+                {/* A re-roll in flight holds its Cancel up; the copy waits on the hover. */}
+                <motion.button
+                  className="vu-pic-action"
+                  type="button"
+                  aria-label={regenerate.ariaLabel}
+                  variants={revealed}
+                  initial={false}
+                  {...gestures(false, toggleLift, quietPress)}
+                  onFocus={() => setFocusedPill('regenerate')}
+                  onBlur={() => setFocusedPill((now) => (now === 'regenerate' ? null : now))}
+                  onClick={regenerate.onAct}
+                >
+                  {regenerate.pill}
+                </motion.button>
+                <motion.button
+                  className="vu-pic-action"
+                  type="button"
+                  aria-label={copy.ariaLabel}
+                  variants={revealed}
+                  initial={false}
+                  animate={raised ? 'shown' : 'hidden'}
+                  {...gestures(false, toggleLift, quietPress)}
+                  onFocus={() => setFocusedPill('copy')}
+                  onBlur={() => setFocusedPill((now) => (now === 'copy' ? null : now))}
+                  onClick={copy.onAct}
+                >
+                  {copy.pill}
+                </motion.button>
+              </div>
+            </motion.div>
+          ) : form === 'single' ? (
             <motion.button
+              key="single"
               className="vu-wardrobe-pic"
               type="button"
-              aria-label={live ? `Cancel ${emotion}` : `Regenerate ${emotion}`}
-              animate={live || over ? 'shown' : 'hidden'}
+              aria-label={single.ariaLabel}
+              animate={(offered && live) || over ? 'shown' : 'hidden'}
               whileFocus="shown"
               whileTap={rowPress}
               onHoverStart={() => setOver(true)}
               onHoverEnd={() => setOver(false)}
-              onClick={() =>
-                live ? onCancelExpression?.(emotion) : onRegenerateExpression?.(emotion)
-              }
+              onClick={single.onAct}
             >
               {sprite}
               {/* Variants rather than a `whileHover`, so focusing the sprite reveals the pill
                   on it; `initial={false}` keeps it tucked from the first frame. */}
               <motion.span className="vu-pic-action" variants={revealed} initial={false}>
-                {live ? (
-                  <>
-                    <motion.span className="vu-ring" animate={spin} />
-                    Cancel
-                  </>
-                ) : (
-                  '↻ Regenerate'
-                )}
+                {single.pill}
               </motion.span>
             </motion.button>
           ) : (

@@ -1,19 +1,32 @@
-/* The five player-authored wardrobes side by side, opened out of the Edit modal. Imported
-   from the view module after `EditCharacter.css`, which owns the column this panel is five
-   of — a screen's file must load after base.css or its overrides lose at equal specificity. */
+/* The player-authored wardrobes five abreast, a page at a time between the page arrows, opened
+   out of the Edit modal. Imported from the view module after `EditCharacter.css`, which owns
+   the column a page is five of — a screen's file must load after base.css or its overrides
+   lose at equal specificity. The arrows are PageArrows.css's. */
 
 /* The chassis is `.vu-sheet--wide`'s, which lays two panes across; this is one pane of
-   columns with a hint over it and a foot under it, so it stands them in a column instead. */
+   columns and the arrows with a foot under them, so it stands them in a column instead. */
 .vu-customs {
   flex-direction: column;
   gap: 18px;
 }
 
+/* Clear of the tab, which hangs off the panel's corner. */
+.vu-customs .vu-pages {
+  margin-top: 20px;
+}
+
+/* The page takes the row between the arrows. */
 .vu-customs-grid {
   display: grid;
+  flex: 1;
   grid-template-columns: repeat(5, minmax(0, 1fr));
-  margin-top: 20px;
   gap: 16px;
+  min-width: 0;
+}
+
+/* The wrapper a column is dealt in on. */
+.vu-customs-cell {
+  min-width: 0;
 }
 
 /* A custom outfit's name is written lowercase and shown exactly as written, the box that
@@ -23,7 +36,7 @@
   text-transform: none;
 }
 
-/* Five columns, a hint and a foot on one 1080 stage: the archway gives up its own cap so the
+/* Five columns and a foot on one 1080 stage: the archway gives up its own cap so the
    panel stands inside the stage rather than the sprites standing at full height. */
 .vu-customs .vu-wardrobe-arch {
   max-height: 520px;

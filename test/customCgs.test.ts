@@ -9,7 +9,7 @@ import {
   writtenCgOf
 } from '@shared/customCgs'
 import type { PromptEdit } from '@shared/imagePrompt'
-import { afterOf, CUSTOM_CG_SLOTS, STOCK_POSITIONS } from '@shared/positions'
+import { afterOf, STOCK_POSITIONS } from '@shared/positions'
 import type { CustomCg } from '@shared/types'
 import { character } from './fixtures'
 
@@ -25,12 +25,16 @@ describe('offeredCustomCgs', () => {
       customCgs: {
         customcg1: { name: 'bunny', tags: ['x'], instructions: 'when she kneels' },
         customcg2: { name: 'nurse', tags: ['x'] },
-        customcg3: { name: 'maid', tags: ['x'], instructions: 'when she serves' }
+        customcg3: { name: 'maid', tags: ['x'], instructions: 'when she serves' },
+        customcg11: { name: 'cow', tags: ['x'], instructions: 'when she rides' }
       }
     })
-    expect(offeredCustomCgs(written, [...CUSTOM_CG_SLOTS]).map((cg) => cg.slot)).toEqual([
+    // In slot-number order whatever order they came in.
+    const ready = ['customcg11', 'customcg3', 'customcg2', 'customcg1'] as const
+    expect(offeredCustomCgs(written, [...ready]).map((cg) => cg.slot)).toEqual([
       'customcg1',
-      'customcg3'
+      'customcg3',
+      'customcg11'
     ])
     expect(offeredCustomCgs(written, ['customcg3']).map((cg) => cg.slot)).toEqual(['customcg3'])
     expect(offeredCustomCgs(written, undefined)).toEqual([])
@@ -47,14 +51,17 @@ describe('offeredCustomCgs', () => {
         customcg1: entry(undefined),
         customcg2: entry('sex'),
         customcg3: entry('sex_after'),
-        customcg4: entry('customcg1')
+        customcg4: entry('customcg1'),
+        customcg5: entry('customcg30')
       }
     })
-    expect(offeredCustomCgs(written, [...CUSTOM_CG_SLOTS]).map((cg) => cg.name)).toEqual([
+    const ready = ['customcg1', 'customcg2', 'customcg3', 'customcg4', 'customcg5'] as const
+    expect(offeredCustomCgs(written, [...ready]).map((cg) => cg.name)).toEqual([
       'customcg1',
       'customcg2',
       'customcg3',
-      'customcg4'
+      'customcg4',
+      'customcg5'
     ])
   })
 

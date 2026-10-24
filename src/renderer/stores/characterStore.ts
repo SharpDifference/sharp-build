@@ -9,11 +9,10 @@ import { cardFileName, spritePackFileName } from '@shared/sillyTavern'
 import type { PromptEdit } from '@shared/imagePrompt'
 import {
   allFollowMain,
-  CUSTOM_OUTFIT_SLOTS,
+  customOutfitSlotsIn,
   expressionTargetFor,
   followsMain,
   outfitLabelOf,
-  OUTFIT_SETS,
   parseSpriteRef,
   STOCK_OUTFIT_SETS,
   withCustomOutfit,
@@ -21,8 +20,8 @@ import {
 } from '@shared/outfits'
 import {
   afterOf,
-  CUSTOM_CG_SLOTS,
   customCgSlotOf,
+  customCgSlotsIn,
   isCustomCgSlot,
   isPosition,
   isStockPosition,
@@ -266,6 +265,10 @@ interface CharacterStoreState {
   editedDefaults: string[]
   /** Whether edits write to the shipped folders themselves, with no copy and no reset. */
   defaultsInPlace: boolean
+  /** The player-authored wardrobe last copied, for the form that makes a new one; never written. */
+  copiedOutfit: CustomOutfit | null
+  /** The player-authored CG pair last copied, on the same terms. */
+  copiedCg: CustomCg | null
 
   load: () => Promise<void>
   /** Reads the shipped cast and what the player has removed from it. */
@@ -337,6 +340,8 @@ interface CharacterStoreState {
    * while anything of that set is still rendering.
    */
   deleteCustomOutfit: (charId: string, slot: CustomOutfitSlot) => Promise<boolean>
+  /** Holds one player-authored wardrobe's record as the copied outfit, over the one before. */
+  copyCustomOutfit: (charId: string, slot: CustomOutfitSlot) => void
   /**
    * Merges a write into one player-authored CG pair on her record as it stands at its turn;
    * a field the patch leaves out keeps what the slot holds.
@@ -347,6 +352,8 @@ interface CharacterStoreState {
    * while the pair or either of its images is still rendering.
    */
   deleteCustomCg: (charId: string, slot: CustomCgSlot) => Promise<boolean>
+  /** Holds one player-authored CG pair's record as the copied CG, over the one before. */
+  copyCustomCg: (charId: string, slot: CustomCgSlot) => void
   /** Writes one character out as a zip through the native save dialog. */
   exportCharacter: (charId: string) => Promise<ExportOutcome>
   /** Composes a SillyTavern card for one character and saves it where the player picks. */
@@ -477,6 +484,8 @@ export const useCharacterStore = create<CharacterStoreState>((set, get) => ({
   removedDefaults: [],
   editedDefaults: [],
   defaultsInPlace: false,
+  copiedOutfit: null,
+  copiedCg: null,
 
   loadDefaults: async () => {
     const result = await window.api.chars.defaults()
@@ -777,6 +786,11 @@ export const useCharacterStore = create<CharacterStoreState>((set, get) => ({
     return written
   },
 
+  copyCustomOutfit: (charId, slot) => {
+    const entry = get().characters[charId]?.customOutfits?.[slot]
+    if (entry) set({ copiedOutfit: { ...entry, tags: [...entry.tags] } })
+  },
+
   writeCustomCg: (charId, slot, patch) =>
     patchCharacter(charId, (current) => withCustomCg(current, slot, patch), set, get),
 
@@ -804,6 +818,11 @@ export const useCharacterStore = create<CharacterStoreState>((set, get) => ({
       ...bumpSpriteVersion(state, charId)
     }))
     return written
+  },
+
+  copyCustomCg: (charId, slot) => {
+    const entry = get().characters[charId]?.customCgs?.[slot]
+    if (entry) set({ copiedCg: { ...entry, tags: [...entry.tags] } })
   },
 
   exportCharacter: async (charId) => {
@@ -1550,8 +1569,7 @@ export function missingContentPlan(
         consider(set, EMOTIONS.filter((emotion) => !state.outfits[charId]?.[set]?.[emotion]).length)
       }
       // Only a slot her record carries tags for: nothing else has anything to render from.
-      for (const slot of CUSTOM_OUTFIT_SLOTS) {
-        if (!character.customOutfits?.[slot]) continue
+      for (const slot of customOutfitSlotsIn(Object.keys(character.customOutfits ?? {}))) {
         consider(
           slot,
           EMOTIONS.filter((emotion) => !state.outfits[charId]?.[slot]?.[emotion]).length
@@ -1561,8 +1579,8 @@ export function missingContentPlan(
         consider('cgs', STOCK_POSITIONS.filter((position) => !state.cgs[charId]?.[position]).length)
       }
       // The same for a CG pair: only a slot her record carries tags for.
-      for (const slot of CUSTOM_CG_SLOTS) {
-        if (!character.customCgs?.[slot] || sfwWithholds(slot, gates.noNsfwImages)) continue
+      for (const slot of customCgSlotsIn(Object.keys(character.customCgs ?? {}))) {
+        if (sfwWithholds(slot, gates.noNsfwImages)) continue
         consider(slot, pairOf(slot).filter((position) => !state.cgs[charId]?.[position]).length)
       }
     }
@@ -2382,7 +2400,7 @@ async function runBuckets(
           recount: () => window.api.chars.outfits(charId),
           applyRecount: (data) =>
             set((state) => ({ outfits: { ...state.outfits, [charId]: data } })),
-          complete: (data) => EMOTIONS.every((emotion) => data[outfitSet][emotion])
+          complete: (data) => EMOTIONS.every((emotion) => data[outfitSet]?.[emotion])
         },
         markDone: (emotion) =>
           set((state) => ({
@@ -2683,11 +2701,15 @@ function outfitSetReady(
   return EMOTIONS.every((emotion) => status?.[set]?.[emotion])
 }
 
-/** Which of a character's outfit sets are fully rendered — what the scene prompt offers RITA. */
+/**
+ * Which of a character's outfit sets are fully rendered, the stock ones first and then her own
+ * in slot-number order — what the scene prompt offers RITA.
+ */
 export function readyOutfitSets(
   status: Record<OutfitSet, Record<Emotion, boolean>> | undefined
 ): OutfitSet[] {
-  return OUTFIT_SETS.filter((set) => outfitSetReady(status, set))
+  const sets = [...STOCK_OUTFIT_SETS, ...customOutfitSlotsIn(Object.keys(status ?? {}))]
+  return sets.filter((set) => outfitSetReady(status, set))
 }
 
 /**
@@ -2697,7 +2719,9 @@ export function readyOutfitSets(
 export function readyCustomCgs(
   status: Partial<Record<Position, boolean>> | undefined
 ): CustomCgSlot[] {
-  return CUSTOM_CG_SLOTS.filter((slot) => pairOf(slot).every((position) => status?.[position]))
+  return customCgSlotsIn(Object.keys(status ?? {})).filter((slot) =>
+    pairOf(slot).every((position) => status?.[position])
+  )
 }
 
 /** URL for a character image, with a cache-buster for regenerations. */

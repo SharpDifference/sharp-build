@@ -21,6 +21,7 @@ import {
   type WardrobeTarget
 } from '@shared/types'
 import { isWet } from '@shared/weather'
+import { BgSlot } from '../components/BgSlot'
 import { DeleteX } from '../components/DeleteX'
 import { SelectField } from '../components/SelectField'
 import { TextField } from '../components/TextField'
@@ -159,7 +160,6 @@ export function CreatePhotoModal({
   const [ready, setReady] = useState(false)
   const [creating, setCreating] = useState(false)
   const [pickingBg, setPickingBg] = useState(false)
-  const [bgHovered, setBgHovered] = useState(false)
   const fittedOnce = useRef(false)
 
   // Every background the scene may name, which a room id the same as one of them never shadows.
@@ -329,44 +329,13 @@ export function CreatePhotoModal({
           <TitleTab>Create photo</TitleTab>
 
           <div className="vu-cp-left">
-            <motion.div
-              className="vu-cp-bg"
-              onHoverStart={() => setBgHovered(true)}
-              onHoverEnd={() => setBgHovered(false)}
-            >
-              {background ? (
-                <>
-                  <span className="vu-cp-bg-thumb">
-                    {bgSrc !== null && <img className="vu-cp-bg-img" src={bgSrc} alt="" />}
-                  </span>
-                  <motion.button
-                    id="cp-change-bg"
-                    className="vu-pill"
-                    type="button"
-                    {...gestures(false, quietLift, quietPress)}
-                    onClick={() => setPickingBg(true)}
-                  >
-                    Change BG
-                  </motion.button>
-                  <DeleteX
-                    className="vu-x"
-                    hovered={bgHovered}
-                    label="Remove the background"
-                    onDelete={() => setBackground(undefined)}
-                  />
-                </>
-              ) : (
-                <motion.button
-                  id="cp-add-bg"
-                  className="vu-pill"
-                  type="button"
-                  {...gestures(false, quietLift, quietPress)}
-                  onClick={() => setPickingBg(true)}
-                >
-                  Add BG
-                </motion.button>
-              )}
-            </motion.div>
+            <BgSlot
+              idPrefix="cp"
+              src={bgSrc}
+              picked={background !== undefined}
+              onPick={() => setPickingBg(true)}
+              onClear={() => setBackground(undefined)}
+            />
 
             {draft.rows.length === 0 ? (
               <p className="vu-empty">

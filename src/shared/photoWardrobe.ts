@@ -1,4 +1,4 @@
-import { CUSTOM_OUTFIT_SLOTS, outfitTagsFor } from './outfits'
+import { customOutfitSlotsIn, outfitTagsFor } from './outfits'
 import { saysAny } from './photoWords'
 import type { Character, CustomOutfitSlot } from './types'
 
@@ -47,7 +47,7 @@ const PE_PLACES = ['pe', 'gym', 'workout', 'working out', 'running', 'jogging', 
 
 /** The custom set whose name the caption says, if any. */
 function namedCustomSet(character: Character, text: string): CustomOutfitSlot | null {
-  for (const slot of CUSTOM_OUTFIT_SLOTS) {
+  for (const slot of customOutfitSlotsIn(Object.keys(character.customOutfits ?? {}))) {
     const name = character.customOutfits?.[slot]?.name?.trim().toLowerCase()
     if (name && saysAny(text, [name])) return slot
   }
@@ -96,7 +96,7 @@ export function wardrobeLine(character: Character): string {
     `everyday — ${spoken(character.outfit)}`,
     `PE kit — ${spoken(character.peOutfit)}`,
     `swimsuit — ${spoken(character.swimOutfit)}`,
-    ...CUSTOM_OUTFIT_SLOTS.flatMap((slot) => {
+    ...customOutfitSlotsIn(Object.keys(character.customOutfits ?? {})).flatMap((slot) => {
       const set = character.customOutfits?.[slot]
       const name = set?.name?.trim()
       return name && set && set.tags.length > 0 ? [`"${name}" — ${spoken(set.tags)}`] : []

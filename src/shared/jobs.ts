@@ -133,8 +133,8 @@ export interface JobDef {
   /** A place that exists in `renderer/prompts/lorebook.ts`, spelled as that file spells it. */
   employer: string
   /**
-   * The lorebook key whose paragraph a `job` scene injects, copied from
-   * `renderer/prompts/lorebook.ts`; `lorebook.test.ts` asserts every one still resolves.
+   * The workplace's lorebook key, copied from `renderer/prompts/lorebook.ts`: one more spelling
+   * a place the classifier names is matched against.
    */
   workplaceKey: string
   /**
