@@ -1,4 +1,11 @@
-import type { ImageSize, ModelConfig, ProviderConfig, ServiceTier, ThinkingLevel } from '../providers'
+import type {
+  EndpointServiceTier,
+  ImageSize,
+  ModelConfig,
+  ProviderConfig,
+  ServiceTier,
+  ThinkingLevel
+} from '../providers'
 import type { AppError, StructuredRequest } from '../types'
 
 /**
@@ -38,8 +45,11 @@ export interface BuildCallContext {
   apiKey: string
   /** Already resolved against `model` by the service — never re-check it here. */
   thinkingLevel: ThinkingLevel
-  /** Already resolved against `provider` by the service — never re-check it here. */
-  serviceTier: ServiceTier
+  /**
+   * Already resolved against `provider` by the service — never re-check it here. Absent sends
+   * none.
+   */
+  serviceTier?: ServiceTier | EndpointServiceTier
   /** The reply cap this call carries, already resolved by the service — send it as it is. */
   maxOutputTokens: number
   /** True when the caller passed an `onDelta` preview channel. */

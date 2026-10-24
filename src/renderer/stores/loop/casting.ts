@@ -177,16 +177,33 @@ export function resolveAttendance(
 
 /**
  * Who a plan's own button brings, in the plan's order: every attendee the reader can reach who is
- * in the city. Her class or her shift does not keep her away, so these clear the busy gate.
+ * in the city. Her class or her shift does not keep her away.
  */
 export function planAttendees(event: CalendarEvent): string[] {
   return event.charIds.filter((charId) => isContact(charId) && !charAwayNow(charId))
 }
 
 /**
- * A line under a plan's opening action for each attendee in the cast who has class or a shift
- * this slot, leaving the model to pick whether it comes after the scene or she has just come
- * from it. A girl whose class or shift the scene itself is — working where it is set, or
+ * Every attendee of every plan on the clock's slot, as {@link planAttendees} reads each, once and
+ * in plan order: whoever is called, by any plan's button or by the words alone, clears the busy
+ * gate, so two plans on one hour can be kept in one scene.
+ */
+export function slotPlanAttendees(): string[] {
+  const game = useGameStore.getState()
+  const attendees: string[] = []
+  for (const event of game.events) {
+    if (event.date !== game.date || event.time !== game.time) continue
+    for (const charId of planAttendees(event)) {
+      if (!attendees.includes(charId)) attendees.push(charId)
+    }
+  }
+  return attendees
+}
+
+/**
+ * A line under the opening action for each girl in the cast with a plan this slot who has class
+ * or a shift in it, leaving the model to pick whether it comes after the scene or she has just
+ * come from it. A girl whose class or shift the scene itself is — working where it is set, or
  * sitting the class it is in — gets none.
  */
 export function commitmentNotes(

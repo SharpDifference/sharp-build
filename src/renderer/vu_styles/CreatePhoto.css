@@ -22,34 +22,6 @@
   height: 876px;
 }
 
-/* The background's slot: the add pill alone, or the picture beside its change pill and ✕.
-   Held at the picture's height, so neither state moves the rows below it. */
-.vu-cp-bg {
-  display: flex;
-  flex: none;
-  align-items: center;
-  gap: 12px;
-  height: 54px;
-}
-
-/* The picture the photo will be set in, small and quiet: a reading, not a control. */
-.vu-cp-bg-thumb {
-  display: block;
-  flex: none;
-  width: 96px;
-  height: 54px;
-  overflow: hidden;
-  border-radius: 14px;
-  background: var(--vu-recessed);
-}
-
-.vu-cp-bg-img {
-  display: block;
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
-
 /* 60px a row, 8px between them, twelve rows: 60*12 + 8*11 = 808px, the rows' share of the
    column above. */
 .vu-cp-rows {

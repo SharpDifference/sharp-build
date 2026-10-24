@@ -700,16 +700,19 @@ export async function renamePlaythrough(playthroughId: string, name: string): Pr
   if (!kept) throw appError(RECORD_NOT_FOUND.code, RECORD_NOT_FOUND.message, playthroughId)
 }
 
-/** Deletes a whole playthrough: its row, every save and replay in it and both of its pictures. */
+/**
+ * Deletes a whole playthrough: its row, every save and replay in it, its lorebook and both of
+ * its pictures.
+ */
 export async function deletePlaythrough(playthroughId: string): Promise<void> {
   assertSafePlaythroughId(playthroughId)
 
   await storage('delete the playthrough', async () => {
     const tx = (await database()).transaction(
-      ['playthroughs', 'saves', 'endingArt', 'profilePictures', 'photos', 'replays'],
+      ['playthroughs', 'saves', 'endingArt', 'profilePictures', 'photos', 'replays', 'lorebooks'],
       'readwrite'
     )
-    // Six deletes, all database requests, so the transaction sees all of them.
+    // Eight deletes, all database requests, so the transaction sees all of them.
     void tx.objectStore('playthroughs').delete(playthroughId)
     void tx.objectStore('saves').delete(partRange(playthroughId))
     void tx.objectStore('endingArt').delete(playthroughId)
@@ -717,6 +720,7 @@ export async function deletePlaythrough(playthroughId: string): Promise<void> {
     void tx.objectStore('profilePictures').delete(playthroughId)
     void tx.objectStore('photos').delete(partRange(playthroughId))
     void tx.objectStore('replays').delete(partRange(playthroughId))
+    void tx.objectStore('lorebooks').delete(playthroughId)
     await tx.done
   })
 }

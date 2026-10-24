@@ -1,7 +1,7 @@
 /** Shared on-disk schema and IPC result types. */
 
 // Type-only, so the import cycles erase: most of these modules import back from here.
-import type { ProviderApi, ServiceTier, ThinkingLevel } from './providers'
+import type { EndpointServiceTier, ProviderApi, ServiceTier, ThinkingLevel } from './providers'
 import type { LedgerStats, PlayerStats, StatKey, StatTier } from './playerStats'
 import type { ClassDifficulty, ClassKind, ExamPeriod, Professor } from './academics'
 import type { CharacterTrait } from './traits'
@@ -104,8 +104,11 @@ export type StockPosition =
   | 'fellatio'
   | 'fellatio_after'
 
-/** The four slots a player-authored CG pair can occupy, each a main CG and its `_after`. */
-export type CustomCgSlot = 'customcg1' | 'customcg2' | 'customcg3' | 'customcg4'
+/**
+ * A slot a player-authored CG pair occupies, each a main CG and its `_after`: `customcg` and
+ * the slot's number, counted from one with no top.
+ */
+export type CustomCgSlot = `customcg${number}`
 
 /**
  * Every CG a character can have rendered: the stock positions, and the two images of each
@@ -123,8 +126,11 @@ export type CgSfx = 'sex' | 'foreplay' | 'oral' | 'handjob' | 'none'
 /** The three alternate wardrobes every character renders from her own record's tags. */
 export type StockOutfitSet = 'pe' | 'swim' | 'nude'
 
-/** The five slots a player-authored wardrobe can occupy, each with its own tags and name. */
-export type CustomOutfitSlot = 'custom1' | 'custom2' | 'custom3' | 'custom4' | 'custom5'
+/**
+ * A slot a player-authored wardrobe occupies, each with its own tags and name: `custom` and the
+ * slot's number, counted from one with no top.
+ */
+export type CustomOutfitSlot = `custom${number}`
 
 /**
  * Every alternate wardrobe a character can have sprites rendered in. A set rides in
@@ -1461,8 +1467,8 @@ export interface GameSave {
   semester?: string
   /**
    * `Date.now().toString()` for a slot-save, incremented on filename collision
-   * until free; the literal `autosave` for the in-progress-scene save; `manual01` to
-   * `manual90` for the player's own saves, one per manual slot.
+   * until free; the literal `autosave` for the in-progress-scene save; `manual01` on
+   * for the player's own saves, one per manual slot.
    */
   saveId: string
   /** Epoch ms, last modified. */
@@ -1736,8 +1742,11 @@ export const DEFAULT_PLAYER_LAST_NAME = 'Hawke'
  */
 export const MAX_SLOT_SAVES = 9
 
-/** Manual save slots a playthrough offers, numbered from 1; none is ever pruned. */
-export const MANUAL_SAVE_SLOTS = 90
+/**
+ * Manual save slots a playthrough offers, numbered from 1; none is ever pruned. Far more than a
+ * playthrough fills, and whole pages of ten.
+ */
+export const MANUAL_SAVE_SLOTS = 9990
 
 /** The scene-in-progress save's id. */
 export const AUTOSAVE_ID = 'autosave'
@@ -2131,6 +2140,11 @@ export interface Settings {
    */
   reasoningEffort?: ThinkingLevel
   /**
+   * The queue a custom endpoint is asked to serve on, sent as `service_tier`. Absent is not sent.
+   * Read only under `openai`.
+   */
+  endpointServiceTier?: EndpointServiceTier
+  /**
    * The reply cap a custom endpoint is sent as `max_tokens`. Absent sends the pinned ceiling,
    * which a small-context server refuses. Read only under `openai`.
    */
@@ -2169,7 +2183,8 @@ export interface Settings {
   secondaryModelFor?: PromptKind[]
   /**
    * Which inference queue serves Gemini's text calls, picked in Settings and resolved at call
-   * time against the provider that runs. Optional on disk, absent meaning `priority`.
+   * time. Optional on disk, absent meaning `priority`. Gemini's alone: a custom endpoint's is
+   * {@link endpointServiceTier}.
    */
   serviceTier?: ServiceTier
   /**
@@ -2338,7 +2353,7 @@ export type SettingsPatch = Omit<
  */
 export type WriterCandidate = Pick<
   Settings,
-  'apiProvider' | 'endpointModel' | 'endpointUrl' | 'reasoningEffort'
+  'apiProvider' | 'endpointModel' | 'endpointUrl' | 'reasoningEffort' | 'endpointServiceTier'
 > & {
   endpointApiKey?: string
 }

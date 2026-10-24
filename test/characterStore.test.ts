@@ -1,14 +1,21 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { EMOTIONS } from '@shared/emotions'
-import { allFollowMain, OUTFIT_SETS } from '@shared/outfits'
+import { allFollowMain, STOCK_OUTFIT_SETS } from '@shared/outfits'
 import { ROOM_VARIANTS, type RoomVariant } from '@shared/room'
-import { POSITIONS } from '@shared/positions'
+import { STOCK_POSITIONS } from '@shared/positions'
 import type { Character, Emotion, OutfitSet, Position, SeededSet } from '@shared/types'
 import { character, stubApi } from './fixtures'
 
 // `characterStore` subscribes to `jobs:progress` at module scope, so the bridge
 // has to exist before the import rather than before the call.
 stubApi({ jobs: { onProgress: () => () => {} } })
+
+/** The stock wardrobes and a few custom slots, low and high, standing for every set. */
+const OUTFIT_SETS: OutfitSet[] = [...STOCK_OUTFIT_SETS, 'custom1', 'custom2', 'custom12']
+
+/** The stock CGs and one custom pair, standing for every CG. */
+const POSITIONS: Position[] = [...STOCK_POSITIONS, 'customcg1', 'customcg1_after']
+
 const {
   useCharacterStore,
   briefRequestOf,
@@ -266,6 +273,20 @@ describe('readyOutfitSets', () => {
     expect(readyOutfitSets(status())).toEqual([])
     expect(readyOutfitSets(undefined)).toEqual([])
   })
+
+  it('lists her own slots by number, whichever of them the status names', () => {
+    // The order reaches the prompt and decides which of two outfits sharing a name keeps it,
+    // so slot 12 stands after slot 2 rather than where a string sort would put it.
+    expect(readyOutfitSets(status('custom12', 'custom2', 'pe'))).toEqual([
+      'pe',
+      'custom2',
+      'custom12'
+    ])
+    const { custom2: _absent, ...sparse } = status('custom12', 'custom2')
+    expect(readyOutfitSets(sparse as Record<OutfitSet, Record<Emotion, boolean>>)).toEqual([
+      'custom12'
+    ])
+  })
 })
 
 describe('importCharacter', () => {
@@ -449,13 +470,17 @@ describe('missingContentPlan', () => {
 
   it('queues a custom wardrobe she has tags for and never one she has not', () => {
     // A slot with no record entry has nothing to render from, so counting its seven
-    // missing sprites would queue a bucket that can only fail.
-    const written = roster({}, { customOutfits: { custom1: { tags: ['maid'] } } })
+    // missing sprites would queue a bucket that can only fail. Her slots go by number.
+    const written = roster(
+      {},
+      { customOutfits: { custom12: { tags: ['nurse'] }, custom2: { tags: ['maid'] } } }
+    )
     expect(missingContentPlan(written, OPEN).map((set) => set.target)).toEqual([
       'pe',
       'swim',
       'nude',
-      'custom1',
+      'custom2',
+      'custom12',
       'cgs',
       'room'
     ])
@@ -469,10 +494,10 @@ describe('missingContentPlan', () => {
   })
 
   it('queues a custom CG pair she has tags for, as one set counting the half it lacks', () => {
-    // Only the slot her record carries: the other three have no tags to render from. A pair
-    // is one bucket, so a running one keeps the sweep off it and off nothing else.
+    // Only the slot her record carries: no other has tags to render from. A pair is one
+    // bucket, so a running one keeps the sweep off it and off nothing else.
     const written = roster({}, { customCgs: { customcg2: { tags: ['cowgirl_position'] } } })
-    written.cgs.c1 = { ...written.cgs.c1, customcg2: true }
+    written.cgs.c1 = { ...written.cgs.c1, customcg2: true, customcg2_after: false }
     const plan = missingContentPlan(written, OPEN)
     expect(plan.map((set) => set.target)).toEqual([
       'pe',

@@ -13,7 +13,7 @@ import type {
   InviteKind,
   Occasion
 } from '@shared/types'
-import { kindOf } from '@shared/academics'
+import { gpaOf, gradedCourses, kindOf } from '@shared/academics'
 import {
   HOTEL_LOCATION,
   isLocationOpen,
@@ -31,7 +31,7 @@ import {
   type NpcSlotOverlay
 } from '@shared/npcRelationships'
 import { readerBlockOf } from '../prompts/setting'
-import { classRostersOf, examDateOf } from '../prompts/classProgress'
+import { classRostersOf, courseStandingOf, examDateOf } from '../prompts/classProgress'
 import { memoryBudgetsOf, secretBudgetOf } from '@shared/settingsRules'
 import { useSettingsStore } from './settingsStore'
 import {
@@ -46,9 +46,11 @@ import {
 import {
   isVenusChat,
   venusColdTipTexts,
+  venusGradeReport,
   venusJobIntroTexts,
   venusMessagesDue,
   VENUS_CHAT_ID,
+  VENUS_GRADES_ASK,
   type VenusMessage
 } from '../prompts/venus'
 import {
@@ -89,6 +91,7 @@ import {
 import { useBunnyboardStore } from './bunnyboardStore'
 import { useGameStore } from './gameStore'
 import { afterDmReply, afterReachOut } from '../mods/hooks'
+import { lorebookNow } from './lorebookStore'
 import { prefetchHangoutScene, startHangoutScene } from './loop/hooks'
 import { createRetryGate } from './retryGate'
 import { createTextExtractor } from './textingStream'
@@ -277,7 +280,11 @@ export function sendBossMessage(jobId: string, text: string): void {
 export async function replyFromBoss(jobId: string, kind: JobMessageKind): Promise<void> {
   const text = bossText(jobId, kind)
   if (!text) return
-  const chatId = bossChatIdOf(jobId)
+  await typedBotReply(bossChatIdOf(jobId), text)
+}
+
+/** A bot's canned answer: a beat, the typing bubble for as long as the text would take, the text. */
+async function typedBotReply(chatId: string, text: string): Promise<void> {
   const playthroughId = useGameStore.getState().playthroughId
 
   // Busy for the whole reply, its beat before the typing included, as her own turn is.
@@ -359,6 +366,28 @@ export function deliverVenusMessages(): void {
  */
 export function replyFromVenus(texts: readonly string[]): void {
   for (const text of texts) deliver(VENUS_CHAT_ID, chatMessage('contact', text))
+}
+
+/** The reader asking Venus for his grades, and her report typed back as of the moment he asked. */
+export async function askVenusForGrades(): Promise<void> {
+  const game = useGameStore.getState()
+  const courses = gradedCourses(game.playerSchedule, game.classes)
+  const report = venusGradeReport(
+    gpaOf(game.classRecords, courses, game.transcript?.gradePoints),
+    courses.map((entry) => ({
+      name: entry.name,
+      standing: courseStandingOf(
+        entry,
+        game.date,
+        game.classRecords[entry.code],
+        game.stats.brain,
+        game.calendar
+      )
+    })),
+    game.calendar.season
+  )
+  deliver(VENUS_CHAT_ID, chatMessage('player', VENUS_GRADES_ASK))
+  await typedBotReply(VENUS_CHAT_ID, report)
 }
 
 /**
@@ -536,6 +565,7 @@ export async function sendMessage(charId: string, text: string): Promise<void> {
         time: game.time,
         stats: game.stats,
         roster: others,
+        lorebook: lorebookNow(),
         charInfo: game.charInfo,
         npcRelationships: game.npcRelationships,
         classes: game.classes,

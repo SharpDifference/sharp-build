@@ -7,6 +7,7 @@ import {
   isLosslessRel,
   layerRel,
   looseNamesOf,
+  OUTFITS_DIR,
   REFERENCE_NAME,
   setDirRel,
   spriteFileRel,
@@ -28,8 +29,8 @@ import {
 import { appError, messageOf } from '@shared/errors'
 import { EMOTIONS } from '@shared/emotions'
 import { assertPng, imageTypeOf } from '@shared/imageBytes'
-import { isCustomOutfitSlot, OUTFIT_SETS } from '@shared/outfits'
-import { afterOf, CUSTOM_CG_SLOTS, isCustomCgSlot, STOCK_POSITIONS } from '@shared/positions'
+import { customOutfitSlotsIn, isCustomOutfitSlot, STOCK_OUTFIT_SETS } from '@shared/outfits'
+import { afterOf, customCgSlotsIn, isCustomCgSlot, STOCK_POSITIONS } from '@shared/positions'
 import { ROOM_VARIANTS, roomStem, type RoomVariant } from '@shared/room'
 import type {
   AppError,
@@ -391,26 +392,50 @@ export async function getRoomStatus(charId: string): Promise<Record<RoomVariant,
   return { day: present[roomStem('day')], night: present[roomStem('night')] }
 }
 
-/** Reports which CG files exist on disk, stock and custom — the files are the record. */
+/** The names of the folders directly inside `dir`, or none where it does not exist. */
+async function foldersIn(dir: string): Promise<string[]> {
+  try {
+    return (await readdir(dir, { withFileTypes: true }))
+      .filter((entry) => entry.isDirectory())
+      .map((entry) => entry.name)
+  } catch (err) {
+    if ((err as NodeJS.ErrnoException).code === 'ENOENT') return []
+    throw err
+  }
+}
+
+/**
+ * Reports which CG files exist on disk — the files are the record: every stock one, and both
+ * images of each custom slot that has a folder.
+ */
 export async function getCgStatus(charId: string): Promise<Record<Position, boolean>> {
   assertSafeCharId(charId)
   const status = {} as Record<Position, boolean>
   Object.assign(status, await scanPresent(getCharacterCgsPath(charId), STOCK_POSITIONS))
-  for (const slot of CUSTOM_CG_SLOTS) {
+  const slots = customCgSlotsIn(
+    await foldersIn(getCharacterImagePath(charId, CUSTOM_CGS_DIR))
+  )
+  for (const slot of slots) {
     const dir = getCharacterImagePath(charId, setDirRel(slot))
     Object.assign(status, await scanPresent(dir, [slot, afterOf(slot)]))
   }
   return status
 }
 
-/** Reports which alternate-outfit sprites exist on disk, per set and emotion. */
+/**
+ * Reports which alternate-outfit sprites exist on disk, per set and emotion: every stock set, and
+ * each custom slot that has a folder.
+ */
 export async function getOutfitStatus(
   charId: string
 ): Promise<Record<OutfitSet, Record<Emotion, boolean>>> {
   assertSafeCharId(charId)
 
   const status = {} as Record<OutfitSet, Record<Emotion, boolean>>
-  for (const set of OUTFIT_SETS) {
+  const customs = customOutfitSlotsIn(
+    await foldersIn(getCharacterImagePath(charId, OUTFITS_DIR))
+  )
+  for (const set of [...STOCK_OUTFIT_SETS, ...customs]) {
     status[set] = await scanPresent(getCharacterOutfitSetPath(charId, set), EMOTIONS)
   }
   return status

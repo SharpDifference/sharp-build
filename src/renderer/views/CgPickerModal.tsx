@@ -2,7 +2,14 @@ import { useState, type JSX } from 'react'
 import { createPortal } from 'react-dom'
 import { motion } from 'motion/react'
 import { cgLabelOf } from '@shared/customCgs'
-import { afterOf, CUSTOM_CG_SLOTS, customCgSlotOf, STOCK_CG_DISPLAY_ORDER } from '@shared/positions'
+import {
+  afterOf,
+  customCgSlotAt,
+  customCgSlotNumber,
+  customCgSlotOf,
+  customCgSlotsIn,
+  STOCK_CG_DISPLAY_ORDER
+} from '@shared/positions'
 import type { Position } from '@shared/types'
 import { PageArrows, wrapPage } from '../components/PageArrows'
 import { typingIn, useWindowKeydown } from '../components/useWindowKeydown'
@@ -12,6 +19,7 @@ import { spriteUrl, useSpriteVersion } from '../stores/characterStore'
 import { useGameStore } from '../stores/gameStore'
 import { cgKnownMissing } from '../stores/stageDisplay'
 import type { ScreenTheme } from './clockTheme'
+import { CG_PAGE_SLOTS, pageSlotNumbers, slotPageCount } from './customPages'
 import {
   dealt,
   gestures,
@@ -34,18 +42,20 @@ interface CgPage {
   custom: boolean
 }
 
+/** The stock eight, with each `_after` under its act. */
+const STOCK_PAGE: CgPage = { title: 'NSFW CG', positions: STOCK_CG_DISPLAY_ORDER, custom: false }
+
 /**
- * The two pages, always both: the stock eight with each `_after` under its act, then her own
- * pairs with each `_after` under its main.
+ * The stock page, then her own pairs on as many pages as her highest slot in use needs, at least
+ * one, each slot in the cell the Custom CG panel stands it in with its `_after` under its main.
  */
-const PAGES: readonly CgPage[] = [
-  { title: 'NSFW CG', positions: STOCK_CG_DISPLAY_ORDER, custom: false },
-  {
-    title: 'Custom CG',
-    positions: [...CUSTOM_CG_SLOTS, ...CUSTOM_CG_SLOTS.map(afterOf)],
-    custom: true
-  }
-]
+function pagesFor(lastTaken: number): CgPage[] {
+  const custom = Array.from({ length: slotPageCount(lastTaken, CG_PAGE_SLOTS) }, (_, page) => {
+    const slots = pageSlotNumbers(page, CG_PAGE_SLOTS).map(customCgSlotAt)
+    return { title: 'Custom CG', positions: [...slots, ...slots.map(afterOf)], custom: true }
+  })
+  return [STOCK_PAGE, ...custom]
+}
 
 /** A page's cells dealing in with the page, quick and close together. */
 const PAGE_DEAL = dealt(0, 0.02)
@@ -58,8 +68,9 @@ export interface CgPickerModalProps {
 }
 
 /**
- * One character's CGs on two pages, the stock eight and her own pairs. A click puts one over the
- * whole stage and a second click on it takes it off; a set not whole on disk is drawn as gaps.
+ * One character's CGs a page at a time, the stock eight and then her own pairs. A click puts one
+ * over the whole stage and a second click on it takes it off; a set not whole on disk is drawn
+ * as gaps.
  */
 export function CgPickerModal({ theme, charId, onClose }: CgPickerModalProps): JSX.Element | null {
   const character = useGameStore((s) => s.characters[charId])
@@ -81,24 +92,32 @@ export function CgPickerModal({ theme, charId, onClose }: CgPickerModalProps): J
       ? cgLock.position
       : null
 
+  // Her slots holding a record or a whole pair: what her pages are counted off.
+  const taken = customCgSlotsIn([
+    ...Object.keys(character?.customCgs ?? {}),
+    ...(customCgReady[charId] ?? [])
+  ])
+  const pages = pagesFor(Math.max(0, ...taken.map(customCgSlotNumber)))
+
   // Opens on the page holding her CG in force, else the first with anything to pick.
   const [page, setPage] = useState(() => {
-    const held = inForce ? PAGES.findIndex((entry) => entry.positions.includes(inForce)) : -1
+    const held = inForce ? pages.findIndex((entry) => entry.positions.includes(inForce)) : -1
     if (held >= 0) return held
-    return Math.max(0, PAGES.findIndex((entry) => entry.positions.some(pickable)))
+    return Math.max(0, pages.findIndex((entry) => entry.positions.some(pickable)))
   })
 
   /** The arrow keys turn the page, as the arrows beside it do. */
   useWindowKeydown((event) => {
     if (typingIn(event)) return
-    if (event.key === 'ArrowLeft') setPage((current) => wrapPage(current - 1, PAGES.length))
-    else if (event.key === 'ArrowRight') setPage((current) => wrapPage(current + 1, PAGES.length))
+    if (event.key === 'ArrowLeft') setPage((current) => wrapPage(current - 1, pages.length))
+    else if (event.key === 'ArrowRight') setPage((current) => wrapPage(current + 1, pages.length))
   })
 
   const { host, overlayProps } = useModalShell(onClose)
   if (!host || !character) return null
 
-  const shown = PAGES[page]
+  // A page whose last pair left mid-view gives way to the last that stands.
+  const shown = pages[Math.min(page, pages.length - 1)]
 
   return createPortal(
     <motion.div
@@ -127,9 +146,14 @@ export function CgPickerModal({ theme, charId, onClose }: CgPickerModalProps): J
           </span>
         </div>
 
-        <PageArrows idPrefix="cg-page" page={page} pageCount={PAGES.length} onPage={setPage}>
+        <PageArrows
+          idPrefix="cg-page"
+          page={Math.min(page, pages.length - 1)}
+          pageCount={pages.length}
+          onPage={setPage}
+        >
           <motion.ul
-            key={page}
+            key={Math.min(page, pages.length - 1)}
             className={`vu-gallery-grid vu-cgpick-grid${shown.custom ? ' vu-cgpick-grid--custom' : ''}`}
             variants={PAGE_DEAL}
             initial="hidden"

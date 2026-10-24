@@ -1,4 +1,4 @@
-import { access, copyFile, mkdir, readdir, readFile, rm } from 'fs/promises'
+import { copyFile, mkdir, readdir, readFile, rm } from 'fs/promises'
 import { join } from 'path'
 import { base64ToBytes } from '@shared/base64'
 import { appError, messageOf } from '@shared/errors'
@@ -17,12 +17,11 @@ import {
   getPhotoMetaPath,
   getPhotoPath,
   getPhotosPath,
-  getPhotoThumbPath,
-  getPlaythroughPath
+  getPhotoThumbPath
 } from '../paths'
 import { findImage, imagePath, removeImage, writeImageFile } from './imageFiles'
 import { writeAtomicJson } from './jsonFile'
-import { assertSafePlaythroughId } from './saveService'
+import { assertSafePlaythroughId, playthroughExists } from './saveService'
 
 /**
  * The Bunnyboard's photos on disk: one picture, one thumbnail and one sidecar per photo, kept
@@ -86,16 +85,6 @@ export async function readPhoto(playthroughId: string, photoId: string): Promise
   } catch (err) {
     if ((err as NodeJS.ErrnoException).code === 'ENOENT') return null
     throw appError('PHOTO_UNREADABLE', 'Could not read the photo.', messageOf(err))
-  }
-}
-
-/** Whether `playthroughId`'s own folder is on disk — never made by a photo write. */
-async function playthroughExists(playthroughId: string): Promise<boolean> {
-  try {
-    await access(getPlaythroughPath(playthroughId))
-    return true
-  } catch {
-    return false
   }
 }
 

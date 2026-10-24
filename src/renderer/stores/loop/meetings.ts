@@ -24,6 +24,7 @@ import {
   resolveAttendance,
   resolveLocationId,
   runIntoNote,
+  slotPlanAttendees,
   workersAtLocation,
   workingHereNote
 } from './casting'
@@ -147,14 +148,15 @@ export function kindLabel(scene: SceneKind): string {
   return ''
 }
 
-/** The people a scene is called with, and where the action set it. */
+/**
+ * The people a scene is called with, and where the action set it. Whoever of them has a plan this
+ * slot clears the busy gate, whichever plan it is.
+ */
 export interface MeetingCall {
   /** Everyone asked for, a plan's attendees first. */
   called: readonly string[]
   /** The hangout's own girl, in the scene whatever else is true of her. */
   required?: string
-  /** A plan's attendees, who clear the busy gate. */
-  attendees: readonly string[]
   inPublic: boolean
   sceneLocation: string
 }
@@ -175,17 +177,18 @@ export interface ComposedMeeting {
  * writes nothing, so a refusal that drops the result costs nothing.
  */
 export function composeMeeting(call: MeetingCall, kind: SceneKindVerdict): ComposedMeeting {
-  if (kind.kind === 'class') return composeClass(call, kind)
-  if (kind.kind === 'shift') return composeShift(call, kind)
+  const planned = slotPlanAttendees()
+  if (kind.kind === 'class') return composeClass(call, kind, planned)
+  if (kind.kind === 'shift') return composeShift(call, kind, planned)
 
-  const { called, required, attendees, inPublic, sceneLocation } = call
+  const { called, required, inPublic, sceneLocation } = call
   // Whoever is working where the action is set clears the busy gate.
   const workers = workersAtLocation(sceneLocation).map((worker) => worker.charId)
-  const attendance = resolveAttendance(called, required, [...workers, ...attendees])
+  const attendance = resolveAttendance(called, required, [...workers, ...planned])
   const notes = [
     ...(kind.kind === 'project' ? [workSessionNote(kind.project.code)] : []),
     ...attendance.notes,
-    ...commitmentNotes(attendance.cast, attendees, workers)
+    ...commitmentNotes(attendance.cast, planned, workers)
   ]
 
   const named = called.length > 0 || required !== undefined
@@ -226,15 +229,16 @@ export function composeMeeting(call: MeetingCall, kind: SceneKindVerdict): Compo
  */
 function composeClass(
   call: MeetingCall,
-  kind: Extract<SceneKindVerdict, { kind: 'class' }>
+  kind: Extract<SceneKindVerdict, { kind: 'class' }>,
+  planned: readonly string[]
 ): ComposedMeeting {
-  const { called, required, attendees } = call
+  const { called, required } = call
   const { entry, students } = kind
   const outsiders = called.filter((charId) => !students.includes(charId))
   const attendance = resolveAttendance(
     outsiders,
     required !== undefined && !students.includes(required) ? required : undefined,
-    attendees
+    planned
   )
 
   const own: string[] = []
@@ -252,7 +256,7 @@ function composeClass(
     notes: [
       ...(sittingIn.length > 0 ? [sittingInNote(sittingIn)] : []),
       ...attendance.notes,
-      ...commitmentNotes(own, attendees, students)
+      ...commitmentNotes(own, planned, students)
     ],
     scene: { classCode: entry.code },
     passerby: null,
@@ -266,12 +270,13 @@ function composeClass(
  */
 function composeShift(
   call: MeetingCall,
-  kind: Extract<SceneKindVerdict, { kind: 'shift' }>
+  kind: Extract<SceneKindVerdict, { kind: 'shift' }>,
+  planned: readonly string[]
 ): ComposedMeeting {
-  const { called, required, attendees } = call
+  const { called, required } = call
   const { job, def, coworkers } = kind
   // A coworker is at the shift the scene is; a girl at work anywhere else is busy.
-  const attendance = resolveAttendance(called, required, [...attendees, ...coworkers])
+  const attendance = resolveAttendance(called, required, [...planned, ...coworkers])
   const locals = def ? localsAtLocation(def.locationId) : []
   const others: string[] = []
   for (const charId of [...coworkers, ...locals]) {
@@ -287,7 +292,7 @@ function composeShift(
     notes: [
       ...(shift.note ? [shift.note] : []),
       ...attendance.notes,
-      ...commitmentNotes(attendance.cast, attendees, coworkers),
+      ...commitmentNotes(attendance.cast, planned, coworkers),
       ...cast
         .filter((charId) => coworkers.includes(charId))
         .map((charId) => workingHereNote(charId, job.jobId)),
