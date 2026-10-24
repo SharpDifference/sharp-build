@@ -23,6 +23,8 @@ export interface ModalShell {
     ref: (node: HTMLElement | null) => void
     onAnimationComplete: (definition: AnimationDefinition) => void
   }
+  /** Whether nothing stands over this modal, for a key of its own it answers only on top. */
+  topmost: () => boolean
 }
 
 /**
@@ -38,13 +40,14 @@ const openShells: object[] = []
  * and a right-click to `answer` only while nothing has been pushed over it. A right-click in a
  * field keeps its own menu; anywhere else the native one never opens. Enter and Space go to
  * `primary`, where there is one, on the same terms. Captured, so a screen's own listener on the
- * bubble does not also fire; whether the event is stopped is the answer's to say.
+ * bubble does not also fire; whether the event is stopped is the answer's to say. `token` is the
+ * caller's to ask the stack about.
  */
 function topmostDismiss(
   answer: (event: Event) => void,
-  primary?: (event: KeyboardEvent) => void
+  primary?: (event: KeyboardEvent) => void,
+  token: object = {}
 ): () => void {
-  const token = {}
   openShells.push(token)
   const onTop = (): boolean => openShells[openShells.length - 1] === token
   const onKeyDown = (event: KeyboardEvent): void => {
@@ -118,6 +121,8 @@ export function useModalShell(
   // The element carrying the primary, and whether it has landed.
   const primaryHolder = useRef<HTMLElement | null>(null)
   const armed = useRef(false)
+  // This shell's place on the stack of open shells.
+  const token = useRef({})
 
   /**
    * **A modal that is leaving answers nothing**. Its exit keeps it mounted for the length
@@ -198,7 +203,8 @@ export function useModalShell(
           event.stopPropagation()
           if (event.repeat || !armed.current) return
           answer.current()
-        }
+        },
+        token.current
       ),
     []
   )
@@ -233,6 +239,7 @@ export function useModalShell(
       onAnimationComplete: (definition) => {
         if (definition === 'shown') armed.current = true
       }
-    }
+    },
+    topmost: () => openShells[openShells.length - 1] === token.current
   }
 }

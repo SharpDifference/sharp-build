@@ -136,6 +136,19 @@ const PERMANENT_CODES = new Set([
   'PHOTO_META_MALFORMED',
   // A photo's sidecar names a schema version this build does not read.
   'PHOTO_META_SCHEMA_VERSION',
+  // Lorebook
+  // The playthrough a lorebook belongs to no longer exists.
+  'LOREBOOK_PLAYTHROUGH_GONE',
+  // A kept lorebook is not valid JSON, or is not one a write would have left.
+  'LOREBOOK_MALFORMED',
+  // A kept lorebook names a schema version this build does not read.
+  'LOREBOOK_SCHEMA_VERSION',
+  // A lorebook handed over to be written is not one a read would take back.
+  'LOREBOOK_INVALID',
+  // The file picked to import is not a SillyTavern lorebook.
+  'LOREBOOK_IMPORT_INVALID',
+  // The file picked to import holds nothing the game can use.
+  'LOREBOOK_IMPORT_EMPTY',
   // Import
   // The zip is not one of ours, or is one this build cannot read.
   'IMPORT_MANIFEST_MISSING',

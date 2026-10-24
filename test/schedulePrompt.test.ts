@@ -11,6 +11,7 @@ import { DEFAULT_MEMORY_BUDGETS } from '@shared/settingsRules'
 import { charKeyOf, type CalendarEvent, type TimeSlot } from '@shared/types'
 import { SPRING_BREAK_LEAVE } from '../src/renderer/prompts/springBreak'
 import { calendarEvent, character, charactersById } from './fixtures'
+import { SHIPPED_BOOK } from '../src/renderer/prompts/lorebook'
 
 /** Day 0 is a Monday, so this is Monday day — every case is dated from it. */
 const MADE_ON = { date: 0, time: 0 as TimeSlot }
@@ -90,6 +91,7 @@ describe('the PLANS half of the ledger request', () => {
       date: 0,
       time: 0 as TimeSlot,
       backgrounds: { interior: ['library'], exterior: ['quad'] },
+      lorebook: SHIPPED_BOOK,
       charInfo: {},
       npcRelationships: {},
       roster: [],

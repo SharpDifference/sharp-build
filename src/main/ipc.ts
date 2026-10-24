@@ -165,6 +165,12 @@ import {
   testWriter
 } from '@shared/llm/endpointProbe'
 import { backupName } from '@shared/backup'
+import {
+  parseWorldInfo,
+  WORLD_INFO_EXPORT_NAME,
+  type LorebookRecord,
+  type WorldInfoFile
+} from '@shared/lorebookRecord'
 import { photoExportName, type PhotoMeta, type PhotoRequest } from '@shared/photos'
 import { exportFileName } from '@shared/characterTransfer'
 import { endingArtExportName } from '@shared/endingPicture'
@@ -200,6 +206,12 @@ import { generateRoomImage, writeRoomUpload } from './services/roomService'
 import { applySettingsPatch, getRendererSettings, getSettings } from './services/settingsService'
 import { getGrabBags, setGrabBags } from './services/grabBagService'
 import { getModSwitches, setModSwitches } from './services/modsService'
+import {
+  readLorebook,
+  readWorldInfoFile,
+  writeLorebook,
+  writeWorldInfoFile
+} from './services/lorebookService'
 import { deleteReplay, listReplayIds, readReplay } from './services/replayService'
 import { deleteScene, listScenes, readScene, writeScene } from './services/sceneService'
 import {
@@ -702,6 +714,36 @@ export function registerIpcHandlers(): void {
     if (canceled || filePath === undefined || filePath === '') return null
 
     await copyPhotoTo(playthroughId, photoId, filePath)
+    return filePath
+  })
+
+  handle('lorebook:read', (_event, playthroughId: string) => readLorebook(playthroughId))
+  handle('lorebook:write', (_event, playthroughId: string, lorebook: LorebookRecord) =>
+    writeLorebook(playthroughId, lorebook)
+  )
+  // A SillyTavern lorebook picked in the native dialog and read, never written; dismissed is `null`.
+  handle('lorebook:import', async (event) => {
+    const { canceled, filePaths } = await showOpenDialogFor(event, {
+      title: 'Import lorebook',
+      filters: [{ name: 'SillyTavern lorebook', extensions: ['json'] }],
+      properties: ['openFile']
+    })
+    if (canceled || filePaths.length === 0) return null
+
+    return readWorldInfoFile(filePaths[0])
+  })
+  // The lorebook the renderer composed, saved where the native dialog points; a file the game
+  // would not read back is never written, and a dismissed dialog resolves `null`.
+  handle('lorebook:export', async (event, world: WorldInfoFile) => {
+    parseWorldInfo(world)
+    const { canceled, filePath } = await showSaveDialogFor(event, {
+      title: 'Export lorebook',
+      defaultPath: WORLD_INFO_EXPORT_NAME,
+      filters: [{ name: 'SillyTavern lorebook', extensions: ['json'] }]
+    })
+    if (canceled || filePath === undefined || filePath === '') return null
+
+    await writeWorldInfoFile(filePath, world)
     return filePath
   })
 

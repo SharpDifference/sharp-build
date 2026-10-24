@@ -11,8 +11,8 @@ import {
   expressionDraft,
   spriteDraft
 } from '@shared/imagePrompt'
-import { OUTFIT_SETS } from '@shared/outfits'
-import { POSITIONS } from '@shared/positions'
+import { STOCK_OUTFIT_SETS } from '@shared/outfits'
+import { STOCK_POSITIONS } from '@shared/positions'
 import type { Emotion } from '@shared/types'
 import { character } from './fixtures'
 
@@ -47,7 +47,7 @@ describe("the draft is the builder's default", () => {
   })
 
   it('renders every wardrobe base frame the same under that set’s draft', () => {
-    for (const set of OUTFIT_SETS) {
+    for (const set of [...STOCK_OUTFIT_SETS, 'custom1', 'custom12'] as const) {
       expect(buildOutfitBasePrompt(c, poseTags, set, spriteDraft(c, poseTags, set))).toEqual(
         buildOutfitBasePrompt(c, poseTags, set)
       )
@@ -63,7 +63,7 @@ describe("the draft is the builder's default", () => {
   })
 
   it('renders every CG the same under its own draft and under the set’s', () => {
-    for (const position of POSITIONS) {
+    for (const position of [...STOCK_POSITIONS, 'customcg1', 'customcg12_after'] as const) {
       const plain = buildCgPrompt(c, position, poseTags)
       expect(buildCgPrompt(c, position, poseTags, cgDraft(c, position))).toEqual(plain)
       expect(buildCgPrompt(c, position, poseTags, cgSetDraft(c))).toEqual(plain)

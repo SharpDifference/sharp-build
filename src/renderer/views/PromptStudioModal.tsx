@@ -54,7 +54,7 @@ import {
   StudioPill
 } from './PromptStudioModals'
 import { useStudioBackup } from './PromptStudioBackup'
-import { SystemPromptModal } from './SystemPromptModal'
+import { TextEditModal } from './TextEditModal'
 import '../vu_styles/Settings.css'
 import '../vu_styles/PromptStudio.css'
 
@@ -886,16 +886,19 @@ export function PromptStudioModal({ theme, onClose }: PromptStudioModalProps): J
       {promptsBackup.panel}
       <AnimatePresence propagate>
         {textEdit && (
-          <SystemPromptModal
+          <TextEditModal
             key="studio-text"
             theme={theme}
+            id="studio-text-modal"
+            idPrefix="studio-text"
             title={textEdit.label}
-            fieldLabel={textEdit.label}
+            label={textEdit.label}
             discardMessage="This text has not been saved."
-            defaultText={textDefault}
-            allowEmpty={textDefault === ''}
             stored={editOf(textEdit) ?? textDefault}
-            onSave={(value) => saveText(textEdit, value)}
+            shipped={textDefault}
+            allowEmpty={textDefault === ''}
+            // Cleared back to the shipped text where the two now agree.
+            save={(value) => saveText(textEdit, value === textDefault ? undefined : value)}
             onClose={() => setTextEdit(null)}
           />
         )}

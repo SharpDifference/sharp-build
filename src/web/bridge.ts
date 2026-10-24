@@ -67,6 +67,7 @@ import {
   removeBackground
 } from './backgrounds'
 import * as chars from './chars'
+import * as lorebooks from './db/lorebooks'
 import * as photos from './db/photos'
 import * as replays from './db/replays'
 import * as saves from './db/saves'
@@ -82,6 +83,7 @@ import { getPoseManifest, getQuickstart, readAudio } from './assets'
 import { offerDownload } from './download'
 import { emitter } from './emitter'
 import { convertLegacyImages } from './legacyImages'
+import { exportWorldInfo, importWorldInfo } from './lorebook'
 import { exportLog, writeLogLine } from './log'
 import { currentSettings, patchSettings, rendererSettings } from './settings'
 import { duplicateCharacter, exportCharacter, importCharacter, ZIP_TYPE } from './transfer'
@@ -523,6 +525,15 @@ export function buildApi(): VenusUniversityApi {
           offerDownload(photoExportName(photoId, bytes), bytes, imageTypeOf(bytes) ?? 'image/png')
           return null
         })
+    },
+    lorebook: {
+      read: (playthroughId) =>
+        result('read the lorebook', () => lorebooks.readLorebook(playthroughId)),
+      write: (playthroughId, lorebook) =>
+        result('save the lorebook', () => lorebooks.writeLorebook(playthroughId, lorebook)),
+      // The picker opens synchronously inside the click: `result` calls this before any await.
+      import: () => result('import the lorebook', importWorldInfo),
+      export: (world) => result('save the lorebook', () => exportWorldInfo(world))
     },
     // Local image generation is the desktop's; no control in the browser reaches any of these.
     comfy: {

@@ -1,4 +1,4 @@
-import { mkdir, readdir, rm, stat } from 'fs/promises'
+import { access, mkdir, readdir, rm, stat } from 'fs/promises'
 import { appError, messageOf, toAppError } from '@shared/errors'
 import {
   idsMissingFrom,
@@ -224,6 +224,16 @@ export async function loadSave(playthroughId: string, saveId: string): Promise<G
   const save = atLocation(candidate, playthroughId, saveId)
   if (stamp && unchallenged(path, mark, 0)) rememberParsed(path, { ...stamp, save })
   return save
+}
+
+/** Whether `playthroughId`'s own folder is on disk — never made by a write beside it. */
+export async function playthroughExists(playthroughId: string): Promise<boolean> {
+  try {
+    await access(getPlaythroughPath(playthroughId))
+    return true
+  } catch {
+    return false
+  }
 }
 
 /** A file's modification time — what stands in for `saveDate` when the file cannot be read. */

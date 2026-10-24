@@ -3,6 +3,7 @@ import { APP_ID } from '@shared/appId'
 import type { BackupPlaythrough } from '@shared/backup'
 import type { BgVariant, CustomBackground } from '@shared/customBackgrounds'
 import { appError, messageOf } from '@shared/errors'
+import type { LorebookRecord } from '@shared/lorebookRecord'
 import type { PhotoMeta } from '@shared/photos'
 import type { SlotReplay } from '@shared/replays'
 import type { SavedScene } from '@shared/sceneCreator'
@@ -67,6 +68,7 @@ export interface VenusUniversityDb extends DBSchema {
   replays: { key: [string, string]; value: SlotReplay }
   presets: { key: 'presets'; value: StoredPresets }
   studioPrompts: { key: 'studioPrompts'; value: StudioPrompts }
+  lorebooks: { key: string; value: LorebookRecord }
 }
 
 /**
@@ -93,10 +95,13 @@ const STORES = [
   'scenes',
   'replays',
   'presets',
-  'studioPrompts'
+  'studioPrompts',
+  'lorebooks'
 ] as const
 
-const DB_VERSION = 11
+// 12: the build's 11 (Prompt Studio's stores) meeting Venus University 0.6.0's 10 (the lorebooks
+// store), so a database at either gains what the other added.
+const DB_VERSION = 12
 
 let opened: Promise<IDBPDatabase<VenusUniversityDb>> | null = null
 

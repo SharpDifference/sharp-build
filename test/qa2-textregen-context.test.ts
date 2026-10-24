@@ -3,6 +3,7 @@ import type { GameSave, Result, SaveDraft, StructuredRequest, TextingResponse } 
 import { useGameStore } from '../src/renderer/stores/gameStore'
 import { useBunnyboardStore } from '../src/renderer/stores/bunnyboardStore'
 import { useModsStore } from '../src/renderer/stores/modsStore'
+import { useLorebookStore } from '../src/renderer/stores/lorebookStore'
 import { regenerateTextReply, resetTextingLoop, sendMessage } from '../src/renderer/stores/textingLoop'
 import { persistRegeneratedConversation, writesSettled } from '../src/renderer/stores/loop/saves'
 import '../src/renderer/modEntries/character-dynamics'
@@ -16,6 +17,7 @@ const answer: TextingResponse = { messages: ['Hello there.'], summary: 'An ordin
 
 beforeEach(() => {
   vi.useFakeTimers(); resetTextingLoop(); game().reset(); useBunnyboardStore.getState().reset()
+  useLorebookStore.getState().drop()
   useModsStore.setState({ switches: { on: { 'character-dynamics': true }, options: {} } })
   useGameStore.setState({ playthroughId: 'qa-regen', date: 7, time: 0, chars: ['a'],
     characters: charactersById(character({ charId: 'a' })), charKeyToId: { sarah_rose: 'a' },
@@ -77,6 +79,16 @@ describe('QA2 ordinary and regenerated DM continuity parity', () => {
     useGameStore.setState({ playthroughId: '123456789', history: { 6: { 0: 'Sarah discussed her violin recording.' } } })
     const { normalRequest, replacementRequest } = await requests()
     expect(normalRequest.storyMemory).toBeDefined()
+    expect(normalRequest.storyMemory?.records).toHaveLength(1)
+    expect(replacementRequest.storyMemory).toEqual(normalRequest.storyMemory)
+  })
+  it('includes current native lorebook edits beside Story Memory in ordinary and regenerated texts', async () => {
+    useLorebookStore.setState({ book: [{ handle: 'custom1', custom: true, keys: ['Hello'], text: 'Hello is the name of Sarah’s campus radio show.' }] })
+    useModsStore.setState(s => ({ switches: { ...s.switches, on: { ...s.switches.on, 'story-memory': true } } }))
+    useGameStore.setState({ playthroughId: '123456789', history: { 6: { 0: 'Sarah discussed her violin recording.' } } })
+    const { normal, replacement, normalRequest, replacementRequest } = await requests()
+    expect(normal).toContain('campus radio show')
+    expect(replacement).toContain('campus radio show')
     expect(normalRequest.storyMemory?.records).toHaveLength(1)
     expect(replacementRequest.storyMemory).toEqual(normalRequest.storyMemory)
   })

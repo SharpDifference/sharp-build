@@ -17,8 +17,8 @@ import type { MemoryBudgets, RendererSettings, Settings, SettingsPatch } from '.
 export const SETTINGS_SCHEMA_VERSION = 1
 
 /**
- * What the settings must carry; the three keys, the custom endpoint's URL, model ids, effort and
- * reply cap, its images URL and model, the two dev switches, the service tier, the
+ * What the settings must carry; the three keys, the custom endpoint's URL, model ids, effort,
+ * tier and reply cap, its images URL and model, the two dev switches, the service tier, the
  * hand-edited stream switch, the hand-edited ComfyUI build, which ComfyUI draws with its URL
  * and both sources' model picks and LoRA weights, Gemini's secondary model, the group
  * volumes, the browser build's key-remembering, the sampling fields, the memory and secret
@@ -34,6 +34,7 @@ const SETTINGS_REQUIRED: Record<
     | 'endpointModel'
     | 'endpointSecondaryModel'
     | 'reasoningEffort'
+    | 'endpointServiceTier'
     | 'maxOutputTokens'
     | 'imageEndpointUrl'
     | 'imageModel'
@@ -400,6 +401,8 @@ export function mergePatch(current: Settings, patch: SettingsPatch): Settings {
     endpointModel: patch.endpointModel ?? '',
     endpointSecondaryModel: patch.endpointSecondaryModel,
     reasoningEffort: patch.reasoningEffort,
+    // Absent stays absent, and absent is not sent.
+    endpointServiceTier: patch.endpointServiceTier,
     maxOutputTokens: patch.maxOutputTokens,
     imageEndpointUrl: patch.imageEndpointUrl,
     imageModel: patch.imageModel,

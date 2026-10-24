@@ -15,23 +15,20 @@ import { withoutRegenEdits } from './regenTags'
 /** The three wardrobes every character has, in a stable order. */
 export const STOCK_OUTFIT_SETS: readonly StockOutfitSet[] = ['pe', 'swim', 'nude'] as const
 
-/** The five slots a player-authored wardrobe can occupy, in slot order. */
-export const CUSTOM_OUTFIT_SLOTS: readonly CustomOutfitSlot[] = [
-  'custom1',
-  'custom2',
-  'custom3',
-  'custom4',
-  'custom5'
-] as const
+/** A custom wardrobe slot's id: `custom` and a whole number from one, with no zero in front. */
+const CUSTOM_OUTFIT_SLOT_ID = /^custom([1-9]\d*)$/
 
-/**
- * Every alternate wardrobe, in a stable order (used for status grids, job counts and the
- * scene schema's emotion enum).
- */
-export const OUTFIT_SETS: readonly OutfitSet[] = [
-  ...STOCK_OUTFIT_SETS,
-  ...CUSTOM_OUTFIT_SLOTS
-] as const
+/** The slot holding the custom wardrobe numbered `n`, counted from one. */
+export function customOutfitSlotAt(n: number): CustomOutfitSlot {
+  return `custom${n}`
+}
+
+/** The custom wardrobe slots among some keys, each once and in slot-number order. */
+export function customOutfitSlotsIn(keys: Iterable<string>): CustomOutfitSlot[] {
+  const slots = new Set<CustomOutfitSlot>()
+  for (const key of keys) if (isCustomOutfitSlot(key)) slots.add(key)
+  return [...slots].sort((a, b) => customSlotNumber(a) - customSlotNumber(b))
+}
 
 /** The longest a player-authored wardrobe's name may be. */
 export const CUSTOM_OUTFIT_NAME_MAX = 20
@@ -75,19 +72,23 @@ export function followsMain(character: Character, key: SeededSet): boolean {
   return character.seedFollowsMain[key] ?? true
 }
 
-/** Type guard narrowing an arbitrary string to {@link OutfitSet}. */
+/** Type guard narrowing an arbitrary string to {@link OutfitSet}: a stock set or a custom slot. */
 export function isOutfitSet(value: string): value is OutfitSet {
-  return (OUTFIT_SETS as readonly string[]).includes(value)
+  return (STOCK_OUTFIT_SETS as readonly string[]).includes(value) || isCustomOutfitSlot(value)
 }
 
-/** Type guard narrowing an arbitrary string to {@link CustomOutfitSlot}. */
+/**
+ * Type guard narrowing an arbitrary string to {@link CustomOutfitSlot}: the id's shape, with a
+ * number small enough to be counted exactly.
+ */
 export function isCustomOutfitSlot(value: string): value is CustomOutfitSlot {
-  return (CUSTOM_OUTFIT_SLOTS as readonly string[]).includes(value)
+  const match = CUSTOM_OUTFIT_SLOT_ID.exec(value)
+  return match !== null && Number.isSafeInteger(Number(match[1]))
 }
 
-/** Which of the five slots this is, 1 to 5 — what an unnamed wardrobe is called by. */
+/** Which slot this is, counted from one — what an unnamed wardrobe is called by. */
 export function customSlotNumber(slot: CustomOutfitSlot): number {
-  return CUSTOM_OUTFIT_SLOTS.indexOf(slot) + 1
+  return Number(slot.slice('custom'.length))
 }
 
 /** Human label for a stock set, for status lines and job cards. */
@@ -177,15 +178,14 @@ export function offeredCustomOutfits(
   character: Character,
   ready: readonly OutfitSet[] | undefined
 ): OfferedOutfit[] {
-  const taken = new Set<string>(OUTFIT_SETS)
+  const taken = new Set<string>()
   const offered: OfferedOutfit[] = []
-  for (const slot of CUSTOM_OUTFIT_SLOTS) {
-    if (!ready?.includes(slot)) continue
+  for (const slot of customOutfitSlotsIn(ready ?? [])) {
     const entry = character.customOutfits?.[slot]
     const instructions = customOutfitInstructions(entry?.instructions)
     if (!instructions) continue
     const name = customOutfitName(entry?.name)
-    const suffix = name && !taken.has(name) ? name : slot
+    const suffix = name && !isOutfitSet(name) && !taken.has(name) ? name : slot
     taken.add(suffix)
     offered.push({ slot, suffix, tags: outfitTagsFor(character, slot), instructions })
   }

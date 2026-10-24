@@ -10,6 +10,7 @@ import { useGameStore } from '../src/renderer/stores/gameStore'
 import { openingScene } from '../src/renderer/stores/loop/saves'
 import { loopState, resetLoopState } from '../src/renderer/stores/loop/state'
 import { playthroughRecord, restoreApi, sceneLines, stubApi } from './fixtures'
+import type { LorebookRecord } from '../src/shared/lorebookRecord'
 
 /**
  * Where a loaded save puts playback. A load that reads its marks wrong either replays lines the
@@ -53,6 +54,9 @@ beforeEach(() => {
       readProfilePicture: vi.fn(
         async (): Promise<Result<Uint8Array<ArrayBuffer> | null>> => ({ ok: true, data: null })
       )
+    },
+    lorebook: {
+      read: vi.fn(async (): Promise<Result<LorebookRecord | null>> => ({ ok: true, data: null }))
     }
   })
 })

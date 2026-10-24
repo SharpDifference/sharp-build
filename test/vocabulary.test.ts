@@ -84,6 +84,8 @@ describe('isCharFileRel', () => {
       'customcg/customcg1/customcg1.png',
       'customcg/customcg1/customcg1_after.webp',
       'customcg/customcg4/customcg4_after.png',
+      'customcg/customcg5/customcg5.png',
+      'customcg/customcg12/customcg12_after.webp',
       'staging/customcg/customcg2/customcg2.png'
     ]) {
       expect(isCharFileRel(rel)).toBe(true)
@@ -97,10 +99,26 @@ describe('isCharFileRel', () => {
       'cg/customcg1.png',
       'cg/customcg1_after.png',
       'customcg/custom1/custom1.png',
-      'customcg/customcg5/customcg5.png',
+      'customcg/customcg0/customcg0.png',
+      'customcg/customcg01/customcg01.png',
+      'customcg/customcg/customcg.png',
       'customcg/customcg1.png',
       'customcg/customcg1/sub/customcg1.png',
       'customcg/customcg1/customcg1.base.png'
+    ]) {
+      expect(isCharFileRel(rel)).toBe(false)
+    }
+  })
+
+  it('takes a custom wardrobe under any slot of hers and nothing only shaped like one', () => {
+    expect(isCharFileRel('outfits/custom1/happy.png')).toBe(true)
+    expect(isCharFileRel('outfits/custom12/neutral.webp')).toBe(true)
+    for (const rel of [
+      'outfits/custom0/happy.png',
+      'outfits/custom01/happy.png',
+      'outfits/custom/happy.png',
+      'outfits/customcg1/happy.png',
+      'outfits/custom9007199254740993/happy.png'
     ]) {
       expect(isCharFileRel(rel)).toBe(false)
     }

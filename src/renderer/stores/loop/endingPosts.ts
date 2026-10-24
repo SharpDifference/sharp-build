@@ -9,11 +9,11 @@ import {
 } from '@shared/types'
 import { buildEndingPostsPrompt, type EndingPoster } from '../../prompts/endingPostsPrompt'
 import { GRADUATION_DATE } from '../../prompts/occasions'
-import { SETTING } from '../../prompts/setting'
 import { hasTexted } from '../../prompts/textingPrompt'
 import { rollEndingPostStamp } from '../feedRolls'
 import { endingPostsDelivered, isFeedContact } from '../feedView'
 import { useGameStore } from '../gameStore'
+import { settingNow } from '../lorebookStore'
 import { retrySilently } from '../silentRetry'
 import { deliverEndingPosts } from './feed'
 import { lessNsfwTextNow, reader, secretBudgetNow } from './promptState'
@@ -66,7 +66,7 @@ async function fetchEndingPosts(
         readerGraduated: game.semesterIndex === LAST_SEMESTER,
         posters
       },
-      SETTING,
+      settingNow(),
       reader()
     )
 

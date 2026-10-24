@@ -1,7 +1,14 @@
 import type { CgSfx, CgVoice, Character, CustomCg, CustomCgSlot, Position } from './types'
 import type { PromptEdit } from './imagePrompt'
 import { customOutfitInstructions, customOutfitName } from './outfits'
-import { afterOf, CUSTOM_CG_SLOTS, customCgSlotOf, isAfterPosition, POSITIONS } from './positions'
+import {
+  afterOf,
+  customCgSlotNumber,
+  customCgSlotOf,
+  customCgSlotsIn,
+  isAfterPosition,
+  isPosition
+} from './positions'
 import { withoutRegenEdits } from './regenTags'
 
 /**
@@ -33,11 +40,6 @@ export function isCgVoice(value: unknown): value is CgVoice {
 /** Type guard narrowing a value read off a hand-editable record to {@link CgSfx}. */
 export function isCgSfx(value: unknown): value is CgSfx {
   return (CG_SFXS as readonly unknown[]).includes(value)
-}
-
-/** Which of the four slots this is, 1 to 4 — what an unnamed CG is called by. */
-export function customCgSlotNumber(slot: CustomCgSlot): number {
-  return CUSTOM_CG_SLOTS.indexOf(slot) + 1
 }
 
 /** What one custom slot's main CG is called on screen: her name for it, or its number. */
@@ -157,15 +159,20 @@ export function offeredCustomCgs(
   character: Character,
   ready: readonly CustomCgSlot[] | undefined
 ): OfferedCg[] {
-  const taken = new Set<string>(POSITIONS)
+  const taken = new Set<string>()
   const offered: OfferedCg[] = []
-  for (const slot of CUSTOM_CG_SLOTS) {
-    if (!ready?.includes(slot)) continue
+  for (const slot of customCgSlotsIn(ready ?? [])) {
     const entry = character.customCgs?.[slot]
     const instructions = customOutfitInstructions(entry?.instructions)
     if (!instructions) continue
     const name = customOutfitName(entry?.name)
-    const written = name && !taken.has(name) && !taken.has(`${name}_after`) ? name : slot
+    const free =
+      name &&
+      !isPosition(name) &&
+      !isPosition(`${name}_after`) &&
+      !taken.has(name) &&
+      !taken.has(`${name}_after`)
+    const written = free ? name : slot
     taken.add(written)
     taken.add(`${written}_after`)
     offered.push({ slot, name: written, tags: customCgTagsFor(character, slot), instructions })

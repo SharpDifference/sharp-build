@@ -15,13 +15,28 @@ export const STOCK_POSITIONS: readonly StockPosition[] = [
   'fellatio_after'
 ] as const
 
-/** The four slots a player-authored CG pair can occupy, in slot order. */
-export const CUSTOM_CG_SLOTS: readonly CustomCgSlot[] = [
-  'customcg1',
-  'customcg2',
-  'customcg3',
-  'customcg4'
-] as const
+/**
+ * A custom CG pair's main id, and its `_after`'s: `customcg` and a whole number from one, with no
+ * zero in front.
+ */
+const CUSTOM_CG_ID = /^customcg([1-9]\d*)(_after)?$/
+
+/** The slot holding the custom CG pair numbered `n`, counted from one. */
+export function customCgSlotAt(n: number): CustomCgSlot {
+  return `customcg${n}`
+}
+
+/** Which slot this is, counted from one — what an unnamed CG pair is called by. */
+export function customCgSlotNumber(slot: CustomCgSlot): number {
+  return Number(slot.slice('customcg'.length))
+}
+
+/** The custom CG slots among some keys, each once and in slot-number order. */
+export function customCgSlotsIn(keys: Iterable<string>): CustomCgSlot[] {
+  const slots = new Set<CustomCgSlot>()
+  for (const key of keys) if (isCustomCgSlot(key)) slots.add(key)
+  return [...slots].sort((a, b) => customCgSlotNumber(a) - customCgSlotNumber(b))
+}
 
 /** The id of the aftermath image that goes with one custom slot's main CG. */
 export function afterOf(slot: CustomCgSlot): `${CustomCgSlot}_after` {
@@ -29,17 +44,11 @@ export function afterOf(slot: CustomCgSlot): `${CustomCgSlot}_after` {
 }
 
 /**
- * Every CG id, the custom pairs appended after the stock eight: what every gate, file and stage
- * path takes. Disjoint from `EMOTIONS`.
+ * Type guard narrowing an arbitrary string to {@link Position}: any CG id, stock or custom — what
+ * every gate, file and stage path takes. Disjoint from `EMOTIONS`.
  */
-export const POSITIONS: readonly Position[] = [
-  ...STOCK_POSITIONS,
-  ...CUSTOM_CG_SLOTS.flatMap((slot) => [slot, afterOf(slot)])
-] as const
-
-/** Type guard narrowing an arbitrary string to {@link Position}: any CG id, stock or custom. */
 export function isPosition(value: string): value is Position {
-  return (POSITIONS as readonly string[]).includes(value)
+  return isStockPosition(value) || customCgSlotOf(value) !== null
 }
 
 /** Type guard narrowing an arbitrary string to {@link StockPosition}. */
@@ -49,12 +58,16 @@ export function isStockPosition(value: string): value is StockPosition {
 
 /** Type guard narrowing an arbitrary string to {@link CustomCgSlot}. */
 export function isCustomCgSlot(value: string): value is CustomCgSlot {
-  return (CUSTOM_CG_SLOTS as readonly string[]).includes(value)
+  return !value.endsWith('_after') && customCgSlotOf(value) !== null
 }
 
-/** The slot a custom CG's main or its `_after` belongs to, or `null` for anything else. */
+/**
+ * The slot a custom CG's main or its `_after` belongs to, or `null` for anything else — a number
+ * too large to be counted exactly included.
+ */
 export function customCgSlotOf(value: string): CustomCgSlot | null {
-  return CUSTOM_CG_SLOTS.find((slot) => value === slot || value === afterOf(slot)) ?? null
+  const match = CUSTOM_CG_ID.exec(value)
+  return match && Number.isSafeInteger(Number(match[1])) ? customCgSlotAt(Number(match[1])) : null
 }
 
 /**

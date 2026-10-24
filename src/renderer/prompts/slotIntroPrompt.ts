@@ -23,7 +23,7 @@ import {
 import type { Weather } from '@shared/weather'
 import { herColdLine } from './colds'
 import { formatRelativeSlot } from './gameDate'
-import type { LoreEntry } from './lorebook'
+import { loreText, type LoreEntry } from './lorebook'
 import { examLookaheadLine } from './occasions'
 import { whereaboutsLine, type NpcCompanions } from './npcRelationship'
 import { relationshipLines } from './relationship'
@@ -415,7 +415,7 @@ function rumorBlock(input: SlotIntroInput): string[] {
   if (!input.rumorPlace) return []
   return [
     'SOMEWHERE TO GO',
-    input.rumorPlace.text,
+    loreText(input.rumorPlace),
     '',
   ]
 }

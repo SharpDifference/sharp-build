@@ -134,10 +134,18 @@ describe('commitStagedSet', () => {
       sex: true,
       sex_after: true,
       customcg1: true,
-      customcg1_after: true,
-      customcg2: false,
-      customcg2_after: false
+      customcg1_after: true
     })
+    // Her pairs are the folders she has, so a slot nothing was ever written to is not listed.
+    expect(status).not.toHaveProperty('customcg2')
+  })
+
+  it('lists every custom wardrobe slot she has a folder for, and no other', async () => {
+    await seed(getCharacterOutfitSetPath(CHAR, 'custom12'), ['happy'], 'new')
+    const status = await characterService.getOutfitStatus(CHAR)
+    expect(Object.keys(status).sort()).toEqual(['custom12', 'nude', 'pe', 'swim'])
+    expect(status.custom12?.happy).toBe(true)
+    expect(status.custom12?.sad).toBe(false)
   })
 
   it('moves only the room variants that were staged', async () => {

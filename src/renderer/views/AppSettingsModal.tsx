@@ -4,10 +4,13 @@ import { AnimatePresence, motion } from 'motion/react'
 import { VOLUME_MAX, VOLUME_MIN, volumesOf, type AudioGroup, type Volumes } from '@shared/audio'
 import { endpointProblem, normalizeEndpoint, normalizeImageEndpoint } from '@shared/endpoint'
 import {
+  ENDPOINT_SERVICE_TIERS,
+  ENDPOINT_SERVICE_TIER_LABELS,
   SERVICE_TIER_LABELS,
   THINKING_LEVELS,
   THINKING_LEVEL_LABELS,
   defaultModelFor,
+  endpointServiceTierFor,
   imageApiFor,
   modelFor,
   providerFor,
@@ -23,7 +26,12 @@ import {
   imageModelOf
 } from '@shared/settingsRules'
 
-import type { ProviderApi, ServiceTier, ThinkingLevel } from '@shared/providers'
+import type {
+  EndpointServiceTier,
+  ProviderApi,
+  ServiceTier,
+  ThinkingLevel
+} from '@shared/providers'
 import type { PromptKind } from '@shared/promptKinds'
 import type { RendererSettings, SettingsPatch } from '@shared/types'
 import { ConfirmModal } from '../components/ConfirmModal'
@@ -49,12 +57,12 @@ import { SoundtracksModal } from './SoundtracksModal'
 import { SettingsAdvancedTab } from './SettingsAdvancedTab'
 import { SettingsComfyTab } from './SettingsComfyTab'
 import { PROMPT_STUDIO_MOD } from '@shared/presets/types'
-import { DEFAULT_SCENE_PERSONA } from '../prompts/promptBlocks'
 import { PromptStudioModal } from './PromptStudioModal'
 import { SystemPromptModal } from './SystemPromptModal'
 import { GamepadIcon, ImageIcon, SlidersIcon, SparklesIcon } from './screenIcons'
 import { useSettingsStore } from '../stores/settingsStore'
 import { useAudioStore } from '../stores/audioStore'
+import { lorebookSettled } from '../stores/lorebookStore'
 import { usePhotoStore } from '../stores/photoStore'
 import { useUiStore } from '../stores/uiStore'
 import {
@@ -172,6 +180,10 @@ export function AppSettingsModal({ theme, onClose }: AppSettingsModalProps): JSX
   const [reasoningEffort, setReasoningEffort] = useState<ThinkingLevel>(() =>
     thinkingLevelFor('openai', '', settings?.reasoningEffort ?? '')
   )
+  // Its own tier, held blank for None: absent sends none.
+  const [endpointTier, setEndpointTier] = useState<EndpointServiceTier | ''>(
+    () => endpointServiceTierFor(settings?.endpointServiceTier) ?? ''
+  )
   // Held as one record, absent on the record meaning all four.
   const [secondaryFor, setSecondaryFor] = useState<Record<PromptKind, boolean>>(() =>
     promptKindValuesOf(settings)
@@ -259,7 +271,8 @@ export function AppSettingsModal({ theme, onClose }: AppSettingsModalProps): JSX
     endpointUrl,
     endpointKey,
     modelId,
-    reasoningEffort
+    reasoningEffort,
+    endpointServiceTier: endpointTier || undefined
   })
 
   // Which image models the images URL serves and whether it draws at all, asked on the staged
@@ -480,6 +493,15 @@ export function AppSettingsModal({ theme, onClose }: AppSettingsModalProps): JSX
       reseed((stored) =>
         setReasoningEffort(thinkingLevelFor('openai', '', stored.reasoningEffort ?? ''))
       )
+    )
+  }
+
+  /** The queue a custom endpoint is asked for on every call, or none at all. */
+  function handleEndpointTierChange(value: string): void {
+    const tier = endpointServiceTierFor(value)
+    setEndpointTier(tier ?? '')
+    void write({ endpointServiceTier: tier }).then(
+      reseed((stored) => setEndpointTier(endpointServiceTierFor(stored.endpointServiceTier) ?? ''))
     )
   }
 
@@ -893,6 +915,21 @@ export function AppSettingsModal({ theme, onClose }: AppSettingsModalProps): JSX
                         }))}
                       />
 
+                      <SelectField
+                        id="settings-endpoint-service-tier"
+                        label="Service tier"
+                        hint="Leave at None unless your provider offers service tiers. The regular tier is called Default on OpenAI and Standard on Google. Some servers reject tiers they don't recognize."
+                        value={endpointTier}
+                        onChange={handleEndpointTierChange}
+                        options={[
+                          { value: '', label: 'None (default)' },
+                          ...ENDPOINT_SERVICE_TIERS.map((tier) => ({
+                            value: tier,
+                            label: ENDPOINT_SERVICE_TIER_LABELS[tier]
+                          }))
+                        ]}
+                      />
+
                       <ComboField
                         id="settings-secondary-model-id"
                         label="Secondary model ID"
@@ -1149,10 +1186,11 @@ export function AppSettingsModal({ theme, onClose }: AppSettingsModalProps): JSX
             onConfirm={() => {
               setConfirmRestore(false)
               setRestoring(true)
-              // A restore swaps every save underneath a photo that is still being written.
+              // A restore swaps every save underneath a photo or a lorebook still being written.
               void usePhotoStore
                 .getState()
                 .cancelAll()
+                .then(() => lorebookSettled())
                 .then(() => importBackup())
                 .finally(() => setRestoring(false))
             }}
@@ -1180,15 +1218,7 @@ export function AppSettingsModal({ theme, onClose }: AppSettingsModalProps): JSX
       </AnimatePresence>
       <AnimatePresence propagate>
         {editing && (
-          <SystemPromptModal
-            key="system-prompt"
-            theme={theme}
-            title="Edit system prompt"
-            defaultText={DEFAULT_SCENE_PERSONA}
-            stored={settings?.scenePersona ?? DEFAULT_SCENE_PERSONA}
-            onSave={(value) => update({ scenePersona: value })}
-            onClose={() => setEditing(false)}
-          />
+          <SystemPromptModal key="system-prompt" theme={theme} onClose={() => setEditing(false)} />
         )}
       </AnimatePresence>
       <AnimatePresence propagate>

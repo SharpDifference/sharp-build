@@ -1,11 +1,12 @@
 import { useState, type JSX, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { motion } from 'motion/react'
-import { cgLabelOf, customCgLabelOf, customCgSlotNumber } from '@shared/customCgs'
+import { cgLabelOf, customCgLabelOf } from '@shared/customCgs'
 import { CUSTOM_OUTFIT_NAME_MAX, customOutfitName } from '@shared/outfits'
-import { afterOf, CUSTOM_CG_SLOTS } from '@shared/positions'
+import { afterOf, customCgSlotAt, customCgSlotNumber, customCgSlotsIn } from '@shared/positions'
 import type { CustomCgSlot, Position } from '@shared/types'
 import { DeleteX } from '../components/DeleteX'
+import { PageArrows } from '../components/PageArrows'
 import { RenameBox } from '../components/RenameBox'
 import { TitleTab } from '../components/TitleTab'
 import { useModalShell } from '../components/useModalShell'
@@ -18,7 +19,9 @@ import {
   useCharacterStore,
   useSpriteVersion
 } from '../stores/characterStore'
+import { CG_PAGE_SLOTS, useSlotPages } from './customPages'
 import {
+  dealt,
   gestures,
   lift,
   panelUnderTab,
@@ -27,6 +30,7 @@ import {
   quietPress,
   revealed,
   rowPress,
+  slideInQuick,
   spin,
   toggleLift,
   veilIn,
@@ -36,10 +40,13 @@ import { PencilIcon, PlusIcon } from './screenIcons'
 import '../vu_styles/ImageGallery.css'
 import '../vu_styles/CustomCgs.css'
 
+/** A page's cells dealing in with the page, quick and close together. */
+const PAGE_DEAL = dealt(0, 0.02)
+
 /** One control a card raises over its picture: the pill's words and what a click on it does. */
 interface CardAction {
   /** Tells the card's controls apart, so a focus that one of them held can be let go of. */
-  key: 'cancel' | 'regenerate' | 'generate' | 'edit'
+  key: 'cancel' | 'regenerate' | 'generate' | 'copy' | 'edit'
   pill: ReactNode
   /** What the control is called to a screen reader, naming the CG the pill's words do not. */
   ariaLabel: string
@@ -177,6 +184,7 @@ function CgCard({ src, actions, held, add, remove, caption }: CardProps): JSX.El
   return (
     <motion.li
       className={`vu-gallery-item${remove ? ' vu-gallery-item--removable' : ''}`}
+      variants={slideInQuick}
       onHoverStart={() => setHovered(true)}
       onHoverEnd={() => setHovered(false)}
     >
@@ -258,12 +266,15 @@ export interface CustomCgsModalProps {
   onEdit: (slot: CustomCgSlot) => void
   /** Asks whether to throw a pair away. */
   onDelete: (slot: CustomCgSlot) => void
+  /** Holds a pair's record as the copied CG; absent where no pair could be made from it. */
+  onCopy?: (slot: CustomCgSlot) => void
   onClose: () => void
 }
 
 /**
- * The player's own CG pairs: each slot's main CG over its `_after`, the plus in an empty slot,
- * and what a hover raises on the rest. Every confirm and form is the Edit modal's.
+ * The player's own CG pairs four abreast, a page at a time between the arrows: each slot's main
+ * CG over its `_after`, the plus in an empty slot, and what a hover raises on the rest. Every
+ * confirm and form is the Edit modal's.
  */
 export function CustomCgsModal({
   charId,
@@ -275,6 +286,7 @@ export function CustomCgsModal({
   onRegenerateAfter,
   onEdit,
   onDelete,
+  onCopy,
   onClose
 }: CustomCgsModalProps): JSX.Element | null {
   const character = useCharacterStore((s) => s.characters[charId])
@@ -285,7 +297,15 @@ export function CustomCgsModal({
   const cancelSet = useCharacterStore((s) => s.cancelSet)
   const writeCustomCg = useCharacterStore((s) => s.writeCustomCg)
 
-  const { host, overlayProps } = useModalShell(onClose)
+  const { host, overlayProps, topmost } = useModalShell(onClose)
+  // The slot last copied from while the panel stands, whose pill says so.
+  const [copied, setCopied] = useState<CustomCgSlot | null>(null)
+  // Her slots holding a record or either image: what the pages are counted off.
+  const taken = customCgSlotsIn([
+    ...Object.keys(character?.customCgs ?? {}),
+    ...Object.keys(cgs ?? {})
+  ]).filter((slot) => character?.customCgs?.[slot] || cgs?.[slot] || cgs?.[afterOf(slot)])
+  const pages = useSlotPages(taken.map(customCgSlotNumber), CG_PAGE_SLOTS, topmost)
   if (!host || !character) return null
 
   const whole = readyCustomCgs(cgs).length
@@ -327,6 +347,21 @@ export function CustomCgsModal({
     const edit: CardAction[] = entry
       ? [{ key: 'edit', pill: 'Edit', ariaLabel: `Edit ${name}`, onAct: () => onEdit(slot) }]
       : []
+    // The words a pair is made from, copied for a new one; they stand under the render.
+    const copy: CardAction[] =
+      entry && onCopy
+        ? [
+            {
+              key: 'copy',
+              pill: copied === slot ? 'Copied' : 'Copy CG',
+              ariaLabel: `Copy ${name}`,
+              onAct: () => {
+                onCopy(slot)
+                setCopied(slot)
+              }
+            }
+          ]
+        : []
     // Nothing is thrown away from under a render, which the store would refuse.
     const remove =
       !pairTask && !afterTask && (entry || onDisk)
@@ -384,9 +419,21 @@ export function CustomCgsModal({
             }
           ]
         : []
-      main = { src: urlOf(slot), actions: [...regenerate, ...edit], held: false, remove, caption }
+      main = {
+        src: urlOf(slot),
+        actions: [...regenerate, ...copy, ...edit],
+        held: false,
+        remove,
+        caption
+      }
     } else {
-      main = { src: null, actions: [...generate(name), ...edit], held: false, remove, caption }
+      main = {
+        src: null,
+        actions: [...generate(name), ...copy, ...edit],
+        held: false,
+        remove,
+        caption
+      }
     }
 
     let afterCard: CardProps
@@ -433,7 +480,7 @@ export function CustomCgsModal({
     return { main, after: afterCard }
   }
 
-  const cards = CUSTOM_CG_SLOTS.map((slot) => ({ slot, ...cardsOf(slot) }))
+  const cards = pages.numbers.map(customCgSlotAt).map((slot) => ({ slot, ...cardsOf(slot) }))
   // The hint names the plus, so it stands only while a live one is on the panel.
   const addable = cards.some(({ main }) => main.add && !main.add.dead)
 
@@ -458,23 +505,36 @@ export function CustomCgsModal({
         <TitleTab>Custom CG</TitleTab>
 
         <div className="vu-gallery-head">
-          <span
-            className={`vu-count vu-gallery-count vu-count--${whole === CUSTOM_CG_SLOTS.length ? 'good' : 'warn'}`}
-          >
-            {whole}/{CUSTOM_CG_SLOTS.length}
-          </span>
+          <span className="vu-count vu-gallery-count vu-count--accent">{whole}</span>
           {addable && <span className="vu-hint">Click + to create a custom CG.</span>}
         </div>
 
-        {/* The four mains across, each slot's after under its own main. */}
-        <ul className="vu-gallery-grid">
-          {cards.map(({ slot, main }) => (
-            <CgCard key={slot} {...main} />
-          ))}
-          {cards.map(({ slot, after }) => (
-            <CgCard key={afterOf(slot)} {...after} />
-          ))}
-        </ul>
+        <PageArrows
+          idPrefix="custom-cgs-page"
+          page={pages.page}
+          pageCount={pages.pageCount}
+          onPage={pages.onPage}
+          ring={false}
+          onAdd={pages.onAdd}
+          addDead={!renderable}
+        >
+          {/* The page's four mains across, each slot's after under its own main. The page the
+              panel opens on stands as it is; a turn re-deals the next. */}
+          <motion.ul
+            key={pages.page}
+            className="vu-gallery-grid"
+            variants={PAGE_DEAL}
+            initial={pages.turned ? 'hidden' : false}
+            animate="shown"
+          >
+            {cards.map(({ slot, main }) => (
+              <CgCard key={slot} {...main} />
+            ))}
+            {cards.map(({ slot, after }) => (
+              <CgCard key={afterOf(slot)} {...after} />
+            ))}
+          </motion.ul>
+        </PageArrows>
 
         <div className="vu-foot">
           <motion.button

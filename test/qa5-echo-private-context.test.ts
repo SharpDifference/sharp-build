@@ -1,3 +1,4 @@
+import { SHIPPED_BOOK } from '../src/renderer/prompts/lorebook'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { calendarOf } from '@shared/semesters'
 import { normalizeBreakthrough } from '@shared/breakthrough'
@@ -69,7 +70,7 @@ function enterContinuedRun(recorded: boolean, menu: boolean, retain = true): voi
 function ordinaryPrompt(): StructuredRequest {
   const state = game()
   return buildTextingPrompt(girl, state.charInfo.a, undefined, 'How is your day?', {
-    date: state.date, time: state.time, memoryBudget: 10, charInfo: state.charInfo,
+    lorebook: SHIPPED_BOOK, date: state.date, time: state.time, memoryBudget: 10, charInfo: state.charInfo,
     npcRelationships: {}, roster: [girl], classes: {}, playerSchedule: {}, classRosters: {}, calendar: calendarOf('spring', []), history: {}, playerJob: null,
     exCharacterDynamics: state.exCharacterDynamics
   }, 'READER')
