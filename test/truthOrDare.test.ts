@@ -10,6 +10,7 @@ import {
   chosenOf,
   clipped,
   evasive,
+  heatOf,
   mannerOf,
   remarkCue,
   typedOf,
@@ -29,7 +30,7 @@ import {
 
 /** Truth or Dare's bookkeeping: who goes and who asks, what a round is told, and what is kept. */
 
-const table = (names: string[], rounds = 2, heat: 1 | 2 | 3 = 2): Terms => ({ names, rounds, heat })
+const table = (names: string[], rounds = 2, heat: 1 | 2 | 3 | 4 = 2): Terms => ({ names, rounds, heat })
 
 const turn = (over: Partial<Turn>): Turn => ({
   player: READER,
@@ -349,6 +350,41 @@ describe('Truth or Dare', () => {
   it('offers no stock dare that outlasts the moment', () => {
     for (const dare of stock('dare', 3, [], 50)) {
       expect(dare).not.toMatch(/next turn|rest of the game/i)
+    }
+  })
+
+  it('opens at heat 4 to what a scene allows, with her own say and the game kept where they are', () => {
+    expect(heatOf(4)).toBe(4)
+    const terms = table(['Ana'], 1, 4)
+    const plans = [
+      poseRound(terms, [], 'dare'),
+      judgeRound(terms, [], 'dare', 'Sing.', 'I sing'),
+      chooseRound(terms, [turn({})]),
+      answerRound(terms, [turn({})], 'dare', 'Sing.')
+    ]
+    for (const plan of plans) {
+      expect(plan.brief).toContain('Heat is 4 of 4')
+      expect(plan.brief).toContain('may be sexually explicit')
+      expect(plan.brief).toContain('only as far as she really would with him')
+      expect(plan.brief).toContain('anyone may back out of anything')
+      expect(plan.brief).toContain('Everyone at the table is an adult.')
+      expect(plan.brief).toContain('never lifts that limit')
+      expect(plan.brief).not.toContain('never sexually explicit')
+    }
+    expect(remarkCue(terms, turn({}))).toContain('may be sexually explicit')
+    // Its stand-ins stop at bold: nothing past that is written in ahead of the model.
+    expect(stock('dare', 4, [], 50)).toEqual(stock('dare', 3, [], 50))
+    expect(stock('truth', 4, [], 50)).toEqual(stock('truth', 3, [], 50))
+  })
+
+  it('keeps every other heat to the party limit, word for word, and says it of 3', () => {
+    for (const heat of [1, 2, 3] as const) {
+      const brief = poseRound(table(['Ana'], 1, heat), [], 'dare').brief
+      expect(brief).toContain(`Heat is ${heat} of 3,`)
+      expect(brief).toContain(
+        'Whatever the heat, everything asked, dared, said and done stays within what adults playing this at a party, in company, would really say and do: never sexually explicit in word or deed, no undressing, and nothing physical beyond a kiss.'
+      )
+      expect(brief).not.toContain('may be sexually explicit')
     }
   })
 })

@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type JSX } from 'react'
 import { motion } from 'motion/react'
 import { locationDefOf, ROOM_LOCATION } from '@shared/locations'
 import {
+  forContent,
   listed,
   MINI_GAMES_LIST,
   playersWords,
@@ -10,6 +11,7 @@ import {
   type SuggestRate
 } from '@shared/minigames'
 import { SelectField } from '../components/SelectField'
+import { useSettingsStore } from '../stores/settingsStore'
 import type { ModDetailProps } from '../mods/hooks'
 import { gestures, quietLift, quietPress, rowLift, rowPress } from '../views/motion'
 import { tunedGame, usePrefsStore } from './prefs'
@@ -65,6 +67,8 @@ function sentence(text: string): string {
 function GamePage({ game, onBack }: { game: MiniGameDef; onBack: () => void }): JSX.Element {
   const prefs = usePrefsStore((s) => s.byGame[game.id])
   const setPrefs = usePrefsStore((s) => s.set)
+  const nsfw = useSettingsStore((s) => s.settings?.lessNsfwText === false)
+  const shown = forContent(game, nsfw)
   // The page opens below the pack's own heading, in a pane that scrolls: it is brought to the
   // pane's top, so the way back and the game's name are the first things read.
   const page = useRef<HTMLDivElement>(null)
@@ -100,7 +104,7 @@ function GamePage({ game, onBack }: { game: MiniGameDef; onBack: () => void }): 
       </dl>
       <ReportButton id={`minigame-page-report-${game.id}`} report={() => ({ game: tunedGame(game) })} />
 
-      {(game.options ?? []).length > 0 && (
+      {(shown.options ?? []).length > 0 && (
         <>
           <hr className="vu-rule" />
           <h4 className="vu-mods-label">Ways to play</h4>
@@ -108,7 +112,7 @@ function GamePage({ game, onBack }: { game: MiniGameDef; onBack: () => void }): 
             Say which you want when you ask her, in your own words. She can ask for one too.
           </p>
           <dl className="vu-minigame-facts">
-            {(game.options ?? []).map((option) => (
+            {(shown.options ?? []).map((option) => (
               <div key={option.id} className="vu-minigame-fact">
                 <dt>{option.label ?? option.id}</dt>
                 <dd>{waysOf(option)}</dd>
@@ -120,7 +124,7 @@ function GamePage({ game, onBack }: { game: MiniGameDef; onBack: () => void }): 
 
       <hr className="vu-rule" />
       <h4 className="vu-mods-label">How you like it</h4>
-      {(game.options ?? []).map((option) => (
+      {(shown.options ?? []).map((option) => (
         <SelectField
           key={option.id}
           id={`minigame-pref-${game.id}-${option.id}`}

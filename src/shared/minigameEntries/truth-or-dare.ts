@@ -24,10 +24,16 @@ const TRUTH_OR_DARE: MiniGameDef = {
       label: 'How far it goes',
       describe:
         'how far the questions and dares may go: 1 is mild, harmless fun between friends ("keep it clean", "nothing weird"); 2 is flirty, with teasing, crushes and a little closeness; 3 is bold, frank about attraction and daring, a kiss at most and never explicit ("no holding back", "make it spicy"). Pick what was said out loud, and no higher than she would be comfortable with given how close she and the reader are',
-      values: { 1: 'Mild', 2: 'Flirty', 3: 'Bold' },
+      values: { 1: 'Mild', 2: 'Flirty', 3: 'Bold', 4: 'Anything goes' },
       min: 1,
       max: 3,
-      default: 2
+      default: 2,
+      // As far as a scene may go, and only where the player lets scenes go there.
+      withNsfw: {
+        max: 4,
+        describe:
+          '4 is anything goes: explicit, undressing and touching all allowed, as far as a scene could go ("no limits", "anything goes"). Only where it was asked for out loud, and only where she would be comfortable with it given how close she and the reader are'
+      }
     }
   ],
   locations: [

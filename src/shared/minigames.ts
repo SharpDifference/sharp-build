@@ -63,6 +63,11 @@ export interface GameOption {
   max: number
   /** What it is where nothing was said, and for a game played alone. */
   default: number
+  /**
+   * Where the player has the game's NSFW text on (Less NSFW text switched off): a higher `max`,
+   * and what the values above the usual one mean, added to `describe`. Never offered otherwise.
+   */
+  withNsfw?: { max: number; describe: string }
 }
 
 /**
@@ -369,7 +374,32 @@ export interface GamePrefs {
  * A game as a player has tuned it: each option starting where he set it, where that is a value
  * the game allows, and suggested as often as he chose. The game itself where he has set nothing.
  */
-export function tuned(game: MiniGameDef, prefs: GamePrefs | undefined): MiniGameDef {
+/**
+ * A game as the player's content setting has it: an option that opens further with NSFW text on
+ * gets its higher top and the words for it; with it off, each keeps its usual range.
+ */
+export function forContent(game: MiniGameDef, nsfw: boolean): MiniGameDef {
+  if (!nsfw || !game.options?.some((option) => option.withNsfw)) return game
+  return {
+    ...game,
+    options: game.options.map((option) =>
+      option.withNsfw
+        ? {
+            ...option,
+            max: Math.max(option.max, option.withNsfw.max),
+            describe: `${option.describe}. ${option.withNsfw.describe}`
+          }
+        : option
+    )
+  }
+}
+
+/**
+ * A game as the player has it set: what his content setting opens (`nsfw`, false where not
+ * known), then his own choices on the game's page, each kept only where it is still in range.
+ */
+export function tuned(game: MiniGameDef, prefs: GamePrefs | undefined, nsfw = false): MiniGameDef {
+  game = forContent(game, nsfw)
   if (!prefs) return game
   const options = game.options?.map((option) => {
     const value = prefs.options?.[option.id]
