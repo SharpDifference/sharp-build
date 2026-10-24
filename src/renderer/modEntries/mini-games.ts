@@ -23,6 +23,7 @@ import { registerHooks } from '../mods/hooks'
 import { useGameStore } from '../stores/gameStore'
 import { useModsStore } from '../stores/modsStore'
 import { scenePlace } from '../minigames/place'
+import { tableCanOpen } from '../minigames/screen'
 
 /** The games a girl in this scene could be played at, each with a component to play it with. */
 function gamesWith(cast: readonly Character[], location: string | null): MiniGameDef[] {
@@ -103,6 +104,9 @@ registerHooks(MINI_GAMES, {
       // Every other turn the reader takes with a girl carries the standing offer. A scene's
       // closing is not one: it has no action of his, and nothing more is going to be played.
       if (!request.user.includes("Reader's action:")) return request
+      // Nor is a screen with no seat to open a table from (the orientation, a created scene):
+      // agreed there, a game would never start, and she would be set up for it turn after turn.
+      if (!tableCanOpen(useGameStore.getState())) return request
       // Only the games a girl may bring up here are on it, and any his action names: the rest
       // are his to ask for from the table.
       const location = scenePlace()
@@ -137,7 +141,7 @@ registerHooks(MINI_GAMES, {
     }
 
     // No proposal of his own was out: the two of them may still have agreed in the scene.
-    if (ending) return
+    if (ending || !tableCanOpen(useGameStore.getState())) return
     // The reply can only name a game its request offered: the field allows no other.
     const agreed = agreedOf(reply, gamesWith(cast, scenePlace()), cast)
     if (agreed) agree(agreed.game, agreed.characters, agreed.stake, agreed.options)
