@@ -3,6 +3,8 @@ import type { JSX } from 'react'
 interface TagSelectOption {
   value: string
   label: string
+  tone?: 'gold'
+  hint?: string
 }
 
 export interface TagSelectProps {
@@ -34,7 +36,8 @@ export function TagSelect({
   return (
     <div className="vu-chips vu-chips--picked">
       {values.map((value) => (
-        <span key={value} className="vu-chip-tag">
+        <span key={value} className="vu-chip-tag" data-tone={options.find(option => option.value === value)?.tone}
+          title={options.find(option => option.value === value)?.hint}>
           {labelOf(value)}
           <button
             className="vu-chip-x"
@@ -59,7 +62,7 @@ export function TagSelect({
             {placeholder ?? 'Add…'}
           </option>
           {remaining.map((option) => (
-            <option key={option.value} value={option.value}>
+            <option key={option.value} value={option.value} data-tone={option.tone}>
               {option.label}
             </option>
           ))}

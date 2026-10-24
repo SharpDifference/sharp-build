@@ -113,6 +113,19 @@ a setter, and set it from `modsStore.ts` at boot and whenever a switch moves
 
 ## Hook points
 
+### Additive romance requirements
+
+`shared/romanceRequirements.ts` lets a mod register a pure per-character map of minimum
+Brain, Body and Heart points. `registerRomanceRequirement(modId, rule)` is called from the
+shared mod entry; `sharedModOn` supplies the active-mod lookup from core. Multiple requirements combine
+by taking the highest minimum for each stat. Disabled rules are not consulted. The native
+preferred-stat and High Standards rules still run as usual.
+
+The requirement is checked before crush rolls, in relationship prompt context and when
+projecting or saving romantic milestones. Milestone callers supply character/stats context to
+`foldRelationshipEvents`; ordinary callers without that context keep the native behavior.
+See [Godlike Standards](docs/mods/godlike-standards.md) for the example and its tests.
+
 A switch decides whether a mod acts. Hook points decide **where** it acts without editing the
 game there. At each place mods commonly add to, the game asks once, in one line of its own
 file; a mod answers from its own files. Two mods adding to the same place then never touch the

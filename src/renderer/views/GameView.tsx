@@ -1,3 +1,5 @@
+import { TalentPanel } from './TalentPanel'
+import { ensureTalents } from '../modEntries/campus-talents'
 import { UnspokenVoice } from './UnspokenVoice'
 import { UnspokenLinkGlitch } from './UnspokenLinkGlitch'
 import { ReckoningModal, ReckoningContinuation, ReckoningPreparation } from './ReckoningModal'
@@ -288,6 +290,7 @@ type OpenPanel =
   | { kind: 'controls' }
   | { kind: 'mods' }
   | { kind: 'plotTwist' }
+  | { kind: 'talents' }
   | { kind: 'echo' }
   | { kind: 'reckoning'; charId: string }
   | { kind: 'storyMemory' }
@@ -586,6 +589,7 @@ function InterruptEndingModal({
 export function GameView(): JSX.Element {
   const tableOwnsInput = useTableInputLayout((state) => state.layout !== null)
   const plotTwistOn = useModOn(PLOT_TWIST_MOD)
+  const talentsOn = useModOn('campus-talents')
   const echoOn = useModOn('echo')
   const bg = useGameStore((s) => s.bg)
   const time = useGameStore((s) => s.time)
@@ -595,6 +599,7 @@ export function GameView(): JSX.Element {
   const playthroughId = useGameStore((s) => s.playthroughId)
   const echoLoads = useGameStore((s) => s.loads)
   useEffect(() => { if (echoOn && playthroughId) ensureEchoes() }, [echoOn, playthroughId, echoLoads])
+  useEffect(() => { if (talentsOn && playthroughId) ensureTalents() }, [talentsOn, playthroughId, echoLoads])
   const slots = useGameStore((s) => s.slots)
   const emotions = useGameStore((s) => s.emotions)
   const flipped = useGameStore((s) => s.flipped)
@@ -2168,6 +2173,7 @@ export function GameView(): JSX.Element {
           calendarBadge={calendarBadge}
           bunnyboardBadge={bunnyboardBadge}
           railDead={false}
+          onTalents={talentsOn && !created && !replaying ? () => setPanel({ kind: 'talents' }) : undefined}
           onEchoes={echoOn && !created && !replaying ? () => setPanel({ kind: 'echo' }) : undefined}
           onCalendar={() => setPanel({ kind: 'calendar' })}
           onBunnyboard={() => useBunnyboardStore.getState().openApp()}
@@ -2230,6 +2236,7 @@ export function GameView(): JSX.Element {
              loses its own, an hour nobody is standing in having nothing to show. */
           bunnymapUnlocked={bunnymapShown}
           bunnyshopUnlocked={bunnyshopShown}
+          onTalents={talentsOn && !created && !replaying ? () => setPanel({ kind: 'talents' }) : undefined}
           onEchoes={echoOn && !created && !replaying ? () => setPanel({ kind: 'echo' }) : undefined}
           onCalendar={() => setPanel({ kind: 'calendar' })}
           onBunnyboard={() => useBunnyboardStore.getState().openApp()}
@@ -2804,6 +2811,7 @@ export function GameView(): JSX.Element {
         />
         <ReckoningContinuation key="reckoning-continuation" blocked={blocked||covered}/>
         {panel?.kind === 'reckoning' && <ReckoningModal key={`reckoning-${panel.charId}`} charId={panel.charId} onClose={closePanel} />}
+        {panel?.kind === 'talents' && <TalentPanel key="talents" theme={half} onClose={closePanel} />}
         {panel?.kind === 'echo' && (
           <EchoPanel key="echo" hidden={covered || created || replaying} theme={half} onClose={closePanel} />
         )}

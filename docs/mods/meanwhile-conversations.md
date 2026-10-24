@@ -1,4 +1,4 @@
-# Meanwhile conversations source port
+# Meanwhile conversations
 
 Meanwhile is an independent, anytime switch in Mods. When enabled, Bunnyboard
 has a **Meanwhile** tab. Character profiles are unchanged. Select a recent encounter
@@ -83,9 +83,9 @@ For UI review, check Bunnyboard → Meanwhile in both palettes, a long dialogue 
 Next, replay, Retry, closing during generation, and a 4:3 viewport. A live provider's
 prose quality still depends on its model; deterministic tests stub generation and disk writes.
 
-## Registration on core 0.3.1
+## Framework registration
 
 - `src/shared/modEntries/meanwhile-conversations.ts` supplies its existing mod definition and carry registration.
 - `src/renderer/modEntries/meanwhile-conversations.ts` loads the hooks automatically at boot.
 
-The stable IDs, defaults, dependencies, save fields and gameplay behavior are unchanged. Native character notes, scene-creator saves and calendar replays retain their 0.3.1 behavior. Merge framework updates from `core` into this mod branch; resolve conflicts with `main` on a separate `integrate/meanwhile-conversations` branch.
+The stable IDs, defaults, dependencies, save fields and gameplay behavior are unchanged. Native character notes, scene-creator saves and calendar replays remain separate base-game features. Merge framework updates from `core` into this mod branch; resolve conflicts with `main` on a separate `integrate/meanwhile-conversations` branch.

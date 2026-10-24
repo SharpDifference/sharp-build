@@ -7,6 +7,10 @@ import { useBunnyboardStore } from '../src/renderer/stores/bunnyboardStore'
 import { regenerateTextReply, resetTextingLoop, textRegenerationTarget } from '../src/renderer/stores/textingLoop'
 import { persistRegeneratedConversation, writesSettled } from '../src/renderer/stores/loop/saves'
 import { character, charactersById, charInfo, restoreApi, stubApi } from './fixtures'
+import '../src/renderer/modEntries/story-memory'
+import { emptyLorebook } from '@shared/lorebookRecord'
+import { effectiveLorebook } from '../src/renderer/prompts/lorebook'
+import { useLorebookStore } from '../src/renderer/stores/lorebookStore'
 
 function thread(count = 5): Conversation {
   return { charId: 'a', unread: count, summary: 'Summary including rejected answer',
@@ -30,7 +34,7 @@ function seed(): void {
     bunnyboard: { ...useGameStore.getState().bunnyboard, conversations: { a: thread() } } })
 }
 beforeEach(seed)
-afterEach(async () => { resetTextingLoop(); await writesSettled(); restoreApi(); vi.restoreAllMocks() })
+afterEach(async () => { useLorebookStore.getState().drop(); resetTextingLoop(); await writesSettled(); restoreApi(); vi.restoreAllMocks() })
 
 describe('whole reply rules', () => {
   it('replaces more than three bubbles as a unit, preserving the player and earlier history', () => {
@@ -78,6 +82,21 @@ function api(complete = vi.fn(async (_request: StructuredRequest): Promise<Resul
   return { complete, classify, save }
 }
 describe('regeneration transaction', () => {
+  it('uses the current native lorebook alongside Story Memory when rebuilding a reply', async () => {
+    useGameStore.setState({ playthroughId: '123' })
+    const record = emptyLorebook()
+    record.custom.push({ id: 'custom1', keys: ['Moon Club'], text: 'Moon Club meets on the library roof.' })
+    useLorebookStore.setState({ record, book: effectiveLorebook(record) })
+    useModsStore.setState({ switches: { on: { 'story-memory': true, 'text-regeneration': true }, options: {} } })
+    const conversation = thread()
+    conversation.messages[1].text = 'What happened at Moon Club?'
+    useGameStore.setState(s => ({ bunnyboard: { ...s.bunnyboard, conversations: { a: conversation } } }))
+    const { complete } = api()
+    await regenerateTextReply('a', persistRegeneratedConversation)
+    expect(complete.mock.calls[0][0].user).toContain('Moon Club meets on the library roof.')
+    expect(complete.mock.calls[0][0].storyMemory).toMatchObject({ playthroughId: '123', cast: ['a'] })
+    expect(complete.mock.calls[0][0].user).not.toContain('Summary including rejected answer')
+  })
   it('saves the entire replacement before making it visible; read receipts do not cancel it', async () => {
     const { complete, save } = api()
     let finish!: (value: Result<TextingResponse>) => void

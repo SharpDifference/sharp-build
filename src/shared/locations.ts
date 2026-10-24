@@ -338,7 +338,7 @@ export const MEAL_LOCATIONS: Readonly<Record<string, string>> = {
 }
 
 export const FUN_LOCATIONS: Readonly<Record<string, string>> = {
-  bowling: 'bowling_alley', roller_skating: 'roller_rink', cat_cafe: 'cat_cafe',
+  bowling: 'bowling_alley', roller_skating: 'roller_rink', cat_cafe: 'cat_cafe', dance: 'dance_studio',
   lounge: 'pino_cola_lounge',
   cutetea: 'cutetea',
   arcade: 'btb_arcade',
@@ -347,7 +347,7 @@ export const FUN_LOCATIONS: Readonly<Record<string, string>> = {
 }
 
 export const ACTIVITY_LOCATIONS: Readonly<Record<string, string>> = {
-  bowling: 'bowling_alley', roller_skating: 'roller_rink', cat_cafe: 'cat_cafe',
+  bowling: 'bowling_alley', roller_skating: 'roller_rink', cat_cafe: 'cat_cafe', dance: 'dance_studio',
   park: 'green_hill_park',
   stadium: 'palaestra_stadium',
   music_hall: 'thorne_auditorium',

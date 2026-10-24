@@ -1,7 +1,7 @@
 import { CG_SFXS, CG_VOICES } from '@shared/customCgs'
 import { STAT_KEYS, STAT_LABELS } from '@shared/playerStats'
 import { GIFT_CATEGORIES } from '@shared/shop'
-import { CHARACTER_TRAITS } from '@shared/traits'
+import { CHARACTER_TRAITS, TRAIT_DESCRIPTIONS, traitTone } from '@shared/traits'
 import type { CgSfx, CgVoice, CharacterBehavior, OutfitSet, SetTarget } from '@shared/types'
 
 /**
@@ -112,7 +112,9 @@ export const CG_SFX_OPTIONS = CG_SFXS.map((sfx) => ({ value: sfx, label: CG_SFX_
 /** The trait vocabulary as picker options (`shared/traits.ts`, authoritative). */
 export const TRAIT_OPTIONS = CHARACTER_TRAITS.map((trait) => ({
   value: trait,
-  label: trait
+  label: trait,
+  tone: traitTone(trait),
+  hint: TRAIT_DESCRIPTIONS[trait]
 }))
 
 /**

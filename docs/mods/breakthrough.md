@@ -1,4 +1,4 @@
-# Breakthrough source port
+# Breakthrough
 
 Breakthrough is a standalone **anytime** mod. It needs neither Story & Social nor SQLite.
 The scene's upper-right card shows a spirit bar for each present character. Choose one,
@@ -172,9 +172,9 @@ typing without advancing playback, ordinary and mid-reply activation, the flouri
 failed generation/refund, and reduced-motion behavior. Automated tests stub generation
 and saves; live-model narrative effectiveness is not a measured probability.
 
-## Registration on core 0.3.1
+## Framework registration
 
 - `src/shared/modEntries/breakthrough.ts` supplies its existing mod definition and carry registration.
 - `src/renderer/modEntries/breakthrough.ts` loads the hooks automatically at boot.
 
-The stable IDs, defaults, dependencies, save fields and gameplay behavior are unchanged. Native character notes, scene-creator saves and calendar replays retain their 0.3.1 behavior. Merge framework updates from `core` into this mod branch; resolve conflicts with `main` on a separate `integrate/breakthrough` branch.
+The stable IDs, defaults, dependencies, save fields and gameplay behavior are unchanged. Native character notes, scene-creator saves and calendar replays remain separate base-game features. Merge framework updates from `core` into this mod branch; resolve conflicts with `main` on a separate `integrate/breakthrough` branch.

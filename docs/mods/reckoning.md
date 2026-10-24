@@ -73,7 +73,7 @@ exReckoning stores the active link, bounded private visit and question progress.
 
 Reading old dialogue is harmless. Submitting a new reply at or before a recorded encounter anchor rolls back that branch's encounter/growth and refunds the recorded charge once, up to the spirit cap. Branching after it retains the encounter. Older records without an anchor are preserved. Blocked follow-up scene prompts support the normal edit-and-retry flow.
 
-The dungeon does not call native scene settlement or Story Memory extraction. Its ordinary Talk, questions, hints and whispers do not become public conversation history. The ordinary link-establishment sensation and later relief can be part of real-world story continuity; the private mechanics must not leak into characters' knowledge. Continuing Semesters resets transient encounters and carries earned dynamics through the existing registry.
+The dungeon does not call native scene settlement or Story Memory extraction. Its ordinary Talk, questions, hints and whispers do not become public conversation history. The ordinary link-establishment sensation and later relief can be part of real-world story continuity; the private mechanics must not leak into characters' knowledge. Native 0.5.0 New Game+ resets transient encounters and carries earned dynamics through the mod carry registry.
 
 ## Source map and validation
 
@@ -86,7 +86,8 @@ The dungeon does not call native scene settlement or Story Memory extraction. It
 | Character images and portability | main/services/echoService, echoArtImage, reflectionLocalImage, reflectionStorage, shared/reflectionPortrait, assets/workflows/reflectionPortrait.json, characterTransferService, backupService |
 | Audio | shared/audio, shared/soundtracks, renderer/stores/audioEngine, audioStore, soundscape |
 
-See [current validation](echo-validation.md), [Echoes](echo.md), [abilities](echo-breakthrough.md) and [Custom soundtracks](custom-soundtracks.md). This remains a draft feature for source review and broader live-model/balance/release testing; simulated responses do not establish narrative quality.
+See [current validation](echo-validation.md), [Echoes](echo.md), [abilities](echo-breakthrough.md) and [Custom soundtracks](custom-soundtracks.md). The feature is included in the shared 0.5.0-based build and defaults off. Broader live-model
+and balance testing remains valuable; simulated responses do not establish narrative quality.
 
 ## October 14 preparation and voice follow-up
 

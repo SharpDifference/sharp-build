@@ -1,6 +1,6 @@
 import type { CharInfo, SceneLine, TimeSlot } from './types'
 import { normalizeTermOrigin, type TermOrigin } from './termOrigin'
-import { isEchoBreakthroughAspect, type EchoBreakthroughAspect, type EchoSpiritCost } from './echoBreakthrough'
+import { isEchoBreakthroughAspect, type EchoBreakthroughAspect } from './echoBreakthrough'
 
 export const BREAKTHROUGH_MOD = 'breakthrough'
 export const SPIRIT_MAX = 100
@@ -15,7 +15,10 @@ export interface BreakthroughPending {
   /** Optional local Echo integration; omitted for an ordinary Breakthrough. */
   echoAspect?: EchoBreakthroughAspect
   /** Price actually charged for an Echo activation; absent in older, full-bar saves. */
-  spent?: EchoSpiritCost | 100
+  spent?: number
+  /** A purchased Borrowed Voice activation uses this present partner's aspect. */
+  borrowedFrom?: string
+  talentTerm?: number
 }
 
 export interface BreakthroughMoment {
@@ -27,7 +30,7 @@ export interface BreakthroughMoment {
   transcriptStart?: number
   transcriptCount?: number
   /** Actual successful charge. Older outcomes omit this; their price cannot be inferred. */
-  spent?: EchoSpiritCost | 100
+  spent?: number
   origin?: TermOrigin
 }
 
@@ -54,12 +57,12 @@ function slot(date: unknown, time: unknown): boolean {
 
 const meter = (n: number): number => Math.max(0, Math.min(SPIRIT_MAX, Number.isFinite(n) ? n : 0))
 
-function isSpiritPrice(value:unknown):value is EchoSpiritCost|100 {
-  return value===25||value===50||value===75||value===100
+function isSpiritPrice(value:unknown):value is number {
+  return typeof value==='number' && Number.isInteger(value) && value>=15 && value<=100 && value%5===0
 }
 
 /** Ordinary and legacy activations always paid a full bar. Never infer an old price from today's catalog. */
-export function breakthroughSpent(pending:BreakthroughPending):EchoSpiritCost|100 {
+export function breakthroughSpent(pending:BreakthroughPending):number {
   return pending.echoAspect&&isSpiritPrice(pending.spent)?pending.spent:SPIRIT_MAX
 }
 
@@ -96,7 +99,8 @@ export function normalizeBreakthrough(value?: unknown, recover = false): Breakth
     slot(p.date,p.time) && typeof p.direction === 'string' && !!p.direction.trim() && p.direction.length <= 1000
     ? { id:p.id, charId:p.charId, playthroughId:p.playthroughId, date:p.date as number,
       time:p.time as TimeSlot, direction:p.direction.trim(),
-      ...(isEchoBreakthroughAspect(p.echoAspect)?{echoAspect:p.echoAspect,...(isSpiritPrice(p.spent)?{spent:p.spent}:{})}:{}) } : null
+      ...(isEchoBreakthroughAspect(p.echoAspect)?{echoAspect:p.echoAspect,...(isSpiritPrice(p.spent)?{spent:p.spent}:{}),
+        ...(safeId(p.borrowedFrom)&&Number.isSafeInteger(p.talentTerm)&&Number(p.talentTerm)>=0?{borrowedFrom:p.borrowedFrom,talentTerm:Number(p.talentTerm)}:{})}:{}) } : null
   if (recover && pending) meters[pending.charId] = refundSpirit(meters[pending.charId]??0,pending)
   return { meters, settled, moments, pending:recover ? null : pending }
 }
@@ -104,7 +108,7 @@ export function normalizeBreakthrough(value?: unknown, recover = false): Breakth
 /** Final edited memories only, once per slot; old retained memories earn nothing again. */
 export function settleBreakthrough(
   value: BreakthroughState, before: Record<string, CharInfo>, after: Record<string, CharInfo>,
-  date: number, time: TimeSlot
+  date: number, time: TimeSlot, positiveGain: (positive:number,id:string)=>number = n=>n
 ): BreakthroughState {
   const state = normalizeBreakthrough(value), key = `${date}:${time}`
   if (state.settled[key]) return state
@@ -117,7 +121,7 @@ export function settleBreakthrough(
     const unique = [...new Map(fresh.map(m => [signature(m),m])).values()]
     const positive = Math.min(20,unique.reduce((sum,m) => sum + (m.type === 'loved' ? 20 : m.type === 'liked' ? 10 : 0),0))
     const penalty = unique.filter(m => m.type === 'hated').length * 15
-    if (positive || penalty) state.meters[id] = meter((state.meters[id] ?? 0) + positive - penalty)
+    if (positive || penalty) state.meters[id] = meter((state.meters[id] ?? 0) + Math.max(0,positiveGain(positive,id)) - penalty)
   }
   state.settled[key] = true
   return state
@@ -133,10 +137,10 @@ export function outcomeOf(lines: readonly SceneLine[]): string {
  * refunds complete activations removed by a real prefix cut, never by rereading or edits.
  * This is pure so decision-point saves can project the same refund without changing play.
  */
-export function reconcileBreakthrough(
+export function reconcileBreakthroughWithRefunds(
   value: BreakthroughState, transcript: readonly SceneLine[], date: number, time: TimeSlot,
   previous?: readonly SceneLine[]
-): BreakthroughState {
+): {state:BreakthroughState;refunded:Set<string>} {
   const state = normalizeBreakthrough(value)
   const cut = previous && transcript.length < previous.length && transcript.every((line, i) =>
     line.speaker === previous[i].speaker && line.text === previous[i].text)
@@ -156,7 +160,12 @@ export function reconcileBreakthrough(
       return outcome ? [{ ...entry, outcome, transcriptCount:lines.length }] : []
     })
   }
-  return state
+  return {state,refunded}
+}
+
+/** Preserve the ordinary reconciliation API for callers without additional usage ledgers. */
+export function reconcileBreakthrough(value:BreakthroughState, transcript:readonly SceneLine[], date:number, time:TimeSlot, previous?:readonly SceneLine[]):BreakthroughState {
+  return reconcileBreakthroughWithRefunds(value,transcript,date,time,previous).state
 }
 
 /** Stable, canonical event records for prompts and a future optional memory index. */

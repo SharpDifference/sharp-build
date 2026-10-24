@@ -125,6 +125,11 @@ type CoreJobMessageKind =
  */
 export type JobMessageKind = CoreJobMessageKind | 'holiday' | 'summer' | 'winter'
 
+/** An optional player qualification. NPC professions do not use player talent ranks. */
+export interface JobSkillRequirement { id: string; label: string; rank: number }
+/** Only ranks whose supplying mod is active may be supplied here. Missing ranks fail closed. */
+export type JobSkillRanks = Readonly<Record<string, number>>
+
 /** One opening on the jobs board. */
 export interface JobDef {
   /** Stable id; what `JobState.jobId`, `jobsClosed` and the boss thread key off. */
@@ -152,6 +157,8 @@ export interface JobDef {
   hours: readonly ShiftSlot[]
   /** The minimum tier per stat. An absent key is no requirement. */
   requires: Partial<Record<StatKey, StatTier>>
+  /** Additional qualifications for player hiring, separate from access to the venue. */
+  requiresSkills?: readonly JobSkillRequirement[]
   /**
    * What a shift can pay: one entry is rolled when the shift is cast, and every stat it names
    * moves a point.
@@ -638,9 +645,14 @@ export function shiftRecordOf(
   }
 }
 
-/** Whether the reader's stats clear every requirement `def` names. */
-export function meetsRequirements(stats: PlayerStats, def: JobDef): boolean {
-  return unmetRequirements(stats, def).length === 0
+/** Player skill qualifications still missing; disabled or absent supplying mods expose no ranks. */
+export function unmetSkillRequirements(def: JobDef, activeRanks: JobSkillRanks = {}): readonly JobSkillRequirement[] {
+  return (def.requiresSkills ?? []).filter(r => !Number.isFinite(activeRanks[r.id]) || activeRanks[r.id] < r.rank)
+}
+
+/** Whether the reader clears every stat and player skill qualification. */
+export function meetsRequirements(stats: PlayerStats, def: JobDef, activeRanks: JobSkillRanks = {}): boolean {
+  return unmetRequirements(stats, def).length === 0 && unmetSkillRequirements(def, activeRanks).length === 0
 }
 
 /**

@@ -1,3 +1,4 @@
+import { challengeForStartingStats, startingChallengeForSetup, STARTING_CHALLENGE_MOD } from '@shared/startingChallenge'
 import { useEffect, useMemo, useRef, useState, type JSX } from 'react'
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react'
 import { appError, toAppError } from '@shared/errors'
@@ -205,6 +206,10 @@ export function NewGameView(): JSX.Element {
   const [startingMods] = useState(() => next
     ? [...(next.record.mods ?? [])]
     : enrollmentMods(resumed?.enrollment, useModsStore.getState().switches))
+  const [startingChallenge] = useState(() => startingChallengeForSetup(
+    resumed?.enrollment ?? (next ? next.handoff.carry.mods ?? {} : undefined),
+    startingMods.includes(STARTING_CHALLENGE_MOD)
+  ))
   const dynamicsEnabled = modIsOn(CHARACTER_DYNAMICS_MOD, { mods: startingMods })
   useEffect(() => {
     setEnrollmentMods(startingMods)
@@ -527,6 +532,7 @@ export function NewGameView(): JSX.Element {
       playerFirstName: first,
       playerLastName: last,
       stats,
+      ...(startingChallenge ? { exStartingChallenge: challengeForStartingStats(stats, startingChallenge) } : {}),
       ...(bio ? { bio } : {}),
       ...(dynamics ? { exCharacterDynamics: dynamics } : {}),
       exCharacterDynamicsEnabled: dynamicsEnabled,
@@ -927,6 +933,7 @@ export function NewGameView(): JSX.Element {
       {
         schemaVersion: SAVE_SCHEMA_VERSION,
         stats: playerStats,
+        ...(startingChallenge ? { exStartingChallenge: challengeForStartingStats(playerStats, startingChallenge) } : {}),
         money: STARTING_MONEY,
         ...(playerBio ? { bio: playerBio } : {}),
         ...(exCharacterDynamics ? { exCharacterDynamics } : {}),
@@ -1081,6 +1088,7 @@ export function NewGameView(): JSX.Element {
             <PlayerNameModal
               key="naming"
               askDetails={false}
+              challenge={startingChallenge}
               theme={theme}
               onSubmit={onNamed}
             />
@@ -1302,7 +1310,7 @@ export function NewGameView(): JSX.Element {
           and the name panel is raised under its cover well after the lineup's own exit finishes. */}
       <AnimatePresence>{dynamicsModal}</AnimatePresence>
       <AnimatePresence>
-        {naming && <PlayerNameModal key="naming" theme={theme} onSubmit={onNamed} />}
+        {naming && <PlayerNameModal key="naming" theme={theme} challenge={startingChallenge} onSubmit={onNamed} />}
 
         {sizing && (
           <CharacterHeightModal

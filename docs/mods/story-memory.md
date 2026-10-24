@@ -1,6 +1,6 @@
-# Story Memory and SQLite source port
+# Story Memory and SQLite
 
-This optional source mod belongs on the `extracurriculars-core` framework. Its switch is
+This optional mod uses the shared Venus Extracurriculars framework. Its switch is
 `story-memory`, scope `anytime`, default on, with no required mods. It is independent of
 journals, Plot Twist, Breakthrough, City Life and Text Regeneration.
 
@@ -37,7 +37,8 @@ state. Off retains data and stops extraction/recall; native character notes are 
 ## Ownership: the save is authoritative
 
 `GameSave.exStoryMemory` is optional. A base save without it loads with an empty collection;
-the save schema stays at version 12. Loading normalizes the optional data defensively. Saving
+the current base game writes save schema 13 and accepts schema 12 through its native upgrade step.
+Story Memory adds no separate top-level schema migration. Loading normalizes optional data defensively. Saving
 exports it alongside the other mutable game state, even while the mod is disabled.
 
 The collection has the earlier mod's `version: 1` shape: `facts`, `edits`, `hidden`,
@@ -241,13 +242,13 @@ the original collection and original history. Leaving/loading waits for queued n
 a late callback cannot inject its collection into a newly loaded game. Cancel/Escape while
 editing discards the form; Back from the browsing page returns to the Game menu.
 
-## Integrating the other source ports
+## Integration boundaries
 
-Each source PR was independently based on the clean framework. Merge shared imports, mod
-registrations, optional save fields, menu entries and test expectations rather than choosing
-one side wholesale. This PR does not bundle or require the other features.
+The current shared build combines independently registered modules. Preserve shared imports,
+optional save fields, menu entries and test expectations when merging a new base version.
+Story Memory has no required mod dependency.
 
-- **Playthrough Renaming:** the cache belongs to `playthroughId`, not its display label, so
+- **Native playthrough naming:** the cache belongs to `playthroughId`, not its display label, so
   renaming does not change identity or move a database.
 - **Custom Soundtracks:** separate settings and storage; no dependency or hook.
 - **City Life:** ordinary native scene history from those venues is recalled like other scenes.
@@ -303,20 +304,20 @@ disabled behavior, fallback, fact evidence and durable editor writes.
 
 UI checks use synthetic characters and a stubbed save service, with no real provider call or
 user save. Check the editor in day/night at 16:9 and 4:3, add/edit/hide/restore, failed writes,
-the fixed footer, and the menu entry's motion. A desktop build is not a live-model or full
-packaged-Electron playthrough test. The local dependency set lacks the Electron executable,
-so native-runtime smoke testing remains a maintainer check; Node's real SQLite service tests
-and both platform builds do pass. The fallback covers an unavailable native SQLite module.
+the fixed footer, and the menu entry's motion. A successful source build is not a live-model or full-semester playthrough test. Exercise the
+packaged Electron runtime as well as Node's SQLite service and browser fallback. Record results
+against the tested revision; this guide does not claim that every future environment passed.
+The fallback covers an unavailable native SQLite module.
 
-This source PR is reviewed independently. The other source PRs are not silently merged into
-it, and a combined runtime still needs the merge steps above and a full integration test.
+The combined runtime requires integration checks as well as these module tests. See the
+[technical handoff](../maestro-technical-guide.md) for the current source baseline and boundaries.
 
-## Registration on core 0.3.1
+## Framework registration
 
 - `src/shared/modEntries/story-memory.ts` supplies its existing mod definition and carry registration.
 - `src/renderer/modEntries/story-memory.ts` loads the hooks automatically at boot.
 
-The stable IDs, defaults, dependencies, save fields and gameplay behavior are unchanged. Native character notes, scene-creator saves and calendar replays retain their 0.3.1 behavior. Merge framework updates from `core` into this mod branch; resolve conflicts with `main` on a separate `integrate/story-memory` branch.
+The stable IDs, defaults, dependencies, save fields and gameplay behavior are unchanged. Native character notes, scene-creator saves and calendar replays remain separate base-game features. Merge framework updates from `core` into this mod branch; resolve conflicts with `main` on a separate `integrate/story-memory` branch.
 
 ## October 14 editor follow-up
 

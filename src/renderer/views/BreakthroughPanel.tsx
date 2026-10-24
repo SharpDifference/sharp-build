@@ -5,7 +5,7 @@ import { echoBreakthroughAbility, ECHO_BREAKTHROUGH_OPTION } from '@shared/echoB
 import { aspectOf } from '@shared/echo'
 import { optionOn } from '@shared/mods'
 import { fullNameOf } from '@shared/types'
-import { activateBreakthrough, breakthroughCast, canBreakthrough } from '../stores/breakthrough'
+import { availableEchoBreakthrough, activateBreakthrough, breakthroughCast, canBreakthrough } from '../stores/breakthrough'
 import { interject } from '../stores/gameLoop'
 import { useGameStore } from '../stores/gameStore'
 import { useModOn, useModsStore } from '../stores/modsStore'
@@ -16,7 +16,8 @@ import { ReckoningEntry } from './ReckoningModal'
 export function BreakthroughPanel({ hidden, blocked, onReckoning }: { hidden: boolean; blocked: boolean; onReckoning?:(id:string)=>void }): JSX.Element | null {
   const game = useGameStore(s => s), on = useModOn(BREAKTHROUGH_MOD)
   const echoOn=useModOn('echo'),echoAbilities=useModsStore(s=>optionOn(s.switches,'echo',ECHO_BREAKTHROUGH_OPTION))
-  const available=echoOn&&echoAbilities?echoBreakthroughAbility(game.exEcho.player?.aspect):null
+  const talentsOn=useModOn('campus-talents')
+  const available=echoOn&&echoAbilities?availableEchoBreakthrough(game):null
   const [mode,setMode]=useState<'echo'|'normal'>('echo')
   const ability=mode==='echo'?available:null
   const [selected,setSelected] = useState(''), [expanded,setExpanded] = useState(false)
@@ -46,7 +47,8 @@ export function BreakthroughPanel({ hidden, blocked, onReckoning }: { hidden: bo
       <span style={{width:`${amount}%`}} />
     </div>
     {expanded && <div className="vu-breakthrough-detail">
-      <p>Liked +10 · Loved +20 · Hated −15 · Disliked unchanged. Spirit settles after the scene, up to +20 per character per time slot.</p>
+      <p>Liked +10 · Loved +20 · Hated −15 · Disliked unchanged. Spirit settles after the scene, up to +20 per character per time slot before skill bonuses.</p>
+      {talentsOn&&<p>Campus Talents can increase positive spirit gains and reduce Echo prices. The price shown includes your skills; the meter still caps at 100.</p>}
       {available&&<label>Breakthrough ability<select aria-label="Breakthrough ability" value={mode} disabled={blocked||!!game.exBreakthrough.pending} onChange={e=>{setMode(e.target.value as 'echo'|'normal');setError('')}}><option value="echo">{available.name} · {available.cost} spirit</option><option value="normal">Normal Breakthrough · 100 spirit</option></select></label>}
       {ability&&<section className="vu-echo-breakthrough" aria-label="Echo ability"><small>{aspectOf(ability.aspect).name} · Your Echo</small><strong>{ability.name}</strong><p>{ability.summary}</p><small>{ability.strength} influence · {cost} spirit</small><small>{ability.scope} · One exchange</small></section>}
       {ready && !ability && <label>What do you do, and what do you hope changes?

@@ -1,3 +1,4 @@
+import { TalentIcon } from './TalentIcon'
 /**
  * The decision landing: the hour between two scenes. It owns both halves of a slot's opening —
  * the narration box and the landing that follows it — so the same component times the swap
@@ -172,6 +173,7 @@ export interface LandingChromeProps {
   onCalendar: () => void
   onBunnyboard: () => void
   onEchoes?: () => void
+  onTalents?: () => void
   onShop: () => void
   onMap: () => void
   onChatLog: () => void
@@ -540,6 +542,20 @@ export function LandingChrome(props: LandingChromeProps): JSX.Element {
             onClick={props.onEchoes}
           >
             <EchoIcon />
+          </motion.button>
+        )}
+
+        {props.onTalents && shown.has('settings') && (
+          <motion.button
+            type="button"
+            className="vu-landing-tool"
+            variants={landingApp}
+            aria-label="Skill trees"
+            title="Skill trees"
+            {...gestures(false, quietLift, quietPress)}
+            onClick={props.onTalents}
+          >
+            <TalentIcon />
           </motion.button>
         )}
         {/* Never gated: the way out must be reachable from wherever the reader is stuck. */}

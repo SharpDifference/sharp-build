@@ -89,6 +89,17 @@ function archivePath(name = 'export.zip'): string {
   return join(root, name)
 }
 
+it('retains the Godlike tag through character ZIP export, import and duplication', async () => {
+  const original = await seedCharacter()
+  await writeCharacter({ ...original, traits: ['Godlike', 'High Standards'] })
+  const archive = archivePath('godlike.zip')
+  await exportCharacter(original.charId, archive)
+  const imported = await importCharacter(archive)
+  const duplicate = await duplicateCharacter(original.charId)
+  expect(imported.traits).toEqual(['Godlike', 'High Standards'])
+  expect(duplicate.traits).toEqual(['Godlike', 'High Standards'])
+})
+
 it('carries reflection artwork and placement through ZIP import and duplication with mods off', async () => {
  const girl = await seedCharacter(), stage = { x: -18, y: 9, scale: 1.25 }
  await writeFile(join(getDataPath(),'mods.json'),JSON.stringify({schemaVersion:1,on:{reckoning:false,echo:false,breakthrough:false},options:{}}))

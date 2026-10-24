@@ -1,3 +1,4 @@
+import { TalentIcon } from './TalentIcon'
 /**
  * The scene view's chrome: what the Game View wears while a scene is on screen. Reads no
  * store — everything it draws is handed to it; the Game View owns the gates, this owns the
@@ -134,6 +135,7 @@ export interface SceneChromeProps {
   onBunnyboard: () => void
   /** Absent when Echo is disabled or this screen has no ordinary playthrough. */
   onEchoes?: () => void
+  onTalents?: () => void
   onSettings: () => void
   /** Opens the panel of the mod whose seat on the rail was pressed. */
   onModPanel: (modId: string) => void
@@ -395,6 +397,16 @@ export function SceneChrome(props: SceneChromeProps): JSX.Element {
             onClick={props.onEchoes}
           >
             <EchoIcon />
+          </RailSeat>
+        )}
+
+        {props.onTalents && (
+          <RailSeat
+            label="Skill trees"
+            state={seatState(!dark && shown.has('settings'), props.railDead)}
+            onClick={props.onTalents}
+          >
+            <TalentIcon />
           </RailSeat>
         )}
         {/* The mods' own seats, each deciding for itself whether it stands. They arrive on the
