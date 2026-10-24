@@ -1,23 +1,13 @@
 import { describe, expect, it } from 'vitest'
 import { nativeDefaultPreset } from '../src/shared/presets/gameParts'
 import {
-  buildLorebooksBackup,
   buildPresetsBackup,
   buildPromptsBackup,
-  mergeLorebooks,
   mergePresets,
   mergePrompts,
   parseStudioBackup,
   presetFromBackup
 } from '../src/shared/presets/studioBackup'
-
-const lorebook = (id: string, text = 'Lore.') => ({
-  schemaVersion: 1,
-  id,
-  name: id,
-  source: 'native' as const,
-  entries: [{ uid: 'e1', keys: ['Venus'], text, enabled: true }]
-})
 
 describe('a presets backup', () => {
   it('merges by id with the file winning, and the file\'s active preset in force', () => {
@@ -63,43 +53,11 @@ describe('a prompts backup', () => {
   })
 })
 
-describe('a lorebooks backup', () => {
-  const index = (shipped: object | undefined, on: string[]) => ({ schemaVersion: 1, ...(shipped ? { shipped } : {}), on })
-
-  it('merges books by id and shipped edits entry by entry, the file winning', () => {
-    const current = {
-      index: index({ a: { text: 'mine', addedKeys: ['x'] }, b: { text: 'kept' } }, ['b1']),
-      books: [lorebook('b1', 'old')]
-    }
-    const file = buildLorebooksBackup(index({ a: { text: 'theirs' } }, ['b1', 'b2']) as never, [
-      lorebook('b1', 'new'),
-      lorebook('b2')
-    ])
-    const merge = mergeLorebooks(current as never, file)
-    expect(merge.index.shipped).toEqual({ a: { text: 'theirs' }, b: { text: 'kept' } })
-    expect(merge.index.on).toEqual(['b1', 'b2'])
-    expect(merge).toMatchObject({ added: 1, replaced: 1, edits: 1 })
-  })
-
-  it('leaves books switched on or off as they are when the file does not have them on', () => {
-    const current = { index: index(undefined, ['b1']), books: [lorebook('b1'), lorebook('b3')] }
-    const file = buildLorebooksBackup(index(undefined, []) as never, [lorebook('b2')])
-    expect(mergeLorebooks(current as never, file).index.on).toEqual(['b1'])
-  })
-
-  it('is refused whole when one book is malformed', () => {
-    const good = buildLorebooksBackup(index(undefined, []) as never, [lorebook('b1')])
-    expect(parseStudioBackup('lorebooks', JSON.stringify(good)).ok).toBe(true)
-    const bad = { ...good, books: [{ ...good.books[0], entries: [{ uid: 'e1', keys: [], text: 't', enabled: true }] }] }
-    expect(parseStudioBackup('lorebooks', JSON.stringify(bad)).ok).toBe(false)
-  })
-})
-
 describe('the kind marker', () => {
   it('refuses a file of another section, naming what it is', () => {
-    const file = buildLorebooksBackup({ schemaVersion: 1, on: [] }, [])
+    const file = buildPromptsBackup({ schemaVersion: 1 })
     const result = parseStudioBackup('presets', JSON.stringify(file))
-    expect(result).toEqual({ ok: false, error: 'This is a lorebooks backup, not a presets backup.' })
+    expect(result).toEqual({ ok: false, error: 'This is a prompts backup, not a presets backup.' })
   })
 
   it('refuses a file that is no backup at all', () => {

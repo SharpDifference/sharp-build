@@ -32,8 +32,6 @@ export interface LoreEntry {
   id?: string
   /** Injected verbatim; it already names its own subject, so it needs no label. */
   text: string
-  /** Set on a shipped entry the player has edited: the shipped entry's own reference, which a grab bag keeps naming it by. */
-  ref?: string
 }
 
 export const LOREBOOK: readonly LoreEntry[] = [
@@ -230,67 +228,16 @@ export function keyPattern(key: string, plural = true): string {
 }
 
 /** One entry's keys as one pattern — the matcher's own, so a scan of any text agrees with it. */
-export function entryPattern(entry: Pick<LoreEntry, 'keys'>): RegExp {
+function entryPattern(entry: LoreEntry): RegExp {
   return new RegExp(entry.keys.map((key) => keyPattern(key)).join('|'), 'iu')
-}
-
-/** One shipped entry as the prompts read it: with the player's edits applied, and whether it is on. */
-export interface ShippedLoreItem {
-  /** The shipped entry's reference: its id, else its first shipped key. */
-  ref: string
-  /** The entry the prompts read: the shipped one, or a copy carrying the player's text and keys. */
-  entry: LoreEntry
-  /** The entry as shipped, whose id and keys never change. */
-  shipped: LoreEntry
-  pattern: RegExp
-  enabled: boolean
-}
-
-/** One of the player's entries that a turn's words trigger. */
-export interface PlayerLoreItem {
-  entry: LoreEntry
-  pattern: RegExp
-}
-
-/** The lorebook as the prompts read it now: the shipped entries as edited, the player's, and what is sent every time. */
-export interface EffectiveLore {
-  /** One per shipped entry, in `LOREBOOK`'s order. */
-  shipped: readonly ShippedLoreItem[]
-  /** The player's enabled entries that need a key, in the order their books are applied. */
-  player: readonly PlayerLoreItem[]
-  /** The text of every enabled entry of the player's, keyed or not, in the same order. */
-  playerTexts: readonly string[]
-  /** The text of the player's enabled always-on entries. */
-  always: readonly string[]
-}
-
-/** The reference a shipped entry is kept under: its id, else its first key. */
-export function shippedRefOf(entry: LoreEntry): string {
-  return entry.id ?? entry.keys[0]
 }
 
 /** One pattern per entry, positionally parallel to `LOREBOOK`, built once at module load. */
 const PATTERNS: readonly RegExp[] = LOREBOOK.map(entryPattern)
 
-/** The shipped lorebook, untouched: every entry on, nothing of the player's. */
-export const SHIPPED_LORE: EffectiveLore = {
-  shipped: LOREBOOK.map((entry, index) => ({
-    ref: shippedRefOf(entry),
-    entry,
-    shipped: entry,
-    pattern: PATTERNS[index],
-    enabled: true
-  })),
-  player: [],
-  playerTexts: [],
-  always: []
-}
-
 /** What an opening may introduce, restricted to the current playthrough's locations. */
-export function availableLore(lore: EffectiveLore = SHIPPED_LORE): readonly LoreEntry[] {
-  return lore.shipped
-    .filter((item) => item.enabled && (!item.shipped.id || locationAvailable(item.shipped.id)))
-    .map((item) => item.entry)
+export function availableLore(): readonly LoreEntry[] {
+  return LOREBOOK.filter(entry => !entry.id || locationAvailable(entry.id))
 }
 
 /**
@@ -304,20 +251,9 @@ export function rumorSentenceFor(entry: LoreEntry, lines: readonly string[]): st
   return first === -1 ? null : said.slice(first).join(' ')
 }
 
-/**
- * The entries `scanned` triggers, the shipped ones in declaration order and then the player's;
- * exact on word boundaries, so `bar` cannot pull in a barn.
- */
-function matchLore(scanned: string, lore: EffectiveLore): LoreEntry[] {
-  return [
-    ...lore.shipped
-      .filter(
-        (item) =>
-          item.enabled && (!item.shipped.id || locationAvailable(item.shipped.id)) && item.pattern.test(scanned)
-      )
-      .map((item) => item.entry),
-    ...lore.player.filter((item) => item.pattern.test(scanned)).map((item) => item.entry)
-  ]
+/** The entries `scanned` triggers, in declaration order; exact on word boundaries, so `bar` cannot pull in a barn. */
+function matchLore(scanned: string): LoreEntry[] {
+  return LOREBOOK.filter((entry, index) => (!entry.id || locationAvailable(entry.id)) && PATTERNS[index].test(scanned))
 }
 
 /** The sentence that says a described character is not here. */
@@ -603,13 +539,13 @@ export function classLore(scanned: string, view: ClassLoreView): string[] {
     })
 }
 
-/** The text of the shipped entry authored under `key`, as edited; null when none claims it or the player turned it off. */
-export function loreTextForKey(key: string, lore: EffectiveLore = SHIPPED_LORE): string | null {
+/** The entry authored under `key`, or null when no entry claims it. */
+export function loreTextForKey(key: string): string | null {
   const wanted = key.trim().toLowerCase()
-  const item = lore.shipped.find((candidate) =>
-    candidate.shipped.keys.some((candidateKey) => candidateKey.toLowerCase() === wanted)
+  const entry = LOREBOOK.find((candidate) =>
+    candidate.keys.some((candidateKey) => candidateKey.toLowerCase() === wanted)
   )
-  return item?.enabled ? item.entry.text : null
+  return entry?.text ?? null
 }
 
 /** The entry carrying `id`, or null. */
@@ -624,7 +560,7 @@ export const RUMOR_PLACE_BAG = 'lore.rumorPlace'
 
 /** The key a grab bag sets an entry aside under; four entries carry no id. */
 export function loreKeyOf(entry: LoreEntry): string {
-  return entry.ref ?? entry.id ?? entry.keys[0]
+  return entry.id ?? entry.keys[0]
 }
 
 /** What the slot's opening put about somewhere, ready to ride that place's entry. */
@@ -642,24 +578,21 @@ function rumoredText(entry: LoreEntry, rumor: LoreRumor | undefined): string {
  * The `LOREBOOK` block for a prompt, or `[]` when nothing matched. `rumor` reaches only the
  * matched entry — a place the turn never mentions never gets rumor text either. `paragraphs`
  * are the entries built for this call — classes, characters, then the dated recaps — printed
- * after the authored ones. `lore` is the lorebook as the player has it; the always-on texts
- * it holds print ahead of `always`.
+ * after the authored ones.
  */
 export function lorebookBlock(
   scanned: string,
   always: readonly string[] = [],
   paragraphs: readonly string[] = [],
-  rumor?: LoreRumor,
-  lore: EffectiveLore = SHIPPED_LORE
+  rumor?: LoreRumor
 ): string[] {
-  const top = [...lore.always, ...always]
-  const stated = new Set(top)
-  const entries = matchLore(scanned, lore).filter((entry) => !stated.has(entry.text))
-  if (entries.length === 0 && top.length === 0 && paragraphs.length === 0) return []
+  const stated = new Set(always)
+  const entries = matchLore(scanned).filter((entry) => !stated.has(entry.text))
+  if (entries.length === 0 && always.length === 0 && paragraphs.length === 0) return []
   return [
     'LOREBOOK',
     '',
-    ...top.flatMap((text) => [text, '']),
+    ...always.flatMap((text) => [text, '']),
     ...entries.flatMap((entry) => [rumoredText(entry, rumor), '']),
     ...paragraphs.flatMap((text) => [text, ''])
   ]

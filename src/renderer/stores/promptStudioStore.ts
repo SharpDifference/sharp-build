@@ -9,7 +9,6 @@ import {
 import { mergePrompts, type PresetsMerge } from '@shared/presets/studioBackup'
 import type { AppError, StructuredRequest } from '@shared/types'
 import type { PromptState } from '../prompts/scenePrompt'
-import { useLoreStore } from './loreStore'
 import { modIsOn, useModsStore } from './modsStore'
 import { useUiStore } from './uiStore'
 
@@ -120,7 +119,6 @@ export const usePromptStudioStore = create<PromptStudioState>((set, get) => {
         try {
           await refresh()
           await refreshPrompts()
-          await useLoreStore.getState().load()
         } catch (error) {
           console.error('[presets] the presets could not be read', error)
         }

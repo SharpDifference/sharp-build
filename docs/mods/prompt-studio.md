@@ -8,15 +8,15 @@ ones say.
 
 ## What the player can do
 
-The editor has nine tabs. **Presets** lists them: import, duplicate, rename, export, delete, and
+The editor has eight tabs. **Presets** lists them: import, duplicate, rename, export, delete, and
 pick the one in force. **Blocks** is the order a scene request is read in: drag a row by its
 grip, or step it with its arrows. **Glossary** lists every
 `{{…}}` macro the active preset writes, what each becomes when a scene is sent, how many blocks
 use it and the variables it names. **Scene text** and **Other prompts** rewrite the game's
 instructions. **New Game** rewrites the calls that build a semester, and appears only on the
-main menu. **Lorebook** edits the places and things the writer is told about. **Variables**
-appears only inside a playthrough. **Preview** shows the last scene request as the active preset
-would send it now. The tabs that change the active preset name it at the top.
+main menu. **Variables** appears only inside a playthrough. **Preview** shows the last scene
+request as the active preset would send it now. The tabs that change the active preset name it
+at the top.
 
 **Find and replace**, on the Blocks tab and beside each name macro in the Glossary, swaps one
 piece of text for another across the preset's blocks, their names and its scene text, never the
@@ -86,31 +86,6 @@ setting and places.
 each of humanities, arts and miscellaneous (0 to 15), and each major (1 to 8). A bigger catalog
 costs more output tokens and risks a reply cut off before it ends.
 
-## Lorebook
-
-The **Lorebook** tab edits the places and things a scene or a text thread is told about when
-its words name them. It works in and out of a game, and a change reaches the next call.
-Characters and classes are added from the save on every call and are not edited here.
-
-The game's own lorebook comes first. Each entry can have its text rewritten, be turned off, or
-be reset. An entry tied to a place keeps its own trigger keys and can gain more; the few that
-are not can have theirs replaced. Casting, the profiles' places and the place minigame
-read the shipped entries whatever the player changes.
-
-Below it, the player's own books, each turned on or off, renamed or deleted. An entry has a
-name, trigger keys and text, and may be **always on**, sent with every scene and text thread
-whatever is said. Turned-off entries are never sent. The slot opening's rumor picks only from
-the game's entries that are on.
-
-**Import World Info** reads a SillyTavern World Info file of up to 8 MiB into a new book. Keys,
-content, comment, constant and disabled carry over. Entries that rely on secondary keys,
-selective logic or a regex key are kept but turned off, with the reason beside them, as are
-entries with no usable key that are not constant. Macros such as `{{char}}` are listed, since
-lore is sent as written. Nothing is kept until the player confirms the import's report.
-
-The occasions call lists every game entry that is on as its places, edited text included, and
-then, under a heading of its own, the player's entries that are on.
-
 ## Variables and macros
 
 A preset block may use these macros, and nothing else is resolved:
@@ -159,9 +134,6 @@ sections. Macros the game does not fill in are listed.
 - `data/presets/`: one file per preset and an index naming the one in force. The browser build
   keeps the same records in its database.
 - `data/prompt-studio/prompts.json`: the studio's own text edits and the catalog sizes.
-- `data/prompt-studio/lorebooks/`: one file per book of the player's, and an index holding the
-  edits to the game's entries and the books that are on. The browser build keeps both in its
-  database instead.
 - `GameSave.presetVars`: the variables, inside each save.
 
 None of it but the variables is in the game's backup, and a restore of one leaves it as it is.
@@ -170,12 +142,11 @@ game wrote it. The variables travel with the saves.
 
 ## Backups
 
-Presets, prompts and lorebooks each have their own **Restore**, on the Presets, Other prompts
-and Lorebook tabs. Prompts and lorebooks each have an **Export** beside it, one file holding
-that section whole: every text edit and the catalog sizes; every book and the edits to the
-game's entries. Presets are exported one at a time, from each preset's row, into a file holding
-that preset as the one in force. Restore presets still reads a file of several, from an earlier
-build. A restore refuses a file from another section and names what it is,
+Presets and prompts each have their own **Restore**, on the Presets and Other prompts tabs.
+Prompts have an **Export** beside it, one file holding every text edit and the catalog sizes.
+Presets are exported one at a time, from each preset's row, into a file holding that preset as
+the one in force. Restore presets still reads a file of several, from an earlier build. A
+restore refuses a file from another section and names what it is,
 checks the whole file before writing anything, says what it will add and replace, and then
 merges it:
 
@@ -183,8 +154,6 @@ merges it:
   file's preset in force becoming the one in force.
 - **Prompts** block by block, the file winning; blocks and sizes it does not hold are left as
   they are.
-- **Lorebooks** by book id, and entry by entry for the game's own entries, the file winning.
-  Books the file has on are turned on, and the rest are left as they are.
 
 A restore writes only its own section, never the settings, saves, characters or the mod
 switches, and takes effect without a reload. Prompts restored during a game include the New
@@ -193,28 +162,26 @@ Game edits, which can be seen again from the main menu.
 ## Turning it off
 
 Off stops everything above. Every request is then the game's own, the Advanced tab's Edit
-system prompt returns, and the Prompt Studio button hides. Presets, edits, lorebooks and
-variables stay saved, so turning it on again finds them.
+system prompt returns, and the Prompt Studio button hides. Presets, edits and variables
+stay saved, so turning it on again finds them.
 
 ## Implementation map
 
 - `src/shared/presets/`: the preset shape, the importers, macros, variable ops and the library
   rules. `assemble.ts` finds the game's parts again in the built request and rearranges them;
   `glossary.ts` reads a preset's macros and does its find and replace. `studioPrompts.ts` is the
-  prompts record and the catalog size ranges; `studioBackup.ts` the three backup files and how
+  prompts record and the catalog size ranges; `studioBackup.ts` the two backup files and how
   each merges.
-- `src/shared/lorebooks/`: the book and index shapes and rules, and `importWorldInfo.ts`.
-- `src/main/services/presetsService.ts`, `studioPromptsService.ts`, `lorebooksService.ts` and
+- `src/main/services/presetsService.ts`, `studioPromptsService.ts` and
   `studioBackupService.ts`, with their twins in `src/web/`: the folders and the browser's
   database. `src/main/ipc.ts` and `src/web/bridge.ts` apply the preset where a structured
   request is sent, and read a scene reply's `vars` back.
 - `src/renderer/prompts/promptBlocks.ts`: the text blocks and their shipped text, the New Game
-  calls' included. `effectiveLore.ts` applies the lorebook edits to the shipped entries.
-- `src/renderer/stores/promptStudioStore.ts`, `loreStore.ts` (with `loreNow()`, which is the
-  shipped lorebook while the mod is off) and `src/renderer/views/PromptStudio*.tsx`: the studio.
+  calls' included.
+- `src/renderer/stores/promptStudioStore.ts` and `src/renderer/views/PromptStudio*.tsx`: the
+  studio.
 - `test/preset*.test.ts`: assembly, macros, variables, imports and the request path;
-  `test/studioPrompts`, `loreBookRules`, `effectiveLore`, `importWorldInfo` and `studioBackup`
-  the rest.
+  `test/studioPrompts` and `studioBackup` the rest.
 
 ## Registration on core 0.3.1
 

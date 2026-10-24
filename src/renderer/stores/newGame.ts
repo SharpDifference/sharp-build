@@ -58,7 +58,6 @@ import { SEED_WORD_BAG, SEED_WORDS } from '../prompts/seedWords'
 import { buildSchedules, type ScheduleResult } from './classScheduler'
 import { useGameStore } from './gameStore'
 import { useGrabBagStore } from './grabBagStore'
-import { loreNow } from './loreStore'
 import { classCatalogNow, textEditsNow } from './promptStudioStore'
 import type { SemesterHandoff } from './semesterCarry'
 import { retrySilently } from './silentRetry'
@@ -340,13 +339,12 @@ export async function startNewGame(roster: readonly Character[]): Promise<StartO
   }))
   // Read once here: a retry resends these requests as built, whatever the player edits meanwhile.
   const textEdits = textEditsNow()?.global
-  const lore = loreNow()
   const current: StartAttempt = {
     roster,
     classRequest: buildClassPrompt(roster, undefined, textEdits, classCatalogNow()),
     profileRequest: buildProfilePrompt(roster, textEdits),
     occasionRequests,
-    occasionRequest: buildOccasionPrompt(occasionRequests, 'spring', textEdits, lore),
+    occasionRequest: buildOccasionPrompt(occasionRequests, 'spring', textEdits),
     secretEntries,
     secretRequest: buildSecretsPrompt(secretEntries, textEdits)
   }
@@ -699,7 +697,6 @@ export async function startNextSemester(
   })
   // Read once here: a retry resends these requests as built, whatever the player edits meanwhile.
   const textEdits = textEditsNow()?.global
-  const lore = loreNow()
   const current: NextAttempt = {
     roster,
     characters,
@@ -709,7 +706,7 @@ export async function startNextSemester(
     classRequest: buildClassPrompt(roster, catalog, textEdits, classCatalogNow()),
     profileRequest: buildContinuedProfilePrompt(profileInput, textEdits),
     occasionRequests,
-    occasionRequest: buildOccasionPrompt(occasionRequests, season, textEdits, lore),
+    occasionRequest: buildOccasionPrompt(occasionRequests, season, textEdits),
     secretEntries,
     secretRequest: buildSecretsPrompt(secretEntries, textEdits)
   }

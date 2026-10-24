@@ -54,12 +54,11 @@ import {
   StudioPill
 } from './PromptStudioModals'
 import { useStudioBackup } from './PromptStudioBackup'
-import { useLorebookTab } from './PromptStudioLorebook'
 import { SystemPromptModal } from './SystemPromptModal'
 import '../vu_styles/Settings.css'
 import '../vu_styles/PromptStudio.css'
 
-type TabId = 'presets' | 'blocks' | 'glossary' | 'scene' | 'other' | 'newgame' | 'lorebook' | 'variables' | 'preview'
+type TabId = 'presets' | 'blocks' | 'glossary' | 'scene' | 'other' | 'newgame' | 'variables' | 'preview'
 
 /** Each tab's word, the one line over its page, and whether the page works on the active preset. */
 const TABS: readonly { id: TabId; word: string; intro: string; preset?: true }[] = [
@@ -99,12 +98,6 @@ const TABS: readonly { id: TabId; word: string; intro: string; preset?: true }[]
     word: 'New Game',
     intro:
       "The instructions for building a new game's classes, student profiles, calendar events and secrets. A new semester uses them too. They can only be changed from the main menu."
-  },
-  {
-    id: 'lorebook',
-    word: 'Lorebook',
-    intro:
-      "Places and things the writer is told about when a scene mentions them. Characters and classes are added from the save on every call, so they aren't edited here. Changes apply straight away, even in a game."
   },
   {
     id: 'variables',
@@ -334,7 +327,6 @@ export function PromptStudioModal({ theme, onClose }: PromptStudioModalProps): J
   }, [])
 
   const { host, overlayProps } = useModalShell(onClose)
-  const lorebook = useLorebookTab(theme)
   const presetsBackup = useStudioBackup(theme, 'presets')
   const promptsBackup = useStudioBackup(theme, 'prompts')
 
@@ -871,7 +863,6 @@ export function PromptStudioModal({ theme, onClose }: PromptStudioModalProps): J
             {shown.id === 'scene' && textPage('preset')}
             {shown.id === 'other' && textPage('global')}
             {shown.id === 'newgame' && newGamePage()}
-            {shown.id === 'lorebook' && page(lorebook.content)}
             {shown.id === 'variables' && variablesPage()}
             {shown.id === 'preview' && previewPage()}
           </div>
@@ -891,7 +882,6 @@ export function PromptStudioModal({ theme, onClose }: PromptStudioModalProps): J
       </motion.div>
 
       {/* Siblings of the veil and of each other, never its children: each leaves when this panel does. */}
-      {lorebook.panels}
       {presetsBackup.panel}
       {promptsBackup.panel}
       <AnimatePresence propagate>

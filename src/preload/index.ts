@@ -55,15 +55,6 @@ const api: VenusUniversityApi = {
     get: () => ipcRenderer.invoke('studioPrompts:get'),
     set: (record) => ipcRenderer.invoke('studioPrompts:set', record)
   },
-  lorebooks: {
-    list: () => ipcRenderer.invoke('lorebooks:list'),
-    get: (id) => ipcRenderer.invoke('lorebooks:get', id),
-    save: (book) => ipcRenderer.invoke('lorebooks:save', book),
-    delete: (id) => ipcRenderer.invoke('lorebooks:delete', id),
-    setOn: (ids) => ipcRenderer.invoke('lorebooks:setOn', ids),
-    saveShipped: (shipped) => ipcRenderer.invoke('lorebooks:saveShipped', shipped),
-    import: () => ipcRenderer.invoke('lorebooks:import')
-  },
   presets: {
     list: () => ipcRenderer.invoke('presets:list'),
     get: (id) => ipcRenderer.invoke('presets:get', id),

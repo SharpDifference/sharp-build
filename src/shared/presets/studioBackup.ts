@@ -1,12 +1,4 @@
 import { appError } from '../errors'
-import {
-  assertSafeLoreBookId,
-  LOREBOOK_SCHEMA_VERSION,
-  loreIndexToKeep,
-  shippedToKeep,
-  validateLoreBook
-} from '../lorebooks/rules'
-import type { LoreBook, LoreIndex, ShippedLoreOverrides } from '../lorebooks/types'
 import { toPresetFile, validatePreset, type PresetFile } from './presetRules'
 import {
   CLASS_CATALOG_RANGES,
@@ -17,13 +9,13 @@ import {
 import type { Preset } from './types'
 
 /**
- * Prompt Studio's section backups: one file each for the presets, the game's own prompts and the
- * lorebooks. Each has its own marker and version, is checked whole before anything is kept, and
- * is merged into what the player has rather than replacing it.
+ * Prompt Studio's section backups: one file each for the presets and the game's own prompts. Each
+ * has its own marker and version, is checked whole before anything is kept, and is merged into
+ * what the player has rather than replacing it.
  */
 
-/** The three sections a backup can hold. */
-export type StudioBackupKind = 'presets' | 'prompts' | 'lorebooks'
+/** The two sections a backup can hold. */
+export type StudioBackupKind = 'presets' | 'prompts'
 
 /** The one version of a section backup this build reads and writes. */
 export const STUDIO_BACKUP_SCHEMA_VERSION = 1
@@ -32,13 +24,11 @@ export const STUDIO_BACKUP_SCHEMA_VERSION = 1
 export const MAX_STUDIO_BACKUP_BYTES = 32 * 1024 * 1024
 
 const MAX_BACKUP_PRESETS = 500
-const MAX_BACKUP_BOOKS = 500
 
 /** What each kind's marker is, and what the player calls it. */
 const KINDS: Record<StudioBackupKind, { marker: string; word: string }> = {
   presets: { marker: 'venus-studio-presets', word: 'presets' },
-  prompts: { marker: 'venus-studio-prompts', word: 'prompts' },
-  lorebooks: { marker: 'venus-studio-lorebooks', word: 'lorebooks' }
+  prompts: { marker: 'venus-studio-prompts', word: 'prompts' }
 }
 
 /** Every preset and the id in force. */
@@ -56,19 +46,10 @@ export interface PromptsBackup {
   prompts: StudioPrompts
 }
 
-/** The lorebooks index and every player book. */
-export interface LorebooksBackup {
-  kind: typeof KINDS.lorebooks.marker
-  schemaVersion: number
-  index: LoreIndex
-  books: LoreBook[]
-}
-
 /** The backup file of each kind. */
 export interface StudioBackupOf {
   presets: PresetsBackup
   prompts: PromptsBackup
-  lorebooks: LorebooksBackup
 }
 
 /** A backup file the player picked, unread by anything but its size. */
@@ -112,11 +93,6 @@ export function buildPromptsBackup(prompts: StudioPrompts): PromptsBackup {
     schemaVersion: STUDIO_BACKUP_SCHEMA_VERSION,
     prompts: studioPromptsToKeep(prompts)
   }
-}
-
-/** The lorebooks backup of an index and every book. */
-export function buildLorebooksBackup(index: LoreIndex, books: readonly LoreBook[]): LorebooksBackup {
-  return { kind: KINDS.lorebooks.marker, schemaVersion: STUDIO_BACKUP_SCHEMA_VERSION, index, books: [...books] }
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -193,31 +169,6 @@ function checkPrompts(json: Record<string, unknown>): Checked<'prompts'> {
   return { ok: true, backup: buildPromptsBackup(record as unknown as StudioPrompts) }
 }
 
-/** The lorebooks section of a parsed file, checked whole. */
-function checkLorebooks(json: Record<string, unknown>): Checked<'lorebooks'> {
-  const index = json.index
-  if (!isRecord(index) || index.schemaVersion !== LOREBOOK_SCHEMA_VERSION) {
-    return { ok: false, error: 'The backup holds no valid lorebooks index.' }
-  }
-  if (index.shipped !== undefined && !isRecord(index.shipped)) return { ok: false, error: 'The shipped lore edits are not valid.' }
-  if (!Array.isArray(index.on) || index.on.some((id) => typeof id !== 'string')) {
-    return { ok: false, error: 'The list of books that are on is not valid.' }
-  }
-  if (!Array.isArray(json.books)) return { ok: false, error: 'The backup holds no lorebooks.' }
-  if (json.books.length > MAX_BACKUP_BOOKS) return { ok: false, error: 'The backup holds too many lorebooks.' }
-  const books: LoreBook[] = []
-  const ids = new Set<string>()
-  for (const item of json.books) {
-    const checked = validateLoreBook(item)
-    if (!checked.ok) return { ok: false, error: checked.error }
-    if (ids.has(checked.book.id)) return { ok: false, error: `Two lorebooks share the id "${checked.book.id}".` }
-    ids.add(checked.book.id)
-    books.push(checked.book)
-  }
-  const kept = loreIndexToKeep({ shipped: index.shipped, on: index.on }, ids)
-  return { ok: true, backup: buildLorebooksBackup(kept, books) }
-}
-
 /**
  * Reads a backup file's text as the kind the player asked to restore. A file of another kind is
  * refused by name, and any part that does not hold up refuses the whole file.
@@ -242,8 +193,7 @@ export function parseStudioBackup<K extends StudioBackupKind>(kind: K, text: str
       error: `The backup has unsupported schemaVersion ${String(json.schemaVersion)}; this build expects ${STUDIO_BACKUP_SCHEMA_VERSION}.`
     }
   }
-  const checked =
-    kind === 'presets' ? checkPresets(json) : kind === 'prompts' ? checkPrompts(json) : checkLorebooks(json)
+  const checked = kind === 'presets' ? checkPresets(json) : checkPrompts(json)
   return checked as Checked<K>
 }
 
@@ -292,37 +242,4 @@ export function mergePrompts(current: StudioPrompts, file: StudioPrompts): Studi
     blocks: { ...current.blocks, ...file.blocks },
     classCatalog: { ...current.classCatalog, ...file.classCatalog }
   })
-}
-
-/** What restoring a lorebooks backup writes. */
-export interface LorebooksMerge {
-  /** Every book in the file, each replacing the one of its id. */
-  books: LoreBook[]
-  /** The shipped edits and the books that are on, once merged. */
-  index: LoreIndex
-  added: number
-  replaced: number
-  /** Shipped entries the file has an override for. */
-  edits: number
-}
-
-/**
- * Books merge by id, the file winning. Shipped edits merge entry by entry: the file's override
- * for an entry replaces the one here whole, and an entry it doesn't mention is left alone. Books
- * the file has on are switched on after those already on; the rest stay as they are.
- */
-export function mergeLorebooks(current: { index: LoreIndex; books: readonly LoreBook[] }, file: LorebooksBackup): LorebooksMerge {
-  for (const book of file.books) assertSafeLoreBookId(book.id)
-  const held = new Set(current.books.map((book) => book.id))
-  const replaced = file.books.filter((book) => held.has(book.id)).length
-  const existing = new Set([...held, ...file.books.map((book) => book.id)])
-  const shipped: ShippedLoreOverrides | undefined = shippedToKeep({ ...current.index.shipped, ...file.index.shipped })
-  const on = [...current.index.on, ...file.index.on.filter((id) => !current.index.on.includes(id))]
-  return {
-    books: file.books,
-    index: loreIndexToKeep({ shipped, on }, existing),
-    added: file.books.length - replaced,
-    replaced,
-    edits: Object.keys(file.index.shipped ?? {}).length
-  }
 }

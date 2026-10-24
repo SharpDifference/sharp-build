@@ -6,10 +6,8 @@
 import { useRef, useState, type JSX } from 'react'
 import { AnimatePresence } from 'motion/react'
 import {
-  buildLorebooksBackup,
   buildPresetsBackup,
   buildPromptsBackup,
-  mergeLorebooks,
   mergePresets,
   parseStudioBackup,
   presetExportName,
@@ -19,7 +17,6 @@ import {
   type StudioBackupOf
 } from '@shared/presets/studioBackup'
 import { ConfirmModal } from '../components/ConfirmModal'
-import { useLoreStore } from '../stores/loreStore'
 import { usePromptStudioStore } from '../stores/promptStudioStore'
 import { useUiStore } from '../stores/uiStore'
 import type { ScreenTheme } from './clockTheme'
@@ -39,12 +36,8 @@ function refuse(message: string): void {
 }
 
 /** A section's backup file's text; presets are exported one at a time instead. */
-function backupText(kind: Exclude<StudioBackupKind, 'presets'>): string {
-  if (kind === 'prompts') {
-    return JSON.stringify(buildPromptsBackup(usePromptStudioStore.getState().prompts), null, 2)
-  }
-  const { index, books } = useLoreStore.getState()
-  return JSON.stringify(buildLorebooksBackup(index, Object.values(books)), null, 2)
+function backupText(): string {
+  return JSON.stringify(buildPromptsBackup(usePromptStudioStore.getState().prompts), null, 2)
 }
 
 /** The parts that are not nothing, joined into one sentence, or `none` where every part is. */
@@ -75,32 +68,17 @@ function describe(pending: Pending): string[] {
       `"${active?.name ?? ''}" becomes the active preset. ${rest}`
     ]
   }
-  if (pending.kind === 'prompts') {
-    const blocks = Object.keys(pending.backup.prompts.blocks ?? {}).length
-    const sizes = Object.keys(pending.backup.prompts.classCatalog ?? {}).length
-    return [
-      sentence(
-        [
-          blocks > 0 ? `replaces ${counted(blocks, 'prompt', 'prompts')} with the file's` : null,
-          sizes > 0 ? `sets ${counted(sizes, 'catalog size', 'catalog sizes')}` : null
-        ],
-        'It holds no edited prompts, so nothing changes.'
-      ),
-      `Any prompt it doesn't hold stays as it is. ${rest}`
-    ]
-  }
-  const { index, books } = useLoreStore.getState()
-  const merge = mergeLorebooks({ index, books: Object.values(books) }, pending.backup)
+  const blocks = Object.keys(pending.backup.prompts.blocks ?? {}).length
+  const sizes = Object.keys(pending.backup.prompts.classCatalog ?? {}).length
   return [
     sentence(
       [
-        merge.added > 0 ? `adds ${counted(merge.added, 'lorebook', 'lorebooks')}` : null,
-        merge.replaced > 0 ? `replaces ${counted(merge.replaced, 'of yours', 'of yours')}` : null,
-        merge.edits > 0 ? `rewrites ${counted(merge.edits, 'entry', 'entries')} of the game lorebook` : null
+        blocks > 0 ? `replaces ${counted(blocks, 'prompt', 'prompts')} with the file's` : null,
+        sizes > 0 ? `sets ${counted(sizes, 'catalog size', 'catalog sizes')}` : null
       ],
-      'It holds no lorebooks and no changes to the game lorebook.'
+      'It holds no edited prompts, so nothing changes.'
     ),
-    `Books the file has on are turned on here. ${rest}`
+    `Any prompt it doesn't hold stays as it is. ${rest}`
   ]
 }
 
@@ -173,10 +151,8 @@ export function useStudioBackup(
       if (file.kind === 'presets') {
         const ids = usePromptStudioStore.getState().presets.map((preset) => preset.id)
         await usePromptStudioStore.getState().restorePresets(mergePresets(ids, file.backup))
-      } else if (file.kind === 'prompts') {
-        await usePromptStudioStore.getState().restorePrompts(file.backup.prompts)
       } else {
-        await useLoreStore.getState().restore(file.backup)
+        await usePromptStudioStore.getState().restorePrompts(file.backup.prompts)
       }
     } finally {
       setBusy(false)
@@ -190,7 +166,7 @@ export function useStudioBackup(
         <StudioPill
           id={`studio-export-${kind}`}
           word={`Export ${word}`}
-          onClick={() => void saveFile(async () => ({ name: studioBackupName(kind), text: backupText(kind) }))}
+          onClick={() => void saveFile(async () => ({ name: studioBackupName(kind), text: backupText() }))}
         />
       )}
       <StudioPill id={`studio-restore-${kind}`} word={`Restore ${word}`} onClick={() => void pickFile()} />

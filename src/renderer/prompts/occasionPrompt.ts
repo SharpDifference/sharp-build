@@ -6,7 +6,7 @@ import type { GlobalTextId, TextEdits } from '@shared/presets/types'
 import { calendarOf } from '@shared/semesters'
 import type { Occasion, Season, StructuredRequest, TimeSlot } from '@shared/types'
 import { formatDatePart } from './gameDate'
-import { SHIPPED_LORE, type EffectiveLore } from './lorebook'
+import { LOREBOOK } from './lorebook'
 import {
   breakWeekOf,
   occasionsOn,
@@ -266,14 +266,12 @@ function briefOf(request: OccasionRequest, textEdits: TextEdits<GlobalTextId> | 
 
 /**
  * Builds the invented-occasions request for a `season` semester; `textEdits` are the player's
- * edits to its text. `lore` lists every shipped place the player has not turned off, as edited,
- * and then the player's own entries under their own heading.
+ * edits to its text.
  */
 export function buildOccasionPrompt(
   requests: readonly OccasionRequest[],
   season: Season,
-  textEdits?: TextEdits<GlobalTextId>,
-  lore: EffectiveLore = SHIPPED_LORE
+  textEdits?: TextEdits<GlobalTextId>
 ): StructuredRequest {
   const named = requests.filter((request) => !request.filler)
   const fillers = requests.filter((request) => request.filler)
@@ -286,8 +284,7 @@ export function buildOccasionPrompt(
       SETTING,
       '',
       'PLACES',
-      ...lore.shipped.filter((item) => item.enabled).map((item) => item.entry.text),
-      ...(lore.playerTexts.length > 0 ? ['', 'LORE', ...lore.playerTexts] : [])
+      ...LOREBOOK.map((entry) => entry.text)
     ].join('\n'),
     textEdits,
     'newgame.occasions.additions'

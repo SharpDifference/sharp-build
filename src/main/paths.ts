@@ -371,7 +371,7 @@ export function getPresetIndexPath(): string {
   return join(getPresetsPath(), 'index.json')
 }
 
-/** `/data/prompt-studio` — what Prompt Studio keeps apart from the presets: the game's own prompts, and later the lorebooks. */
+/** `/data/prompt-studio` — what Prompt Studio keeps apart from the presets: the game's own prompts. */
 export function getPromptStudioPath(): string {
   return join(getDataPath(), 'prompt-studio')
 }
@@ -379,21 +379,6 @@ export function getPromptStudioPath(): string {
 /** `/data/prompt-studio/prompts.json` */
 export function getStudioPromptsPath(): string {
   return join(getPromptStudioPath(), 'prompts.json')
-}
-
-/** `/data/prompt-studio/lorebooks` */
-export function getLoreBooksPath(): string {
-  return join(getPromptStudioPath(), 'lorebooks')
-}
-
-/** `/data/prompt-studio/lorebooks/{id}.json`; the id is checked by the caller. */
-export function getLoreBookFilePath(id: string): string {
-  return join(getLoreBooksPath(), `${id}.json`)
-}
-
-/** `/data/prompt-studio/lorebooks/index.json` — the shipped entries as edited, and which books are on. */
-export function getLoreIndexPath(): string {
-  return join(getLoreBooksPath(), 'index.json')
 }
 
 /** `/data/characters` */

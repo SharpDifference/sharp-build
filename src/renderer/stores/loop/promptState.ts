@@ -4,7 +4,6 @@ import { cityLifeBackgrounds } from '@shared/cityLife'
 import { slotFullLabel, studentsOf } from '@shared/classes'
 import { activePlotTwist, PLOT_TWIST_MOD } from '@shared/plotTwists'
 import { modIsOn } from '../modsStore'
-import { loreNow } from '../loreStore'
 import { textEditsNow } from '../promptStudioStore'
 import { kindOf } from '@shared/academics'
 import { globalSlotOf, jobDefOf, slotFromId } from '@shared/jobs'
@@ -548,7 +547,6 @@ export function promptState(): PromptState {
     // Absent when the player has set no custom one, which is what `scenePersonaFor` reads as.
     ...(scenePersona !== undefined ? { scenePersona } : {}),
     ...(textEdits !== undefined ? { textEdits } : {}),
-    lore: loreNow(),
     memoryBudgets: memoryBudgetsNow(),
     secretBudget: secretBudgetNow(),
     history: game.history,
