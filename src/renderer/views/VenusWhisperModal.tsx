@@ -129,8 +129,9 @@ export function VenusWhisperPage(): JSX.Element | null {
                 <h3>The campus replies <span>{issue.comments.length}</span></h3>
                 {issue.comments.filter(c => !hidden.includes(c.id)).map(c => {
                   const parent = issue.comments.find(p => p.id === c.replyTo)
+                  const picture = c.player ? game.profilePicture : profileUrl(c.person.id)
                   return <div key={c.id} className="vu-whisper-comment">
-                    <span className="vu-whisper-avatar" aria-hidden="true"><span>{c.person.name.charAt(0)}</span>{!c.player && <img src={profileUrl(c.person.id)} alt=""/>}</span>
+                    <span className="vu-whisper-avatar" aria-hidden="true"><span>{c.person.name.charAt(0)}</span>{picture && <img src={picture} alt=""/>}</span>
                     <div><div className="vu-whisper-byline"><strong>{c.person.name}</strong><span>@{c.player && c.person.handle === 'reader' ? whisperPlayerHandle(game.playerFirstName, game.playerLastName) : c.person.handle}</span></div>
                       {parent && <small className="vu-whisper-reply-label">Reply to {parent.person.name}: {parent.text.slice(0, 90)}{parent.text.length > 90 ? '…' : ''}</small>}
                       <p>{c.text}</p>
