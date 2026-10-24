@@ -1,8 +1,8 @@
 import type { Character } from '@shared/types'
 import { isTutorialSlot } from '../../prompts/introScript'
 import { buildScenePrompt } from '../../prompts/scenePrompt'
-import { SETTING } from '../../prompts/setting'
 import { useGameStore } from '../gameStore'
+import { settingNow } from '../lorebookStore'
 import { coverSceneOpening } from '../slotCrossing'
 import { plannedWith } from '../textingLoop'
 import { castCharactersOf, nameOf } from './cast'
@@ -77,7 +77,7 @@ async function prefetchHangoutScene(charId: string, description: string): Promis
   const castCharacters = castCharactersOf(cast)
   // Not `logPlayerAction`: the reader's line in the transcript would take the Bunnyboard's
   // composer away mid-read. Begin logs it.
-  const request = buildScenePrompt(castCharacters, action, promptState(), SETTING, reader())
+  const request = buildScenePrompt(castCharacters, action, promptState(), settingNow(), reader())
   const sink: PreviewSink = { live: false, settled: false, held: [] }
   token.scene = {
     cast,
@@ -175,7 +175,7 @@ export async function startHangoutScene(
     castCharacters,
     cast.action,
     promptState(),
-    SETTING,
+    settingNow(),
     reader()
   )
   await runSceneTurn(

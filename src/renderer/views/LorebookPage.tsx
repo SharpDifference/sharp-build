@@ -8,12 +8,14 @@ import { ChipListInput } from '../components/ChipListInput'
 import { ConfirmModal } from '../components/ConfirmModal'
 import { TextField } from '../components/TextField'
 import type { BookEntry } from '../prompts/lorebook'
+import { SETTING } from '../prompts/setting'
 import { useAssetStore } from '../stores/assetStore'
 import { useLorebookStore, type ImportOutcome } from '../stores/lorebookStore'
 import { BgPicker } from './BgModal'
 import { bgThumbUrl } from './bgAssets'
 import { dealt, gestures, quietLift, quietPress, rowLift, rowPress, slideInQuick } from './motion'
 import { PlusIcon } from './screenIcons'
+import { TextEditModal } from './TextEditModal'
 import '../vu_styles/Lorebook.css'
 
 export interface LorebookPageProps {
@@ -26,13 +28,38 @@ const LIST_DEAL = dealt(0, 0.02)
 /** What the import question says it will do, by whether the replace box is ticked. */
 const IMPORT_SIZE = 'Large lorebooks may slow the game down or cause context bloat.'
 const IMPORT_REPLACE_NOTE =
-  "By default, lorebook entries will be added to this playthrough's lorebook. When this setting is checked, lorebook entries will be replaced instead. Changes to default entries present in your lorebook will be ignored when this box is unchecked."
+  "By default, lorebook entries will be added to this playthrough's lorebook. When this box is checked, lorebook entries and the setting will be replaced instead. Changes to the setting and default entries present in your lorebook will be ignored when this box is unchecked."
 
 /** What an import brought in, and what it left out and why. */
 function importNotice({ imported, leftOut }: ImportOutcome): string {
   const came = `${String(imported)} ${imported === 1 ? 'entry was' : 'entries were'} imported.`
   const why = leftOut === 1 ? 'it was' : 'they were'
   return `${came} ${String(leftOut)} ${leftOut === 1 ? 'was' : 'were'} left out because ${why} turned off or had no trigger word or description the game can use.`
+}
+
+/** The playthrough's setting, opened for hand-editing over the Lorebook tab. */
+function SettingModal({
+  theme,
+  onClose
+}: {
+  theme: 'day' | 'night'
+  onClose: () => void
+}): JSX.Element | null {
+  const setting = useLorebookStore((s) => s.setting)
+  return (
+    <TextEditModal
+      theme={theme}
+      id="setting-modal"
+      idPrefix="setting"
+      title="Edit setting"
+      label="Setting"
+      discardMessage="The setting has not been saved."
+      stored={setting}
+      shipped={SETTING}
+      save={(value) => useLorebookStore.getState().editSetting(value)}
+      onClose={onClose}
+    />
+  )
 }
 
 /** What the editor beside the list is open on: an entry by its handle, or a new one. */
@@ -311,8 +338,8 @@ function LoreEditor({
 
 /**
  * The Bunnyboard's Lorebook tab: the playthrough's own entries and the shipped ones down a list,
- * the one picked open for editing beside it, and the lorebook's way in and out as a SillyTavern
- * World Info file.
+ * the one picked open for editing beside it, the setting opened over it from a pill, and the
+ * lorebook's way in and out as a SillyTavern World Info file.
  */
 export function LorebookPage({ theme }: LorebookPageProps): JSX.Element {
   const status = useLorebookStore((s) => s.status)
@@ -328,6 +355,7 @@ export function LorebookPage({ theme }: LorebookPageProps): JSX.Element {
   const [notice, setNotice] = useState<ImportOutcome | null>(null)
   const [resetting, setResetting] = useState<string | null>(null)
   const [deleting, setDeleting] = useState<string | null>(null)
+  const [editingSetting, setEditingSetting] = useState(false)
 
   const ready = status === 'ready'
   const refused = status === 'refused'
@@ -367,16 +395,32 @@ export function LorebookPage({ theme }: LorebookPageProps): JSX.Element {
         ) : (
           <>
             {ready && (
-              <motion.button
-                id="lore-new"
-                className="vu-pill vu-lore-new"
-                type="button"
-                {...gestures(false, quietLift, quietPress)}
-                onClick={() => open({ draft: true })}
-              >
-                <PlusIcon size={14} />
-                New entry
-              </motion.button>
+              <div className="vu-lore-heads">
+                <motion.button
+                  id="lore-new"
+                  className="vu-pill"
+                  type="button"
+                  {...gestures(false, quietLift, quietPress)}
+                  onClick={() => open({ draft: true })}
+                >
+                  <PlusIcon size={14} />
+                  New entry
+                </motion.button>
+                <div className="vu-lore-setting">
+                  <motion.button
+                    id="lore-setting"
+                    className="vu-pill"
+                    type="button"
+                    {...gestures(false, quietLift, quietPress)}
+                    onClick={() => setEditingSetting(true)}
+                  >
+                    Edit setting
+                  </motion.button>
+                  {record.setting !== undefined && (
+                    <span className="vu-sticker vu-lore-sticker">Edited</span>
+                  )}
+                </div>
+              </div>
             )}
             <div className="vu-bb-scroll vu-lore-scroll">
               {(own.length > 0 || drafting) && (
@@ -531,6 +575,9 @@ export function LorebookPage({ theme }: LorebookPageProps): JSX.Element {
               setResetting(null)
             }}
           />
+        )}
+        {editingSetting && (
+          <SettingModal key="lore-setting" theme={theme} onClose={() => setEditingSetting(false)} />
         )}
         {deleting && (
           <ConfirmModal

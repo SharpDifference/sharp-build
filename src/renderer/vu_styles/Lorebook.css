@@ -2,11 +2,23 @@
    one picked open beside it. The column, the scroller, the rows' voice and the fields are
    Bunnyboard.css's and base.css's. */
 
-/* The column's own furniture: the new-entry pill under the title, and the file pills at its
-   foot. */
-.vu-lore-new {
+/* The column's own furniture: the new-entry and setting pills under the title, and the file
+   pills at its foot. */
+.vu-lore-heads {
+  display: flex;
   flex: none;
-  align-self: flex-start;
+  gap: 12px;
+}
+
+/* The setting pill, holding the sticker that says the player rewrote it on its corner. */
+.vu-lore-setting {
+  position: relative;
+}
+
+/* Raised over a row's, a pill being shorter, so it clears the pill's label. */
+.vu-lore-setting .vu-lore-sticker {
+  top: -14px;
+  right: -14px;
 }
 
 .vu-lore-tools {

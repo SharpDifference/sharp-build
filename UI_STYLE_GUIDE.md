@@ -191,7 +191,7 @@
 - The scrollbar is `base.css`'s, one trio for the whole app; the fade at the foot of a scroller is `.vu-scroll-fade`, one rule for every scroller, standing right after the scroller it ends and drawn only while there is more to scroll to.
 - A grid that scrolls clips in both axes, so it owes padding on every side something can grow into.
 - A header row that holds one control for the thing beside it puts that control at the end of the row.
-- The Lorebook tab stands its entries down the Chats tab's list column, the player's own over the shipped ones, with the one picked open beside it; a shipped entry the player changed wears an Edited sticker on its corner, and the file pills stand at the column's foot.
+- The Lorebook tab stands its entries down the Chats tab's list column, the player's own over the shipped ones, with the one picked open beside it; a shipped entry the player changed wears an Edited sticker on its corner, and the file pills stand at the column's foot. The New entry and Edit setting pills share a row under the title, the second wearing the same sticker, raised clear of its label, while the setting is the player's; the setting opens in the system prompt editor's panel.
 - The chat log's row is a stack beside a tool column at the row's end, kept on every row so the words line up: a pencil on a line that can be rewritten, swapped for a check over a cross while it is, and the words swapped for a box at their own size and inset.
 - A list inside a panel sits a step down from the panel, so the rows on it read as rows.
 

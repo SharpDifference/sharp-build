@@ -8,14 +8,16 @@ import {
   readLorebookRecord,
   withCustomEntry,
   withShippedEdit,
+  withSetting,
   worldInfoOf,
   type LorebookRecord,
-  type ShippedLore
+  type ShippedBook
 } from '@shared/lorebookRecord'
 
 /**
- * A playthrough's own lorebook: only what the player changed of a shipped entry is kept, so an
- * entry he never touched follows the build — on disk and through a SillyTavern file alike.
+ * A playthrough's own lorebook: only what the player changed of a shipped entry or the setting
+ * is kept, so whatever he never touched follows the build — on disk and through a SillyTavern
+ * file alike.
  */
 
 /** The code a refusal carries, or undefined where nothing was refused. */
@@ -28,22 +30,28 @@ function refusalOf(run: () => unknown): string | undefined {
   return undefined
 }
 
-/** A build's shipped entries, made up; `text` lets a later build rewrite the first. */
-function shippedBook(text = 'A library.'): ShippedLore[] {
-  return [
-    { ref: 'library', keys: ['Library', 'books'], text },
-    { ref: 'cafe', keys: ['Cafe'], text: 'A cafe.' }
-  ]
+/**
+ * A build's shipped entries and setting, made up; `text` and `setting` let a later build rewrite
+ * the first entry and the setting.
+ */
+function shippedBook(text = 'A library.', setting = 'A small city.'): ShippedBook {
+  return {
+    entries: [
+      { ref: 'library', keys: ['Library', 'books'], text },
+      { ref: 'cafe', keys: ['Cafe'], text: 'A cafe.' }
+    ],
+    setting
+  }
 }
 
 /** A file's text after a round trip through JSON, as an import reads it. */
-function throughFile(record: LorebookRecord, shipped: readonly ShippedLore[]): string {
+function throughFile(record: LorebookRecord, shipped: ShippedBook): string {
   return JSON.stringify(worldInfoOf(record, shipped))
 }
 
 describe('an edit of a shipped entry', () => {
   it('keeps only the field that differs from the build, and nothing once both match', () => {
-    const [library] = shippedBook()
+    const [library] = shippedBook().entries
     const edited = withShippedEdit(emptyLorebook(), library, {
       keys: ['Library', 'books'],
       text: 'A haunted library.'
@@ -60,10 +68,20 @@ describe('an edit of a shipped entry', () => {
       edits: {
         library: { keys: ['Stacks'], text: 'A haunted library.' },
         gone: { text: 'Somewhere that was cut.' }
-      }
+      },
+      setting: 'A big city.'
     }
-    const read = normalizedLorebook(record, shippedBook('A haunted library.'))
-    expect(read.edits).toEqual({ library: { keys: ['Stacks'] } })
+    const read = normalizedLorebook(record, shippedBook('A haunted library.', 'A big city.'))
+    expect(read).toEqual({ ...emptyLorebook(), edits: { library: { keys: ['Stacks'] } } })
+  })
+})
+
+describe('the setting', () => {
+  it('is kept only while it differs from the build', () => {
+    const { setting } = shippedBook()
+    const edited = withSetting(emptyLorebook(), '  A walled city.\r\n', setting)
+    expect(edited.setting).toBe('A walled city.')
+    expect(withSetting(edited, setting, setting)).toEqual(emptyLorebook())
   })
 })
 
@@ -81,51 +99,65 @@ describe('the kept record', () => {
     expect(refusalOf(() => readLorebookRecord({ ...valid.record, schemaVersion: 9 }, 'x'))).toBe(
       'LOREBOOK_SCHEMA_VERSION'
     )
+
+    const set = { ...valid.record, setting: 'A walled city.' }
+    expect(readLorebookRecord(JSON.parse(JSON.stringify(set)), 'x')).toEqual(set)
+    const unset = { ...valid.record, setting: '  ' }
+    expect(refusalOf(() => readLorebookRecord(unset, 'x'))).toBe('LOREBOOK_MALFORMED')
   })
 })
 
 describe('a SillyTavern lorebook', () => {
   it('replaces the lorebook with exactly what was exported', () => {
     const shipped = shippedBook()
-    let record = withShippedEdit(emptyLorebook(), shipped[0], { text: 'A haunted library.' })
-    record = withShippedEdit(record, shipped[1], { keys: ['Cafe', 'coffee'] })
+    let record = withShippedEdit(emptyLorebook(), shipped.entries[0], {
+      text: 'A haunted library.'
+    })
+    record = withShippedEdit(record, shipped.entries[1], { keys: ['Cafe', 'coffee'] })
     record = withCustomEntry(record, { keys: ['Night market'], text: 'Stalls.', bg: 'market' })
       .record
+    record = withSetting(record, 'A walled city.', shipped.setting)
 
     const read = parseWorldInfoText(throughFile(record, shipped))
     const applied = applyImport(emptyLorebook(), read, shipped, true)
     expect(applied.record).toEqual(record)
-    expect(applied).toMatchObject({ imported: 3, leftOut: 0 })
+    expect(applied).toMatchObject({ imported: 4, leftOut: 0 })
   })
 
-  it('lets an untouched entry follow a later build and keeps an edit across it', () => {
-    const before = shippedBook('A library.')
-    const record = withShippedEdit(emptyLorebook(), before[1], { text: 'A cat cafe.' })
+  it('lets an untouched entry and setting follow a later build and keeps an edit across it', () => {
+    const before = shippedBook('A library.', 'A small city.')
+    const record = withShippedEdit(emptyLorebook(), before.entries[1], { text: 'A cat cafe.' })
     const file = throughFile(record, before)
 
-    const after = shippedBook('A library with a rooftop.')
+    const after = shippedBook('A library with a rooftop.', 'A small city by a river.')
     const applied = applyImport(emptyLorebook(), parseWorldInfoText(file), after, true)
-    expect(applied.record.edits).toEqual({ cafe: { text: 'A cat cafe.' } })
+    expect(applied.record).toEqual({ ...emptyLorebook(), edits: { cafe: { text: 'A cat cafe.' } } })
   })
 
-  it('counts a field changed in the file itself as an edit', () => {
+  it('counts a field or a setting changed in the file itself as an edit', () => {
     const shipped = shippedBook()
     const world = worldInfoOf(emptyLorebook(), shipped)
-    world.entries['0'].content = 'A library, rewritten in SillyTavern.'
+    world.entries['0'].content = 'A city, rewritten in SillyTavern.'
+    world.entries['1'].content = 'A library, rewritten in SillyTavern.'
     const applied = applyImport(emptyLorebook(), parseWorldInfo(world), shipped, true)
     expect(applied.record.edits).toEqual({
       library: { text: 'A library, rewritten in SillyTavern.' }
     })
+    expect(applied.record.setting).toBe('A city, rewritten in SillyTavern.')
   })
 
   it('adds only its own entries after the player\'s, ignoring its edits of shipped ones', () => {
     const shipped = shippedBook()
-    const mine = withCustomEntry(emptyLorebook(), { keys: ['Pier'], text: 'A pier.' }).record
-    let theirs = withShippedEdit(emptyLorebook(), shipped[0], { text: 'Their library.' })
+    let mine = withCustomEntry(emptyLorebook(), { keys: ['Pier'], text: 'A pier.' }).record
+    mine = withSetting(mine, 'My city.', shipped.setting)
+    let theirs = withShippedEdit(emptyLorebook(), shipped.entries[0], { text: 'Their library.' })
     theirs = withCustomEntry(theirs, { keys: ['Night market'], text: 'Stalls.' }).record
+    theirs = withSetting(theirs, 'Their city.', shipped.setting)
 
     const applied = applyImport(mine, parseWorldInfoText(throughFile(theirs, shipped)), shipped, false)
     expect(applied.record.edits).toEqual({})
+    expect(applied.record.setting).toBe('My city.')
+    expect(applied).toMatchObject({ imported: 1, leftOut: 0 })
     expect(applied.record.custom.map((entry) => [entry.id, entry.keys[0]])).toEqual([
       ['custom1', 'Pier'],
       ['custom2', 'Night market']
@@ -144,6 +176,11 @@ describe('a SillyTavern lorebook', () => {
     const applied = applyImport(emptyLorebook(), parseWorldInfo(plain), shippedBook(), false)
     expect(applied.record.custom.map((entry) => entry.keys)).toEqual([['dragon']])
     expect(applied.leftOut).toBe(3)
+
+    const set = withSetting(emptyLorebook(), 'My city.', shippedBook().setting)
+    expect(applyImport(set, parseWorldInfo(plain), shippedBook(), true).record.setting).toBe(
+      undefined
+    )
 
     const nothing = { entries: { '0': { key: ['ghost'], content: 'A ghost.', disable: true } } }
     expect(

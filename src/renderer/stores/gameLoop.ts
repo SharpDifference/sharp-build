@@ -79,7 +79,13 @@ import {
   rumorSentenceFor
 } from '../prompts/lorebook'
 import { pickSlotPosters } from './feedRolls'
-import { lorebookLoaded, lorebookNow, lorebookSettled, useLorebookStore } from './lorebookStore'
+import {
+  lorebookLoaded,
+  lorebookNow,
+  lorebookSettled,
+  settingNow,
+  useLorebookStore
+} from './lorebookStore'
 import { isFeedContact } from './feedView'
 import { deliverSlotPosts, rollFeedExtrasIfNewSlot, rollSuggestions } from './loop/feed'
 import {
@@ -91,7 +97,6 @@ import {
 import { composeTextingSummary, hasTexted } from '../prompts/textingPrompt'
 import { buildTextLedgerPrompt, mergeLedgerReplies } from '../prompts/textLedgerPrompt'
 import { dealEverydayAsk, rollReachOutTopic } from './slotAskers'
-import { SETTING } from '../prompts/setting'
 import {
   buildClosingPrompt,
   buildContinuationPrompt,
@@ -587,8 +592,8 @@ async function startOrientationScene(): Promise<void> {
   const solo = cast.length === 0
   const state = promptState()
   const request = solo
-    ? buildSoloPrompt(action, state, SETTING, reader())
-    : buildScenePrompt(castCharacters, action, state, SETTING, reader())
+    ? buildSoloPrompt(action, state, settingNow(), reader())
+    : buildScenePrompt(castCharacters, action, state, settingNow(), reader())
   await runSceneTurn(
     streamScene(request, undefined, { forceShowSpeakers: !solo }),
     snapshot,
@@ -684,7 +689,7 @@ async function startCreatedOpening(): Promise<void> {
     castCharacters,
     action,
     { ...promptState(), openingOutfits },
-    SETTING,
+    settingNow(),
     reader()
   )
   await runSceneTurn(
@@ -726,7 +731,7 @@ export async function startFarewellScene(charId: string): Promise<void> {
   console.log(`[cast] farewell → ${nameOf(charId)}`)
 
   const castCharacters = castCharactersOf([charId])
-  const request = buildScenePrompt(castCharacters, action, promptState(), SETTING, reader())
+  const request = buildScenePrompt(castCharacters, action, promptState(), settingNow(), reader())
   await runSceneTurn(
     streamScene(request, undefined, { forceShowSpeakers: true }),
     snapshot,
@@ -1094,7 +1099,7 @@ async function fetchSlotIntro(
       ...(visitor ? { homecomingVisitor: visitor } : {}),
       ...(backgroundLore.length > 0 ? { backgroundLore } : {})
     },
-    SETTING,
+    settingNow(),
     // His cold as it stands in the slot opening, not the one ending.
     reader(view, { date, time })
   )
@@ -1789,8 +1794,8 @@ function buildTurnRequest(
   const state = promptState()
   if (!isContinuation) {
     return solo
-      ? buildSoloPrompt(sceneAction, state, SETTING, reader())
-      : buildScenePrompt(castCharacters, sceneAction, state, SETTING, reader())
+      ? buildSoloPrompt(sceneAction, state, settingNow(), reader())
+      : buildScenePrompt(castCharacters, sceneAction, state, settingNow(), reader())
   }
 
   const game = useGameStore.getState()
@@ -1799,7 +1804,7 @@ function buildTurnRequest(
     sceneAction,
     sceneSoFar(),
     state,
-    SETTING,
+    settingNow(),
     reader(),
     game.sceneSummary,
     // `logPlayerAction` ran above, so the count off the log is this action's ordinal — the
@@ -2040,7 +2045,7 @@ async function runClosing(dropped: () => boolean): Promise<boolean> {
     loopState.closingCastPresent,
     sceneSoFar(),
     promptState(),
-    SETTING,
+    settingNow(),
     reader(),
     game.sceneSummary
   )

@@ -2,7 +2,8 @@
  * The lorebook: world detail injected only when a turn actually mentions it. The shipped
  * entries are authored here — Venus University and Veridan are already always-on in
  * `setting.ts` — and a playthrough's own lorebook lays the player's edits and entries over
- * them; roster characters and the class catalog are built per call from the save's own.
+ * them, and may rewrite the setting too; roster characters and the class catalog are built per
+ * call from the save's own.
  */
 import { fullDescriptionOf, kindSentenceOf } from '@shared/academics'
 import { slotFullLabel, yearLabel } from '@shared/classes'

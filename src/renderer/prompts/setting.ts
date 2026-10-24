@@ -26,7 +26,8 @@ import { formatShortGameDate } from './gameDate'
 
 /**
  * Dev-authored setting text injected into every scene prompt. This is the always-on half
- * of the world: the two entries every scene needs whatever it is about.
+ * of the world: the two entries every scene needs whatever it is about. A playthrough's own
+ * lorebook may rewrite it.
  */
 export const SETTING = `VENUS UNIVERSITY (VU)
 Motto: Concordia et Prosperitas | Founded 2014 by Frederic Thorne | 6k Student Population.

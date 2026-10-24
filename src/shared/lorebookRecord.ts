@@ -5,8 +5,9 @@ import { sha256Hex } from './sha256'
 
 /**
  * A playthrough's own lorebook: what the player changed of the shipped entries, field by field,
- * and the entries they wrote themselves; and the SillyTavern World Info file it travels as. An
- * entry or a field the player never changed is not kept, so it always reads as the build ships it.
+ * the entries they wrote themselves and the setting where they rewrote it; and the SillyTavern
+ * World Info file it travels as. An entry, a field or a setting the player never changed is not
+ * kept, so it always reads as the build ships it.
  */
 
 const LOREBOOK_SCHEMA_VERSION = 1
@@ -44,6 +45,8 @@ export interface LorebookRecord {
   edits: Record<string, LoreEdit>
   /** In the order they were made. */
   custom: CustomLoreEntry[]
+  /** The always-on world text, where the player's differs from the build's. */
+  setting?: string
 }
 
 /** What the record's rules read of one shipped entry. */
@@ -51,6 +54,12 @@ export interface ShippedLore {
   ref: string
   keys: readonly string[]
   text: string
+}
+
+/** What the record's rules read of the build: its entries in authored order, and its setting. */
+export interface ShippedBook {
+  entries: readonly ShippedLore[]
+  setting: string
 }
 
 /** What an imported file's entry is worth keeping as. */
@@ -62,6 +71,8 @@ interface ImportedLore {
   /** The shipped words it was exported against, where the file says so. */
   fingerprint?: { keys: string; text: string }
   bg?: string
+  /** Present where it was exported as the setting, with the shipped setting's fingerprint. */
+  setting?: { fingerprint?: string }
 }
 
 /** A World Info file read: the entries worth keeping, and how many were not. */
@@ -75,6 +86,7 @@ interface VenusLoreExtension {
   ref?: string
   fingerprint?: { keys: string; text: string }
   bg?: string
+  setting?: { fingerprint?: string }
 }
 
 /** One entry of a SillyTavern World Info file, as this game writes it. */
@@ -157,6 +169,11 @@ export function loreTextProblem(text: string): string | null {
   return normalizeLoreText(text) === '' ? 'Write a description' : null
 }
 
+/** Whether a setting can be kept: it holds something once trimmed. */
+export function settingKeepable(text: string): boolean {
+  return normalizeLoreText(text) !== ''
+}
+
 /** Whether two key lists are the same words in the same order. */
 function sameKeys(a: readonly string[], b: readonly string[]): boolean {
   return a.length === b.length && a.every((key, index) => key === b[index])
@@ -234,7 +251,15 @@ export function readLorebookRecord(
     }
   })
 
-  return { schemaVersion: record.schemaVersion, edits, custom }
+  const { setting } = record
+  if (setting !== undefined && !keptText(setting)) refuse('keeps an unusable setting')
+
+  return {
+    schemaVersion: record.schemaVersion,
+    edits,
+    custom,
+    ...(setting !== undefined ? { setting } : {})
+  }
 }
 
 /** A playthrough's lorebook before the player has changed anything. */
@@ -257,14 +282,11 @@ function trimmedEdit(edit: LoreEdit, shipped: ShippedLore): LoreEdit | null {
 
 /**
  * The record read against this build: an edit of an entry the build no longer ships is dropped,
- * and so is any field the build now ships as the player wrote it. Hands back `record` itself
- * where nothing changed.
+ * and so is any field, or the setting, the build now ships as the player wrote it. Hands back
+ * `record` itself where nothing changed.
  */
-export function normalizedLorebook(
-  record: LorebookRecord,
-  shipped: readonly ShippedLore[]
-): LorebookRecord {
-  const byRef = new Map(shipped.map((entry) => [entry.ref, entry]))
+export function normalizedLorebook(record: LorebookRecord, shipped: ShippedBook): LorebookRecord {
+  const byRef = new Map(shipped.entries.map((entry) => [entry.ref, entry]))
   const edits: Record<string, LoreEdit> = {}
   let changed = false
   for (const [ref, edit] of Object.entries(record.edits)) {
@@ -273,7 +295,22 @@ export function normalizedLorebook(
     if (kept) edits[ref] = kept
     if (!kept || kept.keys !== edit.keys || kept.text !== edit.text) changed = true
   }
-  return changed ? { ...record, edits } : record
+  const next = changed ? { ...record, edits } : record
+  return withSetting(next, next.setting ?? shipped.setting, shipped.setting)
+}
+
+/** The record with `text` as its setting, kept as absent where it is what the build ships. */
+export function withSetting(
+  record: LorebookRecord,
+  text: string,
+  shippedSetting: string
+): LorebookRecord {
+  const setting = normalizeLoreText(text)
+  if (setting !== shippedSetting) return record.setting === setting ? record : { ...record, setting }
+  if (record.setting === undefined) return record
+  const next = { ...record }
+  delete next.setting
+  return next
 }
 
 /**
@@ -363,27 +400,32 @@ function keysFingerprint(keys: readonly string[]): string {
   return loreFingerprint(JSON.stringify(keys))
 }
 
-/** One World Info entry, with SillyTavern's own switches set to match how this game reads it. */
+/**
+ * One World Info entry, with SillyTavern's own switches set to match how this game reads it.
+ * `always` makes it the setting's: titled, keyless, constant, and ordered ahead of the rest.
+ */
 function worldInfoEntry(
   index: number,
   keys: readonly string[],
   text: string,
-  extension: VenusLoreExtension
+  extension: VenusLoreExtension,
+  always?: { title: string }
 ): WorldInfoEntry {
   return {
     uid: index,
     key: [...keys],
     keysecondary: [],
-    comment: keys[0] ?? '',
+    comment: always?.title ?? keys[0] ?? '',
     content: text,
-    constant: false,
+    constant: always !== undefined,
     selective: true,
-    order: 100,
+    order: always ? 0 : 100,
     position: 0,
     disable: false,
     displayIndex: index,
     addMemo: true,
-    // The game never lets one entry bring in another, so neither does SillyTavern.
+    // The game never lets one entry bring in another, so neither does SillyTavern: the setting
+    // names most of the places the shipped entries are about.
     excludeRecursion: true,
     preventRecursion: true,
     probability: 100,
@@ -395,17 +437,22 @@ function worldInfoEntry(
 }
 
 /**
- * The lorebook as a SillyTavern World Info file: the shipped entries in authored order as the
- * player has them, then his own. A shipped one carries its handle and a fingerprint of the words
- * the build shipped it with, so a later import can tell what was changed from what was not.
+ * The lorebook as a SillyTavern World Info file: the setting as one constant entry, the shipped
+ * entries in authored order as the player has them, then his own. The setting and a shipped
+ * entry carry a fingerprint of the words the build shipped them with, a shipped entry its handle
+ * too, so a later import can tell what was changed from what was not.
  */
-export function worldInfoOf(
-  record: LorebookRecord,
-  shipped: readonly ShippedLore[]
-): WorldInfoFile {
+export function worldInfoOf(record: LorebookRecord, shipped: ShippedBook): WorldInfoFile {
   const entries: Record<string, WorldInfoEntry> = {}
-  let index = 0
-  for (const entry of shipped) {
+  entries['0'] = worldInfoEntry(
+    0,
+    [],
+    record.setting ?? shipped.setting,
+    { setting: { fingerprint: loreFingerprint(shipped.setting) } },
+    { title: 'Setting' }
+  )
+  let index = 1
+  for (const entry of shipped.entries) {
     const edit = editOf(record, entry.ref)
     const fingerprint = { keys: keysFingerprint(entry.keys), text: loreFingerprint(entry.text) }
     entries[String(index)] = worldInfoEntry(
@@ -436,7 +483,7 @@ function notAWorld(): never {
 function venusExtensionOf(entry: Record<string, unknown>): VenusLoreExtension {
   const extensions = entry.extensions
   if (!isPlainObject(extensions) || !isPlainObject(extensions.venus_university)) return {}
-  const { ref, fingerprint, bg } = extensions.venus_university
+  const { ref, fingerprint, bg, setting } = extensions.venus_university
   return {
     ...(typeof ref === 'string' && LORE_REF.test(ref) ? { ref } : {}),
     ...(isPlainObject(fingerprint) &&
@@ -444,14 +491,21 @@ function venusExtensionOf(entry: Record<string, unknown>): VenusLoreExtension {
     typeof fingerprint.text === 'string'
       ? { fingerprint: { keys: fingerprint.keys, text: fingerprint.text } }
       : {}),
-    ...(typeof bg === 'string' && isSafeBgName(bg) ? { bg } : {})
+    ...(typeof bg === 'string' && isSafeBgName(bg) ? { bg } : {}),
+    ...(isPlainObject(setting)
+      ? {
+          setting:
+            typeof setting.fingerprint === 'string' ? { fingerprint: setting.fingerprint } : {}
+        }
+      : {})
   }
 }
 
 /**
  * The entries of a parsed SillyTavern World Info file worth keeping: its primary keys, less any
- * regular expression, and its content. A disabled entry, and one of no shipped entry's with no
- * key or no content left, is counted as left out. Refuses anything that is not a World Info file.
+ * regular expression, and its content. A disabled entry, and one neither the setting nor a
+ * shipped entry's with no key or no content left, is counted as left out. Refuses anything that
+ * is not a World Info file.
  */
 export function parseWorldInfo(parsed: unknown): WorldInfoImport {
   if (!isPlainObject(parsed) || !isPlainObject(parsed.entries)) notAWorld()
@@ -468,7 +522,8 @@ export function parseWorldInfo(parsed: unknown): WorldInfoImport {
     const keys = normalizeLoreKeys(words.filter((key) => !REGEX_KEY.test(key.trim())))
     const text = typeof raw.content === 'string' ? normalizeLoreText(raw.content) : ''
     const extension = venusExtensionOf(raw)
-    if (extension.ref === undefined && (keys.length === 0 || text === '')) {
+    const exported = extension.ref !== undefined || extension.setting !== undefined
+    if (!exported && (keys.length === 0 || text === '')) {
       leftOut++
       continue
     }
@@ -496,25 +551,40 @@ export interface AppliedImport {
 }
 
 /**
- * The lorebook an import leaves. Replacing, it starts from nothing: the first entry carrying a
- * shipped handle sets that entry's edits, a field counting as edited only where it no longer
- * matches the fingerprint it was exported with, and every other usable entry becomes the player's
- * own. Adding, every entry carrying a handle is passed over and the rest are added after his own.
- * Refuses an import that would bring nothing in.
+ * The lorebook an import leaves. Replacing, it starts from nothing: the first entry exported as
+ * the setting sets it, and the first carrying a shipped handle sets that entry's edits, each
+ * counting as edited only where it no longer matches the fingerprint it was exported with, and
+ * every other usable entry becomes the player's own. Adding, the setting and every entry carrying
+ * a handle are passed over and the rest are added after his own. Refuses an import that would
+ * bring nothing in.
  */
 export function applyImport(
   record: LorebookRecord,
   read: WorldInfoImport,
-  shipped: readonly ShippedLore[],
+  shipped: ShippedBook,
   replace: boolean
 ): AppliedImport {
-  const byRef = new Map(shipped.map((entry) => [entry.ref, entry]))
+  const byRef = new Map(shipped.entries.map((entry) => [entry.ref, entry]))
   const claimed = new Set<string>()
+  let settingClaimed = false
   let next = replace ? emptyLorebook() : record
   let imported = 0
   let leftOut = read.leftOut
   for (const entry of read.entries) {
     const usable = entry.keys.length > 0 && entry.text !== ''
+    if (entry.setting !== undefined) {
+      if (!replace) continue
+      if (settingClaimed || entry.text === '') {
+        leftOut++
+        continue
+      }
+      settingClaimed = true
+      if (entry.setting.fingerprint !== loreFingerprint(entry.text)) {
+        next = withSetting(next, entry.text, shipped.setting)
+      }
+      imported++
+      continue
+    }
     if (entry.ref !== undefined) {
       if (!replace) continue
       const target = byRef.get(entry.ref)

@@ -4,16 +4,20 @@ import {
   applyImport,
   emptyLorebook,
   normalizedLorebook,
+  settingKeepable,
   withCustomEntry,
   withCustomPatch,
   withoutCustomEntry,
   withoutShippedEdit,
+  withSetting,
   withShippedEdit,
   worldInfoOf,
   type LoreEdit,
-  type LorebookRecord
+  type LorebookRecord,
+  type ShippedBook
 } from '@shared/lorebookRecord'
 import { effectiveLorebook, LOREBOOK, SHIPPED_BOOK, type BookEntry } from '../prompts/lorebook'
+import { SETTING } from '../prompts/setting'
 import { useUiStore } from './uiStore'
 
 /**
@@ -45,6 +49,8 @@ interface LorebookState {
   record: LorebookRecord
   /** What every prompt reads; the shipped book until a playthrough's has been read. */
   book: readonly BookEntry[]
+  /** The setting every prompt reads; the shipped one until a playthrough's has been read. */
+  setting: string
   /**
    * Moved on by every load, import, reset and delete, so an editor holding a commit from before
    * one of them lands nothing.
@@ -68,6 +74,8 @@ interface LorebookState {
     revision: number
   ) => boolean
   deleteCustom: (id: string) => void
+  /** Rewrites the setting, the shipped one kept as absent; false where nothing could be kept. */
+  editSetting: (text: string) => boolean
   /**
    * Has the player pick a SillyTavern lorebook and lays it in, replacing the lorebook or adding
    * its own entries to it; null where nothing came in. Calls the bridge before anything is
@@ -96,6 +104,14 @@ function enqueue(playthroughId: string, record: LorebookRecord): void {
   })
 }
 
+/** What the record's rules read of the build. */
+const SHIPPED: ShippedBook = { entries: LOREBOOK, setting: SETTING }
+
+/** What the prompts read of a record: its book and its setting. */
+function readOf(record: LorebookRecord): { book: readonly BookEntry[]; setting: string } {
+  return { book: effectiveLorebook(record), setting: record.setting ?? SETTING }
+}
+
 /** The shipped entry kept under `ref`. */
 function shippedOf(ref: string): (typeof LOREBOOK)[number] | undefined {
   return LOREBOOK.find((entry) => entry.ref === ref)
@@ -113,7 +129,7 @@ export const useLorebookStore = create<LorebookState>((set, get) => {
     }
     const record = change(state.record)
     if (JSON.stringify(record) === JSON.stringify(state.record)) return true
-    set({ record, book: effectiveLorebook(record) })
+    set({ record, ...readOf(record) })
     enqueue(state.playthroughId, record)
     return true
   }
@@ -123,6 +139,7 @@ export const useLorebookStore = create<LorebookState>((set, get) => {
     status: 'none',
     record: emptyLorebook(),
     book: SHIPPED_BOOK,
+    setting: SETTING,
     revision: 0,
 
     load: (playthroughId) => {
@@ -133,6 +150,7 @@ export const useLorebookStore = create<LorebookState>((set, get) => {
         status: playthroughId ? 'loading' : 'none',
         record: emptyLorebook(),
         book: SHIPPED_BOOK,
+        setting: SETTING,
         revision
       })
       if (!playthroughId) {
@@ -149,8 +167,8 @@ export const useLorebookStore = create<LorebookState>((set, get) => {
           useUiStore.getState().showError(read.error)
           return
         }
-        const record = normalizedLorebook(read.data ?? emptyLorebook(), LOREBOOK)
-        set({ status: 'ready', record, book: effectiveLorebook(record) })
+        const record = normalizedLorebook(read.data ?? emptyLorebook(), SHIPPED)
+        set({ status: 'ready', record, ...readOf(record) })
       })()
       return loaded
     },
@@ -161,6 +179,7 @@ export const useLorebookStore = create<LorebookState>((set, get) => {
         status: 'none',
         record: emptyLorebook(),
         book: SHIPPED_BOOK,
+        setting: SETTING,
         revision: state.revision + 1
       })),
 
@@ -194,6 +213,11 @@ export const useLorebookStore = create<LorebookState>((set, get) => {
       }
     },
 
+    editSetting: (text) => {
+      if (!settingKeepable(text)) return false
+      return commit(get().revision, (record) => withSetting(record, text, SETTING))
+    },
+
     importWorld: async (replace) => {
       const before = get()
       const playthroughId = before.playthroughId
@@ -211,13 +235,13 @@ export const useLorebookStore = create<LorebookState>((set, get) => {
         const applied = applyImport(
           readable ? now.record : emptyLorebook(),
           picked.data,
-          LOREBOOK,
+          SHIPPED,
           replace || !readable
         )
         set({
           status: 'ready',
           record: applied.record,
-          book: effectiveLorebook(applied.record),
+          ...readOf(applied.record),
           revision: now.revision + 1
         })
         enqueue(playthroughId, applied.record)
@@ -229,7 +253,7 @@ export const useLorebookStore = create<LorebookState>((set, get) => {
     },
 
     exportWorld: async () => {
-      const exported = await window.api.lorebook.export(worldInfoOf(get().record, LOREBOOK))
+      const exported = await window.api.lorebook.export(worldInfoOf(get().record, SHIPPED))
       if (!exported.ok) useUiStore.getState().showError(exported.error)
     }
   }
@@ -238,6 +262,11 @@ export const useLorebookStore = create<LorebookState>((set, get) => {
 /** The book every prompt built now reads. */
 export function lorebookNow(): readonly BookEntry[] {
   return useLorebookStore.getState().book
+}
+
+/** The setting every prompt built now reads. */
+export function settingNow(): string {
+  return useLorebookStore.getState().setting
 }
 
 /** Resolves once the playthrough's lorebook has been read, or refused. */
