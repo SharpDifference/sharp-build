@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os'
 import { formatStoryRecall, type StoryRecallRequest } from '@shared/storyMemory'
 import type { ModSwitches } from '@shared/mods'
 import { inspectStoryMemory, prepareStoryRequest } from '../src/main/services/storyMemoryService'
-import { inspectStoryMemory as webRecall } from '../src/web/storyMemory'
+import { inspectStoryMemory as webRecall, prepareStoryRequest as prepareWebStoryRequest } from '../src/web/storyMemory'
 
 const env = vi.hoisted(() => ({ root: '', switches: { on: {}, options: {} } as ModSwitches }))
 vi.mock('../src/main/paths', () => ({ getPlaythroughPath: (id: string) => join(env.root, id) }))
@@ -122,4 +122,21 @@ it('honors the live Light toggle on desktop, browser and fallback without changi
   env.switches.on['story-memory'] = false
   expect((await inspectStoryMemory(p)).text).toBe('')
   expect(webRecall(p).text).toBe('')
+})
+
+it('applies native coverage equally on desktop and web without leaking metadata or losing the next request\'s recall', async () => {
+  const covered = { ...p, coveredEncounters: ['encounter:1:0'] }
+  const request = { system: 'rules', user: 'Native context already carries the dated atlas recap.',
+    schema: { name: 'scene', schema: {} }, storyMemory: covered }
+  for (const light of [false, true]) {
+    env.switches.options['story-memory:light-memory'] = light
+    const native = await prepareStoryRequest(request)
+    expect(native).toEqual(await prepareWebStoryRequest(request))
+    expect(native.user).toBe(request.user)
+    expect(native).not.toHaveProperty('storyMemory')
+    expect(JSON.stringify(native)).not.toContain('coveredEncounters')
+    expect((await inspectStoryMemory(p)).included).toContain('encounter:1:0')
+    writeFileSync(join(env.root, '123', 'story-memory.sqlite'), 'corrupt test data')
+    expect(await prepareStoryRequest(request)).toEqual(native)
+  }
 })
