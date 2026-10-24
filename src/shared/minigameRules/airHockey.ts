@@ -214,12 +214,16 @@ export interface Play {
   guard: number
 }
 
+/**
+ * Each level is a step up in all four at once, and they compound: 4 and 5 are kept within reach,
+ * so a 4 is a real contest for an ordinary player and a 5 the hard one, not a wall.
+ */
 const PLAYS: Readonly<Record<number, Play>> = {
   1: { reaction: 0.36, speed: 230, error: 46, guard: 0.3 },
   2: { reaction: 0.28, speed: 310, error: 34, guard: 0.5 },
   3: { reaction: 0.21, speed: 400, error: 24, guard: 0.68 },
-  4: { reaction: 0.15, speed: 500, error: 15, guard: 0.85 },
-  5: { reaction: 0.1, speed: 610, error: 8, guard: 1 }
+  4: { reaction: 0.18, speed: 440, error: 20, guard: 0.74 },
+  5: { reaction: 0.15, speed: 500, error: 15, guard: 0.84 }
 }
 
 /** How she plays at a skill from 1 to 5; anything else is taken as the nearest of them. */
