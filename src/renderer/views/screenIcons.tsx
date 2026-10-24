@@ -86,6 +86,26 @@ export function CheckIcon(): JSX.Element {
   )
 }
 
+/** Two leaves of paper, one over the other: what a field holds put on the clipboard. */
+export function CopyIcon(): JSX.Element {
+  return (
+    <svg
+      width="19"
+      height="19"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2.5"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <rect x="8" y="8" width="14" height="14" rx="2" />
+      <path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2" />
+    </svg>
+  )
+}
+
 /**
  * The forward mark on a button that goes somewhere, with `back` the way it came and `down` the
  * list a pill opens under itself. A button never carries a typographic arrow: the half-pill

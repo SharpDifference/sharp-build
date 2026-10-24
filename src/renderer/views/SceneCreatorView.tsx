@@ -29,6 +29,7 @@ import {
   type TimeSlot
 } from '@shared/types'
 import { WEATHER_KINDS, type Weather } from '@shared/weather'
+import { BgSlot } from '../components/BgSlot'
 import { DeleteX } from '../components/DeleteX'
 import { SelectField } from '../components/SelectField'
 import { TextField } from '../components/TextField'
@@ -452,7 +453,6 @@ function SceneRow({
   const characters = useCharacterStore((s) => s.characters)
   const backgrounds = useAssetStore((s) => s.backgrounds)
   const spriteVersion = useCharacterStore((s) => s.spriteVersion)
-  const [bgHover, setBgHover] = useState(false)
   const half = slotHalf(draft.time)
   const wet = draft.weather !== 'clear'
 
@@ -502,44 +502,13 @@ function SceneRow({
       </div>
       <div className="vu-field">
         <span className="vu-field-label">BG</span>
-        <motion.div
-          className="vu-scene-bg"
-          onHoverStart={() => setBgHover(true)}
-          onHoverEnd={() => setBgHover(false)}
-        >
-          {draft.bg !== undefined ? (
-            <>
-              <span className="vu-scene-bg-thumb">
-                {bgSrc !== null && <img className="vu-scene-bg-img" src={bgSrc} alt="" />}
-              </span>
-              <motion.button
-                id="scene-change-bg"
-                className="vu-pill"
-                type="button"
-                {...gestures(false, quietLift, quietPress)}
-                onClick={() => onPanel({ kind: 'bg' })}
-              >
-                Change BG
-              </motion.button>
-              <DeleteX
-                className="vu-x"
-                hovered={bgHover}
-                label="Remove the background"
-                onDelete={() => store.setBg(undefined)}
-              />
-            </>
-          ) : (
-            <motion.button
-              id="scene-add-bg"
-              className="vu-pill"
-              type="button"
-              {...gestures(false, quietLift, quietPress)}
-              onClick={() => onPanel({ kind: 'bg' })}
-            >
-              Add BG
-            </motion.button>
-          )}
-        </motion.div>
+        <BgSlot
+          idPrefix="scene"
+          src={bgSrc}
+          picked={draft.bg !== undefined}
+          onPick={() => onPanel({ kind: 'bg' })}
+          onClear={() => store.setBg(undefined)}
+        />
       </div>
     </div>
   )

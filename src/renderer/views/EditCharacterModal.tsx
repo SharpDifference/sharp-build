@@ -5,7 +5,7 @@ import { useEffect, useRef, useState, type CSSProperties, type JSX } from 'react
 import { createPortal } from 'react-dom'
 import { AnimatePresence, motion } from 'motion/react'
 import { CheckField } from '../components/CheckField'
-import { ChipListInput } from '../components/ChipListInput'
+import { ChipField, useCopyMark } from '../components/ChipField'
 import { ComfyModelRow } from '../components/ComfyModelPicker'
 import { ConfirmModal } from '../components/ConfirmModal'
 import { DeadNote } from '../components/DeadNote'
@@ -28,8 +28,11 @@ import {
 import {
   customCgLabelOf,
   customCgSfxOf,
-  customCgSlotNumber,
-  customCgVoiceOf
+  customCgVoiceOf,
+  DEFAULT_CG_SFX,
+  DEFAULT_CG_VOICE,
+  isCgSfx,
+  isCgVoice
 } from '@shared/customCgs'
 import {
   characterLoraOf,
@@ -50,9 +53,10 @@ import {
 import {
   CUSTOM_OUTFIT_INSTRUCTIONS_MAX,
   CUSTOM_OUTFIT_NAME_MAX,
-  CUSTOM_OUTFIT_SLOTS,
   customOutfitInstructions,
   customOutfitName,
+  customOutfitSlotAt,
+  customOutfitSlotsIn,
   customSlotNumber,
   isCustomOutfitSlot,
   outfitLabelOf
@@ -60,7 +64,8 @@ import {
 import { isStatKey, type StatKey } from '@shared/playerStats'
 import {
   afterOf,
-  CUSTOM_CG_SLOTS,
+  customCgSlotAt,
+  customCgSlotNumber,
   customCgSlotOf,
   isCustomCgSlot,
   STOCK_POSITIONS
@@ -133,7 +138,12 @@ import { CustomOutfitsModal } from './CustomOutfitsModal'
 import { ImageGalleryModal } from './ImageGalleryModal'
 import { OutfitInstructionsModal } from './OutfitInstructionsModal'
 import { ProfilePictureModal } from './ProfilePictureModal'
-import { RegenerateModal, type CgSounds, type SeedPrefill } from './RegenerateModal'
+import {
+  RegenerateModal,
+  type CgSounds,
+  type PastedSet,
+  type SeedPrefill
+} from './RegenerateModal'
 import { SetHeightModal } from './SetHeightModal'
 import { FingerFixModal } from './FingerFixModal'
 import { committedWeightText, useCharacterLora, weightTextAfterPick } from './useCharacterLora'
@@ -203,6 +213,8 @@ interface RegenerateRequest {
   sounds?: CgSounds
   /** A group the render cannot be sent without. */
   requireGroup?: PromptGroup
+  /** Fills the form from the last set of its kind copied, where the set is being made. */
+  paste?: { label: string; group: PromptGroup; from: PastedSet | null }
   /** The primary's words, where the render is not a replacement. */
   submitLabel?: string
   /** Whether the player answered to render it without her missing LoRA. */
@@ -336,6 +348,8 @@ export function EditCharacterModal({
     withoutLora: boolean
   } | null>(null)
   const [regen, setRegen] = useState<RegenerateRequest | null>(null)
+  // Which tag well's copy mark wears the check.
+  const copyMark = useCopyMark()
   const [saved, setSaved] = useState(false)
   const [pending, setPending] = useState<PendingAction | null>(null)
   const [working, setWorking] = useState(false)
@@ -390,6 +404,8 @@ export function EditCharacterModal({
   const deleteCustomOutfit = useCharacterStore((s) => s.deleteCustomOutfit)
   const writeCustomCg = useCharacterStore((s) => s.writeCustomCg)
   const deleteCustomCg = useCharacterStore((s) => s.deleteCustomCg)
+  const copyCustomOutfit = useCharacterStore((s) => s.copyCustomOutfit)
+  const copyCustomCg = useCharacterStore((s) => s.copyCustomCg)
   const exportCharacter = useCharacterStore((s) => s.exportCharacter)
   const exportCard = useCharacterStore((s) => s.exportCard)
   const exportSpritePack = useCharacterStore((s) => s.exportSpritePack)
@@ -750,6 +766,32 @@ export function EditCharacterModal({
     })
   }
 
+  /** The wardrobe last copied, its words as the form that makes a new one opens on them. */
+  const pastedOutfit = (): PastedSet | null => {
+    const clip = useCharacterStore.getState().copiedOutfit
+    if (!clip) return null
+    return {
+      tags: clip.tags,
+      name: customOutfitName(clip.name),
+      instructions: customOutfitInstructions(clip.instructions)
+    }
+  }
+
+  /** The CG pair last copied on the same terms, its loops read as a slot's are. */
+  const pastedCg = (): PastedSet | null => {
+    const clip = useCharacterStore.getState().copiedCg
+    if (!clip) return null
+    return {
+      tags: clip.tags,
+      name: customOutfitName(clip.name),
+      instructions: customOutfitInstructions(clip.instructions),
+      sounds: {
+        voice: isCgVoice(clip.voice) ? clip.voice : DEFAULT_CG_VOICE,
+        sfx: isCgSfx(clip.sfx) ? clip.sfx : DEFAULT_CG_SFX
+      }
+    }
+  }
+
   /** What a set's control runs: a fill goes straight out, a regenerate opens on its tags first. */
   const runSet = (target: SetTarget, mode: RenderMode, withoutLora = false): void => {
     /* A player-authored wardrobe or CG pair with nothing in it is written before it is
@@ -789,6 +831,7 @@ export function EditCharacterModal({
                   // Named as the writer will read it: a blank name is offered under the slot id.
                   hint: (typed: string) => outfitInstructionsHint(customOutfitName(typed) || slot)
                 },
+                paste: { label: 'Paste outfit', group: 'outfit', from: pastedOutfit() },
                 submitLabel: 'Generate'
               }
             : {})
@@ -824,6 +867,7 @@ export function EditCharacterModal({
                   voice: customCgVoiceOf(current, slot),
                   sfx: customCgSfxOf(current, slot)
                 },
+                paste: { label: 'Paste CG', group: 'position', from: pastedCg() },
                 submitLabel: 'Generate'
               }
             : {})
@@ -995,6 +1039,8 @@ export function EditCharacterModal({
         authored.onInstructions = () => setInstructing(slot)
         authored.onDelete = () => setDeleting(slot)
         authored.deleteDisabled = Boolean(taskOf(slot)) || singleExpressions(slot).length > 0
+        // Copied for a new one's form, which only a build with a renderer offers.
+        if (!webBuild) authored.onCopy = () => copyCustomOutfit(charId, slot)
       }
     }
 
@@ -1030,16 +1076,21 @@ export function EditCharacterModal({
     if (shipped) void loadDefaults()
   }, [shipped, updatedAt, version, rendering, loadDefaults])
 
-  /** How many of the five slots hold a whole wardrobe. */
-  const customsOnDisk = CUSTOM_OUTFIT_SLOTS.filter(
+  /** How many of her custom slots hold a whole wardrobe. */
+  const customsOnDisk = customOutfitSlotsIn(Object.keys(outfits ?? {})).filter(
     (slot) => wardrobeDone(slot) === EMOTIONS.length
   ).length
 
+  // Her custom slots holding a record or any sprite: what the panel's pages are counted off.
+  const customsTaken = customOutfitSlotsIn([
+    ...Object.keys(character.customOutfits ?? {}),
+    ...Object.keys(outfits ?? {})
+  ]).filter((slot) => character.customOutfits?.[slot] || wardrobeDone(slot) > 0)
+
   // Whether a custom CG pair can be rendered now: the set gate and the setting, which every
-  // slot answers to alike.
-  const cgPairsRenderable = CUSTOM_CG_SLOTS.every(
-    (slot) => !setBlocked(slot) && !sfwWithholds(slot, noNsfwImages)
-  )
+  // slot answers to alike, so the first stands for them all.
+  const firstCg = customCgSlotAt(1)
+  const cgPairsRenderable = !setBlocked(firstCg) && !sfwWithholds(firstCg, noNsfwImages)
 
   const { host, overlayProps } = useModalShell(requestClose)
   if (!host) return null
@@ -1085,7 +1136,6 @@ export function EditCharacterModal({
                 label="Open custom outfits"
                 auto
                 shownDone={customsOnDisk}
-                total={CUSTOM_OUTFIT_SLOTS.length}
                 onShow={() => setCustoms(true)}
               />
               <LandscapeTile
@@ -1549,20 +1599,19 @@ export function EditCharacterModal({
                         />
 
                         {TAG_FIELDS.map(({ key, id, label }) => (
-                          <label key={key} className="vu-field" htmlFor={id}>
-                            <span className="vu-field-label">{label}</span>
-                            {key === 'baseAppearance' && (
-                              <span className="vu-field-hint">{APPEARANCE_COLOR_HINT}</span>
-                            )}
-                            <ChipListInput
-                              id={id}
-                              values={form[key]}
-                              onChange={setField(key)}
-                              placeholder="Enter or comma to add a tag"
-                            />
-                          </label>
+                          <ChipField
+                            key={key}
+                            id={id}
+                            label={label}
+                            hint={key === 'baseAppearance' ? APPEARANCE_COLOR_HINT : undefined}
+                            values={form[key]}
+                            onChange={setField(key)}
+                            placeholder="Enter or comma to add a tag"
+                            mark={copyMark}
+                          />
                         ))}
 
+<<<<<<< HEAD
                         <BodyFieldsSection
                           body={form.body}
                           baseAppearance={form.baseAppearance}
@@ -1578,6 +1627,16 @@ export function EditCharacterModal({
                             placeholder="Discourages generation of certain elements"
                           />
                         </label>
+=======
+                        <ChipField
+                          id="edit-negative-tags"
+                          label="Additional Negative Prompts"
+                          values={form.negativeTags}
+                          onChange={setField('negativeTags')}
+                          placeholder="Discourages generation of certain elements"
+                          mark={copyMark}
+                        />
+>>>>>>> update/core-0.6.0
                       </>
                     )}
 
@@ -1693,10 +1752,9 @@ export function EditCharacterModal({
           <CustomOutfitsModal
             key="customs"
             theme={theme}
-            slots={CUSTOM_OUTFIT_SLOTS.map((slot) => ({
-              slot,
-              column: columnFor(slot, slot, outfitLabelOf(character, slot))
-            }))}
+            columnOf={(slot) => columnFor(slot, slot, outfitLabelOf(character, slot))}
+            taken={customsTaken}
+            addDead={setBlocked(customOutfitSlotAt(1))}
             onClose={() => setCustoms(false)}
           />
         )}
@@ -1720,6 +1778,7 @@ export function EditCharacterModal({
             }
             onEdit={setEditingCg}
             onDelete={setDeletingCg}
+            onCopy={webBuild ? undefined : (slot) => copyCustomCg(charId, slot)}
             onClose={() => setCustomCgs(false)}
           />
         )}
@@ -1900,6 +1959,7 @@ export function EditCharacterModal({
             instructions={regen.instructions}
             sounds={regen.sounds}
             requireGroup={regen.requireGroup}
+            paste={regen.paste}
             submitLabel={regen.submitLabel}
             onConfirm={(edit, seed, name, instructions, sounds) => {
               const request = regen

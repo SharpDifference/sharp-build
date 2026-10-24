@@ -287,8 +287,11 @@ export const ENROLLMENT_NOT_FOUND = {
 /** Ids that are a bare decimal number: playthrough ids and slot save ids. */
 export const SAFE_NUMERIC_ID = /^[0-9]+$/
 
-/** A manual save's id: `manual` and its slot as two digits, 01 to 90. */
-const MANUAL_ID = /^manual(0[1-9]|[1-8][0-9]|90)$/
+/**
+ * A manual save's id: `manual` and its slot padded to two digits and no further, so a slot is
+ * only ever spelled one way.
+ */
+const MANUAL_ID = /^manual(0[1-9]|[1-9][0-9]{1,3})$/
 
 /** Which kind of save an id names: the scene autosave, a boundary save, or a manual save. */
 export type SaveIdKind = 'autosave' | 'boundary' | 'manual'
@@ -316,7 +319,7 @@ export function assertSafePlaythroughId(playthroughId: string): void {
 export function classifySaveId(saveId: string): SaveIdKind | null {
   if (saveId === AUTOSAVE_ID) return 'autosave'
   if (SAFE_NUMERIC_ID.test(saveId)) return 'boundary'
-  if (MANUAL_ID.test(saveId)) return 'manual'
+  if (manualSlotOf(saveId) !== null) return 'manual'
   return null
 }
 
@@ -337,10 +340,12 @@ export function manualSaveId(slot: number): string {
   return `manual${String(slot).padStart(2, '0')}`
 }
 
-/** The slot a manual save's id names, or `null` for any other id. */
+/** The slot a manual save's id names, or `null` for any other id and for a slot past the last. */
 export function manualSlotOf(saveId: string): number | null {
   const match = MANUAL_ID.exec(saveId)
-  return match ? Number(match[1]) : null
+  if (!match) return null
+  const slot = Number(match[1])
+  return slot <= MANUAL_SAVE_SLOTS ? slot : null
 }
 
 /** Manual save ids by slot, lowest first. */

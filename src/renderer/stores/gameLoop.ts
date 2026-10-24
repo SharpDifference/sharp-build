@@ -82,12 +82,23 @@ import { sendsSpringBreakNotice } from '../prompts/springBreak'
 import {
   ambientLoreCharacters,
   characterLoreForIds,
+<<<<<<< HEAD
   availableLore,
+=======
+>>>>>>> update/core-0.6.0
   loreKeyOf,
   RUMOR_PLACE_BAG,
+  rumorPoolOf,
   rumorSentenceFor
 } from '../prompts/lorebook'
 import { pickSlotPosters } from './feedRolls'
+import {
+  lorebookLoaded,
+  lorebookNow,
+  lorebookSettled,
+  settingNow,
+  useLorebookStore
+} from './lorebookStore'
 import { isFeedContact } from './feedView'
 import { deliverSlotPosts, rollFeedExtrasIfNewSlot, rollSuggestions } from './loop/feed'
 import {
@@ -99,7 +110,6 @@ import {
 import { composeTextingSummary, hasTexted } from '../prompts/textingPrompt'
 import { buildTextLedgerPrompt, mergeLedgerReplies } from '../prompts/textLedgerPrompt'
 import { dealEverydayAsk, rollReachOutTopic } from './slotAskers'
-import { SETTING } from '../prompts/setting'
 import {
   buildClosingPrompt,
   buildContinuationPrompt,
@@ -351,6 +361,9 @@ function breakDecayLines(): SceneLine[] {
 /** Opens a slot: the transition, the narration, and the action prompt. */
 async function beginSlot(): Promise<void> {
   const run = currentRun()
+  // The opening is the first prompt a stay can build, so it waits on the playthrough's lorebook.
+  await lorebookLoaded()
+  if (runStale(run)) return
   const state = useGameStore.getState()
 
   // The playthrough has ended badly.
@@ -592,12 +605,16 @@ async function startOrientationScene(): Promise<void> {
 
   console.log(`[cast] orientation → cast: ${cast.map(nameOf).join(', ') || 'nobody — solo scene'}`)
 
+  // Day 0 replayed from a reload is built before anything else could have waited on the read.
+  await lorebookLoaded()
+  if (runStale(run)) return
+
   const castCharacters = castCharactersOf(cast)
   const solo = cast.length === 0
   const state = promptState()
   const request = solo
-    ? buildSoloPrompt(action, state, SETTING, reader())
-    : buildScenePrompt(castCharacters, action, state, SETTING, reader())
+    ? buildSoloPrompt(action, state, settingNow(), reader())
+    : buildScenePrompt(castCharacters, action, state, settingNow(), reader())
   await runSceneTurn(
     streamScene(request, undefined, { forceShowSpeakers: !solo }),
     snapshot,
@@ -693,7 +710,7 @@ async function startCreatedOpening(): Promise<void> {
     castCharacters,
     action,
     { ...promptState(), openingOutfits },
-    SETTING,
+    settingNow(),
     reader()
   )
   await runSceneTurn(
@@ -735,7 +752,7 @@ export async function startFarewellScene(charId: string): Promise<void> {
   console.log(`[cast] farewell → ${nameOf(charId)}`)
 
   const castCharacters = castCharactersOf([charId])
-  const request = buildScenePrompt(castCharacters, action, promptState(), SETTING, reader())
+  const request = buildScenePrompt(castCharacters, action, promptState(), settingNow(), reader())
   await runSceneTurn(
     streamScene(request, undefined, { forceShowSpeakers: true }),
     snapshot,
@@ -1069,7 +1086,11 @@ async function fetchSlotIntro(
   // about it can be banked.
   const rumorPlace =
     occasions.length === 0 && askers.length === 0
+<<<<<<< HEAD
       ? useGrabBagStore.getState().draw(RUMOR_PLACE_BAG, availableLore(), loreKeyOf)
+=======
+      ? useGrabBagStore.getState().draw(RUMOR_PLACE_BAG, rumorPoolOf(lorebookNow()), loreKeyOf)
+>>>>>>> update/core-0.6.0
       : undefined
 
   // Built once and re-sent verbatim on retry; only a hand edit replaces it.
@@ -1105,7 +1126,7 @@ async function fetchSlotIntro(
       ...(visitor ? { homecomingVisitor: visitor } : {}),
       ...(backgroundLore.length > 0 ? { backgroundLore } : {})
     },
-    SETTING,
+    settingNow(),
     // His cold as it stands in the slot opening, not the one ending.
     reader(view, { date, time })
   )
@@ -1618,7 +1639,8 @@ async function castTurn(
   }
 
   // A plan's own button is a meeting with its attendees whatever the words sound like, as the
-  // same plan begun from her reminder is, and also whatever kind of scene the words are.
+  // same plan begun from her reminder is, and also whatever kind of scene the words are. Anybody
+  // with another plan this slot whom the words name comes past her class or shift too.
   const event = planOf(snapshot)
   const attendees = event ? planAttendees(event) : []
   const meeting = event ? meetingKindOf(actionType) : null
@@ -1765,8 +1787,8 @@ function castProjectTurn(
 
 /**
  * Every other verdict: the people the reader named, or whoever he runs into, in the kind of
- * scene the verdict is. A plan's `attendees` come first and clear the busy gate, as the plan's
- * own button brings them.
+ * scene the verdict is. A plan's `attendees` come first, as the plan's own button brings them,
+ * and anybody called who has a plan this slot clears the busy gate.
  */
 function castPeopleTurn(
   mentioned: string[],
@@ -1786,7 +1808,7 @@ function castPeopleTurn(
   }
 
   const called = [...attendees, ...mentioned]
-  const composed = composeMeeting({ called, attendees, inPublic, sceneLocation }, kind)
+  const composed = composeMeeting({ called, inPublic, sceneLocation }, kind)
 
   // A named cast that is entirely busy is refused; a partly free one plays, with the absences
   // written under the action.
@@ -1818,8 +1840,8 @@ function buildTurnRequest(
   const state = promptState()
   if (!isContinuation) {
     return solo
-      ? buildSoloPrompt(sceneAction, state, SETTING, reader())
-      : buildScenePrompt(castCharacters, sceneAction, state, SETTING, reader())
+      ? buildSoloPrompt(sceneAction, state, settingNow(), reader())
+      : buildScenePrompt(castCharacters, sceneAction, state, settingNow(), reader())
   }
 
   const game = useGameStore.getState()
@@ -1828,7 +1850,7 @@ function buildTurnRequest(
     sceneAction,
     sceneSoFar(),
     state,
-    SETTING,
+    settingNow(),
     reader(),
     game.sceneSummary,
     // `logPlayerAction` ran above, so the count off the log is this action's ordinal — the
@@ -2069,7 +2091,7 @@ async function runClosing(dropped: () => boolean): Promise<boolean> {
     loopState.closingCastPresent,
     sceneSoFar(),
     promptState(),
-    SETTING,
+    settingNow(),
     reader(),
     game.sceneSummary
   )
@@ -3006,6 +3028,7 @@ export function resetLoop(): void {
   dropEndingArt()
   // The same, for the picture the reader's profile draws.
   dropProfilePicture()
+  useLorebookStore.getState().drop()
 }
 
 /**
@@ -3029,6 +3052,8 @@ export function enterGame(
   game.loadSave(save, record, characters)
   // A read nothing on screen is waiting on: the profile is not open yet.
   void loadProfilePicture()
+  // Waited on by the first prompt the stay builds, never by the entry itself.
+  void useLorebookStore.getState().load(useGameStore.getState().playthroughId)
   gameEntered()
   // The file a slot opening is folded back into: a boundary's own save, never the autosave or a
   // manual one.
@@ -3116,6 +3141,7 @@ export function enterGame(
 async function writeDecisionPoint(): Promise<void> {
   if (loopState.decisionSave) await writeAutosave(loopState.decisionSave)
   await writesSettled()
+  await lorebookSettled()
 }
 
 /**
@@ -3164,6 +3190,7 @@ export async function abandonToMenu(): Promise<void> {
   // The teardown first: it fences the run, so a write queued but not yet started is dropped.
   leaveGame(true)
   await writesSettled()
+  await lorebookSettled()
 }
 
 /**

@@ -133,6 +133,25 @@
   overflow: hidden;
 }
 
+/* The pills a sprite raises when it offers more than one control: a stack centred on the
+   picture that takes the pointer only through its pills. */
+.vu-wardrobe-pills {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  pointer-events: none;
+}
+
+/* Each wears the picture's pill, standing in the stack rather than over the sprite. */
+.vu-wardrobe-pills > .vu-pic-action {
+  position: static;
+  border: 0;
+}
+
 .vu-wardrobe-empty {
   color: var(--vu-text-muted);
   font: 700 12px var(--font-mono);
@@ -376,16 +395,12 @@
 }
 
 /* A tile that is only an offer takes the width of what it holds rather than its share of the
-   row, and its count has nothing to be short of, so it reads in the accent. */
+   row. */
 .vu-landscape--auto {
   flex: 0 0 auto;
   /* Its own size, so it has one to take: a size container has none in that axis, and this
      tile carries no control the query above needs to stack. */
   container-type: normal;
-}
-
-.vu-landscape--auto .vu-count {
-  color: var(--vu-accent);
 }
 
 /* A tile with a control and no peek hugs its words where the row is wide, so the room beside

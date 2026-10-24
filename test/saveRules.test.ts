@@ -70,12 +70,12 @@ describe('assertSafeSaveId', () => {
   })
 
   it('takes a manual slot inside the range and refuses one outside it', () => {
-    for (const manual of ['manual01', 'manual90', manualSaveId(MANUAL_SAVE_SLOTS)]) {
+    for (const manual of ['manual01', 'manual90', 'manual100', manualSaveId(MANUAL_SAVE_SLOTS)]) {
       expect(classifySaveId(manual)).toBe('manual')
       expect(() => assertSafeSaveId(manual)).not.toThrow()
     }
 
-    const outside = ['manual0', 'manual00', 'manual91', 'manual007', 'manual-1']
+    const outside = ['manual0', 'manual00', 'manual0100', 'manual007', 'manual-1']
     for (const unsafe of [...outside, manualSaveId(MANUAL_SAVE_SLOTS + 1)]) {
       expect(classifySaveId(unsafe)).toBeNull()
       expect(() => assertSafeSaveId(unsafe)).toThrow()
@@ -85,10 +85,11 @@ describe('assertSafeSaveId', () => {
 
 describe('the save id kinds', () => {
   it('names a slot and reads it back off its id', () => {
-    for (const slot of [1, 9, MANUAL_SAVE_SLOTS]) {
+    for (const slot of [1, 9, 100, MANUAL_SAVE_SLOTS]) {
       expect(manualSlotOf(manualSaveId(slot))).toBe(slot)
     }
     expect(manualSaveId(7)).toBe('manual07')
+    expect(manualSaveId(100)).toBe('manual100')
     expect(manualSlotOf('1700000000000')).toBeNull()
     expect(manualSlotOf(AUTOSAVE_ID)).toBeNull()
   })

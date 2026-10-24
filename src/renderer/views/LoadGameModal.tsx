@@ -5,7 +5,6 @@ import { toAppError } from '@shared/errors'
 import { classifySaveId, manualSlotOf } from '@shared/saveRules'
 import { seasonOf, semesterName, semesterOf, type SemesterView } from '@shared/semesters'
 import {
-  MANUAL_SAVE_SLOTS,
   MAX_SLOT_SAVES,
   fullNameOf,
   type Character,
@@ -85,9 +84,6 @@ interface Entering {
   record: PlaythroughRecord
   characters: Character[]
 }
-
-/** Pages of the second level: the autosaves, then the manual slots ten to a page. */
-const LOAD_PAGES = 1 + MANUAL_SAVE_SLOTS / SAVE_PAGE_CELLS
 
 /** When a file was written, in the machine's own locale. */
 export function writtenAt(savedAt: number): string {
@@ -191,6 +187,13 @@ export function pageEntriesOf(saves: readonly ResolvedSave[], page: number): Sav
     const entry = saves.find((candidate) => manualSlotOf(candidate.saveId) === slot)
     return entry ? cardOf(entry, sticker) : { kind: 'empty', slot, sticker }
   })
+}
+
+/** How many pages of manual slots it takes to reach the highest slot in use; none where none is. */
+export function manualPagesOf(saves: readonly ResolvedSave[]): number {
+  let highest = 0
+  for (const entry of saves) highest = Math.max(highest, manualSlotOf(entry.saveId) ?? 0)
+  return Math.ceil(highest / SAVE_PAGE_CELLS)
 }
 
 /**
@@ -491,11 +494,16 @@ export function LoadGameModal({ theme, onClose }: LoadGameModalProps): JSX.Eleme
   // A name is written onto the record, so a playthrough whose record was refused takes none.
   const renamable = Boolean(selected && !waiting && saves.some((entry) => entry.record))
 
+  // The autosaves, then the manual slots up to the last page with a save on it. A page whose
+  // last save was deleted mid-view gives way to the last that stands.
+  const loadPages = 1 + manualPagesOf(saves)
+  const shownPage = Math.min(page, loadPages - 1)
+
   /** The arrow keys turn the page of saves, as the arrows beside it do. */
   useWindowKeydown((event) => {
     if (!selected || waiting || covered || asking || typingIn(event)) return
-    if (event.key === 'ArrowLeft') setPage((current) => wrapPage(current - 1, LOAD_PAGES))
-    else if (event.key === 'ArrowRight') setPage((current) => wrapPage(current + 1, LOAD_PAGES))
+    if (event.key === 'ArrowLeft') setPage(wrapPage(shownPage - 1, loadPages))
+    else if (event.key === 'ArrowRight') setPage(wrapPage(shownPage + 1, loadPages))
   })
 
   /** Hydrates the held save and hands it to whoever runs it, under the cover. */
@@ -578,10 +586,13 @@ export function LoadGameModal({ theme, onClose }: LoadGameModalProps): JSX.Eleme
               <SavePagesGrid
                 id="save-pages"
                 mode="load"
-                entries={pageEntriesOf(saves, page)}
-                page={page}
-                pageCount={LOAD_PAGES}
+                entries={pageEntriesOf(saves, shownPage)}
+                page={shownPage}
+                pageCount={loadPages}
                 onPage={setPage}
+                // A lone page of autosaves has nowhere to turn, so it stands no arrows.
+                ring={loadPages > 1}
+                count={shownPage === 0 ? 'AUTOSAVES' : `${shownPage} / ${loadPages - 1}`}
                 held={!settled}
                 onPick={(card) => {
                   const entry = saves.find((candidate) => candidate.saveId === card.saveId)

@@ -181,32 +181,6 @@
   height: 52px;
 }
 
-/* The background's slot, as Create Photo's: the add pill alone, or the picture beside its change
-   pill and ✕, held at the picture's height so neither state moves anything. */
-.vu-scene-bg {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  height: 52px;
-}
-
-.vu-scene-bg-thumb {
-  display: block;
-  flex: none;
-  width: 92px;
-  height: 52px;
-  overflow: hidden;
-  border-radius: 14px;
-  background: var(--vu-recessed);
-}
-
-.vu-scene-bg-img {
-  display: block;
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
-
 /* The opening: three lines of well, growing with what is typed and then scrolling, giving up
    height before anything else on the column does. 33px is `.vu-input--multiline`'s padding and
    border doubled. */

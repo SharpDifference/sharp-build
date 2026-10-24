@@ -5,7 +5,7 @@ import { PageArrows } from './PageArrows'
 import { cardSwell, dealt, gestures, rowLift, rowPress, slideInQuick } from '../views/motion'
 import '../vu_styles/SavePages.css'
 
-/** The ring the save pages turn on, for the panels that turn them by key. */
+/** The ring Load Game's pages turn on, for turning them by key. */
 export { wrapPage } from './PageArrows'
 
 /** How many cells one page of saves holds: two columns of five. */
@@ -47,6 +47,12 @@ export interface SavePagesGridProps {
   page: number
   pageCount: number
   onPage: (page: number) => void
+  /** Whether the pages are a ring, as the arrows read it. */
+  ring?: boolean
+  /** Off the ring, whether turning past the last page opens a blank one. */
+  open?: boolean
+  /** Where the page on screen stands in the run, said under it. */
+  count: string
   onPick: (entry: SaveGridCard) => void
   onPickEmpty?: (entry: SaveGridEmpty) => void
   onDelete?: (entry: SaveGridCard) => void
@@ -60,9 +66,9 @@ export interface SavePagesGridProps {
 const PAGE_DEAL = dealt(0, 0.02)
 
 /**
- * A page of saves in two columns, between the arrows that turn it and over a dot per page. The
- * wheel over any of it turns the page a notch at a time, and turning past either end lands on
- * the other.
+ * A page of saves in two columns, between the arrows that turn it and over where it stands in
+ * the run. The wheel over any of it turns the page a notch at a time; whether turning past an
+ * end wraps, stops or opens a blank page is the caller's.
  */
 export function SavePagesGrid({
   id,
@@ -71,6 +77,9 @@ export function SavePagesGrid({
   page,
   pageCount,
   onPage,
+  ring,
+  open,
+  count,
   onPick,
   onPickEmpty,
   onDelete,
@@ -84,6 +93,9 @@ export function SavePagesGrid({
       page={page}
       pageCount={pageCount}
       onPage={onPage}
+      ring={ring}
+      open={open}
+      count={count}
       busy={busy}
     >
       <motion.ul

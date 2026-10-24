@@ -54,6 +54,7 @@ import {
 } from '../../prompts/textingPrompt'
 import { upcomingPlanLines } from '../../prompts/upcomingPlans'
 import { useAssetStore } from '../assetStore'
+import { lorebookNow } from '../lorebookStore'
 import { useSettingsStore } from '../settingsStore'
 import { readyCustomCgs, readyOutfitSets } from '../characterStore'
 import { useGameStore, type SceneKind } from '../gameStore'
@@ -236,6 +237,11 @@ export async function loadCgReady(cast: readonly string[]): Promise<void> {
   useGameStore.setState({ cgReady: ready, customCgReady, outfitReady, roomReady })
 }
 
+/** The secret a scene with this cast tells: a girl cast alone tells the one she has waiting. */
+export function secretToTell(cast: readonly string[]): string | undefined {
+  return cast.length === 1 ? pendingSecretOf(useGameStore.getState().charInfo[cast[0]]) : undefined
+}
+
 /**
  * Puts a decided cast on the stage and settles the phone for the slot it spends — the one
  * sequence every scene start runs. A girl cast alone tells the secret she has waiting.
@@ -243,8 +249,7 @@ export async function loadCgReady(cast: readonly string[]): Promise<void> {
 export async function applyCast(cast: string[], scene?: SceneKind): Promise<void> {
   cancelAllTexts()
   const { ignored, turnedDown } = expireHangoutInvitations(cast)
-  const secret =
-    cast.length === 1 ? pendingSecretOf(useGameStore.getState().charInfo[cast[0]]) : undefined
+  const secret = secretToTell(cast)
   await stageCast(cast, {
     ...scene,
     ...(ignored.length > 0 ? { ignoredInvites: ignored } : {}),
@@ -443,6 +448,7 @@ export function promptState(): PromptState {
     date: game.date,
     time: game.time,
     backgrounds: cityLifeBackgrounds(useAssetStore.getState().backgrounds),
+    lorebook: lorebookNow(),
     charInfo: game.charInfo,
     exCharacterDynamics: game.exCharacterDynamics,
     npcRelationships: game.npcRelationships,

@@ -5,6 +5,12 @@
    The veil, the panel, the grid, the cells, the pill, the ✕ and the foot are base.css's and
    ImageGallery.css's. */
 
+/* The page takes the row between the arrows, which are PageArrows.css's. */
+.vu-customcgs .vu-gallery-grid {
+  flex: 1;
+  min-width: 0;
+}
+
 /* A custom CG's name is written lowercase and shown exactly as written, the box that renames
    it included; a name runs to the cell's width before it wraps. */
 .vu-customcgs .vu-gallery-caption {

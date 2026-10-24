@@ -286,6 +286,14 @@ describe('openaiAdapter.buildCall sampling', () => {
     expect('top_k' in body).toBe(false)
     expect('repetition_penalty' in body).toBe(false)
   })
+
+  it('sends the tier only where one is carried', () => {
+    const tiered = openaiAdapter.buildCall(context({})).body as Record<string, unknown>
+    expect(tiered.service_tier).toBe('priority')
+    const none = openaiAdapter.buildCall({ ...context({}), serviceTier: undefined })
+      .body as Record<string, unknown>
+    expect('service_tier' in none).toBe(false)
+  })
 })
 
 describe('modelIdsOf', () => {

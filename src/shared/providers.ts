@@ -37,6 +37,29 @@ export const SERVICE_TIER_LABELS: Record<ServiceTier, string> = {
   flex: 'Flex'
 }
 
+/**
+ * What a custom endpoint may be sent as `service_tier`, in the order Settings lists them after
+ * None. `default` and `standard` are one tier spelled two ways: OpenAI's and Google's.
+ */
+export const ENDPOINT_SERVICE_TIERS = ['auto', 'priority', 'default', 'standard', 'flex'] as const
+export type EndpointServiceTier = (typeof ENDPOINT_SERVICE_TIERS)[number]
+
+/** Shown in the Settings dropdown. */
+export const ENDPOINT_SERVICE_TIER_LABELS: Record<EndpointServiceTier, string> = {
+  auto: 'Auto',
+  priority: 'Priority',
+  default: 'Default',
+  standard: 'Standard',
+  flex: 'Flex'
+}
+
+/** A stored custom-endpoint tier, or undefined for none or anything this build does not offer. */
+export function endpointServiceTierFor(stored: unknown): EndpointServiceTier | undefined {
+  return ENDPOINT_SERVICE_TIERS.includes(stored as EndpointServiceTier)
+    ? (stored as EndpointServiceTier)
+    : undefined
+}
+
 /** One selectable model with per-model request tuning. */
 export interface ModelConfig {
   /** Sent as the request's `model` field. Use the canonical id, not an alias. */
@@ -229,7 +252,8 @@ const PROVIDERS: Record<ProviderApi, ProviderConfig> = {
     api: 'openai',
     // The root is the player's, read off the settings at call time by `providerToRun`.
     baseUrl: '',
-    // The custom adapter sends no tier field, so only the tier that sends nothing is offered.
+    // Gemini's queues are not resolved here: a custom endpoint's tier is its own
+    // `endpointServiceTier`, which `serviceTierToSend` reads in their place.
     serviceTiers: ['standard'],
     defaultModel: '',
     defaultSecondaryModel: '',
@@ -351,4 +375,15 @@ export function serviceTierFor(apiProvider: ProviderApi, stored: string | undefi
   return isServiceTier(stored) && provider.serviceTiers.includes(stored)
     ? stored
     : provider.serviceTiers[0]
+}
+
+/**
+ * The tier a call names. Gemini resolves its own setting, absent reading as priority; a custom
+ * endpoint reads the tier beside its effort, absent or unknown naming none, so a call sends none.
+ */
+export function serviceTierToSend(
+  settings: Settings
+): ServiceTier | EndpointServiceTier | undefined {
+  if (settings.apiProvider === 'openai') return endpointServiceTierFor(settings.endpointServiceTier)
+  return serviceTierFor(settings.apiProvider, settings.serviceTier)
 }

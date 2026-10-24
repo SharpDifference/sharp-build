@@ -3,19 +3,18 @@ import { EMOTIONS } from '@shared/emotions'
 import type { PromptEdit } from '@shared/imagePrompt'
 import {
   CUSTOM_OUTFIT_NAME_MAX,
-  CUSTOM_OUTFIT_SLOTS,
   followsMain,
   offeredCustomOutfits,
-  OUTFIT_SETS,
   outfitTagsFor,
   parseSpriteRef,
+  STOCK_OUTFIT_SETS,
   spriteRef,
   storedRefOf,
   withCustomOutfit,
   withoutCustomOutfit,
   writtenRefOf
 } from '@shared/outfits'
-import type { CustomOutfit } from '@shared/types'
+import type { CustomOutfit, OutfitSet } from '@shared/types'
 import { character } from './fixtures'
 
 /**
@@ -26,12 +25,22 @@ import { character } from './fixtures'
 
 describe('parseSpriteRef', () => {
   it('reads back every reference `spriteRef` can write', () => {
+    // Her own slots have no top, so a low one and a high one stand for them all.
+    const sets: OutfitSet[] = [...STOCK_OUTFIT_SETS, 'custom1', 'custom12', 'custom9007199254740991']
     for (const emotion of EMOTIONS) {
       expect(parseSpriteRef(spriteRef(emotion, null))).toEqual({ emotion, set: null })
-      for (const set of OUTFIT_SETS) {
+      for (const set of sets) {
         expect(parseSpriteRef(spriteRef(emotion, set))).toEqual({ emotion, set })
       }
     }
+  })
+
+  it('reads nothing that only looks like one of her slots', () => {
+    // A ref under such a set would name a folder no render writes to.
+    for (const set of ['custom0', 'custom01', 'custom', 'customx', 'custom1.5', 'customcg1']) {
+      expect(parseSpriteRef(`happy_${set}`)).toBeNull()
+    }
+    expect(parseSpriteRef('happy_custom9007199254740993')).toBeNull()
   })
 })
 
@@ -101,15 +110,29 @@ describe('offeredCustomOutfits', () => {
         custom2: wardrobe('maid'),
         custom3: wardrobe('pe'),
         custom4: wardrobe('custom1'),
-        custom5: { name: 'nurse', tags: ['x'] }
+        custom5: { name: 'nurse', tags: ['x'] },
+        custom10: wardrobe('custom99'),
+        custom12: wardrobe('nurse')
       }
     })
-    const offered = offeredCustomOutfits(dressed, [...CUSTOM_OUTFIT_SLOTS])
+    const offered = offeredCustomOutfits(dressed, [
+      'custom12',
+      'custom10',
+      'custom5',
+      'custom4',
+      'custom3',
+      'custom2',
+      'custom1'
+    ])
+    // In slot-number order whatever order they came in; a name shaped like any slot's id, one
+    // she has or not, answers to a set.
     expect(offered.map((outfit) => [outfit.slot, outfit.suffix])).toEqual([
       ['custom1', 'maid'],
       ['custom2', 'custom2'],
       ['custom3', 'custom3'],
-      ['custom4', 'custom4']
+      ['custom4', 'custom4'],
+      ['custom10', 'custom10'],
+      ['custom12', 'nurse']
     ])
     // Not whole on disk, nothing offered.
     expect(offeredCustomOutfits(dressed, ['custom2', 'pe']).map((outfit) => outfit.slot)).toEqual([
