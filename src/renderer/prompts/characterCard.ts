@@ -1,7 +1,7 @@
 import { SUBJECT_TAGS } from '@shared/characterRules'
 import { loveLifeBlurb } from '@shared/relationship'
 import { hairColorOf, OUTFIT_SKIN_EXPOSURE } from '@shared/tags'
-import { TRAIT_DESCRIPTIONS } from '@shared/traits'
+import { traitDescription } from '@shared/traits'
 import { fullNameOf, type Character } from '@shared/types'
 import { SETTING } from './setting'
 
@@ -99,7 +99,10 @@ function descriptionSections(character: Character): string[] {
 
   if (character.traits.length > 0) {
     const traits = character.traits
-      .map((trait) => `${trait} (${TRAIT_DESCRIPTIONS[trait]})`)
+      .map((trait) => {
+        const description = traitDescription(trait)
+        return description ? `${trait} (${description})` : trait
+      })
       .join(', ')
     sections.push(`Traits: ${traits}`)
   }

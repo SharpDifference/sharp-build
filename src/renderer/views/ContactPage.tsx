@@ -17,7 +17,7 @@ import {
   memorySentence,
   relationshipTagOf
 } from '@shared/relationship'
-import { isCharacterTrait } from '@shared/traits'
+import { traitTone } from '@shared/traits'
 import { pendingSecretOf, SECRET_TIERS } from '@shared/secrets'
 import { fullNameOf, type CharMemory, type SecretTier, type StockOutfitSet } from '@shared/types'
 import { formatShortGameDate } from '../prompts/gameDate'
@@ -132,7 +132,7 @@ export function ContactPage({
   const affection = affectionFor(info, date, character)
   const tag = relationshipTagOf(flags, affection)
   // Each reveal shows on its persisted flag OR the live condition.
-  const traits = (character.traits ?? []).filter(isCharacterTrait)
+  const traits = (character.traits ?? []).filter((trait): trait is string => typeof trait === 'string')
   const showTraits = traits.length > 0 && (flags.knowsTraits || isPositive(affection))
   const showBackstory = Boolean(character.backstory) && (flags.knowsBackstory || isTrusted(affection))
   // Rides `knowsTraits`: same threshold, same one-way rule.
@@ -232,7 +232,7 @@ export function ContactPage({
                 {traits.length > 0 && (
                   <Field label= 'Traits'>
                     {showTraits ? (
-                      <Chips words={traits} tone="accent" mono />
+                      <Chips words={traits} tone="accent" mono traitColors />
                     ) : (
                       <Locked>??? — Unlocked at Friends</Locked>
                     )}
@@ -615,12 +615,14 @@ function Chips({
   words,
   empty,
   tone,
-  mono
+  mono,
+  traitColors = false
 }: {
   words: readonly string[]
   empty?: string
   tone?: 'deep' | 'accent'
   mono?: boolean
+  traitColors?: boolean
 }): JSX.Element {
   if (words.length === 0) {
     return <p className="vu-contact-empty">{empty ?? 'Nothing you know of.'}</p>
@@ -630,6 +632,7 @@ function Chips({
       {words.map((word) => (
         <span
           key={word}
+          data-tone={traitColors ? traitTone(word) : undefined}
           className={`vu-contact-chip${tone ? ` vu-contact-chip--${tone}` : ''}${
             mono ? ' vu-contact-chip--mono' : ''
           }`}

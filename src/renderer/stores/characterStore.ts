@@ -1,3 +1,4 @@
+import { generatedCharacterTraits } from '@shared/traits'
 import { create } from 'zustand'
 import { bytesToBase64 } from '@shared/base64'
 import { profileRel, roomRel, spriteRel } from '@shared/characterFiles'
@@ -1881,6 +1882,8 @@ async function runWritePipeline(
     return
   }
 
+  // One snapshot for the request and its response, even if switches change while queued.
+  const traits = generatedCharacterTraits()
   const prompt = buildCharacterPrompt(
     request.firstName,
     request.lastName,
@@ -1888,7 +1891,8 @@ async function runWritePipeline(
     poses,
     useGrabBagStore.getState().draw(SEED_WORD_BAG, SEED_WORDS),
     request.namesAreSuggestions,
-    request.reference
+    request.reference,
+    traits
   )
   // charId doubles as the cancellation group: `jobs:cancelGroup` aborts this request too.
   const drafted = await enqueueLlm(async () => {
@@ -1909,7 +1913,7 @@ async function runWritePipeline(
   const character = get().characters[charId]
   if (!character) return
 
-  const written = draftToCharacter(character, drafted.data, poses)
+  const written = draftToCharacter(character, drafted.data, poses, traits)
   const filled = request.lora ? withCharacterLora(written, request.lora) : written
   const missing = missingRequiredFields(filled)
   if (missing.length > 0) {

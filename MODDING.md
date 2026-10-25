@@ -111,6 +111,55 @@ Shared code holds no switches. Where a rule there has to follow one, give the ru
 a setter, and set it from `modsStore.ts` at boot and whenever a switch moves
 (`useModsStore.subscribe`). Continuing Semesters does this for its seniors option.
 
+## Character trait registration
+
+`shared/traits.ts` owns the native trait vocabulary and an additive registry. Register from
+the mod's shared entry before the first screen/request. The exact `value` is both the label
+and permanent string in `character.json`; do not rename a shipped value without a migration.
+
+```ts
+const unregister = registerCharacterTrait(MY_MOD, {
+  value: 'My stored trait',
+  description: 'What this trait means',
+  editor: true,          // default: offered by the editor when installed
+  generated: false,     // default: AI must never assign it
+  tone: 'my-mod-gold',   // optional data-tone token; the mod supplies its CSS
+  hint: 'A short explanation for the player.'
+})
+```
+
+This is one **registry** family, not a gameplay rule. Duplicate stored values, including a
+native value, throw an error naming both owners rather than picking by load order. Metadata
+is copied and frozen. Native traits keep their existing order; extensions sort by owner ID
+then stored value. The returned disposer removes only that registration and is safe to call
+twice; it does not change saved characters. The loader/diagnostic UI is separate work.
+
+#### When the registry is read
+
+| Consumer | Timing and policy |
+| --- | --- |
+| Character generator | `generatedCharacterTraits()` snapshots native traits plus explicitly `generated: true` traits whose owner is currently on. The writing pipeline takes one snapshot before building/queuing the request. Prompt text, schema and response parsing share it even if a mod is toggled or unregistered while generation is pending. A later registration can only affect the next request. |
+| Editor | `traitOptions(form.traits)` reads at each render, not module import. Installed metadata is available with the mod switch off, independently of its gameplay effect. `editor: false` prevents new selections; an already-saved value still gets its chip metadata. `selectedTraitHints` supplies the selected explanations. |
+| Character/contact chips | `traitTone` reads installed metadata when rendered; missing providers fall back to ordinary chips. Contact-page discovery conditions are unchanged. Core supplies `data-tone`, not a mod's visual design. |
+| Character card export | `traitDescription` reads metadata while constructing the card; an unknown trait exports its raw name without an `undefined` description. |
+| Scene/DM prompts | This registry does not automatically inject new instructions or enforce gameplay effects. Use the existing prompt hooks or a gameplay rule such as romance requirements. Native trait mechanics are unchanged. |
+
+Registration is currently a boot operation, before requests/screens. Functions reflect later
+registrations on their next call, but registration alone does not force a mounted React screen
+to rerender. An eventual hot installer must remount/refresh affected screens; this PR does not
+claim that loader lifecycle exists.
+
+`CHARACTER_TRAITS` and `TRAIT_DESCRIPTIONS` remain **native-only** constants for compatibility;
+new consumers must use the registry readers above. `isCharacterTrait` means "currently known",
+not "allowed from AI" and not "safe to retain on disk". Generation uses its explicit snapshot.
+Saved `CharacterTrait` strings are open, and load/import/export preserve unknown values.
+`editedCharacterTraits` permits offered additions while retaining existing unknown/hidden tags;
+only an explicit player removal drops one. A missing mod never rewrites the card.
+
+See `test/characterTraits.test.ts` for generator/editor separation, import-before-registration,
+pending-request snapshots, duplicate owners, deterministic order, metadata disposal, UI tone
+and hints, and read/edit/export with a missing provider. No particular mod trait ships in core.
+
 ## Screens and the files in the root
 
 A mod's screens follow `UI_STYLE_GUIDE.md`, but nobody edits it, nor any other file in the root
