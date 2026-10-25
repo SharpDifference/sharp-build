@@ -12,7 +12,7 @@ import type {
 } from '@shared/types'
 import type { GameOverReason } from '@shared/gameOver'
 import type { PostComment } from '@shared/postComments'
-import type { PlaythroughRecord } from '@shared/types'
+import type { PlaythroughRecord, TimeSlot } from '@shared/types'
 import type { TextingPromptState } from '../prompts/textingPrompt'
 import type { ResolvedSave } from '../stores/saveStore'
 import type { ViewName } from '../stores/uiStore'
@@ -37,6 +37,12 @@ export interface PromptSpots {
   dm: { character: Character; info: CharInfo | undefined; state: TextingPromptState }
   /** The status updates the slot's opening writes, one entry per post. */
   'slot-posts': Record<string, never>
+  /**
+   * One girl posting this slot, under her name in the slot's opening: lines only. The opening
+   * can be written while the slot before it is still playing, so `date` and `time` name the slot
+   * it is for.
+   */
+  'slot-poster': { character: Character; info: CharInfo; date: number; time: TimeSlot }
   /** The girl the slot's opening has texting the reader just to talk, one call per girl. */
   'slot-reach-outs': { character: Character; info: CharInfo; date: number }
   /** A character being generated. */
@@ -234,6 +240,8 @@ export interface ModHooks {
   postLikes?: (ask: LikesAsk) => number | undefined
   /** Whether a post is on her feed yet; every mod has to agree. */
   postVisible?: (post: SocialPost) => boolean
+  /** When a post came out after its slot began (ms since epoch); the first mod that answers. */
+  postOutAt?: (post: SocialPost) => number | undefined
   /** A way on from the ending, beside the menu; the first mod that answers is offered. */
   endingChoice?: (ctx: {
     reason: GameOverReason
@@ -403,6 +411,15 @@ export function postLikes(ask: LikesAsk, own: () => number): number {
 
 export function postVisible(post: SocialPost): boolean {
   return active().every((hooks) => hooks.postVisible?.(post) ?? true)
+}
+
+/** When a post came out after its slot began, or 0 for one out from the start. */
+export function postOutAt(post: SocialPost): number {
+  for (const hooks of active()) {
+    const at = hooks.postOutAt?.(post)
+    if (at !== undefined) return at
+  }
+  return 0
 }
 
 /**
