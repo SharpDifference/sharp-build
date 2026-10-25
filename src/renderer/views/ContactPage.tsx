@@ -20,7 +20,7 @@ import {
   memorySentence,
   relationshipTagOf
 } from '@shared/relationship'
-import { isCharacterTrait } from '@shared/traits'
+import { isCharacterTrait, traitTone } from '@shared/traits'
 import { pendingSecretOf, SECRET_TIERS } from '@shared/secrets'
 import { fullNameOf, type CharMemory, type SecretTier, type StockOutfitSet } from '@shared/types'
 import { formatShortGameDate } from '../prompts/gameDate'
@@ -249,7 +249,7 @@ export function ContactPage({
                 {traits.length > 0 && (
                   <Field label= 'Traits'>
                     {showTraits ? (
-                      <Chips words={traits} tone="accent" mono />
+                      <Chips words={traits} tone="accent" mono traitColors />
                     ) : (
                       <Locked>??? — Unlocked at Friends</Locked>
                     )}
@@ -637,12 +637,14 @@ function Chips({
   words,
   empty,
   tone,
-  mono
+  mono,
+  traitColors
 }: {
   words: readonly string[]
   empty?: string
   tone?: 'deep' | 'accent'
   mono?: boolean
+  traitColors?: boolean
 }): JSX.Element {
   if (words.length === 0) {
     return <p className="vu-contact-empty">{empty ?? 'Nothing you know of.'}</p>
@@ -652,6 +654,7 @@ function Chips({
       {words.map((word) => (
         <span
           key={word}
+          data-tone={traitColors ? traitTone(word) : undefined}
           className={`vu-contact-chip${tone ? ` vu-contact-chip--${tone}` : ''}${
             mono ? ' vu-contact-chip--mono' : ''
           }`}

@@ -28,27 +28,27 @@ actions have consequences outside the message list. Send a new message to make p
 - `test/textRegeneration.test.ts`: multi-bubble replacement, input checkpoint, restrictions,
   failure recovery, save ordering, and stale-response coverage.
 
-## Context and future Story Memory / SQLite integration
+## Context and Story Memory / SQLite integration
 
 New replies use the summary from **before** the rejected reply. Older saves without that
 checkpoint omit the contaminated summary and use at most 160 earlier messages; normal
 texting keeps its original history cap. This fallback cannot recover context already lost
 before the saved thread began.
 
-The native conversation is authoritative. A future memory index must reconcile the final
-message IDs and updated summary after the save succeeds, removing entries for replaced
-message IDs. It must not index the private generation result or reuse the rejected summary.
-No SQLite API is called here, and combined SQLite behavior still needs integration tests
-when that feature is ported. Turning this mod off hides regeneration and stops new grouping
+The native conversation is authoritative. Current Story Memory recalls durable facts and
+native encounter history, not individual raw text bubbles. Normal and regenerated replies use
+the same texting builder and enabled request hooks. No direct SQLite API is called here.
+If a future index adds raw messages, reconcile final message IDs only after the save succeeds;
+never index the rejected reply or reuse its contaminated summary. Turning this mod off hides regeneration and stops new grouping
 metadata; existing messages and checkpoints remain in saves.
 
-This source port is independent of Plot Twist, Breakthrough, City Life, and Story & Social.
-It adds only its own entry to `MODS`. When combining source PRs, retain each registry entry
-and each feature's imports at shared integration points.
+Text Regeneration is independent of Plot Twist, Breakthrough, City Life and Story Memory.
+Its shared entry is discovered automatically. Preserve each feature's imports and save
+bookkeeping at shared integration points.
 
-## Registration on core 0.3.1
+## Framework registration
 
 - `src/shared/modEntries/text-regeneration.ts` supplies its existing mod definition.
 - This mod has no renderer hook registration; its existing switch-gated integration stays in place.
 
-The stable IDs, defaults, dependencies, save fields and gameplay behavior are unchanged. Native character notes, scene-creator saves and calendar replays retain their 0.3.1 behavior. Merge framework updates from `core` into this mod branch; resolve conflicts with `main` on a separate `integrate/text-regeneration` branch.
+The stable IDs, defaults, dependencies, save fields and gameplay behavior are unchanged. Native character notes, scene-creator saves and calendar replays remain separate base-game features. Merge framework updates from `core` into this mod branch; resolve conflicts with `main` on a separate `integrate/text-regeneration` branch.

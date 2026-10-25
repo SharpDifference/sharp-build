@@ -2,6 +2,8 @@ import type { LocationDef } from './locations'
 import type { JobDef } from './jobs'
 
 export const CITY_LIFE_LOCATIONS: readonly LocationDef[] = [
+  { id: "dance_studio", label: "Dance Studio", icon: "💃",
+    blurb: "a welcoming Downtown dance studio with mirrored walls, a sprung floor and space for practice, lessons and social dancing; visitors of every skill level are welcome" },
   {
     "id": "bowling_alley",
     "label": "Lucky Strike Lanes",
@@ -23,6 +25,77 @@ export const CITY_LIFE_LOCATIONS: readonly LocationDef[] = [
 ]
 
 export const CITY_LIFE_JOBS: readonly JobDef[] = [
+  {
+  "id": "ex_dance_instructor",
+  "title": "Dance Instructor",
+  "employer": "Dance Studio",
+  "workplaceKey": "Dance Studio",
+  "locationId": "dance_studio",
+  "boss": {
+    "name": "Robin Ellis",
+    "title": "Studio Director, Dance Studio",
+    "emoji": "💃"
+  },
+  "pay": 300,
+  "hours": [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9,
+    10,
+    11,
+    12,
+    13
+  ],
+  "requires": {
+    "body": 3,
+    "heart": 3
+  },
+  "requiresSkills": [
+    {
+      "id": "body.dancer",
+      "label": "Dancer III",
+      "rank": 3
+    }
+  ],
+  "gains": [
+    {
+      "stats": [
+        "body"
+      ],
+      "text": "Demonstrating steps and leading practice improved your coordination..."
+    },
+    {
+      "stats": [
+        "heart"
+      ],
+      "text": "Encouraging nervous students improved your confidence and patience..."
+    }
+  ],
+  "duty": "teaching beginner dance classes, demonstrating footwork, helping students build confidence, and preparing group routines; adapt lessons to students and available space",
+  "blurb": "Turn your dance skills into a teaching career. $300 per shift.",
+  "description": "DANCE STUDIO — DANCE INSTRUCTOR (PART-TIME)\n\nHelp beginners find their rhythm and lead welcoming group classes at our Downtown studio.\n\nPlayer requirements: Dancer III through Campus Talents, Good Body and Good Heart. You must meet all three to apply. Choose shifts around your classes.\n\n$300 per shift before raises. Completed shifts improve Body or Heart. No application fee.\n\nEveryone is welcome to visit and practice, regardless of rank; these qualifications are for paid teaching only.",
+  "messages": {
+    "intro": "Welcome to the studio! I'm Robin, your director. Your first teaching shift is on the calendar. We'll start with beginners: clear demonstrations, patience, and room for everyone to learn.",
+    "raise": "Your classes are making a difference. I have approved a raise—thank you for helping our students grow.",
+    "missed": "Your class had no instructor today. Please check your roster. This is your first missed shift.",
+    "missed2": "That is a second missed teaching shift. Students are counting on you; one more and we will have to end your contract.",
+    "fired": "After three missed shifts, we have to end your teaching contract. You are still welcome to visit the studio.",
+    "quit": "Thanks for letting me know. Good luck with your studies, and keep dancing.",
+    "shiftApproved": "Your new class schedule is approved. It starts Sunday morning; please cover your current shifts until then.",
+    "shiftChange": "Your new teaching schedule is now active. Please check your calendar.",
+    "sick1": "Rest up. I will arrange cover for your class.",
+    "sick2": "We cannot excuse another absence this semester. Missing this shift will count as a strike.",
+    "welcomeBack": "Welcome back! Your previous pay rate is restored and your attendance record starts fresh. Let us get your classes going again.",
+    "coldNotice": "There is a flu going around. Please stay home if you are ill; I will cover your classes while you recover."
+  }
+},
   {
     "id": "ex_bowling",
     "title": "Lane & Counter Attendant",

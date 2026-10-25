@@ -17,6 +17,34 @@ Install over the official game only: uninstall any other mod first.
 Every mod in the build is listed on the **Mods** screen with its author, and can be turned on or
 off there. The mods' own guides are in [`docs/mods/`](docs/mods/).
 
+## Maestro mods
+
+The [feature index](docs/maestro-mods.md) lists the modules, default switches,
+dependencies and menu locations. The [technical guide](docs/maestro-technical-guide.md)
+explains save handling, AI context, artwork, semester carry and extension points.
+Documentation describes this source branch; use a published release's instructions for
+its supported Venus University version.
+
+- **Campus Talents** adds six skill trees and 43 skills, including Personal Growth.
+  Enable it in Mods and open **Skill trees** beside Echoes. Bond Points come from positive
+  interactions; average stats scale BP earnings only. Native stat gains, full skill bonuses
+  and semester decay keep their usual rules. It defaults off.
+- **Starting Challenge** extends the native per-stat New Game and Quickstart controls to
+  −30, −60, −80 and −100. Choose each stat independently; the arrows display rank titles.
+  It defaults off and works independently of Campus Talents.
+- **Godlike Standards** adds an optional gold **Godlike** character trait. Tagged characters
+  require Godly Brain, Body and Heart before a new romance. Existing relationships continue
+  normally. The mod defaults on, but no character receives the tag automatically.
+- **City Life** includes the **Dance Studio**, open to visitors at any skill rank.
+  The **Dance Instructor** job pays **$300 base per shift**, matching Barback, and requires
+  Dancer III, Good Body and Good Heart. Campus Talents remains usable without City Life.
+
+See [Campus Talents](docs/mods/campus-talents.md) for costs and limits,
+[Starting Challenge](docs/mods/starting-challenge.md) for negative-stat rules,
+[Godlike Standards](docs/mods/godlike-standards.md) for romance requirements and
+[City Life](docs/mods/city-life.md) for the studio. Authors can add talent packs using the
+[framework guide](docs/mods/talent-packs.md).
+
 ## Branches
 
 - `core`: the game from Venus Dev's public repository, plus the mod system, with no mods.

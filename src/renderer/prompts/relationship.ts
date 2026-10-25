@@ -7,8 +7,14 @@ import {
   isPositive
 } from '@shared/relationship'
 import { missingCrushStatOf } from '@shared/relationship'
+import { blocksNewRomance, romanceMinimumsOf } from '@shared/romanceRequirements'
+import { andList } from '@shared/sentences'
 import {
   DEFAULT_PLAYER_STATS,
+  STAT_KEYS,
+  STAT_LABELS,
+  tierNameOf,
+  tierOf,
   STAT_REQUIREMENT_PHRASES,
   type PlayerStats
 } from '@shared/playerStats'
@@ -186,6 +192,17 @@ export function relationshipLines(
   const name = character.firstName
   const lines: string[] = []
 
+  const modBlocked = attractionGate && blocksNewRomance(character, stats, flags)
+  if (modBlocked) {
+    const minimums = romanceMinimumsOf(character)
+    const required = STAT_KEYS.filter(key => minimums[key] !== undefined)
+      .map(key => `${STAT_LABELS[key]} at ${tierNameOf(tierOf(minimums[key]!))}`)
+    lines.push(`${name} requires ${andList(required)} before starting a romance. The reader has not met those requirements. ${name} will not initiate or accept romantic or sexual advances, kisses, hookups or becoming lovers. Friendship and ordinary affection can grow. Gifts, persuasion, mood and abilities do not override these requirements.`)
+    // A crush saved before the trait was added must not contradict the new requirement.
+    // This is prompt context only: no saved relationship flags are rewritten.
+    flags = { ...flags, hasCrush: false, benefits: false, harem: false }
+  }
+
   // Already third-person prose naming her and the stage, so no label.
   const behavior = character.behavior[behaviorLevelOf(flags, affection)]
   if (behavior) lines.push(behavior)
@@ -210,6 +227,7 @@ export function relationshipLines(
   if (!flags.isLover && !flags.hasCrush && !flags.benefits) {
     const missingStat = missingCrushStatOf(character, stats)
     const lustful =
+      !modBlocked &&
       mood !== undefined &&
       !mood.sick &&
       hasTrait(character, 'Promiscuous') &&
@@ -222,7 +240,7 @@ export function relationshipLines(
           ? `${name} isn't usually attracted to the reader, but she's down to fuck today.`
           : `${name} is down to fuck today.`
       )
-    } else if (missingStat && attractionGate) {
+    } else if (missingStat && attractionGate && !modBlocked) {
       lines.push(
         `${name} doesn't feel any attraction towards the reader ${flags.brokenUp > 0 ? 'anymore' : 'yet'}. He needs to be ${STAT_REQUIREMENT_PHRASES[missingStat]} first. ${name} won't make or accept romantic advances.`
       )

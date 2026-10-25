@@ -1,6 +1,9 @@
 # Echo Breakthrough abilities
 
-Source integration for Echoes and Breakthrough in the 0.4.0 community build. The complete draft is tracked in PR #53; see echo-validation.md for current validation and release limits.
+Echo abilities integrate Echo with Breakthrough in the current 0.5.0-based community build.
+See the [technical handoff](../maestro-technical-guide.md) for the source baseline.
+[echo-validation.md](echo-validation.md) retains dated historical checks; it is not a guarantee
+that every later runtime, provider or balance choice has been verified.
 
 ## Player behavior
 
@@ -39,7 +42,7 @@ Normal Breakthrough still costs **100 spirit**. Echo abilities cost **25 (Light)
 
 Only the selected character pays, including Wildspark and Daylark's group effects. An ability can be used once its price is reached; the remaining spirit stays in the bar. From 100, a 25-spirit ability permits four successful uses, a 50-spirit ability two, and a 75-spirit ability one with 25 left. Each needs its own open reply window. The bar still turns gold only at 100; lower-cost readiness reads ECHO READY. The selector, action button and Resonance description all show the price and influence tier. It does not refill bars, charge other characters, spend the player's one aspect change, or add automatic relationship points. Echo abilities activate directly with the catalog's preset action, without a custom text box. The activation handler enforces that preset even if a caller supplies other text. Normal Breakthrough keeps its text box and still requires the player's action text. Existing Echo matching/competing affinity remains a separate end-of-slot rule.
 
-This is a narrative prompt effect, not a guaranteed outcome or a numerical power. The model receives it for one scene response only. The prototype uses the existing scene request; it makes no additional AI call just to activate an ability. Replays, created scenes, absent targets and closed reply windows cannot activate it. It creates no new story lore or literal summoning mechanics.
+This is a narrative prompt effect, not a guaranteed outcome or a numerical power. The model receives it for one scene response only. The integration uses the existing scene request; it makes no additional AI call just to activate an ability. Replays, created scenes, absent targets and closed reply windows cannot activate it. It creates no new story lore or literal summoning mechanics.
 
 ## Source integration and save safety
 

@@ -1,3 +1,7 @@
+import { payableShift } from './jobs'
+import { TALENTS, buyTalent, transferSavings, normalizeTalents } from '@shared/campusTalents'
+import { applyTalentChoice, type TalentChange } from '../talentActions'
+import { buyTraining } from '@shared/talentTrading'
 import { normalizeReckoning, type ReckoningState } from '@shared/reckoning'
 import type { CharacterDynamics } from '@shared/characterDynamics'
 import { assertEchoEdit, normalizeEcho, type EchoState } from '@shared/echo'
@@ -6,7 +10,7 @@ import { appError, toAppError } from '@shared/errors'
 import { PLOT_TWIST_MOD, validatePlotTwist } from '@shared/plotTwists'
 import { modIsOn } from '../modsStore'
 import { normalizeWhisper, VENUS_WHISPER_MOD, type VenusWhisper } from '@shared/venusWhisper'
-import { reconcileBreakthrough } from '@shared/breakthrough'
+import { reconcileTalentBreakthrough } from '@shared/talentAbilities'
 import { withMeanwhile, type MeanwhileScene } from '@shared/meanwhile'
 import type { Conversation } from '@shared/types'
 import { gameOverReasonOf, type GameOverReason } from '@shared/gameOver'
@@ -118,7 +122,7 @@ export function writeAutosave(scene: SceneState | null): Promise<void> {
     if (!playthroughId) return
     const draft: SaveDraft = { ...game.toGameSave(), scene,
       // Project discarded outcomes and their recorded charges onto the same decision point.
-      exBreakthrough: reconcileBreakthrough(game.exBreakthrough, scene?.transcript ?? [], game.date, game.time,
+      ...reconcileTalentBreakthrough(game, scene?.transcript ?? [],
         scene && !game.replaying && !game.createdScene ? game.currentSceneTranscript : undefined)
     }
 
@@ -335,7 +339,7 @@ export function endingGameOver(): GameOverReason | null {
   const game = useGameStore.getState()
   const ledger = loopState.pendingLedgerResult
   if (!ledger) return null
-  const shift = loopState.jobShift
+  const shift = payableShift(loopState.jobShift)
   const money = game.statusShown
     ? game.money
     : shift
@@ -622,6 +626,47 @@ export async function writeEcho(next: EchoState, previous: EchoState, active: ()
   } finally {
     manualWriting = false
   }
+}
+
+/** Purchases and savings join the native queue; a failed write spends nothing. */
+export async function writeTalentChange(action: TalentChange): Promise<void> {
+  const start=useGameStore.getState()
+  const owns=():boolean=>{
+    const now=useGameStore.getState()
+    return now.playthroughId===start.playthroughId && now.loads===start.loads && now.date===start.date && now.time===start.time && now.semesterIndex===start.semesterIndex && now.stats===start.stats && now.exTalents===start.exTalents && now.money===start.money && now.charInfo===start.charInfo && now.classRecords===start.classRecords && now.currentSceneTranscript===start.currentSceneTranscript
+  }
+  const available=():boolean=>owns() && modIsOn('campus-talents') && !start.replaying && !start.createdScene && !start.sceneEnding && !start.statusShown
+  if (!available() || manualSaveOffer()!=='open') throw Error('Wait until the scene or messages have finished before spending points.')
+  let written=false
+  manualWriting=true
+  try {
+    await queueWrite(async()=>{
+      if (!available() || saveOffer(false)!=='open') return
+      const now=useGameStore.getState()
+      const draft=manualSaveDraft() ?? (!sceneActiveOf(now)?{...now.toGameSave(),scene:null}:null)
+      if (!draft || !now.playthroughId) throw Error('No safe save point is available.')
+      let exTalents=normalizeTalents(now.exTalents), money=now.money, stats=now.stats
+      if ('skill' in action) {
+        exTalents=buyTalent(exTalents,action.skill,modIsOn)
+        if ((TALENTS.find(d=>d.id===action.skill)?.effects?.savingsRate?.length??0)>0) exTalents={...exTalents,savingsDay:now.date,savingsSeen:now.date,savingsTerm:now.semesterIndex,reserveFloor:exTalents.reserve}
+      } else if ('transfer' in action) {
+        const moved=transferSavings(exTalents,money,action.transfer)
+        exTalents=moved.talents; money=moved.money
+        if (now.exTalents.reserve===0) exTalents={...exTalents,savingsDay:now.date,savingsSeen:now.date,savingsTerm:now.semesterIndex,reserveFloor:exTalents.reserve}
+      } else if ('train' in action) {
+        if (now.sceneQuiz || now.sceneClass!==null || now.sceneProject!==null || now.sceneJob!==null) throw Error('Finish the class, project or work scene before training.')
+        const trained=buyTraining(exTalents,stats,action.train,now.semesterIndex,now.date)
+        exTalents=trained.talents; stats=trained.stats
+      } else exTalents=applyTalentChoice(now,exTalents,action)
+      const result=await window.api.saves.autosave(now.playthroughId,{...draft,exTalents,money,stats})
+      if (!result.ok) throw Error(result.error.message)
+      if (!available()) return
+      if (loopState.statusBase) loopState.statusBase={...loopState.statusBase,exTalents,money,stats}
+      useGameStore.setState({exTalents,money,stats})
+      written=true
+    })
+    if (!written) throw Error('The game changed. Reopen Skill trees and try again.')
+  } finally { manualWriting=false }
 }
 
 /** One atomic save holds the spirit charge, round progress and earned Character Dynamics tag. */

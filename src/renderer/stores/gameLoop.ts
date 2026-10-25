@@ -1,4 +1,6 @@
-import { slotSettled } from '../mods/hooks'
+import { projectSlotMemories, slotSettled } from '../mods/hooks'
+import { talentProjectWork, talentStatGains } from '@shared/talentPerks'
+import { showUpHeartForScene } from './loop/talentShowUp'
 import { feedStatusLines } from './bunnyfeedsMemory'
 import { canContinueReckoning, pendingReckoningAftermath } from './reckoning'
 import { withReckoningAftermath } from '../prompts/reckoningPrompt'
@@ -226,7 +228,7 @@ import { sceneEventsFor } from './loop/sceneEvents'
 import { liveView, withCrushes, withRumorPass, type PostLedgerView } from './loop/ledgerView'
 import { registerLoopHooks } from './loop/hooks'
 import { failTurn, runSceneTurn } from './loop/turn'
-import { armSceneRecords, sceneRecordsOf, settleShifts } from './loop/jobs'
+import { armSceneRecords, lockShiftPay, sceneRecordsOf, settleShifts } from './loop/jobs'
 import {
   composeMeeting,
   kindLabel,
@@ -1968,10 +1970,15 @@ async function fetchEndingOpening(
 
   // The finished slot's settles, banked below for the boundary to apply.
   const rumor = rollRumorPass(ledger, projected.charInfo)
-  const seen = withRumorPass(projected.charInfo, rumor)
+  // Read the earned mod weights before rolling a crush or writing the opening. This
+  // is a projection only: rewards and ability use still commit at slotSettled.
+  const seen = projectSlotMemories(
+    { before: game, closingCast: loopState.closingCast ?? [] },
+    withRumorPass(projected.charInfo, rumor)
+  )
   // Safe on the exam prefetch too: a texting-only ledger carries no `stats`, and every other
   // input `resolveScene` reads is fixed before the exam starts.
-  const stats = applyStatDeltas(game.stats, resolveScene().deltas)
+  const stats = applyStatDeltas(game.stats, resolveScene().deltas, game.exStartingChallenge)
   // Rolled against the charInfo the witness pass just left and the post-scene stats, which is
   // what the boundary's fallback would see too.
   const crushes = rollCrushSettle(ledger, seen, stats)
@@ -2344,8 +2351,9 @@ function claimTextLedger(date: number, time: TimeSlot): Promise<LedgerResponse |
 }
 
 /** What the finished scene did to the reader's stats, and the lines that say so. */
-function resolveScene(): { deltas: PlayerStats; lines: StatusText[] } {
-  return resolveStatDeltas(loopState.pendingLedgerResult?.stats, {
+function resolveScene(): { deltas: PlayerStats; lines: StatusText[]; showUp: number } {
+  const game = useGameStore.getState()
+  const ctx: Parameters<typeof resolveStatDeltas>[1] = {
     // Not `closingCast`, which a resumed save has already cleared by this point.
     solo: useGameStore.getState().cast.length === 0,
     // The same fact the ledger's `STATS` section is dropped on: a class that went ahead.
@@ -2359,7 +2367,16 @@ function resolveScene(): { deltas: PlayerStats; lines: StatusText[] } {
     gradeOutcome: gradeOutcomeNow(),
     // Read at the scene's own slot, which a dose taken during it never moves.
     sick: readerSickNow()
-  })
+  }
+  const resolved = talentStatGains(game.exTalents, resolveStatDeltas(loopState.pendingLedgerResult?.stats, ctx), ctx,
+    game.sceneClass !== null && game.classes[game.sceneClass]?.category === 'pe', game.stats.heart)
+  // Add after training: an invitation reward must not trigger Social Ease or recovery.
+  const showUp = showUpHeartForScene(loopState.pendingLedgerResult, ctx.sick === true)
+  return {
+    deltas: { ...resolved.deltas, heart: resolved.deltas.heart + showUp },
+    lines: showUp ? [...resolved.lines, { text: `Show Up: Heart went up by ${showUp}.`, polarity: 'positive' }] : resolved.lines,
+    showUp
+  }
 }
 
 /** The status line at the end of a project work session. */
@@ -2371,7 +2388,7 @@ function projectStatusLines(): string[] {
   const period = projectPeriodOf(entry, game.date, game.calendar)
   if (!period) return []
   // The session being reported is not banked until the boundary, so it is counted in here.
-  const worked = workedOn(game.classRecords[loopState.projectWork.code], loopState.projectWork.exam) + 1
+  const worked = workedOn(game.classRecords[loopState.projectWork.code], loopState.projectWork.exam) + talentProjectWork(game.exTalents, game.time, {term:game.semesterIndex,date:game.date,...loopState.projectWork})
   return [projectProgressLine(entry.name, projectProgress(worked, period.needed))]
 }
 
@@ -2689,7 +2706,7 @@ function showStatusLines(): boolean {
   game.setStatusShown(true)
   // Money lands here, so the balance moves as the line reporting it is read.
   // `game` is the pre-spend snapshot, which is what the card counts *from*.
-  const shift = loopState.jobShift
+  const shift = lockShiftPay()
   const spent = shift ? 0 : spentOf(loopState.pendingLedgerResult?.spent)
   if (shift) game.spendMoney(-shift.pay)
   else if (spent > 0) game.spendMoney(spent)
@@ -2700,10 +2717,10 @@ function showStatusLines(): boolean {
   const projected = ledger ? projectLedger(game.charInfo, ledger, game.date) : null
   // `game.stats` is still the before-snapshot — the deltas land at the boundary — so the two
   // readings the rank-up screen walks between are both had here.
-  const after = applyStatDeltas(game.stats, resolved.deltas)
+  const after = applyStatDeltas(game.stats, resolved.deltas, game.exStartingChallenge)
   loopState.statusSteps = buildStatusSteps({
     movement: resolved.lines,
-    ups: tierUps(game.stats, resolved.deltas),
+    ups: tierUps(game.stats, resolved.deltas, game.exStartingChallenge),
     before: game.stats,
     after,
     ledgerNotes: [
@@ -2829,7 +2846,7 @@ async function crossSlotBoundary(): Promise<void> {
   loopState.statusSteps = []
   const ledger = loopState.pendingLedgerResult
   // Re-run: `resolveScene` is pure, so the numbers the player just read are the ones that land.
-  const { deltas } = resolveScene()
+  const { deltas, showUp } = resolveScene()
   loopState.pendingLedgerResult = null
   // The texts the boundary itself sends. The phone is still on screen here, and a landed text
   // rings only where the phone is shown, so they land under the cover below and the landing
@@ -2839,10 +2856,14 @@ async function crossSlotBoundary(): Promise<void> {
   // Before the deltas land: an exam is graded on the Brain he walked in with.
   recordAcademics(ledger)
   loopState.projectWork = null
+  if (showUp > 0) useGameStore.setState(current => ({
+    exTalents: { ...current.exTalents,
+      showUpDay: { term: game.semesterIndex, date: game.date } }
+  }))
   useGameStore.getState().applyStatDeltas(deltas)
   // `workedSlots` is what stops the next `settleShifts` striking a shift he turned up to.
   if (loopState.jobShift) {
-    const shift = loopState.jobShift
+    const shift = lockShiftPay()!
     loopState.jobShift = null
     const raised = useGameStore.getState().recordShiftWorked(shift.slotId, shift.pay)
     const jobId = useGameStore.getState().job?.jobId

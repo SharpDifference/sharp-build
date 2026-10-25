@@ -1,4 +1,4 @@
-# Custom soundtracks source port
+# Custom soundtracks
 
 Custom soundtracks is a self-contained, default-on `anytime` mod, ID `custom-soundtracks`.
 It needs the shared Mods framework, but does not depend on renaming, Plot Twist, Story Memory,
@@ -52,7 +52,7 @@ No saved playthrough is rewritten and no AI prompt or token budget is involved.
 | `src/main/ipc.ts` | Native file dialog and seven typed soundtrack handlers |
 | `src/preload/api.d.ts`, `src/preload/index.ts` | Typed renderer bridge |
 | `src/web/soundtracks.ts`, `src/web/bridge.ts` | Browser file picker and IndexedDB storage behind the same API |
-| `src/web/db/open.ts` | Database version 8: two additive soundtrack stores |
+| `src/web/db/open.ts` | Current database version 9; soundtrackMeta and soundtrackFiles retain the two additive soundtrack stores |
 | `src/renderer/stores/soundtrackStore.ts` | Import/decode/commit actions, busy state, errors and assignment state |
 | `src/renderer/stores/soundtrackAudio.ts` | Separate bounded decoded cache, stale-load fencing and fallback |
 | `src/renderer/stores/audioEngine.ts` | Replacement buffer resolution, looping, one-shot completion, refresh and preview |
@@ -196,18 +196,20 @@ separate soundtrack modal and the native gesture helpers when integrating Settin
 Run type checks, the full tests, desktop and browser builds, then UI/audio tests with a short
 generated WAV. Verify a short title loops past its duration, play-once remains finished,
 unrelated edits do not restart it, disabling falls back, preview stops on close, and corrupt
-backups are rejected before writes. Exercise day/night at 16:9 and 4:3. See the handoff's
-`VALIDATION.md` for results and remaining playtest boundaries.
+backups are rejected before writes. Exercise day/night at 16:9 and 4:3. See the [technical handoff](../maestro-technical-guide.md) and the dated verification record
+in the portable bundle for results and remaining playtest boundaries.
 
-No songs, generated music, game art, personal saves, conversations or credentials are included
-in this source port. It adds no remote downloads, new telemetry, or AI calls.
+The replacement library distributes no player-imported tracks, saves, conversations or credentials.
+The shared game separately includes the community encounter music credited in
+[the asset notice](echo-asset-licenses.md). Importing replacements adds no remote downloads,
+telemetry or AI calls.
 
-## Registration on core 0.3.1
+## Framework registration
 
 - `src/shared/modEntries/custom-soundtracks.ts` supplies its existing mod definition.
 - This mod has no renderer hook registration; its existing switch-gated integration stays in place.
 
-The stable IDs, defaults, dependencies, save fields and gameplay behavior are unchanged. Native character notes, scene-creator saves and calendar replays retain their 0.3.1 behavior. Merge framework updates from `core` into this mod branch; resolve conflicts with `main` on a separate `integrate/custom-soundtracks` branch.
+The stable IDs, defaults, dependencies, save fields and gameplay behavior are unchanged. Native character notes, scene-creator saves and calendar replays remain separate base-game features. Merge framework updates from `core` into this mod branch; resolve conflicts with `main` on a separate `integrate/custom-soundtracks` branch.
 
 ## October 14 load follow-up
 

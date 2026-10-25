@@ -32,7 +32,7 @@ import { isVoiceTier, VOICE_TIERS, voicePitchOfTier } from '@shared/audio'
 import { ROOM_PROMPT_PREFIX } from '@shared/room'
 import { defaultSpriteScale } from '@shared/spriteScale'
 import { isStatKey, STAT_ATTRACTIONS, STAT_KEYS } from '@shared/playerStats'
-import { CHARACTER_TRAITS, isCharacterTrait, TRAIT_DESCRIPTIONS } from '@shared/traits'
+import { NATIVE_CHARACTER_TRAITS as CHARACTER_TRAITS, isCharacterTrait, TRAIT_DESCRIPTIONS } from '@shared/traits'
 import {
   GIFT_CATEGORIES,
   GIFT_CATEGORY_DESCRIPTIONS,
@@ -524,7 +524,8 @@ export function draftToCharacter(
     dislikes: cleanTags(draft.dislikes),
     giftPreferences: giftPreferencesOf(draft.giftPreferences),
     // Filtered to the vocabulary: an unrecognized trait switches nothing.
-    traits: (draft.traits ?? []).filter(isCharacterTrait),
+    traits: (draft.traits ?? []).filter(isCharacterTrait).filter(trait =>
+      (CHARACTER_TRAITS as readonly string[]).includes(trait)),
     // Charm on anything outside the vocabulary.
     preferredStat: isStatKey(draft.preferredStat) ? draft.preferredStat : 'heart',
     baseAppearance,

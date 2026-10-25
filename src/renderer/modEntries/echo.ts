@@ -9,6 +9,11 @@ export function ensureEchoes(): void {
 }
 registerHooks('echo', {
   gameEntered: ensureEchoes,
+  projectSlotMemories: ({ before }, charInfo) => {
+    if (!before.playthroughId || before.replaying || before.createdScene) return charInfo
+    const echoes = assignEchoes(before.exEcho,before.playthroughId,before.characters,`${before.playerFirstName} ${before.playerLastName}`,before.bio)
+    return settleEchoMemories(echoes,before.charInfo,charInfo,before.date)
+  },
   slotSettled: ({ before }) => {
     ensureEchoes()
     const g = useGameStore.getState()

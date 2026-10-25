@@ -5,12 +5,14 @@ export const CITY_LIFE_JOBS_MOD = 'city-life-jobs'
 export const CITY_LIFE_LOCATION_IDS: readonly string[] = [
   "bowling_alley",
   "roller_rink",
-  "cat_cafe"
+  "cat_cafe",
+  "dance_studio"
 ]
 export const CITY_LIFE_JOB_IDS: readonly string[] = [
   "ex_bowling",
   "ex_roller",
-  "ex_cat_cafe"
+  "ex_cat_cafe",
+  "ex_dance_instructor"
 ]
 
 // Shared rules receive the active playthrough's switches from the renderer.

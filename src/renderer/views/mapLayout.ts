@@ -18,6 +18,7 @@ export interface MapAnchor {
 const MAP_ANCHORS: Readonly<Record<string, MapAnchor>> = {
   bowling_alley: { x: 0.075, y: 0.35 },
   roller_rink: { x: 0.21, y: 0.57 },
+  dance_studio: { x: 0.24, y: 0.60 },
   cat_cafe: { x: 0.28, y: 0.39 },
   // Campus, east of the Silk.
   class: { x: 0.57, y: 0.66 },

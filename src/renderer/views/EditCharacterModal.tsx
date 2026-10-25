@@ -1496,6 +1496,9 @@ export function EditCharacterModal({
                       onChange={(values) => setField('traits')(values.filter(isCharacterTrait))}
                       placeholder="Add a trait…"
                     />
+                    {form.traits.includes('Godlike') && (
+                      <span className="vu-field-hint">Godlike requires Brain, Body and Heart all at Godly before romance can begin. Applies while Godlike Standards is on.</span>
+                    )}
                   </label>
 
                   {/* The traits' single-valued sibling. */}

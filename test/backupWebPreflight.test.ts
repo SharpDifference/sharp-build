@@ -3,6 +3,7 @@ import { IDBFactory, IDBObjectStore } from 'fake-indexeddb'
 import { unzipSync, zipSync } from 'fflate'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import { BACKUP_NAME } from '@shared/backup'
+import { emptyLorebook } from '@shared/lorebookRecord'
 import { defaultSettings } from '@shared/settingsRules'
 import { stampRecord, stampSave } from '@shared/saveRules'
 import { useGameStore } from '../src/renderer/stores/gameStore'
@@ -29,6 +30,8 @@ function wav(sample = 0): Uint8Array {
 }
 
 const SOURCE_ID = '1500000000000', CURRENT_ID = '1600000000000'
+const sourceBook = { ...emptyLorebook(), setting: 'The archived campus setting.' }
+const currentBook = { ...emptyLorebook(), setting: 'The current campus setting.' }
 let db: Awaited<ReturnType<typeof import('../src/web/db/open').database>>
 let archive: Uint8Array
 let music: typeof import('../src/web/soundtracks')
@@ -48,6 +51,7 @@ beforeEach(async () => {
   music = await import('../src/web/soundtracks')
   sourceFile = (await music.soundtrackHash(wav())) + '.wav'
   await music.soundtrackLibrary.restore({ map: { title: { file: sourceFile, name: 'Source.wav', loop: false } }, files: { [sourceFile]: wav() } })
+  await db.put('lorebooks', sourceBook, SOURCE_ID)
   await exportBackup()
   archive = mocks.download.mock.calls[0][1] as Uint8Array
   await db.clear('soundtrackFiles')
@@ -56,6 +60,8 @@ beforeEach(async () => {
   liveSave = stampSave({ ...useGameStore.getState().toGameSave(), money: 500 }, CURRENT_ID, CURRENT_ID, 200)
   await db.put('playthroughs', { record: stampRecord(record()), enrollment: null, createdAt: 200 }, CURRENT_ID)
   await db.put('saves', liveSave, [CURRENT_ID, CURRENT_ID])
+  await db.put('lorebooks', currentBook, CURRENT_ID)
+  await db.put('lorebooks', currentBook, SOURCE_ID)
   await db.put('settings', { ...defaultSettings(), lessNsfwText: true }, 'settings')
 })
 afterEach(() => db?.close())
@@ -82,6 +88,8 @@ it('replaces browser saves and restores the source records when the same archive
   expect((await music.soundtrackLibrary.list()).title).toMatchObject({ file: sourceFile, name: 'Source.wav', loop: false })
   expect(await db.getAllKeys('playthroughs')).toEqual([SOURCE_ID])
   expect(await db.get('saves', [CURRENT_ID, CURRENT_ID])).toBeUndefined()
+  expect(await db.getAllKeys('lorebooks')).toEqual([SOURCE_ID])
+  expect(await db.get('lorebooks', SOURCE_ID)).toEqual(sourceBook)
 })
 
 it.each(['characters', 'soundtrackFiles'])('aborts game and music writes if %s throws synchronously', async (failingStore) => {
@@ -99,6 +107,8 @@ it.each(['characters', 'soundtrackFiles'])('aborts game and music writes if %s t
   expect(await db.get('saves', [CURRENT_ID, CURRENT_ID])).toEqual(liveSave)
   expect(await db.getAllKeys('playthroughs')).toContain(CURRENT_ID)
   expect((await db.get('settings', 'settings'))?.lessNsfwText).toBe(true)
+  expect(await db.get('lorebooks', SOURCE_ID)).toEqual(currentBook)
+  expect(await db.get('lorebooks', CURRENT_ID)).toEqual(currentBook)
 })
 
 async function assertMusicUntouched(): Promise<void> {

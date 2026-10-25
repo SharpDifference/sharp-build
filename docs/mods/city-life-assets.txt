@@ -6,4 +6,4 @@ This permission covers only the mod materials included here. The original Venus 
 
 The mod is provided as-is, without warranty. Keep backups of your game and saves.
 
-Source-port adaptation: catalogs, switches, schedule integration and tests are adapted for the extracurriculars-core framework. The six venue backgrounds are generated images from the original City Life community mod.
+Source-port adaptation: catalogs, switches, schedule integration and tests are adapted for the extracurriculars-core framework. The original six venue backgrounds are generated images from the City Life community mod. The two Dance Studio backgrounds and their thumbnails were generated for this expansion using the built-in OpenAI image-generation tool. See dance-studio-art.md for prompts.

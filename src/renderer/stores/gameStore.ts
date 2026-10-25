@@ -1,3 +1,8 @@
+import { readStartingChallenge, type StartingChallenge } from '@shared/startingChallenge'
+import { talentProjectWork } from '@shared/talentPerks'
+import { completeEureka, reconcileTalentBreakthrough } from '@shared/talentAbilities'
+
+import { normalizeTalents, talentsEnabled, talentPrice, type TalentState } from '@shared/campusTalents'
 import { normalizeReckoning, rebaseReckoning, rewindReckoning, type ReckoningState } from '@shared/reckoning'
 import { normalizeEcho, type EchoState } from '@shared/echo'
 import { normalizeStoryMemory, type StoryMemory } from '@shared/storyMemory'
@@ -7,6 +12,7 @@ import { normalizeMeanwhile, type MeanwhileStore } from '@shared/meanwhile'
 import { readCharacterDynamics, type CharacterDynamics } from '@shared/characterDynamics'
 import { presetVarsWithin, readPresetVarMarks, readPresetVars, type PresetVarsMark } from '@shared/presets/varOps'
 import { create } from 'zustand'
+import { blocksNewRomance } from '@shared/romanceRequirements'
 import { savedPlotTwist } from '@shared/plotTwists'
 import {
   affectionFor,
@@ -81,7 +87,8 @@ import {
 import { canDose, withColdCaught, withDose } from '@shared/colds'
 import type { GameOverReason } from '@shared/gameOver'
 import type { Weather } from '@shared/weather'
-import { globalSlotOf, MAX_RAISES, newJobState, RAISE_EVERY } from '@shared/jobs'
+import { classSlotForShift, globalSlotOf, jobDefOf, meetsRequirements, offeredShifts, MAX_RAISES, newJobState, RAISE_EVERY } from '@shared/jobs'
+import { jobAvailable } from '@shared/cityLife'
 import type { ExamPeriod } from '@shared/academics'
 import type { DatingPassOutcome } from '@shared/dating'
 import type {
@@ -273,6 +280,8 @@ function sceneKindFields(scene: SceneKind | null | undefined) {
  */
 interface GameStoreState {
   exReckoning: ReckoningState
+  exStartingChallenge: StartingChallenge | undefined
+  exTalents: TalentState
   exEcho: EchoState
   exBreakthrough: BreakthroughState
   breakthroughFlash: { id: string; playthroughId: string; name: string; echoAspect?: import('@shared/echoBreakthrough').EchoBreakthroughAspect } | null
@@ -1000,7 +1009,7 @@ interface GameStoreState {
    * The reader was hired. `settledThrough` is the slot he accepted in. An employer he worked
    * for before takes him back on the raises he left with and a clean record.
    */
-  takeJob: (jobId: string, shifts: readonly ShiftSlot[], settledThrough: number) => void
+  takeJob: (jobId: string, shifts: readonly ShiftSlot[], settledThrough: number) => boolean
   /** Credits one worked shift and pays for it. Returns whether the streak just bought a raise. */
   recordShiftWorked: (slotId: number, pay: number) => boolean
   /** Records a missed shift: one strike, and the raise streak back to zero. */
@@ -1444,6 +1453,8 @@ function nextLineFields(
 
 const initialState = {
   exReckoning: normalizeReckoning(),
+  exStartingChallenge: undefined,
+  exTalents: normalizeTalents(),
   exEcho: normalizeEcho(),
   exBreakthrough: normalizeBreakthrough(),
   breakthroughFlash: null as GameStoreState['breakthroughFlash'],
@@ -1622,6 +1633,8 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
       playerSchedule: save.playerSchedule,
       exStoryMemory: normalizeStoryMemory(save.exStoryMemory),
       exReckoning: normalizeReckoning(save.exReckoning),
+      exStartingChallenge: readStartingChallenge(save.exStartingChallenge),
+      exTalents: normalizeTalents(save.exTalents),
       exEcho: normalizeEcho(save.exEcho),
       exBreakthrough: normalizeBreakthrough(save.exBreakthrough, true),
       history: save.history,
@@ -1852,7 +1865,7 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
 
   restoreScene: (scene) =>
     set((state) => ({
-      exBreakthrough: reconcileBreakthrough(state.exBreakthrough, scene?.transcript ?? [], state.date, state.time,
+      ...reconcileTalentBreakthrough(state, scene?.transcript ?? [],
         scene && !state.replaying && !state.createdScene ? state.currentSceneTranscript : undefined),
       pendingLines: scene ? [...scene.pendingLines] : [],
       cast: scene ? [...scene.cast] : [],
@@ -1969,11 +1982,11 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
   truncateUnread: () =>
     set((state) => {
       const kept = cutLengthOf(state)
-      const breakthrough = reconcileBreakthrough(state.exBreakthrough, state.currentSceneTranscript.slice(0, kept), state.date, state.time,
+      const reconciled = reconcileTalentBreakthrough(state, state.currentSceneTranscript.slice(0, kept),
         !state.replaying && !state.createdScene ? state.currentSceneTranscript : undefined)
       return {
-        exBreakthrough: breakthrough,
-        ...rewindReckoning({...state,exBreakthrough:breakthrough},kept),
+        ...reconciled,
+        ...rewindReckoning({...state,...reconciled},kept),
         currentSceneTranscript: state.currentSceneTranscript.slice(0, kept),
         pendingLines: [],
         reread: 0,
@@ -2213,7 +2226,7 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
     }),
 
   applyStatDeltas: (deltas) =>
-    set((state) => ({ stats: applyStatDeltas(state.stats, deltas) })),
+    set((state) => ({ stats: applyStatDeltas(state.stats, deltas, state.exStartingChallenge) })),
 
   setBio: (bio) => set({ bio }),
 
@@ -2237,7 +2250,8 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
       inventory: withItem(state.inventory, { itemId }),
       // No affordability check: buying past the debt floor ends the playthrough at the next
       // slot opening, or on the epilogue's next button.
-      money: state.money - price
+      money: state.money - (talentsEnabled() && state.playthroughId && !state.replaying && !state.createdScene ? talentPrice(state.exTalents,price) : price),
+      ...(talentsEnabled() && state.playthroughId && !state.replaying && !state.createdScene ? {exTalents:{...state.exTalents,purchases:state.exTalents.purchases+1}} : {})
     })),
 
   giftItem: (charId, pick) => {
@@ -2420,6 +2434,7 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
         if (!info) return null
         const flags = info.flags ?? emptyFlags()
         if (flags.hasCrush) return null
+        if (blocksNewRomance(state.characters[charId], state.stats, flags)) return null
         return { ...info, flags: { ...flags, hasCrush: true } }
       })
     ),
@@ -2515,7 +2530,7 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
   applyRelationshipEvents: (charId, events) =>
     set((state) =>
       patchCharInfo(state, charId, (info = blankCharInfo()) =>
-        foldRelationshipEvents(info, events, state.date)
+        foldRelationshipEvents(info, events, state.date, { character: state.characters[charId], stats: state.stats })
       )
     ),
 
@@ -2817,13 +2832,26 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
       return { events }
     }),
 
-  takeJob: (jobId, shifts, settledThrough) =>
-    set((state) => ({
-      job: {
-        ...newJobState(jobId, [...shifts], settledThrough),
-        raises: state.formerJobs[jobId]?.raises ?? 0
-      }
-    })),
+  takeJob: (jobId, shifts, settledThrough) => {
+    const state = get(), def = jobDefOf(jobId)
+    // Talent-gated employers verify again here; a stale UI or direct call cannot bypass hiring.
+    // Keep the existing native employment/restore behavior for all other jobs.
+    if (def?.requiresSkills?.length) {
+      const ranks = talentsEnabled() ? state.exTalents.ranks : {}
+      const hours = offeredShifts(def, state.jobClosures)
+      if (!jobAvailable(jobId) || state.job || state.jobsClosed.includes(jobId) ||
+          !meetsRequirements(state.stats, def, ranks) || !shifts.length ||
+          new Set(shifts).size !== shifts.length || shifts.some(slot => {
+            const classSlot = classSlotForShift(slot)
+            return !hours.includes(slot) || classSlot !== null && !!state.playerSchedule[classSlot]
+          })) return false
+    }
+    set({job: {
+      ...newJobState(jobId, [...shifts], settledThrough),
+      raises: state.formerJobs[jobId]?.raises ?? 0
+    }})
+    return true
+  },
 
   recordShiftWorked: (slotId, pay) => {
     const { job, tallies } = get()
@@ -2915,8 +2943,10 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
       const project = record[key] ?? { sessions: [] }
       if (project.sessions.some((session) => session.date === date && session.time === time))
         return {}
-      const session = { date, time, ...(summary ? { summary } : {}) }
+      const units = state.replaying || state.createdScene ? 1 : talentProjectWork(state.exTalents, time, {term:state.semesterIndex,date,code,exam})
+      const session = { date, time, ...(units > 1 ? { talentWorkUnits: units } : {}), ...(summary ? { summary } : {}) }
       return {
+        ...(units === 3 ? {exTalents:completeEureka(state.exTalents,state.semesterIndex,date,code,exam)} : {}),
         classRecords: {
           ...state.classRecords,
           [code]: {
@@ -3139,6 +3169,8 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
       playerSchedule: state.playerSchedule,
       exStoryMemory: normalizeStoryMemory(state.exStoryMemory),
       exReckoning: normalizeReckoning(state.exReckoning),
+      ...(state.exStartingChallenge ? { exStartingChallenge: state.exStartingChallenge } : {}),
+      exTalents: normalizeTalents(state.exTalents),
       exEcho: normalizeEcho(state.exEcho),
       exBreakthrough: normalizeBreakthrough(state.exBreakthrough),
       history: state.history,

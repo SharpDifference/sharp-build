@@ -1,3 +1,4 @@
+import { talentMemoryMultiplier } from './campusTalents'
 import type { Character, CharInfo, CharMemory, Result } from './types'
 import { ECHO_ASPECTS, LEGACY_ECHO_ASPECTS, type EchoAspect } from './echoAspects'
 import { echoProfileCues, explainEchoAspect, type EchoProfilePart, type EchoReasonExample } from './echoReasons'
@@ -243,6 +244,8 @@ let bonusEnabled=false
 export function setEchoBonusEnabled(value:boolean):void{bonusEnabled=value}
 export function echoMultiplier(memory:CharMemory):number {
   if(!bonusEnabled || !['liked','loved'].includes(memory.type))return 1
+  const talent=talentMemoryMultiplier(memory)
+  if(talent!==undefined)return talent
   if(memory.echoAffinity==='competing')return 1-ECHO_BONUS
   return memory.echoAffinity==='matching' || memory.echoBoosted===true ? 1+ECHO_BONUS : 1
 }

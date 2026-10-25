@@ -1,3 +1,4 @@
+import { talentAffinity, talentAbilityCost } from '@shared/campusTalents'
 import { optionOn } from '@shared/mods'
 import { useEffect, useRef, useState, type CSSProperties, type JSX } from 'react'
 import { ECHO_ASPECTS, aspectOf, changePlayerEcho, echoAffinity, echoCreatureOf, editEchoCreature, editEchoSettings, editEchoStage, matchingEcho, normalizeEcho, renameEcho, withEchoArtwork, type EchoAspect, type EchoIdentity, type EchoState } from '@shared/echo'
@@ -20,24 +21,34 @@ import { EchoSwitchDialog } from '../components/EchoSwitchDialog'
 import type { ScreenTheme } from './clockTheme'
 import '../vu_styles/Echo.css'
 
+function useTalentEchoRates() {
+  const game=useGameStore(s=>s), on=useModOn('campus-talents')
+  const active=on&&!!game.playthroughId&&!game.createdScene&&!game.replaying
+  const percent=(kind:'matching'|'competing'|'neutral')=>Math.round(((active?talentAffinity(game.exTalents,kind):kind==='matching'?1.25:kind==='competing'?.75:1)-1)*100)
+  const label=(kind:'matching'|'competing'|'neutral')=>{const n=percent(kind);return n>0?'+'+n+'%':n<0?'−'+Math.abs(n)+'%':'normal progress'}
+  return {label,cost:(n:number)=>active?talentAbilityCost(game.exTalents,n):n}
+}
+
 const artCache = new Map<string,Promise<string | null>>()
 /** Follow the selected option immediately, before the player commits an aspect change. */
 function EchoAspectAbility({aspect}: {aspect: EchoAspect}): JSX.Element | null {
+  const rates=useTalentEchoRates()
   const ability = echoBreakthroughAbility(aspect)
   if (!ability) return null
   return <section className="echo-bond" aria-label="Selected aspect ability" aria-live="polite" aria-atomic="true">
     <strong>{ability.name}</strong>
     <p>{ability.summary}</p>
-    <p>{ability.cost} spirit · {ability.scope} · One exchange</p>
+    <p>{rates.cost(ability.cost)} spirit · {ability.scope} · One exchange</p>
   </section>
 }
 function EchoAspectMatchups({aspect}: {aspect: EchoAspect}): JSX.Element {
+  const rates=useTalentEchoRates()
   const selected = aspectOf(aspect)
   return <section className="echo-bond" aria-label="Selected aspect matchups" aria-live="polite" aria-atomic="true">
     <strong>Aspect matchups</strong>
-    <p>Matching: <b>{selected.name}</b> · +25%</p>
-    <p>Competing: <b>{aspectOf(selected.opposite).name}</b> · −25%</p>
-    <p>All other aspects: neutral · normal progress</p>
+    <p>Matching: <b>{selected.name}</b> · {rates.label('matching')}</p>
+    <p>Competing: <b>{aspectOf(selected.opposite).name}</b> · {rates.label('competing')}</p>
+    <p>All other aspects: neutral · {rates.label('neutral')}</p>
     <p>Based on your Echo’s aspect. Applies to new positive relationship progress.</p>
   </section>
 }
@@ -144,6 +155,7 @@ export function EchoPanel({hidden,gallery=false,owner,onClose,setup,theme}: {hid
     return draft?{...base,playthroughId:draft.id,loads:0,exEcho:draft.value,characters:Object.fromEntries(draft.roster.map(c=>[c.charId,c])),playerFirstName:draft.first,playerLastName:draft.last,bio:draft.bio}:base
   }
   const game=setup?readGame():storedGame
+  const rates=useTalentEchoRates()
   const state=game.exEcho
   const [open,setOpen] = useState(!gallery), [selected,setSelected] = useState('player')
   const [pendingSwitch,setPendingSwitch] = useState<string | null>(null)
@@ -353,7 +365,8 @@ export function EchoPanel({hidden,gallery=false,owner,onClose,setup,theme}: {hid
   const pendingEdits=namePending||creaturePending||stagePending||aspectPending||opacity!==state.opacity
   if(hidden || !enabled || !game.playthroughId || !state.player || (!setup&&(game.replaying || game.createdScene)))return null
   const aspect=aspectOf(identity?.aspect ?? state.player.aspect)
-  const ability=selected==='player'?echoBreakthroughAbility(identity?.aspect):null
+  const baseAbility=selected==='player'?echoBreakthroughAbility(identity?.aspect):null
+  const ability=baseAbility?{...baseAbility,cost:rates.cost(baseAbility.cost)}:null
   return <>
     {gallery&&<section className="echo-gallery-section" aria-label="Echo gallery"><div className="vu-bb-section">Echoes</div><p>Echoes belonging to you and the students you’ve met. Open one to edit its design or artwork.</p><div className="echo-gallery-grid">{galleryIds.map(id=>{const e=id==='player'?state.player:state.girls[id];return e?<button type="button" className="echo-gallery-tile" key={id} onClick={()=>{setSelected(id);setOpen(true);setError('');setMessage('');setBusy(false)}} aria-label={`Open ${id==='player'?'your Echo':label(id)+' Echo'}`}><div><EchoArt identity={e} status/></div><b>{e.name}</b><span>{id==='player'?'Your Echo':label(id)} · {aspectOf(e.aspect).name}</span><small>{e.art?'View / regenerate':'Generate artwork'}</small></button>:null})}</div></section>}
     {open && identity && <dialog ref={dialog} className="echo-dialog" data-theme={setup?'day':theme} data-setup={!!setup} aria-labelledby="echo-title" onCancel={e=>{e.preventDefault();close()}}
@@ -363,7 +376,7 @@ export function EchoPanel({hidden,gallery=false,owner,onClose,setup,theme}: {hid
         <nav aria-label="Echo owners">
           <button type="button" aria-pressed={selected==='player'} disabled={busy} onClick={()=>requestOwner('player')}><b>Your Echo</b><span>{aspectOf(state.player.aspect).name}</span></button>
           <small>{setup?'THIS SEMESTER’S CAST':'MET THIS SEMESTER'} · {ids.length}</small>
-          {ids.map(id=><button type="button" key={id} aria-pressed={selected===id} disabled={busy} onClick={()=>requestOwner(id)}><b>{label(id)} {matchingEcho(state,id)&&<em title="Matching aspect · +25%">✦</em>}{echoAffinity(state,id)==='competing'&&<em className="echo-competing" title="Competing aspect · −25%">◇</em>}</b><span>{aspectOf(state.girls[id]?.aspect??'horizonbound').name}</span></button>)}
+          {ids.map(id=><button type="button" key={id} aria-pressed={selected===id} disabled={busy} onClick={()=>requestOwner(id)}><b>{label(id)} {matchingEcho(state,id)&&<em title={`Matching aspect · ${rates.label('matching')}`}>✦</em>}{echoAffinity(state,id)==='competing'&&<em className="echo-competing" title={`Competing aspect · ${rates.label('competing')}`}>◇</em>}</b><span>{aspectOf(state.girls[id]?.aspect??'horizonbound').name}</span></button>)}
         </nav>
         <div className="echo-workspace">
           <div className="echo-preview">
@@ -399,7 +412,7 @@ export function EchoPanel({hidden,gallery=false,owner,onClose,setup,theme}: {hid
             </div>}
             {section==='resonance'&&<div id="echo-section-resonance" role="tabpanel" aria-labelledby="echo-tab-resonance" tabIndex={0}>
             {selected==='player'&&<section className="echo-bond" aria-label="Your Breakthrough ability"><strong>{ability?.name||'Standard Breakthrough'}</strong><p>{ability?.summary||'Normal Breakthrough remains available.'}</p>{ability&&<p><b>{ability.strength} influence · {ability.cost} spirit.</b> {ability.balance}</p>}<p>{ability?`In a scene, spend ${ability.cost} spirit with a character for one exchange. Unspent spirit stays in the bar. Normal Breakthrough costs 100.`:'Each player Echo aspect has its own Breakthrough ability.'}</p>{ability&&(!abilityOption||!breakthroughOn)&&<p>Enable Breakthrough and Echo’s “Echo Breakthrough abilities” option in Mods to use it.</p>}</section>}
-            <div className="echo-bond"><strong>{selected==='player'?`${matches.length} matching · ${competitors.length} competing`:matchingEcho(state,selected)?'Resonance · +25%':echoAffinity(state,selected)==='competing'?'Competing · −25%':'Neutral · normal progress'}</strong><p>Matching types give <b>25% more</b> new positive relationship progress. Competing types give <b>25% less</b>. Other pairings and negative memories are unchanged. Effects settle at the end of the time slot.</p><p><b>{aspect.name}</b> competes with <b>{aspectOf(aspect.opposite).name}</b>.</p></div>
+            <div className="echo-bond"><strong>{selected==='player'?`${matches.length} matching · ${competitors.length} competing`:matchingEcho(state,selected)?`Resonance · ${rates.label('matching')}`:echoAffinity(state,selected)==='competing'?`Competing · ${rates.label('competing')}`:`Neutral · ${rates.label('neutral')}`}</strong><p>New positive memories: matching <b>{rates.label('matching')}</b>, competing <b>{rates.label('competing')}</b>, other pairings <b>{rates.label('neutral')}</b>. Negative memories are unchanged. Effects settle at the end of the time slot.</p><p><b>{aspect.name}</b> competes with <b>{aspectOf(aspect.opposite).name}</b>.</p></div>
             <details className="echo-reason" key={selected}><summary>Why this type? <span className="echo-spoiler-badge">Spoilers</span></summary><p>{identity.reason}</p>{identity.reasonExamples.map((example,i)=><div className="echo-reason-example" key={i}><b>{example.source}{!example.supportsType?' · context':''}</b><blockquote>{example.quote}</blockquote><p>{example.connection}</p></div>)}<small>These passages come from the saved profile. They offer one way to read this Echo’s connection to its owner.</small></details>
             <p className="echo-help">Opening “Why this type?” reveals details from the owner’s personal history.</p>
             {setup?<p className="echo-lock">{setupAspectEditable?'Choose a starting aspect in Appearance. You can change it freely until you begin the semester.':'This aspect carries over from the previous semester.'}</p>:selected==='player' ? state.playerChangeUsed ? <p className="echo-lock">Relationship aspect locked · Your one change has been used. You can still edit the monster design and replace the artwork.</p> : <div className="echo-change"><label>Choose your one aspect change<select aria-label="Player Echo aspect" disabled={busy||!safe} value={chosenAspect} onChange={e=>setChosenAspect(e.target.value as EchoAspect)}>{ECHO_ASPECTS.map(a=><option key={a.id} value={a.id}>{a.name}</option>)}</select><small>{aspectOf(chosenAspect).meaning}. Competes with {aspectOf(aspectOf(chosenAspect).opposite).name}.</small></label><EchoAspectAbility aspect={chosenAspect}/><button type="button" className="vu-btn vu-btn--primary vu-paper echo-action" disabled={busy||!safe||chosenAspect===identity.aspect} onClick={()=>void apply(changePlayerEcho(state,chosenAspect,game.bio))}>Use my one aspect change</button><p className="echo-help">This permanently locks your relationship aspect for this playthrough and returning semesters. It creates a new Echo name and clears its current artwork. Your monster details and earned progress stay as they were.</p></div> : <p className="echo-lock">Her starting relationship aspect is fixed for this playthrough and returning semesters. You can edit her monster design and artwork freely.</p>}

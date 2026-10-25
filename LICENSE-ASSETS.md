@@ -39,6 +39,18 @@ assets and are excluded from the blanket attribution above. See the
 [Darts asset permissions](src/assets/darts/LICENSE.md) for their provenance,
 redistribution permissions and CC BY 4.0 attribution requirements where applicable.
 
+## Community Campus Talents and City Life artwork
+
+The 43 PNGs under `src/renderer/assets/talents/` and the Dance Studio day/night
+backgrounds (`assets/bg/interior/dance_studio_*.png`) and thumbnails
+(`assets/bg_thumbs/interior/dance_studio_*.webp`) were AI-generated for Maestro Leeds's
+mods and supplied for use and redistribution with Venus Extracurriculars. They are
+not Venus Dev assets and are excluded from the blanket attribution above. This
+does not grant rights to the official game's other assets.
+
+See [Campus Talents artwork](docs/mods/talent-artwork.md) and
+[Dance Studio artwork](docs/mods/dance-studio-art.md) for provenance.
+
 ## Optional Echo model and artwork dependencies
 
 The Megaten Style LoRA is by **emerjk** and retains its creator permissions and

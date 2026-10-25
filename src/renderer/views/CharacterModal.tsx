@@ -8,6 +8,7 @@ import { STAT_ATTRACTIONS } from '@shared/playerStats'
 import { STOCK_POSITIONS } from '@shared/positions'
 import { ROOM_VARIANTS } from '@shared/room'
 import { fullNameOf, type Character } from '@shared/types'
+import { traitTone } from '@shared/traits'
 import { LandscapeTile } from '../components/LandscapeTile'
 import { useModalShell } from '../components/useModalShell'
 import { TitleTab } from '../components/TitleTab'
@@ -59,17 +60,19 @@ function Prose({ label, value }: { label: string; value: string }): JSX.Element 
 /** A list field as static chips — the picker's shape without the picker. */
 function Chips({
   label,
-  values
+  values,
+  traitColors
 }: {
   label: string
   values: readonly string[]
+  traitColors?: boolean
 }): JSX.Element | null {
   if (values.length === 0) return null
   return (
     <Field label={label}>
       <ul className="vu-view-chips">
         {values.map((value) => (
-          <li className="vu-chip-tag" key={value}>
+          <li className="vu-chip-tag" key={value} data-tone={traitColors ? traitTone(value) : undefined}>
             {value}
           </li>
         ))}
@@ -252,7 +255,7 @@ export function CharacterModal({
                       <Prose key={key} label={label} value={character.behavior[key]} />
                     ))}
 
-                    <Chips label="Traits" values={character.traits} />
+                    <Chips label="Traits" values={character.traits} traitColors />
                     <Prose label="Preferred stat" value={STAT_ATTRACTIONS[character.preferredStat]} />
                     <Chips label="Liked gifts" values={character.giftPreferences.liked} />
                     <Chips label="Disliked gifts" values={character.giftPreferences.disliked} />

@@ -1583,6 +1583,7 @@ describe('toGameSave', () => {
       'exPlotTwist',
       'exReckoning',
       'exStoryMemory',
+      'exTalents',
       'exVenusWhisper',
       'expelled',
       'farewellsDone',

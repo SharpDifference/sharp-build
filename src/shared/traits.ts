@@ -6,7 +6,7 @@ import type { Character } from './types'
  */
 
 /** Every trait the LLM may assign, as it echoes them back and the file stores them. */
-export const CHARACTER_TRAITS = [
+export const NATIVE_CHARACTER_TRAITS = [
   'Mood-swings',
   'Disagreeable',
   'Good-natured',
@@ -15,6 +15,9 @@ export const CHARACTER_TRAITS = [
   'Promiscuous',
   'High Standards'
 ] as const
+
+/** Editor-only traits are opt-in; ordinary AI character generation uses the native list. */
+export const CHARACTER_TRAITS = [...NATIVE_CHARACTER_TRAITS, 'Godlike'] as const
 
 export type CharacterTrait = (typeof CHARACTER_TRAITS)[number]
 
@@ -33,7 +36,13 @@ export const TRAIT_DESCRIPTIONS: Readonly<Record<CharacterTrait, string>> = {
   Promiscuous:
     'hooks-up frequently and doesn\'t get jealous of her partners',
   'High Standards':
-    'picky about who she\'s attracted to'
+    'picky about who she\'s attracted to',
+  'Godlike':
+    'requires Godly Brain, Body and Heart before romance can begin (Godlike Standards mod)'
+}
+
+export function traitTone(trait: string): 'gold' | undefined {
+  return trait === 'Godlike' ? 'gold' : undefined
 }
 
 /** Guard for a trait echoed back by the LLM. */

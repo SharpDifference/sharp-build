@@ -1,3 +1,4 @@
+import { setSharedModRules } from '@shared/modRules'
 import { setEchoBonusEnabled } from '@shared/echo'
 import { CITY_LIFE_LOCATIONS_MOD, CITY_LIFE_JOBS_MOD, setCityLifeEnabled } from '@shared/cityLife'
 import { useGameStore } from './gameStore'
@@ -100,10 +101,12 @@ useModsStore.subscribe((state) => tellSharedRules(state.switches))
 // The game's hooks ask only the mods that are on, in the order the list names them. Inside a
 // game, a mod scoped to the playthrough is on as the game's record says, not as the switch now
 // stands; on the menus, with no game entered, the switches decide.
-setHookRules({
-  isOn: (modId) => modOn(useModsStore.getState().switches, modId, enrollmentRecord ?? loopState.record),
-  order: (modId) => MODS.findIndex((mod) => mod.id === modId)
-})
+const rules = {
+  isOn: (modId: string) => modOn(useModsStore.getState().switches, modId, enrollmentRecord ?? loopState.record),
+  order: (modId: string) => MODS.findIndex((mod) => mod.id === modId)
+}
+setHookRules(rules)
+setSharedModRules(rules.isOn)
 
 /** Whether a mod is on, for code outside a component; see `modOn` for what a record changes. */
 export function modIsOn(id: string, record?: Pick<PlaythroughRecord, 'mods'> | null): boolean {

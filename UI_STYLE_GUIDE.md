@@ -418,6 +418,7 @@
 - The Cast modal's CG button is an action shape that takes the accent fill while her CG is over the stage: it is both the way into the picker and the sign that the lock stands.
 - A character's room and the player's own backgrounds have no thumbnails, so the Change BG picker and the custom background gallery draw their full pictures, and only the shipped thumbnails are warmed.
 - New Game's Start is the only control whose size is a state, which rides a wrapper so the gesture composes.
+- Starting Challenge extends the native stat rows with four lower tiers (−30, −60, −80 and −100). The arrows display the rank title only, without a numeric value. The row grid, stat colours, step buttons and motion remain native; the same rows appear in Quickstart when the mod is enabled. Scene Creator uses its existing stat dropdowns with the same title-only choices.
 - The Bunnyboard's chat rows and lorebook rows lift `.vu-row` to a surface fill, the list standing on the ground rather than in a panel.
 - A sticker is the only rotated text outside the fan.
 - The contact page and the self-improvement screen take the bare veil, both placing their own layers against the stage's edges.
@@ -446,3 +447,8 @@
 - Copy text, or anything quoted off a screen.
 - A measurement tuned to one screen.
 - History, post-mortems or rejected alternatives.
+
+
+### Campus Talents
+
+The Skill trees dialog uses a wide half-pill paper panel with the shared title tab, serif headings, native icon palette tabs and a quiet half-pill Bond Points reading at the upper-right edge. Six recessed numerical cards occupy two rows. One centered ability sits beneath them; rounded branch lines merge into it, highlighting completed prerequisite paths. Only this special ability carries a paper shadow. Numerical cards use row hover gestures so they do not swell over their neighbors; palette tabs use the shared toggle gesture. All seven shipped skills fit together. The detail panel lists the three second-row alternatives and current ranks, and keeps long descriptions and controls in a native scroller with a bottom fade. Ability dropdowns use SelectField and their actions use quiet half-pill buttons. The selected talent is named at the lower left; the status line stands above the shared Close/Learn footer at the right. Cards contain the name, rank markers and next price or prerequisite; rank descriptions name each rank explicitly. Both themes use the shared color roles and type sizes stay above the normal reading floor.
