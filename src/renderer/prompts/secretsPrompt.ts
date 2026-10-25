@@ -1,4 +1,5 @@
 import { appError } from '@shared/errors'
+import type { GlobalTextId, TextEdits } from '@shared/presets/types'
 import { loveLifeBlurb } from '@shared/relationship'
 import { SECRET_TIERS, secretText } from '@shared/secrets'
 import {
@@ -9,6 +10,7 @@ import {
   type SecretTier,
   type StructuredRequest
 } from '@shared/types'
+import { newGameText, withAdditions } from './promptBlocks'
 import { keyedArray } from './profilePrompt'
 import { objectSchema } from './schema'
 
@@ -40,30 +42,6 @@ function invalid(detail: string): never {
   throw appError('SECRET_GEN_INVALID', "The generated students' secrets were not usable.", detail)
 }
 
-/** Who the secrets call is written by. */
-const SECRETS_SYSTEM = [
-  'You are a novelist inventing secrets for the students of a story set at a university.',
-  'You return a single JSON object matching the provided schema exactly.'
-].join(' ')
-
-/** What a secret is, asked of every tier. */
-const SECRET_LINES = [
-  'A secret is something true of her that is not already in her description, backstory or love life, and that nobody would guess on first meeting her: either something she hides or something nobody would expect of her.',
-  'It can be mundane, like "Sara is top 10 in the Angry Ducks mobile game.", or core to who she is, like "Sara almost died in a plane crash when she was 17 while flying to Paris."',
-  'Make each one a concrete fact, something she does, has or did or something that happened to her, rather than a feeling on its own, and new rather than a detail of what her backstory already tells.',
-  'Write each as one or two sentences in the third person that name her by her first name. It is already true before she meets the reader, and leaves him and the other students out of it.'
-]
-
-/** What each tier's secret is, matched to how close she is to the reader when she tells it. */
-const TIER_LINES: Record<SecretTier, string> = {
-  friendly:
-    'friendly: what she tells the reader once they are friends. Something light that surprises, a hobby, habit or talent she is a little embarrassed by.',
-  trusted:
-    'trusted: what she tells him once she trusts him. Something more personal that she keeps from most people, that she is ashamed of, afraid of or hoping for.',
-  devoted:
-    'devoted: what she tells him once she is devoted to him. The deepest of her secrets, one she has told almost nobody because it shaped who she is or still hurts. It is more often something that happened to her than something she did.'
-}
-
 /** One girl's block: who she is, and for a returning girl the secrets she already has. */
 function entryLines(entry: SecretsEntry): string[] {
   const { character } = entry
@@ -87,12 +65,15 @@ function wantsAll(entry: SecretsEntry): boolean {
   return entry.tiers.length === SECRET_TIERS.length
 }
 
-/** Builds the secrets request for every girl `entries` names. */
-export function buildSecretsPrompt(entries: readonly SecretsEntry[]): StructuredRequest {
+/** Builds the secrets request for every girl `entries` names; `textEdits` are the player's edits to its text. */
+export function buildSecretsPrompt(
+  entries: readonly SecretsEntry[],
+  textEdits?: TextEdits<GlobalTextId>
+): StructuredRequest {
   const preamble = [
     'FOR EACH STUDENT',
-    ...SECRET_LINES,
-    ...SECRET_TIERS.map((tier) => TIER_LINES[tier]),
+    newGameText(textEdits, 'newgame.secrets.instructions'),
+    newGameText(textEdits, 'newgame.secrets.tiers'),
     '',
     'FOR EACH RETURNING STUDENT',
     'devoted: one new secret on the same terms as the devoted secret above, unlike every secret listed under her.',
@@ -136,7 +117,11 @@ export function buildSecretsPrompt(entries: readonly SecretsEntry[]): Structured
   ].join('\n')
 
   return {
-    system: SECRETS_SYSTEM,
+    system: withAdditions(
+      newGameText(textEdits, 'newgame.secrets.system'),
+      textEdits,
+      'newgame.secrets.additions'
+    ),
     user: `${preamble}\n${rest}`,
     schema: objectSchema('character_secrets', groups, schemaGroups),
     cacheKey: 'venus-university-secret-generation',

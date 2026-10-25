@@ -9,9 +9,17 @@ import {
 } from '@shared/types'
 import { rollDifficulty, rollProfessor, type ClassKind } from '@shared/academics'
 import { freeClassCode } from '@shared/classes'
+import {
+  CLASS_CATALOG_RANGES,
+  DEFAULT_CLASS_CATALOG,
+  type ClassCatalogEdits,
+  type ClassCatalogKey
+} from '@shared/presets/studioPrompts'
+import type { GlobalTextId, TextEdits } from '@shared/presets/types'
 import type { DormId } from '@shared/dorms'
 import { appError } from '@shared/errors'
 import { LAST_NAMES } from './characterSuggestions'
+import { CLASS_INSTRUCTION_RUNS, newGameText, withAdditions } from './promptBlocks'
 import { objectSchema } from './schema'
 
 /**
@@ -21,11 +29,6 @@ import { objectSchema } from './schema'
 
 /** Categories the model may return. `interest` is ours, applied after parsing. */
 const GENERATED_CATEGORIES = ['pe', 'humanities', 'arts', 'major', 'misc'] as const
-
-/** How many classes the model is asked for, per pool. */
-const PE_POOL_SIZE = 10
-const FILLER_POOL_SIZE = 5
-const CLASSES_PER_MAJOR = 4
 
 /** One catalog entry as the model returns it — no slot yet (the scheduler deals those). */
 export interface ClassDraft {
@@ -128,58 +131,108 @@ export function rosterCastLines(roster: readonly Character[]): {
   return { keys, cast }
 }
 
+/** One pool size: the player's where it is a whole number in range, else the shipped one. */
+function poolSize(catalog: ClassCatalogEdits | undefined, key: ClassCatalogKey): number {
+  const size = catalog?.[key]
+  const { min, max } = CLASS_CATALOG_RANGES[key]
+  return typeof size === 'number' && Number.isInteger(size) && size >= min && size <= max
+    ? size
+    : DEFAULT_CLASS_CATALOG[key]
+}
+
+/** How many classes of a kind the catalog is asked for, in the words the model reads. */
+function poolLine(count: number, kind: string, category: string, note = ''): string {
+  if (count === 0) return `Do not create any ${kind} classes (category "${category}").`
+  return `Create ${count} ${kind} ${count === 1 ? 'class' : 'classes'} (category "${category}")${note}.`
+}
+
+/**
+ * The instruction lines of the class call. Unedited they are the shipped text with the locked
+ * lines in their places; an edited text is followed by the locked lines in that same order.
+ */
+function instructionLines(
+  edits: TextEdits<GlobalTextId> | undefined,
+  locked: {
+    returningMajor: string[]
+    majorsTaken: string
+    counts: string[]
+    uniqueCode: string[]
+    takenClasses: string[]
+  }
+): string[] {
+  const { intro, student, gap, course } = CLASS_INSTRUCTION_RUNS
+  const text = newGameText(edits, 'newgame.classes.instructions')
+  if (text === [...intro, ...student, ...gap, ...course].join('\n')) {
+    return [
+      ...intro,
+      ...locked.returningMajor,
+      locked.majorsTaken,
+      ...student,
+      ...locked.counts,
+      ...gap,
+      ...locked.uniqueCode,
+      ...locked.takenClasses,
+      ...course
+    ]
+  }
+  return [
+    text,
+    ...locked.returningMajor,
+    locked.majorsTaken,
+    ...locked.counts,
+    ...locked.uniqueCode,
+    ...locked.takenClasses
+  ]
+}
+
 /**
  * Builds the class-catalog request; `continued` builds a next semester's, around the returning
- * students' majors and away from every class already run.
+ * students' majors and away from every class already run. `textEdits` and `catalog` are the
+ * player's edits to its text and its pool sizes.
  */
 export function buildClassPrompt(
   roster: readonly Character[],
-  continued?: ContinuedCatalog
+  continued?: ContinuedCatalog,
+  textEdits?: TextEdits<GlobalTextId>,
+  catalog?: ClassCatalogEdits
 ): StructuredRequest {
   const { keys, cast } = rosterCastLines(roster)
   const majors = continued?.majors ?? {}
+  const pe = poolSize(catalog, 'pe')
+  const filler = poolSize(catalog, 'filler')
+  const perMajor = poolSize(catalog, 'perMajor')
 
-  const system = [
-    'You are a university registrar building a course catalog and enrolling students.',
-    'You return a single JSON object matching the provided schema exactly.',
-    'Course codes follow real university convention: a subject prefix and a three-digit number, like "BIO 210".'
-  ].join(' ')
+  const system = withAdditions(
+    newGameText(textEdits, 'newgame.classes.system'),
+    textEdits,
+    'newgame.classes.additions'
+  )
 
   const preamble = [
-    'Build a course catalog for a university, then enroll each student below.',
-    '',
-    'FOR EACH STUDENT',
-    'major: the field she studies. Pick one that fits her personality. Collape similar majors like Business Studies and Business Science into a single major like Business Administration.',
-    ...(continued
-      ? [
-          'A returning student already has a major, written under her name: she is not asked for one, and that exact major counts as one you assigned.'
-        ]
-      : []),
-    'majorClassesTaken: how many classes she takes in her major, from 1 to 3.',
-    'interestClass: one course this specific student would sign up for out of pure personal interest.',
-    'It should read like something only she would pick.',
-    '',
-    'THE CATALOG',
-    `Create ${PE_POOL_SIZE} physical education classes (category "pe").`,
-    `Create ${FILLER_POOL_SIZE} humanities classes (category "humanities").`,
-    `Create ${FILLER_POOL_SIZE} arts classes (category "arts").`,
-    `Create ${FILLER_POOL_SIZE} miscellaneous classes (category "misc") that fit no other pool.`,
-    `For every distinct major you assigned above, create ${CLASSES_PER_MAJOR} classes with category "major" and that major's exact name in the "major" field. Leave "major" out for every other category.`,
-    '',
-    'RULE: every "code" in the whole reply must be unique, including the interest classes.',
-    'No two courses may share a code.',
-    ...(continued
-      ? [
-          'Classes listed under ALREADY TAKEN ran in earlier semesters: never reuse one of their codes, and never recreate one of them under another code.'
-        ]
-      : []),
-    'Every course needs a one-sentence description written the way a real course catalog writes them.',
-    '',
-    'EVERY COURSE ALSO NEEDS A KIND',
-    'kind "lecture": the class meets to be taught. The professor lectures, students take notes, and the course is assessed by a midterm and a final exam.',
-    'kind "project": the class is built around producing work. Students spend the term making something, and the course is assessed by showcasing that work instead of by exams.',
-    'Pick whichever genuinely fits the subject — a studio, a workshop or a design course is a project class; a survey, a theory or a history course is a lecture class.',
-    'Physical education classes are neither, so answer "lecture" for those and it will be ignored.',
+    ...instructionLines(textEdits, {
+      returningMajor: continued
+        ? [
+            'A returning student already has a major, written under her name: she is not asked for one, and that exact major counts as one you assigned.'
+          ]
+        : [],
+      majorsTaken: 'majorClassesTaken: how many classes she takes in her major, from 1 to 3.',
+      counts: [
+        poolLine(pe, 'physical education', 'pe'),
+        poolLine(filler, 'humanities', 'humanities'),
+        poolLine(filler, 'arts', 'arts'),
+        poolLine(filler, 'miscellaneous', 'misc', ' that fit no other pool'),
+        `For every distinct major you assigned above, create ${perMajor} ${perMajor === 1 ? 'class' : 'classes'} with category "major" and that major's exact name in the "major" field. Leave "major" out for every other category.`
+      ],
+      uniqueCode: [
+        'RULE: every "code" in the whole reply must be unique, including the interest classes.',
+        'No two courses may share a code.'
+      ],
+      takenClasses: continued
+        ? [
+            'Classes listed under ALREADY TAKEN ran in earlier semesters: never reuse one of their codes, and never recreate one of them under another code.'
+          ]
+        : []
+    }),
     '',
     '---',
     ''

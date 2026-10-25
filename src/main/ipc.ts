@@ -2,6 +2,20 @@ import { resetReflectionPortrait, uploadReflectionPortrait, generateReflectionPo
 import { writeFile } from 'fs/promises'
 import type { EchoArtRequest } from '@shared/echo'
 import { prepareStoryRequest, inspectStoryMemory } from './services/storyMemoryService'
+import { planPresetRequest, finishPresetReply } from '@shared/presets/request'
+import {
+  deletePreset,
+  getPreset,
+  importPresetFromFile,
+  listPresets,
+  loadActivePreset,
+  savePreset,
+  setActivePreset
+} from './services/presetsService'
+import type { Preset } from '@shared/presets/types'
+import type { StudioPrompts } from '@shared/presets/studioPrompts'
+import { getStudioPrompts, setStudioPrompts } from './services/studioPromptsService'
+import { readStudioBackupFile, saveStudioBackup } from './services/studioBackupService'
 import type { StoryRecallRequest } from '@shared/storyMemory'
 import type { WhisperDraft, WhisperReply } from '@shared/venusWhisper'
 import type { MeanwhileResponse } from '@shared/meanwhile'
@@ -381,6 +395,47 @@ export function registerIpcHandlers(): void {
     }
     return next
   })
+  // Prompt Studio's presets. Import reads a file the player picks and keeps nothing; a dismissed
+  // dialog resolves `null`.
+  handle('presets:list', () => listPresets())
+  handle('presets:get', (_event, id: string) => getPreset(id))
+  handle('presets:save', (_event, preset: Preset) => savePreset(preset))
+  handle('presets:delete', (_event, id: string) => deletePreset(id))
+  handle('presets:setActive', (_event, id: string) => setActivePreset(id))
+  // The section backups: a file saved where the native dialog points, and one picked to restore
+  // from; a dismissed dialog resolves `null`.
+  handle('studioBackup:save', async (event, name: string, text: string) => {
+    const { canceled, filePath } = await showSaveDialogFor(event, {
+      title: 'Back up Prompt Studio',
+      defaultPath: name,
+      filters: [{ name: 'Prompt Studio backup', extensions: ['json'] }]
+    })
+    if (canceled || filePath === undefined || filePath === '') return null
+
+    await saveStudioBackup(filePath, text)
+    return filePath
+  })
+  handle('studioBackup:pick', async (event) => {
+    const { canceled, filePaths } = await showOpenDialogFor(event, {
+      title: 'Restore Prompt Studio',
+      filters: [{ name: 'Prompt Studio backup', extensions: ['json'] }],
+      properties: ['openFile']
+    })
+    if (canceled || filePaths.length === 0) return null
+    return readStudioBackupFile(filePaths[0])
+  })
+  handle('studioPrompts:get', () => getStudioPrompts())
+  handle('studioPrompts:set', (_event, record: StudioPrompts) => setStudioPrompts(record))
+  handle('presets:import', async (event) => {
+    const { canceled, filePaths } = await showOpenDialogFor(event, {
+      title: 'Import a preset',
+      filters: [{ name: 'Preset', extensions: ['json', 'marinara'] }],
+      properties: ['openFile']
+    })
+    if (canceled || filePaths.length === 0) return null
+    return importPresetFromFile(filePaths[0])
+  })
+
   // The grab bags' set-aside keys, read once at boot and written behind every draw.
   handle('grabBags:get', () => getGrabBags())
   handle('grabBags:set', (_event, bags: GrabBags) => setGrabBags(bags))
@@ -1072,6 +1127,15 @@ async function openFolder(path: string, message: string): Promise<void> {
   if (failure !== '') throw appError('OPEN_FOLDER_FAILED', message, failure)
 }
 
-async function completeStructured<T>(request: StructuredRequest, ...args: Parameters<typeof completeCloudStructured<T>> extends [unknown, ...infer R] ? R : never): Promise<T> {
-  return completeCloudStructured<T>(await prepareStoryRequest(request), ...args)
+/**
+ * Sends one structured request: the story recall is prepended, the active Prompt Studio preset is
+ * applied where the request asks for one, and the fields only this app reads never reach the
+ * provider. A preset that cannot be loaded costs nothing but a warning.
+ */
+async function completeStructured<T>(request: StructuredRequest, signal?: AbortSignal, onDelta?: (delta: string) => void): Promise<T> {
+  const prepared = await prepareStoryRequest(request)
+  const plan = planPresetRequest(prepared, prepared.preset ? await loadActivePreset() : null)
+  const reply = await completeCloudStructured<T>(plan.request, signal, onDelta, undefined, plan.sampling)
+  for (const warning of finishPresetReply(reply, plan.applied)) console.warn(`[presets] ${warning}`)
+  return reply
 }

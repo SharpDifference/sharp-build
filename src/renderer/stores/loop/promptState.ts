@@ -4,6 +4,7 @@ import { cityLifeBackgrounds } from '@shared/cityLife'
 import { slotFullLabel, studentsOf } from '@shared/classes'
 import { activePlotTwist, PLOT_TWIST_MOD } from '@shared/plotTwists'
 import { modIsOn } from '../modsStore'
+import { textEditsNow } from '../promptStudioStore'
 import { kindOf } from '@shared/academics'
 import { globalSlotOf, jobDefOf, slotFromId } from '@shared/jobs'
 import type { PlayerStats } from '@shared/playerStats'
@@ -381,6 +382,7 @@ function withCancellation(
 export function promptState(): PromptState {
   const game = useGameStore.getState()
   const scenePersona = scenePersonaNow()
+  const textEdits = textEditsNow()
 
   // The Bunnyboard recap each character carries into the scene.
   const textingSummaries: Record<string, string[]> = {}
@@ -550,6 +552,7 @@ export function promptState(): PromptState {
     lessNsfwText: lessNsfwTextNow(),
     // Absent when the player has set no custom one, which is what `scenePersonaFor` reads as.
     ...(scenePersona !== undefined ? { scenePersona } : {}),
+    ...(textEdits !== undefined ? { textEdits } : {}),
     memoryBudgets: memoryBudgetsNow(),
     secretBudget: secretBudgetNow(),
     history: game.history,

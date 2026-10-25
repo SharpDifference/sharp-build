@@ -58,6 +58,7 @@ import { SEED_WORD_BAG, SEED_WORDS } from '../prompts/seedWords'
 import { buildSchedules, type ScheduleResult } from './classScheduler'
 import { useGameStore } from './gameStore'
 import { useGrabBagStore } from './grabBagStore'
+import { classCatalogNow, textEditsNow } from './promptStudioStore'
 import type { SemesterHandoff } from './semesterCarry'
 import { retrySilently } from './silentRetry'
 
@@ -336,14 +337,16 @@ export async function startNewGame(roster: readonly Character[]): Promise<StartO
     tiers: secretTiersWanted(undefined),
     held: []
   }))
+  // Read once here: a retry resends these requests as built, whatever the player edits meanwhile.
+  const textEdits = textEditsNow()?.global
   const current: StartAttempt = {
     roster,
-    classRequest: buildClassPrompt(roster),
-    profileRequest: buildProfilePrompt(roster),
+    classRequest: buildClassPrompt(roster, undefined, textEdits, classCatalogNow()),
+    profileRequest: buildProfilePrompt(roster, textEdits),
     occasionRequests,
-    occasionRequest: buildOccasionPrompt(occasionRequests, 'spring'),
+    occasionRequest: buildOccasionPrompt(occasionRequests, 'spring', textEdits),
     secretEntries,
-    secretRequest: buildSecretsPrompt(secretEntries)
+    secretRequest: buildSecretsPrompt(secretEntries, textEdits)
   }
   attempt = current
 
@@ -692,18 +695,20 @@ export async function startNextSemester(
       ...(carried?.flags?.hadSex ? { hadSex: true } : {})
     }
   })
+  // Read once here: a retry resends these requests as built, whatever the player edits meanwhile.
+  const textEdits = textEditsNow()?.global
   const current: NextAttempt = {
     roster,
     characters,
     continuation: next,
     catalog,
     profileInput,
-    classRequest: buildClassPrompt(roster, catalog),
-    profileRequest: buildContinuedProfilePrompt(profileInput),
+    classRequest: buildClassPrompt(roster, catalog, textEdits, classCatalogNow()),
+    profileRequest: buildContinuedProfilePrompt(profileInput, textEdits),
     occasionRequests,
-    occasionRequest: buildOccasionPrompt(occasionRequests, season),
+    occasionRequest: buildOccasionPrompt(occasionRequests, season, textEdits),
     secretEntries,
-    secretRequest: buildSecretsPrompt(secretEntries)
+    secretRequest: buildSecretsPrompt(secretEntries, textEdits)
   }
   nextAttempt = current
   return runNextAttempt(current, mine)

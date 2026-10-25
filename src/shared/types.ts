@@ -1,6 +1,7 @@
 import type { ReckoningState } from './reckoning'
 import type { EchoState } from './echo'
 import type { StoryMemory, StoryRecallRequest } from './storyMemory'
+import type { GamePart, PresetRequest, SceneSpotTag } from './presets/types'
 import type { BreakthroughState } from './breakthrough'
 import type { MeanwhileStore } from './meanwhile'
 /** Shared on-disk schema and IPC result types. */
@@ -57,6 +58,12 @@ export const MAX_LOG_RECORD_CHARS = 32 * 1024
 export interface StructuredRequest {
   /** Local-only recall snapshot; stripped before the provider request. */
   storyMemory?: StoryRecallRequest
+  /** Local-only: the game's coarse prompt parts a scene builder joined into `system` and `user`; stripped before the provider request. */
+  parts?: GamePart[]
+  /** Local-only: which scene call a builder made; `streamScene` turns it into `preset`, and it is stripped before the provider request. */
+  sceneSpot?: SceneSpotTag
+  /** Local-only: what main applies the active Prompt Studio preset with; stripped before the provider request. */
+  preset?: PresetRequest
   system: string
   user: string
   /** JSON Schema the reply is constrained to. */
@@ -1237,6 +1244,8 @@ export interface SceneState {
    * the last is {@link summary}. Absent when none has landed.
    */
   summaries?: SceneSummaryMark[]
+  /** Prompt Studio: each reply that committed variables, with where its lines start and the variables before it. Absent when none has. */
+  presetVarMarks?: import('./presets/varOps').PresetVarsMark[]
   /** Background base name, without the `_day`/`_night` suffix. */
   bg: string | null
   /** charIds occupying the three portrait slots, left to right; null = empty. */
@@ -1479,6 +1488,8 @@ export interface GameSave {
   exNpcWatch?: MeanwhileStore
   /** Character Dynamics: fixed setup choices retained by every save. */
   exCharacterDynamics?: import('./characterDynamics').CharacterDynamics
+  /** Prompt Studio's tracked variables, name to value; absent when there are none. */
+  presetVars?: Record<string, string>
   schemaVersion: 13
   /**
    * The playthrough this save belongs to. Derived from the containing folder
@@ -2455,6 +2466,8 @@ export interface SceneResponse {
   summary?: string
   /** "The scene is resolved." What it *meant* is the ledger call's job. */
   end_scene?: boolean | null
+  /** Set by main when a Prompt Studio preset was applied: the save's variables after this reply. Never on the wire. */
+  presetVars?: Record<string, string>
 }
 
 /**

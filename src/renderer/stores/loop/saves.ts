@@ -244,6 +244,9 @@ export function queuedScene(
   if (game.sceneSummaries.length > 0) {
     scene.summaries = game.sceneSummaries.map((mark) => ({ ...mark }))
   } else delete scene.summaries
+  if (game.scenePresetVars.length > 0) {
+    scene.presetVarMarks = game.scenePresetVars.map((mark) => ({ at: mark.at, before: { ...mark.before } }))
+  } else delete scene.presetVarMarks
   // Set-or-delete: a scene that is not one of these kinds must carry no key at all.
   if (game.sceneClass) scene.classCode = game.sceneClass
   else delete scene.classCode

@@ -152,6 +152,20 @@ export function PlusIcon({ size }: { size: number }): JSX.Element {
   )
 }
 
+/** The two columns of dots a row is dragged by. */
+export function GripIcon(): JSX.Element {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+      {[5, 12, 19].map((y) => (
+        <g key={y}>
+          <circle cx="9" cy={y} r="1.9" />
+          <circle cx="15" cy={y} r="1.9" />
+        </g>
+      ))}
+    </svg>
+  )
+}
+
 /** The eye's outline, open around whatever the pupil or the strike-through says. */
 const EYE_OUTLINE = 'M2 12s4-7 10-7 10 7 10 7-4 7-10 7-10-7-10-7Z'
 

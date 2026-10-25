@@ -47,6 +47,22 @@ const api: VenusUniversityApi = {
     get: () => ipcRenderer.invoke('grabBags:get'),
     set: (bags) => ipcRenderer.invoke('grabBags:set', bags)
   },
+  studioBackup: {
+    save: (name, text) => ipcRenderer.invoke('studioBackup:save', name, text),
+    pick: () => ipcRenderer.invoke('studioBackup:pick')
+  },
+  studioPrompts: {
+    get: () => ipcRenderer.invoke('studioPrompts:get'),
+    set: (record) => ipcRenderer.invoke('studioPrompts:set', record)
+  },
+  presets: {
+    list: () => ipcRenderer.invoke('presets:list'),
+    get: (id) => ipcRenderer.invoke('presets:get', id),
+    save: (preset) => ipcRenderer.invoke('presets:save', preset),
+    delete: (id) => ipcRenderer.invoke('presets:delete', id),
+    setActive: (id) => ipcRenderer.invoke('presets:setActive', id),
+    import: () => ipcRenderer.invoke('presets:import')
+  },
   mods: {
     get: () => ipcRenderer.invoke('mods:get'),
     set: (switches) => ipcRenderer.invoke('mods:set', switches)

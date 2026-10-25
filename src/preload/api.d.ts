@@ -12,6 +12,9 @@ import type {
 import type { FeedThreadsResponse } from '@shared/bunnyfeeds'
 import type { PromptEdit } from '@shared/imagePrompt'
 import type { ModSwitches } from '@shared/mods'
+import type { StudioBackupFile } from '@shared/presets/studioBackup'
+import type { StudioPrompts } from '@shared/presets/studioPrompts'
+import type { Preset, PresetImport, PresetListing } from '@shared/presets/types'
 import type { SoundtracksApi } from '@shared/soundtracks'
 import type { LorebookRecord, WorldInfoFile, WorldInfoImport } from '@shared/lorebookRecord'
 import type {
@@ -112,6 +115,42 @@ export interface VenusUniversityApi {
     get: () => Promise<Result<GrabBags>>
     /** Replaces every grab bag's set-aside keys. */
     set: (bags: GrabBags) => Promise<Result<void>>
+  }
+  /** Prompt Studio's section backups as files the player keeps. */
+  studioBackup: {
+    /**
+     * Saves a backup the renderer composed where the native save dialog points (the browser build
+     * offers it as a download), after sniffing it as a studio backup. Answers where it went, or
+     * `null` where the dialog was dismissed.
+     */
+    save: (name: string, text: string) => Promise<Result<string | null>>
+    /** Reads a backup file the player picks as text, with its name; nothing is parsed or kept. `null` where nothing was picked. */
+    pick: () => Promise<Result<StudioBackupFile | null>>
+  }
+  /** What Prompt Studio keeps for the game's own prompts, apart from the settings. */
+  studioPrompts: {
+    /** The record; an empty one where nothing has been kept. A wrong schema version is refused with `STUDIO_PROMPTS_SCHEMA_VERSION`. */
+    get: () => Promise<Result<StudioPrompts>>
+    /** Replaces the record and answers it as kept: blank blocks dropped, pool sizes whole and in range. */
+    set: (record: StudioPrompts) => Promise<Result<StudioPrompts>>
+  }
+  /** Prompt Studio's presets, kept for every playthrough. */
+  presets: {
+    /** Every preset's summary, by name, and the id in force; an empty store gets its Default first. */
+    list: () => Promise<Result<PresetListing>>
+    /** One preset whole; an id nothing readable is kept under is refused with `PRESET_NOT_FOUND`. */
+    get: (id: string) => Promise<Result<Preset>>
+    /** Keeps a preset under its own id, replacing one already there. */
+    save: (preset: Preset) => Promise<Result<void>>
+    /** Removes one; the last preset is refused with `PRESET_LAST`, and deleting the one in force puts another in force. */
+    delete: (id: string) => Promise<Result<void>>
+    /** Puts a preset in force. */
+    setActive: (id: string) => Promise<Result<void>>
+    /**
+     * Reads a SillyTavern, Marinara or exported Prompt Studio file the player picks into a preset under a fresh id, with
+     * what the import left behind. Nothing is kept: the caller saves it. `null` where nothing was picked.
+     */
+    import: () => Promise<Result<PresetImport | null>>
   }
   mods: {
     /** Which community mods are switched on, and their options (`shared/mods.ts`). */

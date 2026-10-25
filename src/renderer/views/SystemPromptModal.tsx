@@ -1,6 +1,6 @@
 import type { JSX } from 'react'
 import { useSettingsStore } from '../stores/settingsStore'
-import { DEFAULT_SCENE_PERSONA } from '../prompts/scenePrompt'
+import { DEFAULT_SCENE_PERSONA } from '../prompts/promptBlocks'
 import type { ScreenTheme } from './clockTheme'
 import { TextEditModal } from './TextEditModal'
 

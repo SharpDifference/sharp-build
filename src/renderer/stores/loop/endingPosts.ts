@@ -17,6 +17,7 @@ import { settingNow } from '../lorebookStore'
 import { retrySilently } from '../silentRetry'
 import { deliverEndingPosts } from './feed'
 import { lessNsfwTextNow, reader, secretBudgetNow } from './promptState'
+import { textEditsNow } from '../promptStudioStore'
 import { writeEpilogueSave } from './saves'
 import { currentRun, loopState, runStale, LOOP_LLM_GROUP } from './state'
 
@@ -59,6 +60,7 @@ async function fetchEndingPosts(
         playthroughId: game.playthroughId ?? 'unsaved',
         stats: game.stats,
         lessNsfwText: lessNsfwTextNow(),
+        globalTextEdits: textEditsNow()?.global,
         secretBudget: secretBudgetNow(),
         season: game.calendar.season,
         readerGraduated: game.semesterIndex === LAST_SEMESTER,

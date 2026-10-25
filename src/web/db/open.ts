@@ -9,6 +9,8 @@ import type { SlotReplay } from '@shared/replays'
 import type { SavedScene } from '@shared/sceneCreator'
 import type { SoundtrackMap } from '@shared/soundtracks'
 import type { Character, GameSave, GrabBags, Settings } from '@shared/types'
+import type { StudioPrompts } from '@shared/presets/studioPrompts'
+import type { StoredPresets } from './presets'
 
 /**
  * The browser build's whole disk: one IndexedDB database, one store per kind of file the
@@ -64,6 +66,8 @@ export interface VenusUniversityDb extends DBSchema {
   backgrounds: { key: string; value: StoredBackground }
   scenes: { key: string; value: SavedScene }
   replays: { key: [string, string]; value: SlotReplay }
+  presets: { key: 'presets'; value: StoredPresets }
+  studioPrompts: { key: 'studioPrompts'; value: StudioPrompts }
   lorebooks: { key: string; value: LorebookRecord }
 }
 
@@ -90,11 +94,14 @@ const STORES = [
   'backgrounds',
   'scenes',
   'replays',
+  'presets',
+  'studioPrompts',
   'lorebooks'
 ] as const
 
-// 10: Venus Dev's 8 (the lorebooks store) landing on the build's 9, so every database here gains it.
-const DB_VERSION = 10
+// 12: the build's 11 (Prompt Studio's stores) meeting Venus University 0.6.0's 10 (the lorebooks
+// store), so a database at either gains what the other added.
+const DB_VERSION = 12
 
 let opened: Promise<IDBPDatabase<VenusUniversityDb>> | null = null
 

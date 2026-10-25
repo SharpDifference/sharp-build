@@ -5,6 +5,7 @@ import { normalizeWhisper, type VenusWhisper } from '@shared/venusWhisper'
 import { normalizeBreakthrough, reconcileBreakthrough, type BreakthroughState } from '@shared/breakthrough'
 import { normalizeMeanwhile, type MeanwhileStore } from '@shared/meanwhile'
 import { readCharacterDynamics, type CharacterDynamics } from '@shared/characterDynamics'
+import { presetVarsWithin, readPresetVarMarks, readPresetVars, type PresetVarsMark } from '@shared/presets/varOps'
 import { create } from 'zustand'
 import { savedPlotTwist } from '@shared/plotTwists'
 import {
@@ -319,6 +320,10 @@ interface GameStoreState {
   /** Save-owned story direction; serialized even when its mod is switched off. */
   exPlotTwist: string
   exCharacterDynamics?: CharacterDynamics
+  /** Prompt Studio's tracked variables, by name. Persisted, and empty where there are none. */
+  presetVars: Record<string, string>
+  /** Each reply of this scene that committed variables, so a cut can take them back. Persisted with the scene. */
+  scenePresetVars: PresetVarsMark[]
   /**
    * Lifetime counts about the reader — money earned, kisses, nights, shifts worked, moved only
    * in boundary passes so a replay credits each of them once — and the output tokens the cloud
@@ -842,6 +847,10 @@ interface GameStoreState {
   applyStatDeltas: (deltas: PlayerStats) => void
   /** Replaces what the reader says about himself: New Game's answer, and every later rewrite. */
   setBio: (bio: string) => void
+  /** Replaces Prompt Studio's tracked variables with the ones a scene reply left. */
+  setPresetVars: (vars: Record<string, string>) => void
+  /** Commits a scene reply's variables, noting the transcript length its lines start at and the variables before it. */
+  commitPresetVars: (vars: Record<string, string>, at: number) => void
   /** Counts a finished scene's kisses and nights into the lifetime tallies. */
   recordActs: (acts: readonly IntimateAct[]) => void
   /** Adds one cloud reply's output tokens to the lifetime tallies. */
@@ -1232,6 +1241,15 @@ export function stageContextOf(state: Omit<StageContext, 'noNsfwImages'>): Stage
   }
 }
 
+/** The variables and marks a cut of the transcript to `length` leaves; nothing when it takes no reply's. */
+function presetVarsCut(
+  marks: readonly PresetVarsMark[],
+  length: number
+): Partial<Pick<GameStoreState, 'presetVars' | 'scenePresetVars'>> {
+  const cut = presetVarsWithin(marks, length)
+  return cut ? { presetVars: cut.vars, scenePresetVars: cut.marks } : {}
+}
+
 /**
  * The summary marks left once the transcript is cut to `length`, with the running summary
  * re-derived off the top one; nothing at all when every mark survives.
@@ -1447,6 +1465,8 @@ const initialState = {
   bio: '',
   exPlotTwist: '',
   exCharacterDynamics: undefined as CharacterDynamics | undefined,
+  presetVars: {} as Record<string, string>,
+  scenePresetVars: [] as PresetVarsMark[],
   tallies: emptyTallies(),
   charInfo: {} as Record<string, CharInfo>,
   classes: {} as Record<string, ClassEntry>,
@@ -1588,6 +1608,7 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
       bio: save.bio ?? '',
       exPlotTwist: savedPlotTwist(save.exPlotTwist),
       exCharacterDynamics: readCharacterDynamics(save),
+      presetVars: readPresetVars(save.presetVars),
       tallies: { ...emptyTallies(), ...save.tallies },
       // The two halves rejoined; a save entry with no profile falls back to the blank one,
       // which is what a charId the record never knew about would land on.
@@ -1807,6 +1828,9 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
       ...(state.sceneSummaries.length > 0
         ? { summaries: state.sceneSummaries.map((mark) => ({ ...mark })) }
         : {}),
+      ...(state.scenePresetVars.length > 0
+        ? { presetVarMarks: state.scenePresetVars.map((mark) => ({ at: mark.at, before: { ...mark.before } })) }
+        : {}),
       bg: state.bg,
       slots: [...state.slots],
       emotions: { ...state.emotions },
@@ -1844,6 +1868,7 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
       sceneSummaries:
         scene?.summaries?.map((mark) => ({ ...mark })) ??
         (scene?.summary ? [{ at: 0, summary: scene.summary }] : []),
+      scenePresetVars: readPresetVarMarks(scene?.presetVarMarks),
       bg: scene?.bg ?? null,
       slots: scene ? [...scene.slots] : Array<string | null>(PORTRAIT_SLOTS).fill(null),
       emotions: scene ? { ...scene.emotions } : {},
@@ -1933,7 +1958,7 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
     }),
 
   clearSceneTranscript: () =>
-    set({ currentSceneTranscript: [], sceneSummary: null, sceneSummaries: [] }),
+    set({ currentSceneTranscript: [], sceneSummary: null, sceneSummaries: [], scenePresetVars: [] }),
 
   setSceneSummary: (summary, at) =>
     set((state) => ({
@@ -1953,7 +1978,8 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
         pendingLines: [],
         reread: 0,
         ...summariesWithin(state.sceneSummaries, kept),
-        ...giftsWithin(state, kept)
+        ...giftsWithin(state, kept),
+        ...presetVarsCut(state.scenePresetVars, kept)
       }
     }),
 
@@ -2190,6 +2216,14 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
     set((state) => ({ stats: applyStatDeltas(state.stats, deltas) })),
 
   setBio: (bio) => set({ bio }),
+
+  setPresetVars: (vars) => set({ presetVars: readPresetVars(vars) }),
+
+  commitPresetVars: (vars, at) =>
+    set((state) => ({
+      presetVars: readPresetVars(vars),
+      scenePresetVars: [...state.scenePresetVars, { at, before: { ...state.presetVars } }]
+    })),
 
   recordActs: (acts) => set((state) => ({ tallies: talliesAfterActs(state.tallies, acts) })),
 
@@ -3094,6 +3128,7 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
       bio: state.bio,
       exPlotTwist: state.exPlotTwist,
       ...(state.exCharacterDynamics ? { exCharacterDynamics: structuredClone(state.exCharacterDynamics) } : {}),
+      ...(Object.keys(state.presetVars).length > 0 ? { presetVars: { ...state.presetVars } } : {}),
       tallies: state.tallies,
       date: state.date,
       time: state.time,

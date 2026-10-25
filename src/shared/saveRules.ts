@@ -64,6 +64,7 @@ const SAVE_REQUIRED: Record<
     | 'bio'
     | 'exPlotTwist'
     | 'exCharacterDynamics'
+    | 'presetVars'
     | 'tallies'
     | 'thumbnail'
     | 'replays'
