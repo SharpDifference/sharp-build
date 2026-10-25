@@ -184,6 +184,11 @@ else names it.
 | `postPicture` | `BunnyboardModal.tsx` (`PostSpots.tsx`) | Draw a post's picture under its text |
 | `endingChoice` | `GameView.tsx` | Offer a way on from the ending, beside "Return to the main menu" |
 | `saveChoice` | `LoadGameModal.tsx` | Offer something for a picked save, beside "Load" |
+| `saveNote` | `SaveGameModal.tsx` | Add a line to Save Game about what a save of the scene keeps of the mod's own |
+| `statActivities` | `slotActions.ts` | Offer a training activity in place of one of the landing's stat suggestions |
+| `slotActivityAvailable` | `gameLoop.ts`, `slotActions.ts`, `GameView.tsx` | Say whether a training activity is still there to commit to or resume |
+| `settleSceneStats` | `gameLoop.ts` (`resolveScene`) | Change what a finished scene does to the reader's stats, and the lines that say so |
+| `statFloor` | `gameLoop.ts`, `gameStore.ts` | Say the lowest a stat may fall to; the first mod that answers decides |
 | `modDetail` | `ModsModal.tsx` | Draw a page of its own for the mod picked on the Mods screen, its own or one built on it, in place of the list of that mod's options |
 
 The two ways on (`endingChoice`, `saveChoice`) share one shape, `WayOn`. Its `prepare` runs
@@ -286,6 +291,27 @@ Files a mod keeps per playthrough outside the save (pictures, say) need nothing:
 
 ## Shared gameplay extensions
 
+- A mod keeps data with the scene being played by declaring optional fields on
+  `ModSceneFields` in `shared/types.ts` by declaration merging, and reading and writing them on
+  the game store's `sceneMods`, leaving other mods' fields as they are. They are saved as the
+  scene's `mods`, restored with it and cleared when the next scene is cast, so they must be
+  plain data.
+- A slot activity is something a mod offers on the landing in place of a stat suggestion
+  (`statActivities`), such as a game to train a stat with. Committing to one saves it with the
+  scene as `activity`; the scene is cast as usual, held open while the activity is pending, and
+  told to stage only the arrival (`COMMITTED SLOT ACTIVITY` in the system prompt). The mod opens
+  its own surface and calls `finishSlotActivity(owner, id, completed, result)` once; the game
+  saves the result, then sends a closing turn that ends the scene. Once the reply to that closing
+  has landed the activity is closed and the scene runs as any other. A reload resumes a settled
+  activity's closing rather than its play, and `slotActivityAvailable` is asked again at commit
+  and on reload; one no longer available ends without being completed. The game pays nothing
+  for an activity itself: a mod that rewards one does it in `settleSceneStats`.
+- `settleSceneStats` changes the stats a finished scene settles, after the game has resolved
+  them from the ledger. It runs for enabled mods in list order, each handed what the one before
+  left, with the ledger's verdict and the scene's facts. It also runs for the projections before
+  the ending, so return fresh values and write nothing. `statFloor` gives the lowest a stat may
+  fall to wherever the game applies stats; the first mod that answers decides, and the game's own
+  floor stands where none does.
 - `projectSlotMemories` transforms the projected character memories before the crush roll
   and next opening. It runs for enabled mods in list order. Return fresh values; do not write
   stores, award currency, consume an ability or roll randomness. Commit effects at
