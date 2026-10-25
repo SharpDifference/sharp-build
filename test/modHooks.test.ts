@@ -109,6 +109,26 @@ describe('ways on', () => {
   })
 })
 
+describe('updates tabs and option previews', () => {
+  const Page = () => null
+  const Preview = () => null
+
+  it('lists one page per id from the mods on, and offers a preview whether its mod is on or off', async () => {
+    const on = { notes: true, copy: true, faces: false }
+    const hooks = await fresh(on, ['notes', 'copy', 'faces'])
+    hooks.registerHooks('copy', { updatesTab: { id: 'notes', word: 'Copy', Page } })
+    hooks.registerHooks('notes', { updatesTab: { id: 'notes', word: 'Notes', Page } })
+    hooks.registerHooks('faces', { optionPreviews: { style: Preview } })
+
+    expect(hooks.updatesTabs().map((tab: { word: string }) => tab.word)).toEqual(['Notes'])
+    expect(hooks.optionPreview('faces', 'style')).toBe(Preview)
+    expect(hooks.optionPreview('faces', 'other')).toBeUndefined()
+
+    on.notes = false
+    expect(hooks.updatesTabs().map((tab: { word: string }) => tab.word)).toEqual(['Copy'])
+  })
+})
+
 
 describe('preparing a way on', () => {
   /** A prepare the test answers by hand, so the screen can be closed while it waits. */
