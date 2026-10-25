@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { normalizeTalents, setTalentRules, type TalentState } from '@shared/campusTalents'
 import { talentAssessment, talentColdProtection, talentHeartBonus, talentHeartMultiplier, talentProjectWork, talentStatGains } from '@shared/talentPerks'
 import { affectionOf } from '@shared/relationship'
+import { challengeStatFloor } from '@shared/startingChallenge'
 import { applyStatDeltas, resolveStatDeltas, type StatContext } from '@shared/playerStats'
 import { coldPassOf, COLD_READER, type ColdPassInput } from '@shared/colds'
 import { useGameStore } from '../src/renderer/stores/gameStore'
@@ -70,7 +71,7 @@ describe('Training and challenge stats', () => {
   it('boosts actual solo gains and recovers negative stats without resetting their floor or adding free stats', () => {
     const gained = resolve(ctx())
     expect(gained.deltas).toEqual({brain: 4, body: 4, heart: 0})
-    expect(applyStatDeltas({brain: -60, body: -60, heart: -60}, gained.deltas, 'rock-bottom')).toEqual({brain: -56, body: -56, heart: -60})
+    expect(applyStatDeltas({brain: -60, body: -60, heart: -60}, gained.deltas, key => challengeStatFloor('rock-bottom', key))).toEqual({brain: -56, body: -56, heart: -60})
     const native = resolveStatDeltas(undefined, ctx())
     expect(talentStatGains(s, native, ctx(), false).deltas).toEqual(native.deltas)
     expect(resolve(ctx({sick: true, gradeOutcome: {heart: 2, lines: []}})).deltas).toEqual({brain: 0, body: 0, heart: 2})

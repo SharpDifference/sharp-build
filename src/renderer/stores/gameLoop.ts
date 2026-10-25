@@ -1,6 +1,6 @@
-import { projectSlotMemories, slotSettled } from '../mods/hooks'
-import { talentProjectWork, talentStatGains } from '@shared/talentPerks'
-import { showUpHeartForScene } from './loop/talentShowUp'
+import { projectSlotMemories, settleSceneStats, slotActivityAvailable, slotSettled, statFloor } from '../mods/hooks'
+import { withSlotActivityPrompt } from '../prompts/slotActivity'
+import { talentProjectWork } from '@shared/talentPerks'
 import { feedStatusLines } from './bunnyfeedsMemory'
 import { canContinueReckoning, pendingReckoningAftermath } from './reckoning'
 import { withReckoningAftermath } from '../prompts/reckoningPrompt'
@@ -16,6 +16,7 @@ import {
   resolveStatDeltas,
   tierUps,
   type PlayerStats,
+  type StatContext,
   type StatusText
 } from '@shared/playerStats'
 import { factoidLine, kindOf, projectProgress, projectProgressLine } from '@shared/academics'
@@ -1320,7 +1321,8 @@ function dispatchTurn(snapshot: TurnSnapshot): void {
       snapshot.preset,
       snapshot.planId,
       snapshot.sceneEvents,
-      snapshot.answeredReminder
+      snapshot.answeredReminder,
+      snapshot.activity
     )
   }
 }
@@ -1441,7 +1443,8 @@ export async function submitAction(
   /** What a failed attempt at this turn rolled, so its retry opens on the same. */
   sceneEvents?: TurnSnapshot['sceneEvents'],
   /** Whose reminder a failed attempt at this plan answered, so its retry skips her thread too. */
-  answeredReminder?: string
+  answeredReminder?: string,
+  activity?: import('@shared/slotActivity').SlotActivityOffer
 ): Promise<void> {
   const run = currentRun()
   const raw = action.trim()
@@ -1450,6 +1453,7 @@ export async function submitAction(
 
   const game = useGameStore.getState()
   if (game.busy || !game.awaitingInput) return
+  if (activity && !slotActivityAvailable(activity)) return
 
   // A created scene's opening, typed again after its first send was refused or abandoned: it
   // goes the way its first send went, to the cast the setup settled, never to the classifier.
@@ -1466,6 +1470,7 @@ export async function submitAction(
     action: raw,
     ...(game.exBreakthrough.pending ? { breakthrough: { ...game.exBreakthrough.pending } } : {}),
     ...(gift ? { gift } : {}),
+    ...(activity ? { activity } : {}),
     ...(preset ? { preset } : {}),
     ...(planId ? { planId } : {}),
     ...(sceneEvents ? { sceneEvents } : {}),
@@ -1546,6 +1551,7 @@ export async function submitAction(
     if (!isTutorialSlot(game.date, game.time, game.semesterIndex)) {
       plan.scene = { ...plan.scene, ...sceneEventsFor(snapshot, plan.cast, plan.scene) }
     }
+    if (activity) plan.scene = { ...plan.scene, activity: { ...activity, status: 'pending' } }
     await applyCastToScene(plan)
     if (runStale(run)) return
     // Off the scene just cast, the same derivation a resumed save runs, so what the boundary
@@ -1560,12 +1566,12 @@ export async function submitAction(
   useGameStore.getState().logPlayerAction(plan.sceneAction, isContinuation)
 
   // A solo scene opens and closes in this one call, so it is never a continuation.
-  const solo = !isContinuation && plan.cast.length === 0
+  const solo = (!isContinuation || Boolean(useGameStore.getState().sceneActivity)) && plan.cast.length === 0
 
   const request = withBreakthrough(buildTurnRequest(plan.sceneAction, castCharacters, isContinuation, solo), castCharacters, solo)
   // Only the call that opens a scene repairs a forgotten entrance.
   await runSceneTurn(
-    streamScene(request, undefined, { forceShowSpeakers: !isContinuation && !solo }),
+    streamScene(withSlotActivityPrompt(request, useGameStore.getState().sceneActivity), undefined, { forceShowSpeakers: !isContinuation && !solo }),
     snapshot,
     plan.cast,
     castCharacters,
@@ -1978,7 +1984,7 @@ async function fetchEndingOpening(
   )
   // Safe on the exam prefetch too: a texting-only ledger carries no `stats`, and every other
   // input `resolveScene` reads is fixed before the exam starts.
-  const stats = applyStatDeltas(game.stats, resolveScene().deltas, game.exStartingChallenge)
+  const stats = applyStatDeltas(game.stats, resolveScene().deltas, statFloor)
   // Rolled against the charInfo the witness pass just left and the post-scene stats, which is
   // what the boundary's fallback would see too.
   const crushes = rollCrushSettle(ledger, seen, stats)
@@ -2351,9 +2357,9 @@ function claimTextLedger(date: number, time: TimeSlot): Promise<LedgerResponse |
 }
 
 /** What the finished scene did to the reader's stats, and the lines that say so. */
-function resolveScene(): { deltas: PlayerStats; lines: StatusText[]; showUp: number } {
-  const game = useGameStore.getState()
-  const ctx: Parameters<typeof resolveStatDeltas>[1] = {
+function resolveScene(): { deltas: PlayerStats; lines: StatusText[] } {
+  const ledger = loopState.pendingLedgerResult?.stats
+  const ctx: StatContext = {
     // Not `closingCast`, which a resumed save has already cleared by this point.
     solo: useGameStore.getState().cast.length === 0,
     // The same fact the ledger's `STATS` section is dropped on: a class that went ahead.
@@ -2368,15 +2374,7 @@ function resolveScene(): { deltas: PlayerStats; lines: StatusText[]; showUp: num
     // Read at the scene's own slot, which a dose taken during it never moves.
     sick: readerSickNow()
   }
-  const resolved = talentStatGains(game.exTalents, resolveStatDeltas(loopState.pendingLedgerResult?.stats, ctx), ctx,
-    game.sceneClass !== null && game.classes[game.sceneClass]?.category === 'pe', game.stats.heart)
-  // Add after training: an invitation reward must not trigger Social Ease or recovery.
-  const showUp = showUpHeartForScene(loopState.pendingLedgerResult, ctx.sick === true)
-  return {
-    deltas: { ...resolved.deltas, heart: resolved.deltas.heart + showUp },
-    lines: showUp ? [...resolved.lines, { text: `Show Up: Heart went up by ${showUp}.`, polarity: 'positive' }] : resolved.lines,
-    showUp
-  }
+  return settleSceneStats(resolveStatDeltas(ledger, ctx), { ledger, ctx })
 }
 
 /** The status line at the end of a project work session. */
@@ -2717,10 +2715,10 @@ function showStatusLines(): boolean {
   const projected = ledger ? projectLedger(game.charInfo, ledger, game.date) : null
   // `game.stats` is still the before-snapshot — the deltas land at the boundary — so the two
   // readings the rank-up screen walks between are both had here.
-  const after = applyStatDeltas(game.stats, resolved.deltas, game.exStartingChallenge)
+  const after = applyStatDeltas(game.stats, resolved.deltas, statFloor)
   loopState.statusSteps = buildStatusSteps({
     movement: resolved.lines,
-    ups: tierUps(game.stats, resolved.deltas, game.exStartingChallenge),
+    ups: tierUps(game.stats, resolved.deltas, statFloor),
     before: game.stats,
     after,
     ledgerNotes: [
@@ -2846,7 +2844,7 @@ async function crossSlotBoundary(): Promise<void> {
   loopState.statusSteps = []
   const ledger = loopState.pendingLedgerResult
   // Re-run: `resolveScene` is pure, so the numbers the player just read are the ones that land.
-  const { deltas, showUp } = resolveScene()
+  const { deltas } = resolveScene()
   loopState.pendingLedgerResult = null
   // The texts the boundary itself sends. The phone is still on screen here, and a landed text
   // rings only where the phone is shown, so they land under the cover below and the landing
@@ -2856,10 +2854,6 @@ async function crossSlotBoundary(): Promise<void> {
   // Before the deltas land: an exam is graded on the Brain he walked in with.
   recordAcademics(ledger)
   loopState.projectWork = null
-  if (showUp > 0) useGameStore.setState(current => ({
-    exTalents: { ...current.exTalents,
-      showUpDay: { term: game.semesterIndex, date: game.date } }
-  }))
   useGameStore.getState().applyStatDeltas(deltas)
   // `workedSlots` is what stops the next `settleShifts` striking a shift he turned up to.
   if (loopState.jobShift) {

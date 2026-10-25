@@ -174,6 +174,11 @@ Silver Lining uses the normal scene provider and its result is narrative, not a 
 
 ## Saves and switches
 
+Scene stat bonuses register through `settleSceneStats`. That hook is a pure calculation used
+for both ending previews and the committed reward. Show Up is added after training bonuses,
+so its invitation reward cannot itself earn another training bonus. Its daily-use stamp is
+committed by `slotSettled`, after the boundary's memory edits and before its save.
+
 Previously purchased abilities and their effects remain available after this update. Any further ranks, including Dancer II and III, use the new prerequisite. Finding Your Feet receives the single-rank migration and refund described above; other ranks, BP and cooldowns are retained.
 
 Purchases and bank transfers join the game's save queue. They are available only at a safe save point. A failed write changes neither BP, money nor purchased stats. An acknowledgement from a different loaded save cannot change the current one. Normal saves and semester carry retain the new `exTalents` data.

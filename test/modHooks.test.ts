@@ -68,6 +68,21 @@ describe('mod hooks', () => {
   })
 })
 
+describe('when a post came out', () => {
+  it("is the first answer from a mod that is on, and the slot's start where none answers", async () => {
+    const on = { held: true, late: true }
+    const hooks = await fresh(on, ['held', 'late'])
+    hooks.registerHooks('late', { postOutAt: () => 20 })
+    hooks.registerHooks('held', { postOutAt: (one) => (one.id === 'p1' ? 10 : undefined) })
+
+    expect(hooks.postOutAt(post)).toBe(10)
+    expect(hooks.postOutAt({ ...post, id: 'p2' })).toBe(20)
+
+    on.held = on.late = false
+    expect(hooks.postOutAt(post)).toBe(0)
+  })
+})
+
 describe('ways on', () => {
   it('offers the first answer from a mod that is on, and none from a mod that is off', async () => {
     const hooks = await fresh({ off: false }, ['off', 'quiet', 'semesters', 'later'])
@@ -91,6 +106,26 @@ describe('ways on', () => {
     hooks.registerHooks('a', { saveChoice: () => undefined })
     const save = {} as Parameters<typeof hooks.saveChoice>[0]['save']
     expect(hooks.saveChoice({ playthroughId: 'p', save })).toBeUndefined()
+  })
+})
+
+describe('updates tabs and option previews', () => {
+  const Page = () => null
+  const Preview = () => null
+
+  it('lists one page per id from the mods on, and offers a preview whether its mod is on or off', async () => {
+    const on = { notes: true, copy: true, faces: false }
+    const hooks = await fresh(on, ['notes', 'copy', 'faces'])
+    hooks.registerHooks('copy', { updatesTab: { id: 'notes', word: 'Copy', Page } })
+    hooks.registerHooks('notes', { updatesTab: { id: 'notes', word: 'Notes', Page } })
+    hooks.registerHooks('faces', { optionPreviews: { style: Preview } })
+
+    expect(hooks.updatesTabs().map((tab: { word: string }) => tab.word)).toEqual(['Notes'])
+    expect(hooks.optionPreview('faces', 'style')).toBe(Preview)
+    expect(hooks.optionPreview('faces', 'other')).toBeUndefined()
+
+    on.notes = false
+    expect(hooks.updatesTabs().map((tab: { word: string }) => tab.word)).toEqual(['Copy'])
   })
 })
 
@@ -220,5 +255,64 @@ describe('post comments', () => {
 
     on.plain = false
     expect(hooks.postCommentsOwner()?.modId).toBe('threads')
+  })
+})
+
+describe('emoji tool and sent text', () => {
+  const Tool = () => null
+  const Other = () => null
+  const Text = () => null
+
+  it('are drawn by the first mod on that draws them, and by none once it is off', async () => {
+    const on = { picker: true, plain: true }
+    const hooks = await fresh(on, ['picker', 'plain'])
+    hooks.registerHooks('plain', { emojiTool: Other })
+    hooks.registerHooks('picker', { emojiTool: Tool, sentText: { Text } })
+
+    expect(hooks.emojiTool()).toBe(Tool)
+    expect(hooks.sentText()?.Text).toBe(Text)
+
+    on.picker = false
+    expect(hooks.emojiTool()).toBe(Other)
+    expect(hooks.sentText()).toBeNull()
+  })
+})
+
+describe('slot activity offers', () => {
+  it('accepts only enabled owners, the requested stat, and currently available offers', async () => {
+    const hooks = await fresh({ disabled: false }, ['pack', 'disabled'])
+    const offer = { owner: 'pack', id: 'memory', label: 'Memory', location: 'cutetea', stat: 'brain' as const }
+    hooks.registerHooks('pack', {
+      statActivities: () => [offer, { ...offer, owner: 'someone-else' }, { ...offer, stat: 'body' }],
+      slotActivityAvailable: o => o.id === 'memory'
+    })
+    hooks.registerHooks('disabled', { statActivities: () => [{ ...offer, owner: 'disabled' }], slotActivityAvailable: () => true })
+    expect(hooks.statActivities('brain')).toEqual([offer])
+    expect(hooks.slotActivityAvailable({ ...offer, id: 'removed' })).toBe(false)
+    expect(hooks.slotActivityAvailable({ ...offer, owner: 'disabled' })).toBe(false)
+  })
+})
+
+describe('scene stat settlement', () => {
+  const zero = { brain: 0, body: 0, heart: 0 }
+  const settlement = { ledger: { brain: true }, ctx: { solo: true, classScene: false, classOutcome: null, jobOutcome: null } }
+  it('hands each mod that is on what the one before it left, in list order', async () => {
+    const hooks = await fresh({ off: false }, ['first', 'second', 'off'])
+    hooks.registerHooks('second', { settleSceneStats: (resolved) => ({ ...resolved, deltas: { ...resolved.deltas, body: resolved.deltas.brain * 10 } }) })
+    hooks.registerHooks('first', { settleSceneStats: (resolved, s) => ({ ...resolved, deltas: { ...resolved.deltas, brain: s.ledger?.brain ? 1 : 0 } }) })
+    hooks.registerHooks('off', { settleSceneStats: () => ({ deltas: { brain: 9, body: 9, heart: 9 }, lines: [] }) })
+    const resolved = { deltas: zero, lines: [] }
+    expect(hooks.settleSceneStats(resolved, settlement).deltas).toEqual({ brain: 1, body: 10, heart: 0 })
+    expect(resolved.deltas).toEqual(zero)
+  })
+  it("takes the first floor a mod that is on gives, and the game's own where none does", async () => {
+    const hooks = await fresh({ off: false }, ['first', 'second', 'off'])
+    hooks.registerHooks('off', { statFloor: () => -100 })
+    hooks.registerHooks('second', { statFloor: () => -20 })
+    hooks.registerHooks('first', { statFloor: (key) => (key === 'heart' ? -5 : undefined) })
+    expect(hooks.statFloor('heart')).toBe(-5)
+    expect(hooks.statFloor('brain')).toBe(-20)
+    hooks.setHookRules({ isOn: () => false, order: () => 0 })
+    expect(hooks.statFloor('brain')).toBeUndefined()
   })
 })
