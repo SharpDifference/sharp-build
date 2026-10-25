@@ -1,5 +1,5 @@
 import { trainingSuggestions, trainingAvailable, pendingTraining } from '../minigames/training'
-import { trainedSceneStats } from '@shared/minigameTraining'
+import { trainingExercise } from '@shared/minigameTraining'
 import { locationAvailable } from '@shared/cityLife'
 import { locationDefOf } from '@shared/locations'
 import { gameById, tunedGame } from '../minigames/prefs'
@@ -101,10 +101,10 @@ function agree(
 registerHooks(MINI_GAMES, {
   statActivities: trainingSuggestions,
   slotActivityAvailable: trainingAvailable,
-  // A training slot pays its own stat in place of the hour's exercise; any other scene is left be.
-  settleSceneStats: (settled, { ledger, ctx }) => {
+  // A training slot exercised its own stat in place of the hour's; any other scene is left be.
+  sceneExercise: (exercised) => {
     const activity = useGameStore.getState().sceneActivity
-    return activity?.owner === MINI_GAMES ? trainedSceneStats(settled, ledger, ctx, activity) : settled
+    return activity?.owner === MINI_GAMES ? trainingExercise(activity) : exercised
   },
   scenePlay: { Seat: MiniGameSeat, Panel: MiniGamePanel },
   // A pack's page on the Mods screen: its games, and each one's own page.

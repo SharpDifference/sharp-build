@@ -26,7 +26,7 @@ Each training game supplies a natural activity phrase rather than inserting its 
 
 ## Completion, rewards and recovery
 
-Win, loss, draw or a completed solo run all count as completion. Closing narration begins after the real result, without replaying the final move. Mini-games' `settleSceneStats` hook awards the selected stat as the scene settles: +2 for a scene without company, +1 for a scene with company. Playing alone while a girl is present still counts as company. Existing sickness restrictions apply.
+Win, loss, draw or a completed solo run all count as completion. Closing narration begins after the real result, without replaying the final move. Mini-games' `sceneExercise` hook makes the selected stat the one the scene exercised, before any award or other mod's bonus is worked out: +2 for a scene without company, +1 for a scene with company. Playing alone while a girl is present still counts as company. Existing sickness restrictions apply.
 
 The award replaces the ledger's training award for that committed slot; it is not an extra award. Ordinary hangouts retain their existing ledger rewards. Games played outside a committed training activity have no new guaranteed reward.
 

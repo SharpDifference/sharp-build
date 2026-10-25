@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { trainedSceneStats, trainingOffers } from '@shared/minigameTraining'
+import { trainingExercise, trainingOffers } from '@shared/minigameTraining'
 import { resolveStatDeltas, type StatContext } from '@shared/playerStats'
 import type { SlotActivity } from '@shared/slotActivity'
 import { MINI_GAMES, MINI_GAMES_LIST } from '@shared/minigames'
@@ -27,31 +27,13 @@ describe('training catalogue', () => {
   })
 })
 
-describe('training reward as the scene settles', () => {
+describe('what a training slot exercised', () => {
   const activity: SlotActivity = { owner: MINI_GAMES, id: 'cat-pairs', location: 'cutetea', label: 'Train', stat: 'brain', status: 'completed' }
-  const exercisedAll = { brain: true, body: true, heart: true }
   const context: StatContext = { solo: true, classScene: false, classOutcome: null, jobOutcome: null }
-  function settle(ctx: StatContext, training: SlotActivity, ledger = exercisedAll) {
-    return trainedSceneStats(resolveStatDeltas(ledger, ctx), ledger, ctx, training)
-  }
-  it.each([true, false])('replaces ledger training with exactly the selected stat (solo=%s)', solo => {
-    const ctx = { ...context, solo }
-    const settled = settle(ctx, activity)
-    expect(settled.deltas).toEqual({ brain: solo ? 2 : 1, body: 0, heart: 0 })
-    expect(settled.lines).toEqual(resolveStatDeltas({ brain: true }, ctx).lines)
+  it.each([true, false])('pays exactly the trained stat on the game\'s own terms (solo=%s)', solo => {
+    expect(resolveStatDeltas(trainingExercise(activity), { ...context, solo }).deltas).toEqual({ brain: solo ? 2 : 1, body: 0, heart: 0 })
   })
-  it.each(['pending', 'abandoned'] as const)('does not pay unfinished training despite the ledger: %s', status => {
-    expect(settle(context, { ...activity, status }).deltas).toEqual({ brain: 0, body: 0, heart: 0 })
-  })
-  it('keeps the cold restriction', () => {
-    expect(settle({ ...context, sick: true }, activity).deltas.brain).toBe(0)
-  })
-  it("keeps what an earlier mod changed, and the scene's other lines", () => {
-    const ctx = { ...context, solo: false }
-    const resolved = resolveStatDeltas({ heart: true }, ctx)
-    const earlier = { deltas: { ...resolved.deltas, body: resolved.deltas.body + 3 }, lines: [...resolved.lines, { text: 'A perk.', polarity: 'positive' as const }] }
-    const settled = trainedSceneStats(earlier, { heart: true }, ctx, activity)
-    expect(settled.deltas).toEqual({ brain: 1, body: 3, heart: 0 })
-    expect(settled.lines.map(line => line.text)).toEqual([...resolveStatDeltas({ brain: true }, ctx).lines.map(line => line.text), 'A perk.'])
+  it.each(['pending', 'abandoned'] as const)('counts nothing as exercised for unfinished training: %s', status => {
+    expect(trainingExercise({ ...activity, status })).toEqual({})
   })
 })
