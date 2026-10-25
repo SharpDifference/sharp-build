@@ -190,7 +190,7 @@ import { ClassScheduleModal } from './ClassScheduleModal'
 import { EditPromptModal } from './EditPromptModal'
 import { FeedbackModal } from './FeedbackModal'
 import { GameMenuModal } from './GameMenuModal'
-import { endingChoice, prepareWayOn, updatesTabs, type WayOn } from '../mods/hooks'
+import { endingChoice, prepareWayOn, scenePlays, updatesTabs, type WayOn } from '../mods/hooks'
 import { currentRun, runStale } from '../stores/loop/state'
 import { ModsModal } from './ModsModal'
 import { LoadGameModal } from './LoadGameModal'
@@ -276,6 +276,8 @@ type OpenPanel =
   | { kind: 'appSettings' }
   | { kind: 'controls' }
   | { kind: 'mods' }
+  /** A mod's own panel over the scene, opened from its seat on the rail. */
+  | { kind: 'modPanel'; modId: string }
   | { kind: 'feedback' }
   | { kind: 'leaving' }
   | { kind: 'quitting' }
@@ -2157,6 +2159,7 @@ export function GameView(): JSX.Element {
           onCalendar={() => setPanel({ kind: 'calendar' })}
           onBunnyboard={() => useBunnyboardStore.getState().openApp()}
           onSettings={() => setPanel({ kind: 'settings' })}
+          onModPanel={(modId) => setPanel({ kind: 'modPanel', modId })}
           onHideUi={hideUi}
           onBackground={() => setPanel({ kind: 'background' })}
           onCast={() => setPanel({ kind: 'cast' })}
@@ -2785,6 +2788,15 @@ export function GameView(): JSX.Element {
         {panel?.kind === 'mods' && (
           <ModsModal key="mods" theme={half} onClose={closePanel} inGame />
         )}
+
+        {/* A mod's panel, an arm of `OpenPanel` for the reason Settings is: the scene behind it
+            takes nothing while it is up. A mod switched off while its panel is open has none. */}
+        {panel?.kind === 'modPanel' &&
+          scenePlays()
+            .filter(({ modId }) => modId === panel.modId)
+            .map(({ modId, play }) => (
+              <play.Panel key={`mod-${modId}`} theme={half} onClose={closePanel} />
+            ))}
 
         {/* The key list the menu opens, an arm of `OpenPanel` for the reason Settings is. */}
         {panel?.kind === 'controls' && (
