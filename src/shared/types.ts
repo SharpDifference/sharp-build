@@ -2043,8 +2043,11 @@ export interface QuickstartBundle {
   secrets?: Record<string, CharSecret[]>
 }
 
+/** Optional enrollment data declared by mods in their own modules. */
+export interface ModEnrollmentFields {}
+
 /** A whole semester with the reader beside it, as the screen that generated it hands it over. */
-export type EnrollmentDraft = QuickstartBundle & {
+export type EnrollmentDraft = QuickstartBundle & ModEnrollmentFields & {
   playerFirstName: string
   playerLastName: string
   stats: PlayerStats

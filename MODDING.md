@@ -258,3 +258,18 @@ A mod may augment `ModCarryFields` and register its own pure adapter with `regis
 Fields a mod adds to a feed post that hold a time (the last slot it answered, say) are carried by the mod too: New Game+ moves each post's own date back onto the next semester's clock, and `registerPostCarry(modId, (post, days) => …)` in `shared/modCarry.ts` moves the mod's fields back the same `days` (a global slot moves twice that). Like the adapters, it runs with the switch off.
 
 Files a mod keeps per playthrough outside the save (pictures, say) need nothing: New Game+ continues the same playthrough, so they stay where they are. `registerTermFiles(modId, async ({ from, to }) => …)` is kept for an extension that starts a new playthrough per semester, which calls `carryModFiles({ from, to })` once the new playthrough is written, before it is entered; the game itself never calls it. A copier runs with its mod's switch off too, and one that fails costs only its own files.
+
+## Shared gameplay extensions
+
+- `projectSlotMemories` transforms the projected character memories before the crush roll
+  and next opening. It runs for enabled mods in list order. Return fresh values; do not write
+  stores, award currency, consume an ability or roll randomness. Commit effects at
+  `slotSettled` instead. With no active handler, the native projection passes through.
+- `sharedModOn` in `shared/modRules.ts` uses the same live lookup as renderer hooks,
+  without importing renderer stores. It defaults off before binding. A mod's renderer entry
+  owns any mod-specific setup; framework stores should not import feature modules.
+- Mods may add optional fields to `GameSave`, `CharMemory` and `ProjectSession` by
+  TypeScript declaration merging in their own modules. Enrollment additions go on
+  `ModEnrollmentFields`. Save/enrollment validation requires the native required keys;
+  optional additions do not make older files invalid. Mods own normalization and carryover.
+- The native `lorebook` Bunnyboard tab is reserved, like Chats and Friends.
