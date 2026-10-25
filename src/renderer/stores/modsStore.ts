@@ -70,7 +70,11 @@ export const useModsStore = create<ModsStoreState>((set, get) => {
 // stands; on the menus, with no game entered, the switches decide.
 const rules = {
   isOn: (modId: string) => modOn(useModsStore.getState().switches, modId, loopState.record),
-  order: (modId: string) => MODS.findIndex((mod) => mod.id === modId)
+  order: (modId: string) => MODS.findIndex((mod) => mod.id === modId),
+  subscribe: (onChange: () => void) =>
+    useModsStore.subscribe((state, before) => {
+      if (state.switches !== before.switches) onChange()
+    })
 }
 setHookRules(rules)
 setSharedModRules(rules.isOn)

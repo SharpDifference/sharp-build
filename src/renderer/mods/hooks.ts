@@ -18,6 +18,7 @@ import type { ModSceneFields, PlaythroughRecord, TimeSlot } from '@shared/types'
 import type { TextingPromptState } from '../prompts/textingPrompt'
 import type { ResolvedSave } from '../stores/saveStore'
 import type { ViewName } from '../stores/uiStore'
+import type { ScreenTheme } from '../views/clockTheme'
 
 /**
  * The places in the game a mod adds to, without editing the game's code there.
@@ -315,7 +316,75 @@ export interface ModHooks {
   }) => SaveChoice | undefined
   /** A line on Save Game about what a save of the scene keeps of the mod's own; null for none. */
   saveNote?: (scene: Readonly<ModSceneFields>) => string | null
+  /** Drawn in app settings, in the Game tab under the volume sliders. */
+  settingsSection?: ComponentType<ScreenSlotProps['settingsSection']>
+  /** Drawn in each portrait on the stage, under her sprite. */
+  portraitOverlay?: ComponentType<ScreenSlotProps['portraitOverlay']>
+  /** Mounted in the phone's veil for as long as the phone is open. */
+  phoneOverlay?: ComponentType<ScreenSlotProps['phoneOverlay']>
+  /** Drawn on the map, under the places and above its foot. */
+  mapOverlay?: ComponentType<ScreenSlotProps['mapOverlay']>
+  /** Drawn on the Photos page, under the grid of photos. */
+  photosPageSection?: ComponentType<ScreenSlotProps['photosPageSection']>
+  /** Mounted over the stage and under the scene's chrome, on every screen of the game view. */
+  stageLayer?: ComponentType<ScreenSlotProps['stageLayer']>
+  /** Mounted among the game view's panels, over the chrome, on every screen of the game view. */
+  panelLayer?: ComponentType<ScreenSlotProps['panelLayer']>
 }
+
+/**
+ * What the game hands a mod's component at each place on screen it draws one. Every mod that is
+ * on and has a component there is drawn, in list order.
+ */
+export interface ScreenSlotProps {
+  settingsSection: {
+    /** The half of the day the settings wear, which a modal raised over them wears too. */
+    theme: ScreenTheme
+    /** A backup or a restore is running. */
+    busy: boolean
+  }
+  portraitOverlay: { charId: string }
+  phoneOverlay: Record<string, never>
+  mapOverlay: {
+    /** The map was opened to go somewhere, not only to look. */
+    canTravel: boolean
+    /** Closes the map. */
+    close: () => void
+  }
+  photosPageSection: { theme: ScreenTheme }
+  stageLayer: {
+    /** A scene is on screen, rather than the landing or a game over. */
+    sceneMode: boolean
+    /** The orientation's cinematic hour. */
+    cinematic: boolean
+    /** A crossing between screens is over the view. */
+    covered: boolean
+    /** The reader has hidden the interface. */
+    uiHidden: boolean
+    /** The scene's action row is up. */
+    rowShown: boolean
+    /** A panel, a modal or a failure stands over the scene, and it takes no input. */
+    blocked: boolean
+    /** A quiz's answers stand in place of the action row. */
+    quiz: boolean
+    /** The row stands over a reply still being read: open to a hover, or locked. Null otherwise. */
+    interjectRow: 'open' | 'locked' | null
+    /** The scene is waiting on the reader's turn. */
+    awaitingInput: boolean
+  }
+  panelLayer: {
+    cinematic: boolean
+    covered: boolean
+    uiHidden: boolean
+    blocked: boolean
+    /** One of the game view's panels is open. */
+    panelOpen: boolean
+    /** Opens the game menu. */
+    openGameMenu: () => void
+  }
+}
+
+export type ScreenSlot = keyof ScreenSlotProps
 
 interface Registered {
   modId: string
@@ -324,14 +393,26 @@ interface Registered {
 
 const registered: Registered[] = []
 
-/** Whether a mod is on, and where `MODS` lists it; the mods store sets both at boot. */
-let rules: { isOn: (modId: string) => boolean; order: (modId: string) => number } = {
+/**
+ * Whether a mod is on, and where `MODS` lists it; the mods store sets both at boot, and
+ * `subscribe`, which calls back whenever a switch moves.
+ */
+let rules: {
+  isOn: (modId: string) => boolean
+  order: (modId: string) => number
+  subscribe?: (onChange: () => void) => () => void
+} = {
   isOn: () => true,
   order: () => 0
 }
 
 export function setHookRules(next: typeof rules): void {
   rules = next
+}
+
+/** Calls back whenever a switch moves; a no-op until the mods store has set the rules. */
+export function subscribeHookRules(onChange: () => void): () => void {
+  return rules.subscribe?.(onChange) ?? (() => {})
 }
 
 /** A mod's hooks, registered once from its own files. */
@@ -601,6 +682,16 @@ export function statActivities(stat: StatKey): SlotActivityOffer[] {
 /** Whether the mod that owns a training activity is on and still offers it. */
 export function slotActivityAvailable(offer: SlotActivityOffer): boolean {
   return activeEntries().some(({ modId, hooks }) => modId === offer.owner && hooks.slotActivityAvailable?.(offer) === true)
+}
+
+/** The components drawn at one place on screen: each mod's that is on, in list order, under its id. */
+export function screenSlot<S extends ScreenSlot>(
+  slot: S
+): { modId: string; Component: ComponentType<ScreenSlotProps[S]> }[] {
+  return activeEntries().flatMap(({ modId, hooks }) => {
+    const Component = hooks[slot] as ComponentType<ScreenSlotProps[S]> | undefined
+    return Component ? [{ modId, Component }] : []
+  })
 }
 
 /** The lines Save Game shows about the scene being saved, one from each mod that has one. */
