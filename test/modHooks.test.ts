@@ -296,6 +296,18 @@ describe('slot activity offers', () => {
 describe('scene stat settlement', () => {
   const zero = { brain: 0, body: 0, heart: 0 }
   const settlement = { ledger: { brain: true }, ctx: { solo: true, classScene: false, classOutcome: null, jobOutcome: null } }
+  it("hands each mod that is on what the hour exercised as the one before left it, and the ledger's own where none answers", async () => {
+    const hooks = await fresh({ off: false }, ['first', 'second', 'off'])
+    // A training session replaces the exercise; a later mod reads it as the ledger.
+    hooks.registerHooks('first', { exercisedStats: (ledger, ctx) => (ctx.solo ? { body: true } : ledger) })
+    hooks.registerHooks('second', { exercisedStats: (ledger) => ({ ...ledger, heart: ledger?.body === true }) })
+    hooks.registerHooks('off', { exercisedStats: () => ({ brain: true, body: true, heart: true }) })
+    expect(hooks.exercisedStats({ brain: true }, settlement.ctx)).toEqual({ body: true, heart: true })
+    expect(hooks.exercisedStats(undefined, { ...settlement.ctx, solo: false })).toEqual({ heart: false })
+    hooks.setHookRules({ isOn: () => false, order: () => 0 })
+    expect(hooks.exercisedStats({ brain: true }, settlement.ctx)).toEqual({ brain: true })
+    expect(hooks.exercisedStats(undefined, settlement.ctx)).toBeUndefined()
+  })
   it('hands each mod that is on what the one before it left, in list order', async () => {
     const hooks = await fresh({ off: false }, ['first', 'second', 'off'])
     hooks.registerHooks('second', { settleSceneStats: (resolved) => ({ ...resolved, deltas: { ...resolved.deltas, body: resolved.deltas.brain * 10 } }) })
@@ -304,15 +316,6 @@ describe('scene stat settlement', () => {
     const resolved = { deltas: zero, lines: [] }
     expect(hooks.settleSceneStats(resolved, settlement).deltas).toEqual({ brain: 1, body: 10, heart: 0 })
     expect(resolved.deltas).toEqual(zero)
-  })
-  it('settles what was exercised first, in list order, and hands that on to the settlement', async () => {
-    const hooks = await fresh({ off: false }, ['first', 'second', 'off'])
-    hooks.registerHooks('second', { sceneExercise: (exercised) => ({ ...exercised, heart: true }) })
-    hooks.registerHooks('first', { sceneExercise: () => ({ body: true }) })
-    hooks.registerHooks('off', { sceneExercise: () => ({}) })
-    expect(hooks.sceneExercise({ brain: true }, settlement.ctx)).toEqual({ body: true, heart: true })
-    hooks.setHookRules({ isOn: () => false, order: () => 0 })
-    expect(hooks.sceneExercise({ brain: true }, settlement.ctx)).toEqual({ brain: true })
   })
   it("takes the first floor a mod that is on gives, and the game's own where none does", async () => {
     const hooks = await fresh({ off: false }, ['first', 'second', 'off'])

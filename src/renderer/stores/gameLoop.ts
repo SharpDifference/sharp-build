@@ -1,4 +1,4 @@
-import { projectSlotMemories, sceneExercise, settleSceneStats, slotActivityAvailable, slotSettled, statFloor } from '../mods/hooks'
+import { exercisedStats, projectSlotMemories, settleSceneStats, slotActivityAvailable, slotSettled, statFloor } from '../mods/hooks'
 import { withSlotActivityPrompt } from '../prompts/slotActivity'
 import { talentProjectWork } from '@shared/talentPerks'
 import { feedStatusLines } from './bunnyfeedsMemory'
@@ -2373,8 +2373,9 @@ function resolveScene(): { deltas: PlayerStats; lines: StatusText[] } {
     // Read at the scene's own slot, which a dose taken during it never moves.
     sick: readerSickNow()
   }
-  // What the scene counts as exercised is settled first, so every award below reads the same.
-  const ledger = sceneExercise(loopState.pendingLedgerResult?.stats, ctx)
+  // What the hour exercised, as the mods leave the ledger's verdict, then what that pays, as they
+  // leave the game's resolution: a mod changing the exercise never has to undo another's reward.
+  const ledger = exercisedStats(loopState.pendingLedgerResult?.stats, ctx)
   return settleSceneStats(resolveStatDeltas(ledger, ctx), { ledger, ctx })
 }
 

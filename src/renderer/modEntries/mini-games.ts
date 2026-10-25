@@ -102,7 +102,7 @@ registerHooks(MINI_GAMES, {
   statActivities: trainingSuggestions,
   slotActivityAvailable: trainingAvailable,
   // A training slot exercised its own stat in place of the hour's; any other scene is left be.
-  sceneExercise: (exercised) => {
+  exercisedStats: (exercised) => {
     const activity = useGameStore.getState().sceneActivity
     return activity?.owner === MINI_GAMES ? trainingExercise(activity) : exercised
   },
