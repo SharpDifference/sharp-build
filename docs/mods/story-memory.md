@@ -106,6 +106,12 @@ additional manual fact at capacity; existing facts remain editable.
 
 ### Native Lorebook and character context
 
+When Prompt Studio tags a request for a preset, Story Memory retains its normal recap
+candidates: the preset may remove the native Lorebook text after recall is prepared.
+The preset's Story recall control can still turn this context off deliberately. Native
+recap deduplication resumes on requests without a preset. This conservative fallback may
+repeat a recap with a preset active, but keeps the existing recall budgets and API call count.
+
 Native 0.6 supplies world entries, character profiles/notes, personal memories, plans and
 dated history recaps. Story Memory supplements those sources with lasting facts and additional
 encounter recall. It does not rewrite the native context or replace the native Lorebook.

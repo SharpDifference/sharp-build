@@ -2,6 +2,7 @@ import { modOn, optionOn } from '@shared/mods'
 import {
   assertStoryRecall,
   formatStoryRecall,
+  recallForPromptRequest,
   withStoryRecall,
   STORY_MEMORY_LIGHT_OPTION,
   type StoryRecall,
@@ -27,7 +28,7 @@ export function inspectStoryMemory(payload: StoryRecallRequest): StoryRecall {
 export async function prepareStoryRequest(request: StructuredRequest): Promise<StructuredRequest> {
   if (!request.storyMemory) return request
   try {
-    return withStoryRecall(request, inspectStoryMemory(request.storyMemory))
+    return withStoryRecall(request, inspectStoryMemory(recallForPromptRequest(request)!))
   } catch {
     console.warn('[story-memory] Optional recall was unavailable; continuing without it.')
     return withStoryRecall(request)

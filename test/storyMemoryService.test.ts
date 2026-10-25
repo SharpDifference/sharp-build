@@ -140,3 +140,28 @@ it('applies native coverage equally on desktop and web without leaking metadata 
     expect(await prepareStoryRequest(request)).toEqual(native)
   }
 })
+
+it('retains native-covered recaps when a later prompt preset may remove the native context', async () => {
+  const covered = { ...p, coveredEncounters: ['encounter:1:0'] }
+  const request = { system: 'rules', user: 'LOREBOOK\nNative dated recap.\nYOUR TURN\nTalk.',
+    schema: { name: 'scene', schema: {} }, storyMemory: covered,
+    preset: { spot: 'opening' as const, playthroughId: '123', vars: {}, names: { user: 'Sam', char: 'Sarah', group: 'Sarah' } } }
+  const before = JSON.stringify(request)
+  for (const light of [false, true]) {
+    env.switches.options['story-memory:light-memory'] = light
+    const native = await prepareStoryRequest(request)
+    expect(native.user).toContain('Sarah borrowed an atlas.')
+    expect(native).toEqual(await prepareWebStoryRequest(request))
+    expect(native).not.toHaveProperty('storyMemory')
+    expect(native).toHaveProperty('preset', request.preset)
+    expect(JSON.stringify(native)).not.toContain('coveredEncounters')
+    writeFileSync(join(env.root, '123', 'story-memory.sqlite'), 'corrupt test data')
+    expect(await prepareStoryRequest(request)).toEqual(native)
+    const { preset: _preset, ...withoutPreset } = request
+    expect((await prepareStoryRequest(withoutPreset)).user).toBe(request.user)
+  }
+  expect(JSON.stringify(request)).toBe(before)
+  env.switches.on['story-memory'] = false
+  expect((await prepareStoryRequest(request)).user).toBe(request.user)
+  expect((await prepareWebStoryRequest(request)).user).toBe(request.user)
+})

@@ -672,6 +672,18 @@ export function recallPayload(
     ? { storyMemory: { ...snapshot, cast: [...new Set(cast)], query: storyText(query, 4000) } }
     : {}
 }
+/** Keep recap candidates when a later preset may remove their native-context counterpart. */
+export function recallForPromptRequest(request: StructuredRequest): StoryRecallRequest | undefined {
+  const payload = request.storyMemory
+  if (!payload) return undefined
+  assertStoryRecall(payload)
+  // Prompt Studio is optional: recognize its request marker without depending on its code.
+  // Its Story recall row can still disable this context deliberately after assembly.
+  return 'preset' in request && request.preset && payload.coveredEncounters?.length
+    ? { ...payload, coveredEncounters: [] }
+    : payload
+}
+
 export function withStoryRecall(
   request: StructuredRequest,
   recall?: StoryRecall
