@@ -68,6 +68,21 @@ describe('mod hooks', () => {
   })
 })
 
+describe('when a post came out', () => {
+  it("is the first answer from a mod that is on, and the slot's start where none answers", async () => {
+    const on = { held: true, late: true }
+    const hooks = await fresh(on, ['held', 'late'])
+    hooks.registerHooks('late', { postOutAt: () => 20 })
+    hooks.registerHooks('held', { postOutAt: (one) => (one.id === 'p1' ? 10 : undefined) })
+
+    expect(hooks.postOutAt(post)).toBe(10)
+    expect(hooks.postOutAt({ ...post, id: 'p2' })).toBe(20)
+
+    on.held = on.late = false
+    expect(hooks.postOutAt(post)).toBe(0)
+  })
+})
+
 describe('ways on', () => {
   it('offers the first answer from a mod that is on, and none from a mod that is off', async () => {
     const hooks = await fresh({ off: false }, ['off', 'quiet', 'semesters', 'later'])
