@@ -10,6 +10,7 @@ import {
   listed,
   MINI_GAMES,
   playersWords,
+  settledOptions,
   type Chattiness,
   type MiniGameDef
 } from '@shared/minigames'
@@ -83,7 +84,7 @@ function namesOf(charIds: readonly string[]): string {
 }
 
 /** A game being played: against whom, and for what. */
-interface Sitting {
+export interface Sitting {
   game: MiniGameDef
   /** Null while a girl's skill is still being judged. */
   opponents: Opponent[] | null
@@ -97,10 +98,17 @@ const RESULT_BEAT_MS = 1800
 /** Nobody at the table but the reader. */
 const NO_ONE: Opponent[] = []
 
-/** The sitting a game she agreed to opens on, her skill still to come. */
-function sittingOf(agreed: Agreed | null): Sitting | null {
+/**
+ * The sitting a game she agreed to opens on, her skill still to come. What was agreed is read
+ * against the game as it is set now: an option agreed under a wider content setting, then kept
+ * across a reload while the setting was turned back, falls to the game's default rather than
+ * opening the table past what the player allows.
+ */
+export function sittingOf(agreed: Agreed | null): Sitting | null {
   const game = agreed && gameById(agreed.gameId)
-  return game ? { game, opponents: null, stake: agreed.stake, options: agreed.options } : null
+  return game
+    ? { game, opponents: null, stake: agreed.stake, options: settledOptions(game, agreed.options) }
+    : null
 }
 
 /**
