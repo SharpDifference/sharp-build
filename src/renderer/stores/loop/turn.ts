@@ -1,6 +1,6 @@
-import { activityEnding } from '@shared/slotActivity'
 import { finishBreakthrough } from '../breakthrough'
 import { finishReckoningAftermath, settleUnspokenVoice } from '../reckoning'
+import { activityEnding } from '@shared/slotActivity'
 import { isPermanent } from '@shared/errors'
 import type { AppError, Character } from '@shared/types'
 import { shortenSceneSoFar } from '../../prompts/scenePrompt'

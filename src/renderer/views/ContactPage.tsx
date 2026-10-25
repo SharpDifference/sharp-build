@@ -4,7 +4,6 @@ import { CharacterDynamicsBackstory } from './CharacterDynamicsBackstory'
 import { AnimatePresence, motion } from 'motion/react'
 import { slotPartsOf, yearLabel } from '@shared/classes'
 import { dormLabel } from '@shared/dorms'
-import { postVisible } from '../mods/hooks'
 import { jobDefOf, WEEK_DAY_HEADERS } from '@shared/jobs'
 import { OUTFIT_SET_LABELS, spriteRef, STOCK_OUTFIT_SETS } from '@shared/outfits'
 import { npcEnemiesOf, npcFriendsOf } from '@shared/npcRelationships'
@@ -26,6 +25,7 @@ import { fullNameOf, type CharMemory, type SecretTier, type StockOutfitSet } fro
 import { formatShortGameDate } from '../prompts/gameDate'
 import { useBunnyboardStore } from '../stores/bunnyboardStore'
 import { profileUrl, spriteUrl, useSpriteVersion } from '../stores/characterStore'
+import { postOutAt, postVisible } from '../mods/hooks'
 import { newestFirst } from '../stores/feedRolls'
 import { PostPhotoLink, useContactGallery } from './ContactGallery'
 import { useGameStore } from '../stores/gameStore'
@@ -121,7 +121,7 @@ export function ContactPage({
   // Her gallery, and the tab strip it brings with it.
   const gallery = useContactGallery({ charId, isContact, theme })
   const handle = info?.handle
-  const feed = (info?.feed ?? []).filter(postVisible).sort(newestFirst)
+  const feed = (info?.feed ?? []).filter(postVisible).sort((a, b) => newestFirst(a, b) || postOutAt(b) - postOutAt(a))
   // The days she made a friend, among what she posted. The other girl has to be one the
   // reader can name — a stranger is omitted rather than masked, as everywhere else.
   const made = npcFriendships.flatMap((pair) => {

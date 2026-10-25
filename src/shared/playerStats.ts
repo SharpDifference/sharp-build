@@ -1,4 +1,4 @@
-import { challengeStatFloor, CHALLENGE_TIERS, type ChallengeStatTier, type StartingChallenge } from './startingChallenge'
+import { CHALLENGE_TIERS, type ChallengeStatTier } from './startingChallenge'
 /**
  * The player-stat vocabulary: three stats that accumulate points and tier up. Points
  * are stored; a tier is always derived. This module owns the arithmetic and every word said
@@ -369,8 +369,8 @@ function withGradeOutcome(
  * since the player didn't cause it. **Stats, not crossings**: the caller already holds the
  * reader either side and reads both tiers off those points, so a tier pair here would double up.
  */
-export function tierUps(before: PlayerStats, deltas: PlayerStats, challenge?: StartingChallenge, floorOf?: StatFloor): StatKey[] {
-  const after = applyStatDeltas(before, deltas, challenge, floorOf)
+export function tierUps(before: PlayerStats, deltas: PlayerStats, floorOf?: StatFloor): StatKey[] {
+  const after = applyStatDeltas(before, deltas, floorOf)
   return STAT_KEYS.filter((key) => displayedTierOf(after[key]) > displayedTierOf(before[key]))
 }
 
@@ -390,11 +390,11 @@ export function breakDecayedStats(stats: PlayerStats): PlayerStats {
 export type StatFloor = (key: StatKey) => number | undefined
 
 /**
- * Adds `deltas` to `stats`, flooring each at `floorOf`'s answer, else the playthrough's selected
- * floor. Never mutates its input.
+ * Adds `deltas` to `stats`, flooring each at `floorOf`'s answer, or the scale's floor where it
+ * gives none. Never mutates its input.
  */
-export function applyStatDeltas(stats: PlayerStats, deltas: PlayerStats, challenge?: StartingChallenge, floorOf?: StatFloor): PlayerStats {
-  const floor = (key: StatKey): number => floorOf?.(key) ?? challengeStatFloor(challenge, key) ?? pointsForTier(MIN_TIER)
+export function applyStatDeltas(stats: PlayerStats, deltas: PlayerStats, floorOf?: StatFloor): PlayerStats {
+  const floor = (key: StatKey): number => floorOf?.(key) ?? pointsForTier(MIN_TIER)
   return {
     brain: Math.max(floor('brain'), stats.brain + deltas.brain),
     body: Math.max(floor('body'), stats.body + deltas.body),

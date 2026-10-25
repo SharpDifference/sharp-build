@@ -287,16 +287,16 @@ function sceneKindFields(scene: SceneKind | null | undefined) {
  * `gameLoop.ts` drives this store imperatively outside React.
  */
 interface GameStoreState {
-  /** The activity this scene was committed to on the landing, or null. */
-  sceneActivity: import('@shared/slotActivity').SlotActivity | null
-  /** What mods keep with the scene being played, saved with it as `mods`. */
-  sceneMods: import('@shared/types').ModSceneFields
   exReckoning: ReckoningState
   exStartingChallenge: StartingChallenge | undefined
   exTalents: TalentState
   exEcho: EchoState
   exBreakthrough: BreakthroughState
   breakthroughFlash: { id: string; playthroughId: string; name: string; echoAspect?: import('@shared/echoBreakthrough').EchoBreakthroughAspect } | null
+  /** The activity this scene was committed to on the landing, or null. */
+  sceneActivity: import('@shared/slotActivity').SlotActivity | null
+  /** What mods keep with the scene being played, saved with it as `mods`. */
+  sceneMods: import('@shared/types').ModSceneFields
   /** The playthrough being played; every save this session writes goes into it. */
   playthroughId: string | null
   /** The Scene Creator's scene being played, with no playthrough; null in a game. */
@@ -2243,7 +2243,7 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
     }),
 
   applyStatDeltas: (deltas) =>
-    set((state) => ({ stats: applyStatDeltas(state.stats, deltas, state.exStartingChallenge, statFloor) })),
+    set((state) => ({ stats: applyStatDeltas(state.stats, deltas, statFloor) })),
 
   setBio: (bio) => set({ bio }),
 

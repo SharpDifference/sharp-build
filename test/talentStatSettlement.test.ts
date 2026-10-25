@@ -4,6 +4,9 @@ import { readTalentGrowth } from '@shared/talentGrowth'
 import { resolveStatDeltas, type PlayerStats } from '@shared/playerStats'
 import { talentStatGains } from '@shared/talentPerks'
 import { useGameStore } from '../src/renderer/stores/gameStore'
+import '../src/renderer/modEntries/campus-talents'
+import '../src/renderer/modEntries/starting-challenge'
+import { settleSceneStats } from '../src/renderer/mods/hooks'
 import { useModsStore } from '../src/renderer/stores/modsStore'
 import { loopState, resetLoopState } from '../src/renderer/stores/loop/state'
 import { writesSettled } from '../src/renderer/stores/loop/saves'
@@ -24,7 +27,7 @@ const ranks = (rank: number) => ({ 'brain.focus': rank, 'body.training': rank, '
 
 beforeEach(() => {
   game().reset(); resetLoopState(); setTalentRules(true)
-  useModsStore.setState({ switches: { on: { 'campus-talents': true, echo: false, reckoning: false }, options: {} } })
+  useModsStore.setState({ switches: { on: { 'campus-talents': true, 'starting-challenge': true, echo: false, reckoning: false }, options: {} } })
   useGameStore.setState({ playthroughId: 'full-stat-gains-test', date: 7, time: 0, cast: [],
     sceneEnding: true, statusShown: false, awaitingInput: false, pendingLines: [],
     currentSceneTranscript: sceneLines('The reader practiced alone.'),
@@ -70,6 +73,19 @@ describe('Full activity and skill gains through native scene settlement', () => 
 })
 
 describe('Stat-independent bonuses and old save compatibility', () => {
+  it('projects through the registered hook repeatedly without spending points or changing the input', () => {
+    useGameStore.setState({stats:stats(-100),exTalents:normalizeTalents({initialized:true,earned:1000,ranks:ranks(2)})})
+    const before=game(), saved=JSON.stringify(before.toGameSave())
+    const ledger={brain:true,body:true,heart:true}
+    const ctx={solo:true,classScene:false,classOutcome:null,jobOutcome:null}
+    const native=resolveStatDeltas(ledger,ctx)
+    for(let i=0;i<3;i++) expect(settleSceneStats(native,{ledger,ctx}).deltas).toEqual(stats(4))
+    expect(native.deltas).toEqual(stats(2))
+    expect(game()).toBe(before)
+    expect(JSON.stringify(game().toGameSave())).toBe(saved)
+    useModsStore.setState({switches:{on:{'campus-talents':false},options:{}}})
+    expect(settleSceneStats(native,{ledger,ctx})).toEqual(native)
+  })
   it('gives the same full bonuses at every integer from -100 through +100', () => {
     const s = normalizeTalents({ initialized: true, earned: 1000, ranks: ranks(2) })
     const ctx = { solo: true, classScene: false, classOutcome: null, jobOutcome: null }

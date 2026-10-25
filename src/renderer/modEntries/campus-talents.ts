@@ -7,6 +7,11 @@ import { registerHooks } from '../mods/hooks'
 import { modIsOn } from '../stores/modsStore'
 import { useGameStore } from '../stores/gameStore'
 import { reconcileTraining } from '@shared/talentTrading'
+import { talentStatGains } from '@shared/talentPerks'
+import { sickInSlot } from '@shared/colds'
+import { globalSlotOf } from '@shared/jobs'
+import { showUpHeartForScene } from '../stores/loop/talentShowUp'
+import { loopState } from '../stores/loop/state'
 
 export function ensureTalents(): void {
   const g=useGameStore.getState()
@@ -16,6 +21,18 @@ export function ensureTalents(): void {
 }
 registerHooks('campus-talents', {
   gameEntered:ensureTalents,
+  settleSceneStats:(resolved,{ctx})=>{
+    const g=useGameStore.getState()
+    const trained=talentStatGains(g.exTalents,resolved,ctx,
+      g.sceneClass!==null&&g.classes[g.sceneClass]?.category==='pe',g.stats.heart)
+    // Add after training: an invitation reward must not trigger Social Ease or recovery.
+    const showUp=showUpHeartForScene(loopState.pendingLedgerResult,ctx.sick===true)
+    if (!showUp) return trained
+    return {
+      deltas:{...trained.deltas,heart:trained.deltas.heart+showUp},
+      lines:[...trained.lines,{text:`Show Up: Heart went up by ${showUp}.`,polarity:'positive'}]
+    }
+  },
   projectSlotMemories:({before,closingCast},charInfo)=>{
     if (!before.playthroughId || before.createdScene || before.replaying) return charInfo
     const cast=closingCast.map(c=>c.charId)
@@ -50,12 +67,17 @@ registerHooks('campus-talents', {
     const ended=ending&&cast.some(c=>c.charId===f.charId)&&farewellEnded(g.exTalents,g.currentSceneTranscript,g.semesterIndex,g.date,g.time)
     useGameStore.setState({exTalents:{...g.exTalents,abilities:{...g.exTalents.abilities,farewell:{...f,ended}}}})
   },
-  slotSettled:({before,closingCast})=>{
+  slotSettled:({before,ledger,closingCast})=>{
     const g=useGameStore.getState()
     if (!g.playthroughId || g.createdScene || g.replaying || g.loads!==before.loads || g.playthroughId!==before.playthroughId) return
     // An older save first enabled during a scene is seeded from its pre-scene relationships.
     const total=Object.entries(before.charInfo).reduce((sum,[id,info])=>sum+Math.max(0,affectionFor(info,before.date,before.characters[id])),0)
-    const seeded=seedTalents(g.exTalents,total,g.semesterIndex,g.date)
+    // Preview hooks never spend the daily use. Bank it only at the completed boundary,
+    // from the same pre-scene state and ledger that produced the displayed stat award.
+    const showUp=showUpHeartForScene(ledger,
+      sickInSlot(before.readerCold??undefined,globalSlotOf(before.date,before.time)),before,false)
+    const daily=showUp>0?{...g.exTalents,showUpDay:{term:before.semesterIndex,date:before.date}}:g.exTalents
+    const seeded=seedTalents(daily,total,g.semesterIndex,g.date)
     const abilityResult=settleTalentSceneAbilities(seeded,before.charInfo,g.charInfo,closingCast.map(c=>c.charId),g.currentSceneTranscript,g.semesterIndex,before.date,before.time)
     // Use the closing snapshot before this scene's stat gains, not the updated stats.
     const tracked=reconcileTraining(reconcileTraining(abilityResult.state,before.stats,g.semesterIndex),g.stats,g.semesterIndex)

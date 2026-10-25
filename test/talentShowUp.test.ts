@@ -3,7 +3,10 @@ import { buyTalent, normalizeTalents, setTalentRules, TALENTS } from '@shared/ca
 import { showUpHeart, type ShowUpContext } from '@shared/talentShowUp'
 import type { CalendarEvent, LedgerResponse, GameSave } from '@shared/types'
 import { useGameStore } from '../src/renderer/stores/gameStore'
+import '../src/renderer/modEntries/campus-talents'
+import '../src/renderer/modEntries/starting-challenge'
 import { useModsStore } from '../src/renderer/stores/modsStore'
+import { slotSettled } from '../src/renderer/mods/hooks'
 import { showUpHeartForScene } from '../src/renderer/stores/loop/talentShowUp'
 import { loopState, resetLoopState } from '../src/renderer/stores/loop/state'
 import { writesSettled } from '../src/renderer/stores/loop/saves'
@@ -32,7 +35,7 @@ const game = () => useGameStore.getState()
 
 beforeEach(() => {
   game().reset(); resetLoopState(); setTalentRules(true)
-  useModsStore.setState({switches:{on:{'campus-talents':true,echo:false,reckoning:false},options:{}}})
+  useModsStore.setState({switches:{on:{'campus-talents':true,'starting-challenge':true,echo:false,reckoning:false},options:{}}})
   useGameStore.setState({playthroughId:'show-up-test',date:7,time:0,chars:['a'],cast:['a'],
     characters:{a:character({charId:'a'})},charInfo:{a:charInfo({nameKnown:true})},
     charKeyToId:{sarah_rose:'a'},sceneTextLedgerSkip:'a',exTalents:state(),
@@ -101,6 +104,7 @@ describe('Show Up in native scene settlement', () => {
   it('applies the full positive-stat reward at settlement and saves its daily use', async () => {
     useGameStore.setState({stats:{brain:0,body:0,heart:0},sceneEnding:true,statusShown:false,
       awaitingInput:false,pendingLines:[],exTalents:normalizeTalents({...state(),growth:{brain:0,body:0,heart:.25}})})
+    const before = game()
     loopState.pendingLedgerResult = ledger
     advance()
     expect(game().currentLine?.text).toContain('Show Up: Heart went up by 2.')
@@ -112,6 +116,9 @@ describe('Show Up in native scene settlement', () => {
     advance()
     expect(game().stats.heart).toBe(2)
     expect(game().exTalents.growth?.heart).toBe(.25)
+    expect(game().exTalents.showUpDay).toBeUndefined()
+    // The boundary pauses for memory edits; its mod callback commits the daily stamp afterward.
+    slotSettled({before,ledger,closingCast:[before.characters.a]})
     expect(game().exTalents.showUpDay).toEqual({term:0,date:7})
     const save = JSON.parse(JSON.stringify(game().toGameSave())) as GameSave
     expect(normalizeTalents(save.exTalents).growth?.heart).toBe(.25)
@@ -141,6 +148,7 @@ describe('Show Up in native scene settlement', () => {
     // Owning training/recovery must not amplify this attendance award.
     useGameStore.setState({exTalents:normalizeTalents({...state(),ranks:{...state().ranks,'heart.ease':2,'heart.feet':2}}),
       sceneEnding:true,statusShown:false,awaitingInput:false,pendingLines:[]})
+    const before = game()
     loopState.pendingLedgerResult = ledger
     advance()
     expect(game().currentLine?.text).toContain('Show Up: Heart went up by 2.')
@@ -149,6 +157,9 @@ describe('Show Up in native scene settlement', () => {
     loopState.statusSteps=[]
     advance()
     expect(game().stats.heart).toBe(-28)
+    expect(game().exTalents.showUpDay).toBeUndefined()
+    // The boundary pauses for memory edits; its mod callback commits the daily stamp afterward.
+    slotSettled({before,ledger,closingCast:[before.characters.a]})
     expect(game().exTalents.showUpDay).toEqual({term:0,date:7})
     const save = JSON.parse(JSON.stringify(game().toGameSave())) as GameSave
     expect(normalizeTalents(save.exTalents).showUpDay).toEqual({term:0,date:7})
