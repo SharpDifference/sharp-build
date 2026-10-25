@@ -340,8 +340,8 @@ function withGradeOutcome(
  * since the player didn't cause it. **Stats, not crossings**: the caller already holds the
  * reader either side and reads both tiers off those points, so a tier pair here would double up.
  */
-export function tierUps(before: PlayerStats, deltas: PlayerStats): StatKey[] {
-  const after = applyStatDeltas(before, deltas)
+export function tierUps(before: PlayerStats, deltas: PlayerStats, floorOf?: StatFloor): StatKey[] {
+  const after = applyStatDeltas(before, deltas, floorOf)
   return STAT_KEYS.filter((key) => tierOf(after[key]) > tierOf(before[key]))
 }
 
@@ -357,12 +357,18 @@ export function breakDecayedStats(stats: PlayerStats): PlayerStats {
   return { brain: decayed(stats.brain), body: decayed(stats.body), heart: decayed(stats.heart) }
 }
 
-/** Adds `deltas` to `stats`, flooring each at the scale's floor. Never mutates its input. */
-export function applyStatDeltas(stats: PlayerStats, deltas: PlayerStats): PlayerStats {
-  const floor = pointsForTier(MIN_TIER)
+/** The lowest a stat may fall to, where something other than the scale's floor decides it. */
+export type StatFloor = (key: StatKey) => number | undefined
+
+/**
+ * Adds `deltas` to `stats`, flooring each at `floorOf`'s answer, or the scale's floor where it
+ * gives none. Never mutates its input.
+ */
+export function applyStatDeltas(stats: PlayerStats, deltas: PlayerStats, floorOf?: StatFloor): PlayerStats {
+  const floor = (key: StatKey): number => floorOf?.(key) ?? pointsForTier(MIN_TIER)
   return {
-    brain: Math.max(floor, stats.brain + deltas.brain),
-    body: Math.max(floor, stats.body + deltas.body),
-    heart: Math.max(floor, stats.heart + deltas.heart)
+    brain: Math.max(floor('brain'), stats.brain + deltas.brain),
+    body: Math.max(floor('body'), stats.body + deltas.body),
+    heart: Math.max(floor('heart'), stats.heart + deltas.heart)
   }
 }

@@ -1,3 +1,5 @@
+import { savedModScene } from '@shared/modScene'
+import { statFloor } from '../mods/hooks'
 import { create } from 'zustand'
 import {
   affectionFor,
@@ -196,6 +198,10 @@ export type ReplayStayFields = Pick<
  * classifier verdict decides.
  */
 export interface SceneKind {
+  /** The activity the landing committed the scene to. */
+  activity?: import('@shared/slotActivity').SlotActivity
+  /** What mods keep with the scene. */
+  mods?: import('@shared/types').ModSceneFields
   /** The class the scene sits in — a `goto_class:` verdict, or an exam. */
   classCode?: string | null
   /** The course a work session is for — a `project:` verdict. */
@@ -240,6 +246,8 @@ export interface SceneKind {
 /** The scene-kind facts a `set` writes onto the store, unpacked from one verdict. */
 function sceneKindFields(scene: SceneKind | null | undefined) {
   return {
+    sceneActivity: scene?.activity ? { ...scene.activity } : null,
+    sceneMods: savedModScene(scene?.mods ?? {}) ?? {},
     sceneClass: scene?.classCode ?? null,
     sceneProject: scene?.projectClass ?? null,
     sceneJob: scene?.jobId ?? null,
@@ -263,6 +271,10 @@ function sceneKindFields(scene: SceneKind | null | undefined) {
  * `gameLoop.ts` drives this store imperatively outside React.
  */
 interface GameStoreState {
+  /** The activity this scene was committed to on the landing, or null. */
+  sceneActivity: import('@shared/slotActivity').SlotActivity | null
+  /** What mods keep with the scene being played, saved with it as `mods`. */
+  sceneMods: import('@shared/types').ModSceneFields
   /** The playthrough being played; every save this session writes goes into it. */
   playthroughId: string | null
   /** The Scene Creator's scene being played, with no playthrough; null in a game. */
@@ -1470,7 +1482,9 @@ const initialState = {
   characters: {} as Record<string, Character>,
   charKeyToId: {} as Record<string, string>,
   cast: [] as string[],
+  sceneMods: {} as import('@shared/types').ModSceneFields,
   sceneClass: null as string | null,
+  sceneActivity: null,
   sceneProject: null as string | null,
   sceneJob: null as string | null,
   sceneJobStats: [] as StatKey[],
@@ -1735,7 +1749,10 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
     ) {
       return null
     }
+    const mods = savedModScene(state.sceneMods)
     return {
+      ...(state.sceneActivity ? { activity: { ...state.sceneActivity } } : {}),
+      ...(mods ? { mods } : {}),
       cast: [...state.cast],
       // Optional on `SceneState`: a field that does not apply to the scene is not written.
       ...(state.sceneClass ? { classCode: state.sceneClass } : {}),
@@ -2139,7 +2156,7 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
     }),
 
   applyStatDeltas: (deltas) =>
-    set((state) => ({ stats: applyStatDeltas(state.stats, deltas) })),
+    set((state) => ({ stats: applyStatDeltas(state.stats, deltas, statFloor) })),
 
   setBio: (bio) => set({ bio }),
 

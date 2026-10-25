@@ -11,8 +11,10 @@ import type {
   TextingResponse
 } from '@shared/types'
 import type { GameOverReason } from '@shared/gameOver'
+import type { LedgerStats, PlayerStats, StatContext, StatKey, StatusText } from '@shared/playerStats'
 import type { PostComment } from '@shared/postComments'
-import type { PlaythroughRecord } from '@shared/types'
+import type { SlotActivityOffer } from '@shared/slotActivity'
+import type { ModSceneFields, PlaythroughRecord } from '@shared/types'
 import type { TextingPromptState } from '../prompts/textingPrompt'
 import type { ResolvedSave } from '../stores/saveStore'
 import type { ViewName } from '../stores/uiStore'
@@ -123,6 +125,18 @@ export interface SlotSettled {
 /** A read-only preview of the finished scene, before the crush roll and next opening. */
 export type SlotMemoryProjection = Pick<SlotSettled, 'before' | 'closingCast'>
 
+/** What a finished scene does to the reader's stats, and the lines that say so. */
+export interface SceneStats {
+  deltas: PlayerStats
+  lines: StatusText[]
+}
+
+/** What the game resolved a scene's stats from: the ledger's verdict and the scene's facts. */
+export interface SceneStatSettlement {
+  ledger: LedgerStats | undefined
+  ctx: StatContext
+}
+
 export interface BunnyboardPage {
   id: string
   word: string
@@ -163,6 +177,10 @@ export interface PostPictureProps {
 }
 
 export interface ModHooks {
+  /** Activities the landing may offer for a stat, in place of its own suggestion. */
+  statActivities?: (stat: StatKey) => readonly SlotActivityOffer[]
+  /** Whether an activity offered is still there, asked at commit and on reload. */
+  slotActivityAvailable?: (offer: SlotActivityOffer) => boolean
   bunnyboardPage?: BunnyboardPage
   /** Draws the comments under a post; see {@link PostCommentsSpot}. */
   postComments?: PostCommentsSpot
@@ -178,6 +196,14 @@ export interface ModHooks {
    * without writing the store, paying rewards, consuming abilities or rolling randomness.
    */
   projectSlotMemories?: (ctx: SlotMemoryProjection, charInfo: Record<string, CharInfo>) => Record<string, CharInfo>
+  /**
+   * Change what a finished scene does to the reader's stats. Runs for the projections before
+   * the ending as well as for the settlement itself, so it must return new values without
+   * writing the store, paying rewards or rolling randomness.
+   */
+  settleSceneStats?: (resolved: SceneStats, settlement: SceneStatSettlement) => SceneStats
+  /** The lowest a stat may fall to; the first mod that answers decides. */
+  statFloor?: (key: StatKey) => number | undefined
 
   prompts?: { [S in PromptSpot]?: PromptAddition<PromptSpots[S]> }
   /** Added to a DM in the history a prompt quotes, after its text. */
@@ -221,6 +247,8 @@ export interface ModHooks {
     playthroughId: string
     save: ResolvedSave & { record: PlaythroughRecord }
   }) => SaveChoice | undefined
+  /** A line on Save Game about what a save of the scene keeps of the mod's own; null for none. */
+  saveNote?: (scene: Readonly<ModSceneFields>) => string | null
 }
 
 interface Registered {
@@ -423,6 +451,22 @@ export function projectSlotMemories(ctx: SlotMemoryProjection, charInfo: Record<
   return projected
 }
 
+/** The scene's stats as every mod that is on leaves them, in list order; the game's own otherwise. */
+export function settleSceneStats(resolved: SceneStats, settlement: SceneStatSettlement): SceneStats {
+  let settled = resolved
+  for (const hooks of active()) settled = hooks.settleSceneStats?.(settled, settlement) ?? settled
+  return settled
+}
+
+/** The lowest a stat may fall to, from the first mod on that answers; undefined for the game's own floor. */
+export function statFloor(key: StatKey): number | undefined {
+  for (const hooks of active()) {
+    const floor = hooks.statFloor?.(key)
+    if (floor !== undefined) return floor
+  }
+  return undefined
+}
+
 /** Enabled pages follow native tabs; the first registration of an id wins. */
 export function bunnyboardPages(): BunnyboardPage[] {
   const seen = new Set(['chats', 'friends', 'updates', 'profile', 'photos', 'lorebook'])
@@ -431,5 +475,24 @@ export function bunnyboardPages(): BunnyboardPage[] {
     if (!page || seen.has(page.id)) return []
     seen.add(page.id)
     return [page]
+  })
+}
+
+/** The activities on offer for a stat: each from the mod that is on and owns it, and still available. */
+export function statActivities(stat: StatKey): SlotActivityOffer[] {
+  return activeEntries().flatMap(({ modId, hooks }) =>
+    (hooks.statActivities?.(stat) ?? []).filter(offer => offer.owner === modId && offer.stat === stat && hooks.slotActivityAvailable?.(offer)))
+}
+
+/** Whether the mod that owns a training activity is on and still offers it. */
+export function slotActivityAvailable(offer: SlotActivityOffer): boolean {
+  return activeEntries().some(({ modId, hooks }) => modId === offer.owner && hooks.slotActivityAvailable?.(offer) === true)
+}
+
+/** The lines Save Game shows about the scene being saved, one from each mod that has one. */
+export function saveNotes(scene: Readonly<ModSceneFields>): string[] {
+  return active().flatMap((hooks) => {
+    const note = hooks.saveNote?.(scene)
+    return note ? [note] : []
   })
 }

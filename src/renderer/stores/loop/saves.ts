@@ -1,4 +1,5 @@
 import { toAppError } from '@shared/errors'
+import { savedModScene } from '@shared/modScene'
 import { gameOverReasonOf, type GameOverReason } from '@shared/gameOver'
 import { isGameOver, spentOf } from '@shared/money'
 import { replayIdOf, type SlotReplay } from '@shared/replays'
@@ -203,7 +204,12 @@ export function queuedScene(
   if (game.sceneSummaries.length > 0) {
     scene.summaries = game.sceneSummaries.map((mark) => ({ ...mark }))
   } else delete scene.summaries
+  const mods = savedModScene(game.sceneMods)
+  if (mods) scene.mods = mods
+  else delete scene.mods
   // Set-or-delete: a scene that is not one of these kinds must carry no key at all.
+  if (game.sceneActivity) scene.activity = { ...game.sceneActivity }
+  else delete scene.activity
   if (game.sceneClass) scene.classCode = game.sceneClass
   else delete scene.classCode
   if (game.sceneProject) scene.projectClass = game.sceneProject

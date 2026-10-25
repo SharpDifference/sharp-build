@@ -1,3 +1,6 @@
+import { useModsStore } from '../stores/modsStore'
+import { slotActivityAvailable } from '../mods/hooks'
+import { finishSlotActivity, resumeSlotActivity } from '../stores/slotActivity'
 import {
   useEffect,
   useLayoutEffect,
@@ -1709,10 +1712,19 @@ export function GameView(): JSX.Element {
    * per render would reshuffle them under the cursor. Stats are not a dependency because
    * they move only at the boundary, with `date` and `time`.
    */
+  const activitySwitches = useModsStore(s => s.switches)
+  const slotActivity = useGameStore(s => s.sceneActivity)
+  useEffect(() => {
+    if (!slotActivity || busy || !awaitingInput || replaying || turnError || sceneEnding) return
+    if (slotActivity.status !== 'pending') void resumeSlotActivity()
+    else if (!slotActivityAvailable(slotActivity)) {
+      void finishSlotActivity(slotActivity.owner, slotActivity.id, false, 'The activity is no longer available, so it ended without being completed.')
+    }
+  }, [slotActivity, busy, awaitingInput, replaying, turnError, sceneEnding, activitySwitches])
   const slotActions = useMemo(
     // A created scene and a replay have no slot, and their landing is never drawn.
     () => (created || replaying ? [] : [...slotActionsNow(), relaxAction(time)]),
-    [date, time, events, classes, job, playerSchedule, classRecords, calendar]
+    [date, time, events, classes, job, playerSchedule, classRecords, calendar, activitySwitches]
   )
 
   /** The epilogue's own row, in the slot actions' place: a button per goodbye still owed. */
@@ -1785,7 +1797,7 @@ export function GameView(): JSX.Element {
     // box for the length of a call. It is the gift's own argument, one control along.
     setSending(true)
     // The button's own words are the action: what it says is what the reader did.
-    void submitAction(chosen.text, false, chosen.verdict ?? undefined, chosen.planId)
+    void submitAction(chosen.text, false, chosen.verdict ?? undefined, chosen.planId, undefined, undefined, chosen.activity)
   }
 
   /**
