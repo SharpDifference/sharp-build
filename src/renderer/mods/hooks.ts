@@ -120,6 +120,9 @@ export interface SlotSettled {
   closingCast: readonly Character[]
 }
 
+/** A read-only preview of the finished scene, before the crush roll and next opening. */
+export type SlotMemoryProjection = Pick<SlotSettled, 'before' | 'closingCast'>
+
 export interface BunnyboardPage {
   id: string
   word: string
@@ -170,6 +173,11 @@ export interface ModHooks {
   requests?: { [S in keyof RequestSpots]?: (request: StructuredRequest, ctx: RequestSpots[S]) => StructuredRequest }
   /** After bookkeeping settles, before the clock advances and the boundary save is written. */
   slotSettled?: (ctx: SlotSettled) => void
+  /**
+   * Apply the same memory weights as settlement to a projection. Must return new values
+   * without writing the store, paying rewards, consuming abilities or rolling randomness.
+   */
+  projectSlotMemories?: (ctx: SlotMemoryProjection, charInfo: Record<string, CharInfo>) => Record<string, CharInfo>
 
   prompts?: { [S in PromptSpot]?: PromptAddition<PromptSpots[S]> }
   /** Added to a DM in the history a prompt quotes, after its text. */
@@ -409,9 +417,15 @@ export function slotSettled(ctx: SlotSettled): void {
   for (const hooks of active()) hooks.slotSettled?.(ctx)
 }
 
+export function projectSlotMemories(ctx: SlotMemoryProjection, charInfo: Record<string, CharInfo>): Record<string, CharInfo> {
+  let projected = charInfo
+  for (const hooks of active()) projected = hooks.projectSlotMemories?.(ctx, projected) ?? projected
+  return projected
+}
+
 /** Enabled pages follow native tabs; the first registration of an id wins. */
 export function bunnyboardPages(): BunnyboardPage[] {
-  const seen = new Set(['chats', 'friends', 'updates', 'profile', 'photos'])
+  const seen = new Set(['chats', 'friends', 'updates', 'profile', 'photos', 'lorebook'])
   return active().flatMap(hooks => {
     const page = hooks.bunnyboardPage
     if (!page || seen.has(page.id)) return []
