@@ -144,6 +144,7 @@ export interface SceneStats {
 
 /** What the game resolved a scene's stats from: the ledger's verdict and the scene's facts. */
 export interface SceneStatSettlement {
+  /** What the hour exercised, as `exercisedStats` left it. */
   ledger: LedgerStats | undefined
   ctx: StatContext
 }
@@ -246,9 +247,18 @@ export interface ModHooks {
    */
   projectSlotMemories?: (ctx: SlotMemoryProjection, charInfo: Record<string, CharInfo>) => Record<string, CharInfo>
   /**
-   * Change what a finished scene does to the reader's stats. Runs for the projections before
-   * the ending as well as for the settlement itself, so it must return new values without
-   * writing the store, paying rewards or rolling randomness.
+   * Change what the hour exercised, before the game resolves what that pays: the ledger's verdict
+   * on which stats the scene worked, or undefined where it gave none. A scene whose exercise is
+   * something other than what the ledger saw — a game played to train a stat, say — says so here,
+   * and every mod settling afterwards sees it as the ledger. Runs for the projections before the
+   * ending too, so it must return new values without writing the store or rolling randomness.
+   */
+  exercisedStats?: (ledger: LedgerStats | undefined, ctx: StatContext) => LedgerStats | undefined
+  /**
+   * Change what a finished scene does to the reader's stats, after the game has resolved what the
+   * exercise pays. Runs for the projections before the ending as well as for the settlement
+   * itself, so it must return new values without writing the store, paying rewards or rolling
+   * randomness. What the hour exercised is `exercisedStats`'s to change, not this hook's.
    */
   settleSceneStats?: (resolved: SceneStats, settlement: SceneStatSettlement) => SceneStats
   /** The lowest a stat may fall to; the first mod that answers decides. */
@@ -533,6 +543,15 @@ export function projectSlotMemories(ctx: SlotMemoryProjection, charInfo: Record<
   let projected = charInfo
   for (const hooks of active()) projected = hooks.projectSlotMemories?.(ctx, projected) ?? projected
   return projected
+}
+
+/** What the hour exercised as every mod that is on leaves it, in list order; the ledger's own otherwise. */
+export function exercisedStats(ledger: LedgerStats | undefined, ctx: StatContext): LedgerStats | undefined {
+  let exercised = ledger
+  for (const hooks of active()) {
+    if (hooks.exercisedStats) exercised = hooks.exercisedStats(exercised, ctx)
+  }
+  return exercised
 }
 
 /** The scene's stats as every mod that is on leaves them, in list order; the game's own otherwise. */
