@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 import { MINI_GAMES_LIST, tuned, type GamePrefs, type MiniGameDef } from '@shared/minigames'
+import { useSettingsStore } from '../stores/settingsStore'
 
 /**
  * What the player has set for each game on its page of the Mods screen. Kept on this computer,
@@ -46,9 +47,14 @@ export const usePrefsStore = create<PrefsState>((set) => ({
     })
 }))
 
-/** A game as the player has it set. */
+/** Whether the player has the game's NSFW text on: Less NSFW text switched off. Off until known. */
+export function nsfwTextOn(): boolean {
+  return useSettingsStore.getState().settings?.lessNsfwText === false
+}
+
+/** A game as the player has it set, his content setting included. */
 export function tunedGame(game: MiniGameDef): MiniGameDef {
-  return tuned(game, usePrefsStore.getState().byGame[game.id])
+  return tuned(game, usePrefsStore.getState().byGame[game.id], nsfwTextOn())
 }
 
 /** A game in this build by its id, as the player has it set. */

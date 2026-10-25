@@ -15,8 +15,11 @@ export type Kind = 'truth' | 'dare'
  */
 export type Verdict = 'honest' | 'dodged' | 'done' | 'chickened' | 'skipped' | 'void'
 
-/** How far the questions and dares may go. */
-export type Heat = 1 | 2 | 3
+/**
+ * How far the questions and dares may go. 4 is only ever agreed where the player has the game's
+ * NSFW text on: the game's option offers it nowhere else.
+ */
+export type Heat = 1 | 2 | 3 | 4
 
 /** The reader's seat; the girls sit at 1 and up, in the order they were handed over. */
 export const READER = 0
@@ -88,17 +91,30 @@ export function mannerOf(skill: number, style: string): string {
   return way ? `${nerve}; ${way}` : nerve
 }
 
-export const HEAT_WORD: Record<Heat, string> = { 1: 'mild', 2: 'flirty', 3: 'bold' }
+export const HEAT_WORD: Record<Heat, string> = { 1: 'mild', 2: 'flirty', 3: 'bold', 4: 'wide open' }
 
 const HEAT_MEANS: Record<Heat, string> = {
   1: 'mild: harmless fun between friends. Embarrassing stories, silly habits, goofy dares. Nothing romantic and no touching beyond a high five.',
   2: 'flirty: teasing is welcome. Crushes, first impressions, what they like in someone; dares with a little closeness, such as holding a hand, a compliment said with a straight face, a kiss on the cheek at most.',
-  3: 'bold: frank about attraction, romance and each other; dares may be daring and close, a kiss at most. Nothing explicit.'
+  3: 'bold: frank about attraction, romance and each other; dares may be daring and close, a kiss at most. Nothing explicit.',
+  4: 'anything goes: questions may be as explicit as they like, and dares may go as far as a scene could, undressing and touching included.'
 }
 
 /** What holds at every heat, said in every brief. */
 const LIMIT =
   'Whatever the heat, everything asked, dared, said and done stays within what adults playing this at a party, in company, would really say and do: never sexually explicit in word or deed, no undressing, and nothing physical beyond a kiss.'
+
+/**
+ * What holds at heat 4 in place of the limit above: nothing is off the table but what she would
+ * not do, and the game stays a game, played where they are.
+ */
+const OPEN_LIMIT =
+  'At this heat nothing is ruled out by the game itself: what is asked, dared, said and done may be sexually explicit, and dares may include undressing and touching. Each girl still goes only as far as she really would with him, here and now, and anyone may back out of anything. A dare is still done right here and in a moment; anything that would take longer is for after the game.'
+
+/** The line a game's briefs hold to: the open one at heat 4, the party one at every other. */
+function limitOf(heat: Heat): string {
+  return heat === 4 ? OPEN_LIMIT : LIMIT
+}
 
 const ADULTS = 'Everyone at the table is an adult.'
 
@@ -114,7 +130,7 @@ function fairField(what: string): string {
 const FAIR = ['yes', 'over'] as const
 
 export function heatOf(value: number | undefined): Heat {
-  return value === 1 || value === 3 ? value : 2
+  return value === 1 || value === 3 || value === 4 ? value : 2
 }
 
 /** How many sit at the table, the reader included. */
@@ -178,7 +194,10 @@ export function outcomeOf(points: readonly number[]): 'won' | 'lost' | 'draw' {
 
 /* What stands in for the model. Tame on purpose, and each works whoever asks whom. */
 
-const TRUTHS: Record<Heat, readonly string[]> = {
+/** The stand-ins go no further than bold: what goes past that is the model's and the reader's. */
+type StockHeat = Exclude<Heat, 4>
+
+const TRUTHS: Record<StockHeat, readonly string[]> = {
   1: [
     'What is the most embarrassing thing that has happened to you in a class?',
     'What is a food you pretend to like but secretly cannot stand?',
@@ -205,7 +224,7 @@ const TRUTHS: Record<Heat, readonly string[]> = {
   ]
 }
 
-const DARES: Record<Heat, readonly string[]> = {
+const DARES: Record<StockHeat, readonly string[]> = {
   1: [
     'Do your best impression of me.',
     'Say the alphabet backwards as far as you can get.',
@@ -267,7 +286,7 @@ export function stock(
     }
   }
   // A long game at the mild heat can run the lists dry: then a repeat is better than nothing.
-  return (out.length > 0 ? out : [...lists[heat]]).slice(0, count)
+  return (out.length > 0 ? out : [...lists[heat === 4 ? 3 : heat]]).slice(0, count)
 }
 
 /** One round asked of the model: what it is told, and what it sends back. */
@@ -287,7 +306,7 @@ function frame(terms: Terms, log: readonly Turn[]): string[] {
     .filter(Boolean)
   return [
     `Truth or Dare, turn ${turn + 1} of ${turnsIn(terms)}. It is ${told(terms, player)}'s turn to take a truth or a dare; ${told(terms, asker)} is the one who asks the question or sets the dare.`,
-    `Heat is ${terms.heat} of 3, ${HEAT_MEANS[terms.heat]} That is the ceiling, not a target. ${LIMIT}`,
+    `Heat is ${terms.heat} of ${terms.heat === 4 ? 4 : 3}, ${HEAT_MEANS[terms.heat]} That is the ceiling, not a target. ${limitOf(terms.heat)}`,
     `${ADULTS} ${NO_LIFT}`,
     'Write every girl in her own character and voice, as her sheet and the scene so far show her. How close she is to the reader is judged from the scene so far, by how she has been with him in it: she says and does only what she really would with him, here, now, and no more than that shows.',
     ...(manners.length > 0 ? [`How each plays this game: ${manners.join('. ')}.`] : []),
@@ -566,7 +585,7 @@ const VERDICT_TOLD: Record<Verdict, string> = {
 export function remarkCue(terms: Terms, turn: Turn): string {
   const player = told(terms, turn.player)
   const asker = told(terms, turn.asker)
-  const bounds = `Her remark keeps to the game's heat, ${HEAT_MEANS[terms.heat]} ${LIMIT} ${ADULTS} ${NO_LIFT}`
+  const bounds = `Her remark keeps to the game's heat, ${HEAT_MEANS[terms.heat]} ${limitOf(terms.heat)} ${ADULTS} ${NO_LIFT}`
   if (turn.verdict === 'void') {
     return `${asker} put a ${turn.kind} to ${player}, and the turn was called void for going past what was agreed: no point to anyone. She was watching, not part of that turn; she does not guess at or repeat what it was. ${bounds}`
   }

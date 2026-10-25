@@ -1,16 +1,19 @@
 import { describe, expect, it } from 'vitest'
 import {
+  forContent,
   gamesNamed,
   gamesOffered,
   gamesSuggested,
   seatsFor,
   settledOptions,
   suggestRate,
+  tuned,
   MINI_GAMES,
   type MiniGameDef
 } from '../src/shared/minigames'
 import { modOn, NO_SWITCHES, withMod, type ModDef } from '../src/shared/mods'
 import DARTS from '../src/shared/minigameEntries/darts'
+import TRUTH_OR_DARE from '../src/shared/minigameEntries/truth-or-dare'
 
 /** Which games a scene offers: the mod's switch, the place, and who is there to play. */
 
@@ -145,5 +148,30 @@ describe('gamesNamed', () => {
     expect(gamesNamed(all, 'She clawed at the racetrack, then hold me')).toEqual([])
     expect(gamesNamed(all, 'I raced here')).toEqual([])
     expect(gamesNamed(all, '')).toEqual([])
+  })
+})
+
+describe('options the content setting opens', () => {
+  const heat = (g: MiniGameDef) => g.options?.find((option) => option.id === 'heat')
+
+  it('offers Truth or Dare past bold only with the game\'s NSFW text on', () => {
+    expect(heat(forContent(TRUTH_OR_DARE, false))?.max).toBe(3)
+    expect(heat(tuned(TRUTH_OR_DARE, undefined))?.max).toBe(3)
+    expect(heat(forContent(TRUTH_OR_DARE, true))?.max).toBe(4)
+    expect(heat(forContent(TRUTH_OR_DARE, true))?.describe).toContain('4 is anything goes')
+    expect(heat(forContent(TRUTH_OR_DARE, false))?.describe).not.toContain('anything goes')
+    // What the table settles is held to the range the setting gives.
+    expect(settledOptions(forContent(TRUTH_OR_DARE, false), { heat: 4 }).heat).toBe(2)
+    expect(settledOptions(forContent(TRUTH_OR_DARE, true), { heat: 4 }).heat).toBe(4)
+  })
+
+  it('drops a usual of 4 the player set while it was open, once it is not', () => {
+    const prefs = { options: { heat: 4 } }
+    expect(heat(tuned(TRUTH_OR_DARE, prefs, true))?.default).toBe(4)
+    expect(heat(tuned(TRUTH_OR_DARE, prefs, false))?.default).toBe(2)
+  })
+
+  it('leaves a game with nothing to open as it is', () => {
+    expect(forContent(DARTS, true)).toBe(DARTS)
   })
 })
