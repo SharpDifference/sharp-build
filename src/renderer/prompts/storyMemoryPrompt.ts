@@ -1,5 +1,26 @@
-import { STORY_CATEGORIES, lightStoryFacts, type StorySnapshot, type StoryMemoryMode } from '@shared/storyMemory'
-import type { StructuredRequest } from '@shared/types'
+import { STORY_CATEGORIES, lightStoryFacts, rankedStoryFacts, recallPayload, type StorySnapshot, type StoryMemoryMode } from '@shared/storyMemory'
+import type { Season, StructuredRequest } from '@shared/types'
+import { formatShortGameDate, formatTimeSlot } from './gameDate'
+
+/** Native 0.6 dated recaps already carry the same save history and a witness guard. */
+export function withNativeStoryRecall(
+  request: StructuredRequest, snapshot: StorySnapshot | undefined,
+  cast: readonly string[], query: string, season: Season
+): StructuredRequest {
+  const payload = recallPayload(snapshot, cast, query)
+  if (!payload.storyMemory) return request
+  // Only inspect the context, never a player's action, quoted dialogue or an instruction to the model.
+  const context = request.user.split(/\n(?:STORY SO FAR|SCENE SO FAR|STORY|TEXTING SO FAR|RECENT MESSAGES|YOUR TURN)\n/, 1)[0]
+  const lines = new Set(context.split('\n').map(line => line.trim()))
+  const covered = payload.storyMemory.records.filter(r => {
+    if (r.kind !== 'encounter' || r.manual || r.origin || r.date < 0) return false
+    const summary = r.text.replace(/\s*\n+\s*/g, ' ').trim()
+    const native = `${formatShortGameDate(r.date, season)}, ${formatTimeSlot(r.time)} summary: ${summary} Only those who were there know what happened.`
+    return lines.has(native)
+  }).map(r => r.id)
+  if (covered.length) payload.storyMemory.coveredEncounters = covered
+  return { ...request, ...payload }
+}
 
 /** Extends the existing ledger call, so extraction makes no additional model request. */
 export function withStoryExtraction(
@@ -16,7 +37,8 @@ export function withStoryExtraction(
   const sceneAt = request.user.lastIndexOf('SCENE SO FAR')
   // Match the actual scene, never the static ledger instructions or unrelated roster blocks.
   const scene = sceneAt >= 0 ? request.user.slice(sceneAt) : ''
-  const candidates = light ? lightStoryFacts(snapshot.records, options.cast ?? [], scene) : snapshot.records
+  const candidates = light ? lightStoryFacts(snapshot.records, options.cast ?? [], scene)
+    : rankedStoryFacts(snapshot.records, options.cast ?? [], scene)
   let referenceSize = 2 // The JSON array delimiters.
   const facts = candidates
     .filter((r) => r.kind === 'fact')

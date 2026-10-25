@@ -104,10 +104,52 @@ additional manual fact at capacity; existing facts remain editable.
 
 ## Retrieval and prompt cost
 
+### Native Lorebook and character context
+
+When Prompt Studio tags a request for a preset, Story Memory retains its normal recap
+candidates: the preset may remove the native Lorebook text after recall is prepared.
+The preset's Story recall control can still turn this context off deliberately. Native
+recap deduplication resumes on requests without a preset. This conservative fallback may
+repeat a recap with a preset active, but keeps the existing recall budgets and API call count.
+
+Native 0.6 supplies world entries, character profiles/notes, personal memories, plans and
+dated history recaps. Story Memory supplements those sources with lasting facts and additional
+encounter recall. It does not rewrite the native context or replace the native Lorebook.
+
+The scene and DM hooks compare completed native context with current-semester encounter rows.
+Only a complete matching dated recap, including the native witness restriction, marks that
+encounter covered. The immediate action, recent-message log and scene transcript are not used
+as coverage. The request carries optional `coveredEncounters` IDs to the shared formatter;
+they are validated at the platform boundary and stripped with the snapshot before generation.
+Standard and Light recall omit covered recaps. They do not fetch arbitrary older encounters
+just to fill the vacated space; independently relevant topic matches remain eligible.
+
+Coverage changes only this request. Saves, the SQLite index and recall on a later request
+still retain the encounter. Player-corrected and previous-semester recaps keep their separate
+provenance. Facts are not dropped merely because their wording also occurs in Lorebook,
+character notes or a summary: their knowledge, claim/event and timeline labels may add meaning
+that native prose does not express. Paraphrases and similar keywords alone never prove a duplicate.
+
+Both modes suppress identical fact references only when text, subject/participants, category,
+date/time, semester origin, timeline, certainty, claimant, knowledge audience, public/private
+status and correction status agree. These prompt-only reductions never delete stored facts.
+Native character notes and game state remain authoritative under the existing recall rules.
+
+Fact ranking favors manual corrections, the present cast, topic matches, then lasting categories
+(promises, relationships, roles and memory restoration) before recency. This keeps older milestones
+ahead of otherwise equally relevant routine facts. The ledger's prior-fact reference uses the
+same ranking against the completed scene, so old relevant facts remain candidates for supported
+updates. This does not infer promise completion, add a new lifecycle schema, or guarantee that
+an AI will follow every supplied fact. Evidence validation and correction protection are unchanged.
+
+Tests: `test/storyMemoryNative.test.ts` exercises actual opening/continuation/closing/solo/DM
+builders, full-versus-partial matches, quoted player input, corrections, prior semesters,
+duplicate knowledge scopes, ranking, bounded context and SQLite/save-snapshot parity.
+
 ### Optional Light memory
 
-In **Mods → Story Memory → Options**, **Light memory** is off by default. Standard mode
-keeps the existing selection and formatting. Turning Light memory on changes future requests;
+In **Mods → Story Memory → Options**, **Light memory** is off by default. Both modes use the
+native-overlap checks above. Turning Light memory on changes future requests;
 an already prepared/in-flight request may finish with its previous context. The preference
 is stored in `mods.json` as `story-memory:light-memory`, not in the save's fact collection.
 
@@ -126,7 +168,7 @@ or less relevant detail: switch Light memory off when fuller recall is desired.
 
 Light ledger extraction keeps the same schema, evidence validation and eight-development limit.
 It sends up to 2,500 characters of prior facts ranked against the scene and its cast, instead of
-up to 6,500 characters from the first 80 saved facts. The full fact collection and encounter
+Standard's 6,500-character allowance. Both modes consider up to 80 ranked facts. The full fact collection and encounter
 history remain available for editing, searching, future recall and semester carryover.
 
 Desktop and browser services read the current switch before preparing recall. Native SQLite
@@ -144,8 +186,8 @@ IDs are the stable on-disk IDs, never display names or filenames derived from us
 membership recorded at completed boundaries is used for relevance. Older recaps fall back to
 full names or unambiguous first names, which establishes relevance, **not** witnessed knowledge.
 
-The selector ranks manual facts first, then keyword relevance and recency. It also takes two
-recent encounters per involved character, round-robin, and up to three older keyword matches.
+The selector ranks facts as described above. It also considers two recent encounters per involved
+character, round-robin, and up to three older keyword matches, omitting native-covered recaps.
 The final formatter enforces a total maximum of **18,000 characters**, including its instructions,
 with at most 6,500 characters of fact rows. Long encounters are clipped to 5,000 characters for
 this reference. These are character budgets, not guaranteed token counts. Unrelated character

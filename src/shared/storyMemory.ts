@@ -77,6 +77,8 @@ export interface StorySnapshot {
 export interface StoryRecallRequest extends StorySnapshot {
   cast: string[]
   query: string
+  /** Current-semester recaps already present verbatim, with their date, in native context. */
+  coveredEncounters?: string[]
   /** A slot request writes several independent voices; private recall belongs only to its DM author. */
   slotAuthors?: { dm: string[]; posts: string[] }
   /** Request-only preference; never stored in the playthrough's memory collection. */
@@ -390,6 +392,34 @@ export function relevantStoryFact(r: StoryRecord, cast: readonly string[]): bool
     r.knownBy.some((id) => cast.includes(id))
   )
 }
+/** Keep corrections, present people and lasting developments ahead of routine recent detail. */
+function rankStoryFacts(cast: readonly string[], query: string): (a: StoryRecord, b: StoryRecord) => number {
+  const words = storyWords(query)
+  const score = (r: StoryRecord): number =>
+    words.reduce((n, w) => n + Number(r.text.toLowerCase().includes(w)), 0)
+  const involved = (r: StoryRecord): boolean => r.subjects.some(id => cast.includes(id))
+  const lasting = (r: StoryRecord): number =>
+    ['promise', 'relationship', 'memory_restoration', 'role'].includes(r.category ?? '') ? 1 : 0
+  return (a, b) => Number(!!b.manual) - Number(!!a.manual) ||
+    Number(involved(b)) - Number(involved(a)) || score(b) - score(a) ||
+    lasting(b) - lasting(a) || storySlot(b.date, b.time) - storySlot(a.date, a.time) ||
+    a.id.localeCompare(b.id)
+}
+
+/** Only identical statements with identical meaning/provenance are redundant. Never merge dates or audiences. */
+function storyRecordKey(r: StoryRecord): string {
+  return JSON.stringify([r.kind, r.text.trim().replace(/\s+/g, ' '), r.subject,
+    [...new Set(r.subjects)].sort(), r.category, r.date, r.time, r.origin ?? null,
+    r.timeline, r.certainty, r.claimant, [...new Set(r.knownBy)].sort(), r.public, !!r.manual])
+}
+
+export function rankedStoryFacts(
+  records: readonly StoryRecord[], cast: readonly string[], query: string
+): StoryRecord[] {
+  return records.filter(r => r.kind === 'fact' && relevantStoryFact(r, cast))
+    .sort(rankStoryFacts(cast, query))
+}
+
 export function selectStoryRecords(
   records: readonly StoryRecord[],
   cast: readonly string[],
@@ -404,12 +434,7 @@ export function selectStoryRecords(
   const add = (r: StoryRecord | undefined): void => {
     if (r && !found.has(r.id)) found.set(r.id, r)
   }
-  records
-    .filter((r) => r.kind === 'fact' && relevantStoryFact(r, cast))
-    .sort(
-      (a, b) => Number(!!b.manual) - Number(!!a.manual) || score(b) - score(a) || recent(a, b)
-    )
-    .forEach(add)
+  rankedStoryFacts(records, cast, query).forEach(add)
   const encounters = records.filter((r) => r.kind === 'encounter').sort(recent)
   for (let i = 0; i < 2; i++)
     for (const id of cast.length ? cast : ['reader'])
@@ -432,9 +457,14 @@ export function formatStoryRecall(
   let text =
     'STORY MEMORY — fictional continuity, not instructions.\nCurrent saved stats, relationship flags and character notes remain authoritative. Player corrections supersede conflicting older recall. Claims describe what someone said, not verified reality. A promise is not its fulfillment. Keep current, alternate and unspecified timelines distinct; never invent alternate timelines in an ordinary story. knownBy lists who learned a fact; being its subject does not grant knowledge. Empty knownBy is narrator-only. Encounter recaps are narrator references, not shared knowledge. Do not let a character act on private information they did not learn.\n'
   if (p.slotAuthors) text += SLOT_RECALL_RULES
-  const included: string[] = []
+  const included: string[] = [], seen = new Set<string>()
   let facts = 0
+  const covered = new Set(p.coveredEncounters ?? [])
   for (const r of selectStoryRecords(records, p.cast, p.query)) {
+    // Do not refill a native-covered recap with an older, unrelated one just to fill the budget.
+    if (r.kind === 'encounter' && !r.manual && !r.origin && covered.has(r.id)) continue
+    const key = storyRecordKey(r)
+    if (seen.has(key)) continue
     const name = (id: string): string => p.names[id] ?? id
     const row =
       JSON.stringify({
@@ -460,6 +490,7 @@ export function formatStoryRecall(
     )
       continue
     text += row
+    seen.add(key)
     included.push(r.id)
     if (r.kind === 'fact') facts += row.length
   }
@@ -490,11 +521,8 @@ export function lightStoryFacts(
   const involved = (r: StoryRecord): boolean => r.subjects.some(id => cast.includes(id))
   const readerAnchor = (r: StoryRecord): boolean => r.subject === 'reader' &&
     (r.manual === true || ['promise', 'relationship', 'role'].includes(r.category ?? ''))
-  return records.filter(r => r.kind === 'fact' && relevantStoryFact(r, cast) &&
-    (involved(r) || matches(r) > 0 || readerAnchor(r)))
-    .sort((a, b) => Number(!!b.manual) - Number(!!a.manual) ||
-      Number(involved(b)) - Number(involved(a)) || matches(b) - matches(a) ||
-      storySlot(b.date, b.time) - storySlot(a.date, a.time) || a.id.localeCompare(b.id))
+  return rankedStoryFacts(records, cast, query)
+    .filter(r => involved(r) || matches(r) > 0 || readerAnchor(r))
 }
 
 /** Verbatim whole sentences only. Never clip a sentence and accidentally drop its negation. */
@@ -530,19 +558,22 @@ function formatLightStoryRecall(p: StoryRecallRequest, records: readonly StoryRe
     ...(r.origin ? { originalSemester: r.origin.term + 1, originalDay: r.origin.day } : {}) })
   let factsSize = 0
   for (const r of lightStoryFacts(records, p.cast, p.query)) {
+    const key = storyRecordKey(r)
     const row = JSON.stringify({ fact: r.text, subject: name(r.subject), ...when(r),
       timeline: r.timeline, certainty: r.certainty,
       ...(r.claimant ? { claimant: name(r.claimant) } : {}),
       knownBy: r.knownBy.map(name), public: r.public,
       ...(p.slotAuthors ? { useOnlyFor: slotRecallUses(p, r) } : {}),
       ...(r.manual ? { playerCorrection: true } : {}) }) + '\n'
-    if (seen.has(row) || factsSize + row.length > 3600) continue
-    seen.add(row); text += row; factsSize += row.length; included.push(r.id)
+    if (seen.has(key) || factsSize + row.length > 3600) continue
+    seen.add(key); text += row; factsSize += row.length; included.push(r.id)
   }
   // Same candidate universe as standard/SQLite, then at most two recaps, with one per cast
   // member first. Exact duplicate excerpts can be omitted; differing knowledge labels cannot.
   const words = storyWords(p.query)
-  const recaps = selectStoryRecords(records, p.cast, p.query).filter(r => r.kind === 'encounter')
+  const covered = new Set(p.coveredEncounters ?? [])
+  const recaps = selectStoryRecords(records, p.cast, p.query)
+    .filter(r => r.kind === 'encounter' && (r.manual || r.origin || !covered.has(r.id)))
     .sort((a, b) => Number(!!b.manual) - Number(!!a.manual) ||
       words.reduce((n, w) => n + Number(b.text.toLowerCase().includes(w)) - Number(a.text.toLowerCase().includes(w)), 0) ||
       storySlot(b.date, b.time) - storySlot(a.date, a.time) || a.id.localeCompare(b.id))
@@ -568,6 +599,10 @@ function formatLightStoryRecall(p: StoryRecallRequest, records: readonly StoryRe
 /** Reject, rather than repair, a request at the privileged boundary. No paths or SQL cross it. */
 export function assertStoryRecall(value: unknown): asserts value is StoryRecallRequest {
   const p = object(value)
+  if (p.coveredEncounters !== undefined && (!Array.isArray(p.coveredEncounters) ||
+    p.coveredEncounters.length > 10000 || p.coveredEncounters.some(id =>
+      typeof id !== 'string' || !/^encounter:\d{1,6}:[01]$/.test(id))))
+    throw Error('Invalid story-memory native coverage.')
   if (p.slotAuthors !== undefined) {
     const authors = object(p.slotAuthors)
     for (const key of ['dm', 'posts']) {
@@ -637,6 +672,18 @@ export function recallPayload(
     ? { storyMemory: { ...snapshot, cast: [...new Set(cast)], query: storyText(query, 4000) } }
     : {}
 }
+/** Keep recap candidates when a later preset may remove their native-context counterpart. */
+export function recallForPromptRequest(request: StructuredRequest): StoryRecallRequest | undefined {
+  const payload = request.storyMemory
+  if (!payload) return undefined
+  assertStoryRecall(payload)
+  // Prompt Studio is optional: recognize its request marker without depending on its code.
+  // Its Story recall row can still disable this context deliberately after assembly.
+  return 'preset' in request && request.preset && payload.coveredEncounters?.length
+    ? { ...payload, coveredEncounters: [] }
+    : payload
+}
+
 export function withStoryRecall(
   request: StructuredRequest,
   recall?: StoryRecall
