@@ -207,6 +207,14 @@ describe('applyStatDeltas', () => {
       playerStats(floor, -1, 4)
     )
   })
+
+  it('floors where the floor it is handed says, and at the scale where it says nothing', () => {
+    const floor = pointsForTier(MIN_TIER)
+    const lower = (key: string): number | undefined => (key === 'brain' ? floor - 10 : undefined)
+    expect(applyStatDeltas(playerStats(floor, floor, 5), playerStats(-4, -4, -1), lower)).toEqual(
+      playerStats(floor - 4, floor, 4)
+    )
+  })
 })
 
 describe('tierUps', () => {

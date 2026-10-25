@@ -1,3 +1,4 @@
+import { activityEnding } from '@shared/slotActivity'
 import { isPermanent } from '@shared/errors'
 import type { AppError, Character } from '@shared/types'
 import { shortenSceneSoFar } from '../../prompts/scenePrompt'
@@ -197,8 +198,13 @@ export async function runSceneTurn(
 
   // `end_scene` is stashed until playback reaches the last line; a solo scene is over
   // after its one turn.
-  const ending = solo || result.data.end
+  const activity = useGameStore.getState().sceneActivity
+  const ending = activityEnding(activity, solo || result.data.end)
   useGameStore.getState().setSceneEnding(ending)
+  // The reply to a settled activity's closing turn has landed: it steers the scene no further.
+  if (activity && activity.status !== 'pending' && !activity.closed) {
+    useGameStore.setState({ sceneActivity: { ...activity, closed: true } })
+  }
 
   if (!ending) {
     // Written before playback is handed back: `unpark()` can run to the next decision point,
