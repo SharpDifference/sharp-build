@@ -68,6 +68,21 @@ describe('mod hooks', () => {
   })
 })
 
+describe('when a post came out', () => {
+  it("is the first answer from a mod that is on, and the slot's start where none answers", async () => {
+    const on = { held: true, late: true }
+    const hooks = await fresh(on, ['held', 'late'])
+    hooks.registerHooks('late', { postOutAt: () => 20 })
+    hooks.registerHooks('held', { postOutAt: (one) => (one.id === 'p1' ? 10 : undefined) })
+
+    expect(hooks.postOutAt(post)).toBe(10)
+    expect(hooks.postOutAt({ ...post, id: 'p2' })).toBe(20)
+
+    on.held = on.late = false
+    expect(hooks.postOutAt(post)).toBe(0)
+  })
+})
+
 describe('ways on', () => {
   it('offers the first answer from a mod that is on, and none from a mod that is off', async () => {
     const hooks = await fresh({ off: false }, ['off', 'quiet', 'semesters', 'later'])
@@ -91,6 +106,26 @@ describe('ways on', () => {
     hooks.registerHooks('a', { saveChoice: () => undefined })
     const save = {} as Parameters<typeof hooks.saveChoice>[0]['save']
     expect(hooks.saveChoice({ playthroughId: 'p', save })).toBeUndefined()
+  })
+})
+
+describe('updates tabs and option previews', () => {
+  const Page = () => null
+  const Preview = () => null
+
+  it('lists one page per id from the mods on, and offers a preview whether its mod is on or off', async () => {
+    const on = { notes: true, copy: true, faces: false }
+    const hooks = await fresh(on, ['notes', 'copy', 'faces'])
+    hooks.registerHooks('copy', { updatesTab: { id: 'notes', word: 'Copy', Page } })
+    hooks.registerHooks('notes', { updatesTab: { id: 'notes', word: 'Notes', Page } })
+    hooks.registerHooks('faces', { optionPreviews: { style: Preview } })
+
+    expect(hooks.updatesTabs().map((tab: { word: string }) => tab.word)).toEqual(['Notes'])
+    expect(hooks.optionPreview('faces', 'style')).toBe(Preview)
+    expect(hooks.optionPreview('faces', 'other')).toBeUndefined()
+
+    on.notes = false
+    expect(hooks.updatesTabs().map((tab: { word: string }) => tab.word)).toEqual(['Copy'])
   })
 })
 

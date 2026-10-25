@@ -111,6 +111,13 @@ Shared code holds no switches. Where a rule there has to follow one, give the ru
 a setter, and set it from `modsStore.ts` at boot and whenever a switch moves
 (`useModsStore.subscribe`). Continuing Semesters does this for its seniors option.
 
+## Screens and the files in the root
+
+A mod's screens follow `UI_STYLE_GUIDE.md`, but nobody edits it, nor any other file in the root
+besides this one (`DESIGN_GUIDE.md`, `README.md`, …): they come from Venus Dev and are replaced
+whenever a new version of the game is synced in. How a mod's own screens look goes in its guide
+under `docs/mods/`; how a hook point draws goes in its entry here.
+
 ## Hook points
 
 A switch decides whether a mod acts. Hook points decide **where** it acts without editing the
@@ -154,6 +161,7 @@ else names it.
 | --- | --- | --- |
 | `prompts.dm` | `textingPrompt.ts` | Add lines to her DM prompt, and fields to its reply |
 | `prompts['slot-posts']` | `slotIntroPrompt.ts` | Add lines about status posts, and fields to each post |
+| `prompts['slot-poster']` | `slotIntroPrompt.ts` | Add lines under each girl posting, by her name, given the slot the opening is for |
 | `prompts['slot-reach-outs']` | `slotIntroPrompt.ts` | Add lines under a girl texting first, and fields to her entry |
 | `prompts.character` | `characterPrompt.ts` | Add lines and fields to character generation |
 | `dmHistoryNote` | `textingPrompt.ts` | Add a note after a DM in the history the prompt quotes |
@@ -165,12 +173,15 @@ else names it.
 | `fileFeedPost` | `loop/feed.ts` | Change a slot post before it is filed, or file it later itself (`held`) |
 | `postLikes` | `loop/feed.ts`, `NewGameView.tsx` | Decide likes on ending, stranger and winter posts |
 | `postVisible` | `feedView.ts`, `loop/feed.ts`, `ContactPage.tsx` | Keep a post off the feed for now |
+| `postOutAt` | `feedView.ts`, `ContactPage.tsx` | When a post kept off came out, so it stands above its slot's posts already showing |
 | `postComments` | `BunnyboardModal.tsx` (`PostSpots.tsx`) | Draw the comments under a post and a control beside its like; one mod at a time |
 | `postPicture` | `BunnyboardModal.tsx` (`PostSpots.tsx`) | Draw a post's picture under its text |
 | `emojiTool` | `BunnyboardModal.tsx` (`TextSpots.tsx`) | Stand an emoji tool beside a box being typed in, in place of the phone's row of quick emoji; one mod at a time |
 | `sentText` | `BunnyboardModal.tsx` (`TextSpots.tsx`) | Draw what somebody sent (a message, a post) and say which messages stand with no bubble; one mod at a time |
 | `endingChoice` | `GameView.tsx` | Offer a way on from the ending, beside "Return to the main menu" |
 | `saveChoice` | `LoadGameModal.tsx` | Offer something for a picked save, beside "Load" |
+| `updatesTab` | `BunnyboardModal.tsx` | Add a page beside the feed in the Updates tab, with an unread count |
+| `optionPreviews` | `ModsModal.tsx` | Draw a preview under one of the mod's option groups on the Mods screen |
 | `saveNote` | `SaveGameModal.tsx` | Add a line to Save Game about what a save of the scene keeps of the mod's own |
 | `statActivities` | `slotActions.ts` | Offer a training activity in place of one of the landing's stat suggestions |
 | `slotActivityAvailable` | `gameLoop.ts`, `slotActions.ts`, `GameView.tsx` | Say whether a training activity is still there to commit to or resume |
@@ -190,11 +201,12 @@ as a new hook beside the old one.
 
 ### Not covered yet
 
-- Screens: a mod's own panels, menu entries and editor fields.
+- Screens: a mod's own panels, menu entries and editor fields, beyond a page beside the feed
+  (`updatesTab`) and a preview on the Mods screen (`optionPreviews`).
 - Main process: IPC, protocols, services, settings and character rules.
-- Saves: a mod's own fields in a save, and what carries into the next semester.
+- Saves: a mod's own fields in a save. Carrying them into the next semester is covered below.
 
-Both are still direct edits, as before.
+These are still direct edits, as before.
 
 ### Tests
 
@@ -241,10 +253,14 @@ Where a branch goes:
 - `prompts.scene` adds context to cast and solo scenes, including continuations and closing requests.
 - `requests.scene`, `requests.dm`, `requests.ledger` and `requests['slot-intro']` extend a completed request in mod-list order. Preserve the request and schema fields received from earlier mods. DM hooks run for normal and regenerated replies because both use the same builder.
 - `slotSettled` receives the scene's starting state, the completed ledger and closing cast after bookkeeping, before clock advancement and the boundary save. It is synchronous so mod state is included in that save.
+- `fileLatePost(post)` in `loop/feed.ts` files a post a mod wrote mid-slot, outside the slot's opening, the way the opening files its own: through `fileFeedPost`, so it can be held like any other. It leaves the slot's teaser and fill as they were drawn.
+- `texts` on a ComfyUI job in `comfyService.ts` fills more prompt nodes by id, for a graph with more prompts than the positive, negative and detailer the job already fills.
 
 These hooks add to the existing API; existing hooks and their arguments are unchanged. Screens, IPC and save fields still use direct integration as documented above.
 
 - `bunnyboardPage` registers an independently gated tab with `id`, `word`, `Mark` and `Page`. Disabling its mod unmounts the page and returns the phone to Chats. Native tab IDs cannot be replaced. Other screen integration remains direct.
+- `optionPreviews` draws a preview under an option group on the Mods screen, keyed by the group's id. The game hands it `optionId`, the option picked (or null), and draws it under the group's switches on the recessed ground. It is asked whether or not the mod is on, so a player sees it before switching the mod on.
+- `updatesTab` puts a page beside the feed in the Updates tab, with `id`, `word`, `Page`, an optional `unread(game)` and an optional `Action`, drawn at the end of the titles' row while the page is showing. With one or more on, Updates draws a row of titles you press, its own first (the one showing drawn as the screen's title, the rest muted over a faded blob), and the game puts each `unread` on the far corner of its title's blob and sums them onto the Updates tile and the landing's Bunnyboard badge. The page is drawn under the title; it brings its own `vu-bb-scroll`. The feed's id, `feed`, cannot be replaced; leaving the tab, or the mod switching off, comes back to the feed.
 
 ### Comments under posts
 

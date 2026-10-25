@@ -14,7 +14,7 @@ import type { GameOverReason } from '@shared/gameOver'
 import type { LedgerStats, PlayerStats, StatContext, StatKey, StatusText } from '@shared/playerStats'
 import type { PostComment } from '@shared/postComments'
 import type { SlotActivityOffer } from '@shared/slotActivity'
-import type { ModSceneFields, PlaythroughRecord } from '@shared/types'
+import type { ModSceneFields, PlaythroughRecord, TimeSlot } from '@shared/types'
 import type { TextingPromptState } from '../prompts/textingPrompt'
 import type { ResolvedSave } from '../stores/saveStore'
 import type { ViewName } from '../stores/uiStore'
@@ -39,6 +39,12 @@ export interface PromptSpots {
   dm: { character: Character; info: CharInfo | undefined; state: TextingPromptState }
   /** The status updates the slot's opening writes, one entry per post. */
   'slot-posts': Record<string, never>
+  /**
+   * One girl posting this slot, under her name in the slot's opening: lines only. The opening
+   * can be written while the slot before it is still playing, so `date` and `time` name the slot
+   * it is for.
+   */
+  'slot-poster': { character: Character; info: CharInfo; date: number; time: TimeSlot }
   /** The girl the slot's opening has texting the reader just to talk, one call per girl. */
   'slot-reach-outs': { character: Character; info: CharInfo; date: number }
   /** A character being generated. */
@@ -100,6 +106,11 @@ export interface EndingChoice extends WayOn {
   label: string
 }
 
+/** What the Mods screen hands a preview of one of a mod's option groups: the option picked. */
+export interface OptionPreviewProps {
+  optionId: string | null
+}
+
 /** What a mod offers for a save picked in Load Game, beside loading it. */
 export interface SaveChoice extends WayOn {
   title: string
@@ -142,6 +153,19 @@ export interface BunnyboardPage {
   word: string
   Mark: ComponentType
   Page: ComponentType
+}
+
+/**
+ * A page of a mod's own beside the feed in the Updates tab, behind a title of its own beside the
+ * feed's. `unread` is what its title and the Updates tile on the rail count; `Action` is drawn at
+ * the end of the titles' row while the page is showing.
+ */
+export interface UpdatesTab {
+  id: string
+  word: string
+  Page: ComponentType
+  Action?: ComponentType
+  unread?: (game: ReturnType<typeof useGameStore.getState>) => number
 }
 
 /** What the row drawing a post hands to whatever draws its comments or acts on them. */
@@ -201,6 +225,8 @@ export interface ModHooks {
   /** Whether an activity offered is still there, asked at commit and on reload. */
   slotActivityAvailable?: (offer: SlotActivityOffer) => boolean
   bunnyboardPage?: BunnyboardPage
+  /** A page beside the feed in the Updates tab; see {@link UpdatesTab}. */
+  updatesTab?: UpdatesTab
   /** Draws the comments under a post; see {@link PostCommentsSpot}. */
   postComments?: PostCommentsSpot
   /** An emoji tool beside a box being typed in, in place of the phone's own row of emoji. */
@@ -260,11 +286,18 @@ export interface ModHooks {
   postLikes?: (ask: LikesAsk) => number | undefined
   /** Whether a post is on her feed yet; every mod has to agree. */
   postVisible?: (post: SocialPost) => boolean
+  /** When a post came out after its slot began (ms since epoch); the first mod that answers. */
+  postOutAt?: (post: SocialPost) => number | undefined
   /** A way on from the ending, beside the menu; the first mod that answers is offered. */
   endingChoice?: (ctx: {
     reason: GameOverReason
     playthroughId: string | null
   }) => EndingChoice | undefined
+  /**
+   * A preview drawn under one of its option groups on the Mods screen, by the group's id, of
+   * whichever option is picked. Asked whether or not the mod is on, so it shows before it is.
+   */
+  optionPreviews?: Record<string, ComponentType<OptionPreviewProps>>
   /** An offer for a save picked in Load Game, beside loading it; the first mod that answers. */
   saveChoice?: (ctx: {
     playthroughId: string
@@ -433,6 +466,15 @@ export function postVisible(post: SocialPost): boolean {
   return active().every((hooks) => hooks.postVisible?.(post) ?? true)
 }
 
+/** When a post came out after its slot began, or 0 for one out from the start. */
+export function postOutAt(post: SocialPost): number {
+  for (const hooks of active()) {
+    const at = hooks.postOutAt?.(post)
+    if (at !== undefined) return at
+  }
+  return 0
+}
+
 /**
  * Prepares a way on for the screen that offered it. Null where the mod declined, and null too
  * where that screen is gone or its game left by the time the mod is ready (`stillHere` false):
@@ -453,6 +495,15 @@ export function endingChoice(ctx: Parameters<NonNullable<ModHooks['endingChoice'
     if (choice) return choice
   }
   return undefined
+}
+
+/** The preview a mod draws under one of its option groups, on or off; none where it has none. */
+export function optionPreview(
+  modId: string,
+  groupId: string
+): ComponentType<OptionPreviewProps> | undefined {
+  return registered.find((entry) => entry.modId === modId && entry.hooks.optionPreviews?.[groupId])
+    ?.hooks.optionPreviews?.[groupId]
 }
 
 /** The offer for a picked save from the first mod that makes one, or none. */
@@ -508,6 +559,17 @@ export function bunnyboardPages(): BunnyboardPage[] {
     if (!page || seen.has(page.id)) return []
     seen.add(page.id)
     return [page]
+  })
+}
+
+/** The pages beside the feed in the Updates tab, one per id, in mod-list order. */
+export function updatesTabs(): UpdatesTab[] {
+  const seen = new Set(['feed'])
+  return active().flatMap(hooks => {
+    const tab = hooks.updatesTab
+    if (!tab || seen.has(tab.id)) return []
+    seen.add(tab.id)
+    return [tab]
   })
 }
 
