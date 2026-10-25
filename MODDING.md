@@ -201,6 +201,7 @@ else names it.
 | `saveNote` | `SaveGameModal.tsx` | Add a line to Save Game about what a save of the scene keeps of the mod's own |
 | `statActivities` | `slotActions.ts` | Offer a training activity in place of one of the landing's stat suggestions |
 | `slotActivityAvailable` | `gameLoop.ts`, `slotActions.ts`, `GameView.tsx` | Say whether a training activity is still there to commit to or resume |
+| `exercisedStats` | `gameLoop.ts` (`resolveScene`) | Change what the hour exercised, before the game resolves what that pays |
 | `settleSceneStats` | `gameLoop.ts` (`resolveScene`) | Change what a finished scene does to the reader's stats, and the lines that say so |
 | `statFloor` | `gameLoop.ts`, `gameStore.ts` | Say the lowest a stat may fall to; the first mod that answers decides |
 
@@ -337,11 +338,18 @@ Files a mod keeps per playthrough outside the save (pictures, say) need nothing:
   has landed the activity is closed and the scene runs as any other. A reload resumes a settled
   activity's closing rather than its play, and `slotActivityAvailable` is asked again at commit
   and on reload; one no longer available ends without being completed. The game pays nothing
-  for an activity itself: a mod that rewards one does it in `settleSceneStats`.
+  for an activity itself: a mod whose activity trains a stat says so in `exercisedStats`, and one
+  that rewards it beyond that does so in `settleSceneStats`.
+- `exercisedStats` changes what the hour exercised — the ledger's verdict on which stats the
+  scene worked — before the game resolves what that pays, so every mod settling afterwards sees
+  the exercise as the ledger. It runs for enabled mods in list order, each handed what the one
+  before left. A mod changing the exercise belongs here, not in `settleSceneStats`: there it
+  would run after another mod's bonus on the exercise it is about to change, and list order
+  would decide the outcome.
 - `settleSceneStats` changes the stats a finished scene settles, after the game has resolved
-  them from the ledger. It runs for enabled mods in list order, each handed what the one before
-  left, with the ledger's verdict and the scene's facts. It also runs for the projections before
-  the ending, so return fresh values and write nothing. `statFloor` gives the lowest a stat may
+  them from the exercise. It runs for enabled mods in list order, each handed what the one before
+  left, with the exercise as `exercisedStats` left it and the scene's facts. Both run for the
+  projections before the ending too, so return fresh values and write nothing. `statFloor` gives the lowest a stat may
   fall to wherever the game applies stats; the first mod that answers decides, and the game's own
   floor stands where none does.
 - `projectSlotMemories` transforms the projected character memories before the crush roll
