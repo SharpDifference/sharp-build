@@ -1,4 +1,4 @@
-import { challengeStatFloor, CHALLENGE_TIERS, type ChallengeStatTier, type StartingChallenge } from './startingChallenge'
+import { CHALLENGE_TIERS, type ChallengeStatTier } from './startingChallenge'
 /**
  * The player-stat vocabulary: three stats that accumulate points and tier up. Points
  * are stored; a tier is always derived. This module owns the arithmetic and every word said
@@ -369,15 +369,9 @@ function withGradeOutcome(
  * since the player didn't cause it. **Stats, not crossings**: the caller already holds the
  * reader either side and reads both tiers off those points, so a tier pair here would double up.
  */
-<<<<<<< HEAD
-export function tierUps(before: PlayerStats, deltas: PlayerStats, challenge?: StartingChallenge): StatKey[] {
-  const after = applyStatDeltas(before, deltas, challenge)
-  return STAT_KEYS.filter((key) => displayedTierOf(after[key]) > displayedTierOf(before[key]))
-=======
 export function tierUps(before: PlayerStats, deltas: PlayerStats, floorOf?: StatFloor): StatKey[] {
   const after = applyStatDeltas(before, deltas, floorOf)
-  return STAT_KEYS.filter((key) => tierOf(after[key]) > tierOf(before[key]))
->>>>>>> origin/core
+  return STAT_KEYS.filter((key) => displayedTierOf(after[key]) > displayedTierOf(before[key]))
 }
 
 /**
@@ -392,11 +386,6 @@ export function breakDecayedStats(stats: PlayerStats): PlayerStats {
   return { brain: decayed(stats.brain), body: decayed(stats.body), heart: decayed(stats.heart) }
 }
 
-<<<<<<< HEAD
-/** Adds `deltas` to `stats`, flooring each at the playthrough's selected floor. Never mutates its input. */
-export function applyStatDeltas(stats: PlayerStats, deltas: PlayerStats, challenge?: StartingChallenge): PlayerStats {
-  const floor = (key: StatKey): number => challengeStatFloor(challenge, key) ?? pointsForTier(MIN_TIER)
-=======
 /** The lowest a stat may fall to, where something other than the scale's floor decides it. */
 export type StatFloor = (key: StatKey) => number | undefined
 
@@ -406,7 +395,6 @@ export type StatFloor = (key: StatKey) => number | undefined
  */
 export function applyStatDeltas(stats: PlayerStats, deltas: PlayerStats, floorOf?: StatFloor): PlayerStats {
   const floor = (key: StatKey): number => floorOf?.(key) ?? pointsForTier(MIN_TIER)
->>>>>>> origin/core
   return {
     brain: Math.max(floor('brain'), stats.brain + deltas.brain),
     body: Math.max(floor('body'), stats.body + deltas.body),

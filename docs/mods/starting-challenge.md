@@ -47,7 +47,10 @@ retain progress and their original −30/−60 floor. Existing normal saves are 
 - [Challenge rules](../../src/shared/startingChallenge.ts): legacy strings and version-2 per-stat
   floor records, setup selection and opening-floor capture. Floors are never recalculated on load.
 - [Stat arithmetic](../../src/shared/playerStats.ts): extra starting/display tiers −4 through −1,
-  names, descriptions, recovery milestones and per-stat loss floors. Mechanical tiers 0–5 stay fixed.
+  names, descriptions and recovery milestones. Mechanical tiers 0–5 stay fixed.
+- [Renderer registration](../../src/renderer/modEntries/starting-challenge.ts): supplies the
+  playthrough's saved per-stat floors through `statFloor`. Projections, rank-up messages and
+  committed gains use the same hook; arithmetic no longer accepts a challenge-specific argument.
 - [Name modal](../../src/renderer/views/PlayerNameModal.tsx) and
   [setup flow](../../src/renderer/views/NewGameView.tsx): native controls in both start routes,
   snapshot into enrollment and initial save. Quickstart shows stat controls when enabled.

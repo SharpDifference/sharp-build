@@ -2243,11 +2243,7 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
     }),
 
   applyStatDeltas: (deltas) =>
-<<<<<<< HEAD
-    set((state) => ({ stats: applyStatDeltas(state.stats, deltas, state.exStartingChallenge) })),
-=======
     set((state) => ({ stats: applyStatDeltas(state.stats, deltas, statFloor) })),
->>>>>>> origin/core
 
   setBio: (bio) => set({ bio }),
 
