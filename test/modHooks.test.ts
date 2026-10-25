@@ -244,6 +244,15 @@ describe('scene stat settlement', () => {
     expect(hooks.settleSceneStats(resolved, settlement).deltas).toEqual({ brain: 1, body: 10, heart: 0 })
     expect(resolved.deltas).toEqual(zero)
   })
+  it('settles what was exercised first, in list order, and hands that on to the settlement', async () => {
+    const hooks = await fresh({ off: false }, ['first', 'second', 'off'])
+    hooks.registerHooks('second', { sceneExercise: (exercised) => ({ ...exercised, heart: true }) })
+    hooks.registerHooks('first', { sceneExercise: () => ({ body: true }) })
+    hooks.registerHooks('off', { sceneExercise: () => ({}) })
+    expect(hooks.sceneExercise({ brain: true }, settlement.ctx)).toEqual({ body: true, heart: true })
+    hooks.setHookRules({ isOn: () => false, order: () => 0 })
+    expect(hooks.sceneExercise({ brain: true }, settlement.ctx)).toEqual({ brain: true })
+  })
   it("takes the first floor a mod that is on gives, and the game's own where none does", async () => {
     const hooks = await fresh({ off: false }, ['first', 'second', 'off'])
     hooks.registerHooks('off', { statFloor: () => -100 })
