@@ -51,6 +51,7 @@ import {
   normalizeComfyUrl
 } from '@shared/comfyModels'
 import { CustomBackgroundsModal } from './CustomBackgroundsModal'
+import { ModSlot } from '../mods/ModSlot'
 import { SettingsAdvancedTab } from './SettingsAdvancedTab'
 import { SettingsComfyTab } from './SettingsComfyTab'
 import { SystemPromptModal } from './SystemPromptModal'
@@ -828,6 +829,11 @@ export function AppSettingsModal({ theme, onClose }: AppSettingsModalProps): JSX
                         </div>
                       ))}
                     </div>
+
+                    <ModSlot
+                      slot="settingsSection"
+                      props={{ theme, busy: backingUp || restoring }}
+                    />
                   </>
                 )}
               </>

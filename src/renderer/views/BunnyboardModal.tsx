@@ -1,4 +1,5 @@
 import { bunnyboardPages, updatesTabs, type UpdatesTab } from '../mods/hooks'
+import { ModSlot } from '../mods/ModSlot'
 import { useModsStore } from '../stores/modsStore'
 import {
   Fragment,
@@ -347,6 +348,7 @@ export function BunnyboardModal({
       exit="gone"
       {...overlayProps}
     >
+      <ModSlot slot="phoneOverlay" props={{}} />
       {contact ? (
         <ContactPage key={contact} charId={contact} theme={theme} />
       ) : (

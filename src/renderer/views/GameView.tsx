@@ -191,6 +191,7 @@ import { EditPromptModal } from './EditPromptModal'
 import { FeedbackModal } from './FeedbackModal'
 import { GameMenuModal } from './GameMenuModal'
 import { endingChoice, prepareWayOn, updatesTabs, type WayOn } from '../mods/hooks'
+import { ModSlot } from '../mods/ModSlot'
 import { currentRun, runStale } from '../stores/loop/state'
 import { ModsModal } from './ModsModal'
 import { LoadGameModal } from './LoadGameModal'
@@ -440,6 +441,7 @@ function PortraitSlot({
           : undefined
       }
     >
+      <ModSlot slot="portraitOverlay" props={{ charId }} />
       {/* Both halves of a change breathe as one, so a crossfade never comes apart. */}
       <motion.div className="vu-stage-breath" animate={breathing}>
         {pair.from && pair.from !== pair.to && (
@@ -2097,6 +2099,21 @@ export function GameView(): JSX.Element {
           arrow — the hand is the dialogue box's, which is the thing a click is *aimed* at. */}
       <div className="vu-stage-advance" onClick={onAdvanceClick} />
 
+      <ModSlot
+        slot="stageLayer"
+        props={{
+          sceneMode,
+          cinematic,
+          covered,
+          uiHidden,
+          rowShown,
+          blocked,
+          quiz: quizRow !== null,
+          interjectRow,
+          awaitingInput
+        }}
+      />
+
       {/* One chrome at a time over the shared stage — the scene, the landing (with the epilogue's
           goodbye menu), or the three game overs — each wearing the slot's own half of the day. */}
       {sceneMode || cinematic || created || replaying ? (
@@ -2768,6 +2785,19 @@ export function GameView(): JSX.Element {
         {panel?.kind === 'saveGame' && (
           <SaveGameModal key="save-game" theme={half} onClose={closePanel} />
         )}
+
+        <ModSlot
+          key="mod-panel-layer"
+          slot="panelLayer"
+          props={{
+            cinematic,
+            covered,
+            uiHidden,
+            blocked,
+            panelOpen: panel !== null,
+            openGameMenu: () => setPanel({ kind: 'settings' })
+          }}
+        />
 
         {panel?.kind === 'loadGame' && (
           <LoadGameModal key="load-game" theme={half} onClose={closePanel} />
