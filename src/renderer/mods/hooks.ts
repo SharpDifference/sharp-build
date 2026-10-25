@@ -320,6 +320,11 @@ export interface ModHooks {
    * writing the store, paying rewards or rolling randomness.
    */
   settleSceneStats?: (resolved: SceneStats, settlement: SceneStatSettlement) => SceneStats
+  /**
+   * Change what a finished scene counts as exercised, before any stats are paid for it, so the
+   * game's own award and every `settleSceneStats` read the same. Pure, for the same reason.
+   */
+  sceneExercise?: (exercised: LedgerStats | undefined, ctx: StatContext) => LedgerStats | undefined
   /** The lowest a stat may fall to; the first mod that answers decides. */
   statFloor?: (key: StatKey) => number | undefined
 
@@ -641,6 +646,13 @@ export function projectSlotMemories(ctx: SlotMemoryProjection, charInfo: Record<
   let projected = charInfo
   for (const hooks of active()) projected = hooks.projectSlotMemories?.(ctx, projected) ?? projected
   return projected
+}
+
+/** What the scene counts as exercised once every mod that is on has had its say, in list order. */
+export function sceneExercise(exercised: LedgerStats | undefined, ctx: StatContext): LedgerStats | undefined {
+  let counted = exercised
+  for (const hooks of active()) counted = hooks.sceneExercise ? hooks.sceneExercise(counted, ctx) : counted
+  return counted
 }
 
 /** The scene's stats as every mod that is on leaves them, in list order; the game's own otherwise. */

@@ -1,4 +1,4 @@
-import { projectSlotMemories, settleSceneStats, slotActivityAvailable, slotSettled, statFloor } from '../mods/hooks'
+import { projectSlotMemories, sceneExercise, settleSceneStats, slotActivityAvailable, slotSettled, statFloor } from '../mods/hooks'
 import { withSlotActivityPrompt } from '../prompts/slotActivity'
 import { talentProjectWork } from '@shared/talentPerks'
 import { feedStatusLines } from './bunnyfeedsMemory'
@@ -2358,7 +2358,6 @@ function claimTextLedger(date: number, time: TimeSlot): Promise<LedgerResponse |
 
 /** What the finished scene did to the reader's stats, and the lines that say so. */
 function resolveScene(): { deltas: PlayerStats; lines: StatusText[] } {
-  const ledger = loopState.pendingLedgerResult?.stats
   const ctx: StatContext = {
     // Not `closingCast`, which a resumed save has already cleared by this point.
     solo: useGameStore.getState().cast.length === 0,
@@ -2374,6 +2373,8 @@ function resolveScene(): { deltas: PlayerStats; lines: StatusText[] } {
     // Read at the scene's own slot, which a dose taken during it never moves.
     sick: readerSickNow()
   }
+  // What the scene counts as exercised is settled first, so every award below reads the same.
+  const ledger = sceneExercise(loopState.pendingLedgerResult?.stats, ctx)
   return settleSceneStats(resolveStatDeltas(ledger, ctx), { ledger, ctx })
 }
 
