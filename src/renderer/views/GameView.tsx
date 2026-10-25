@@ -9,6 +9,9 @@ import { EchoAura, EchoPanel } from './EchoPanel'
 import { ensureEchoes } from '../modEntries/echo'
 import { StoryMemoryModal } from './StoryMemoryModal'
 import { modIsOn } from '../stores/modsStore'
+import { useModsStore } from '../stores/modsStore'
+import { slotActivityAvailable } from '../mods/hooks'
+import { finishSlotActivity, resumeSlotActivity } from '../stores/slotActivity'
 import {
   useEffect,
   useLayoutEffect,
@@ -200,7 +203,7 @@ import { ClassScheduleModal } from './ClassScheduleModal'
 import { EditPromptModal } from './EditPromptModal'
 import { FeedbackModal } from './FeedbackModal'
 import { GameMenuModal } from './GameMenuModal'
-import { endingChoice, prepareWayOn, scenePlays, type WayOn } from '../mods/hooks'
+import { endingChoice, prepareWayOn, scenePlays, updatesTabs, type WayOn } from '../mods/hooks'
 import { currentRun, runStale } from '../stores/loop/state'
 import { ModsModal } from './ModsModal'
 import { PlotTwistModal } from './PlotTwistModal'
@@ -763,10 +766,14 @@ export function GameView(): JSX.Element {
   /** The quit's autosave is being written; nothing is closed, since the app ends. */
   const [quitting, setQuitting] = useState(false)
 
-  // The badge sums every unread thread plus the Friends tab's own count.
+  // The badge sums every unread thread, the Friends tab's own count and what the pages mods add
+  // beside the feed have unread, as the phone's own rail does.
   const showingBunnyboard = useBunnyboardStore((s) => s.open)
   const bunnyboardLocked = useBunnyboardStore((s) => s.locked)
   const bunnyboard = useGameStore((s) => s.bunnyboard)
+  const updatesUnread = useGameStore((s) =>
+    updatesTabs().reduce((total, page) => total + (page.unread?.(s) ?? 0), 0)
+  )
 
   // What the menu's Save Game is gated on besides the fields selected above, subscribed so the
   // entry follows a reply, an ending or a text going out while the menu is open.
@@ -786,7 +793,9 @@ export function GameView(): JSX.Element {
           ? total
           : total + c.unread,
       0
-    ) + bunnyboard.contactsBadge
+    ) +
+    bunnyboard.contactsBadge +
+    updatesUnread
 
   /**
    * What the count was the last time the landing rang for it. **Starts at nothing**, so a save
@@ -1741,10 +1750,19 @@ export function GameView(): JSX.Element {
    * per render would reshuffle them under the cursor. Stats are not a dependency because
    * they move only at the boundary, with `date` and `time`.
    */
+  const activitySwitches = useModsStore(s => s.switches)
+  const slotActivity = useGameStore(s => s.sceneActivity)
+  useEffect(() => {
+    if (!slotActivity || busy || !awaitingInput || replaying || turnError || sceneEnding) return
+    if (slotActivity.status !== 'pending') void resumeSlotActivity()
+    else if (!slotActivityAvailable(slotActivity)) {
+      void finishSlotActivity(slotActivity.owner, slotActivity.id, false, 'The activity is no longer available, so it ended without being completed.')
+    }
+  }, [slotActivity, busy, awaitingInput, replaying, turnError, sceneEnding, activitySwitches])
   const slotActions = useMemo(
     // A created scene and a replay have no slot, and their landing is never drawn.
     () => (created || replaying ? [] : [...slotActionsNow(), relaxAction(time)]),
-    [date, time, events, classes, job, playerSchedule, classRecords, calendar]
+    [date, time, events, classes, job, playerSchedule, classRecords, calendar, activitySwitches]
   )
 
   /** The epilogue's own row, in the slot actions' place: a button per goodbye still owed. */
@@ -1817,7 +1835,7 @@ export function GameView(): JSX.Element {
     // box for the length of a call. It is the gift's own argument, one control along.
     setSending(true)
     // The button's own words are the action: what it says is what the reader did.
-    void submitAction(chosen.text, false, chosen.verdict ?? undefined, chosen.planId)
+    void submitAction(chosen.text, false, chosen.verdict ?? undefined, chosen.planId, undefined, undefined, chosen.activity)
   }
 
   /**

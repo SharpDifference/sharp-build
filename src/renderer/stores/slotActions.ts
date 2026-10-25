@@ -1,7 +1,9 @@
+import { statActivities } from '../mods/hooks'
+import type { SlotActivityOffer } from '@shared/slotActivity'
 import { kindOf } from '@shared/academics'
 import { jobDefOf } from '@shared/jobs'
 import { LOWRISE_LOCATION } from '@shared/locations'
-import { statsLowestFirst, type StatKey } from '@shared/playerStats'
+import { STAT_KEYS, statsLowestFirst, type StatKey } from '@shared/playerStats'
 import type { SemesterCalendar } from '@shared/semesters'
 import type { ClassEntry, TimeSlot } from '@shared/types'
 import { examOn } from '../prompts/classProgress'
@@ -30,6 +32,8 @@ export interface SlotAction {
   verdict: Verdict | null
   /** The plan this button starts, whose attendees it casts whatever its words name. */
   planId?: string
+  /** The mod's activity this button commits the slot to. */
+  activity?: SlotActivityOffer
 }
 
 /** A verdict for a button that names nobody and knows what it is doing. */
@@ -154,12 +158,23 @@ function fillerText(stat: StatKey): string {
 /** Pushes the reader's weakest stats: somewhere to go and a stat to push, one per stat. */
 function fillers(count: number): SlotAction[] {
   const stats = statsLowestFirst(useGameStore.getState().stats).slice(0, count)
-  return stats.map((stat) => ({
-    key: `stat:${stat}`,
-    text: fillerText(stat),
-    tone: 'idle',
-    verdict: null
-  }))
+  const game = useGameStore.getState()
+  return stats.map((stat): SlotAction => {
+    // A mod's activity takes every other slot's suggestion, the same one all slot long.
+    const offers = statActivities(stat)
+    const seed = game.date * 2 + game.time + STAT_KEYS.indexOf(stat)
+    const offer = offers.length > 0 && seed % 2 === 0 ? offers[Math.floor(seed / 2) % offers.length] : undefined
+    if (offer) {
+      return {
+        key: `stat:${stat}:${offer.owner}:${offer.id}:${offer.location}`,
+        text: offer.label,
+        tone: 'idle',
+        verdict: goToVerdict(offer.location),
+        activity: offer
+      }
+    }
+    return { key: `stat:${stat}`, text: fillerText(stat), tone: 'idle', verdict: null }
+  })
 }
 
 /** What the Relax row is keyed by, which `relax` answers rather than the classifier. */

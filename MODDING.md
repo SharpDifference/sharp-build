@@ -111,6 +111,13 @@ Shared code holds no switches. Where a rule there has to follow one, give the ru
 a setter, and set it from `modsStore.ts` at boot and whenever a switch moves
 (`useModsStore.subscribe`). Echo does this for its bonus, and Photo Feature for its switches.
 
+## Screens and the files in the root
+
+A mod's screens follow `UI_STYLE_GUIDE.md`, but nobody edits it, nor any other file in the root
+besides this one (`DESIGN_GUIDE.md`, `README.md`, …): they come from Venus Dev and are replaced
+whenever a new version of the game is synced in. How a mod's own screens look goes in its guide
+under `docs/mods/`; how a hook point draws goes in its entry here.
+
 ## Hook points
 
 ### Additive romance requirements
@@ -167,6 +174,7 @@ else names it.
 | --- | --- | --- |
 | `prompts.dm` | `textingPrompt.ts` | Add lines to her DM prompt, and fields to its reply |
 | `prompts['slot-posts']` | `slotIntroPrompt.ts` | Add lines about status posts, and fields to each post |
+| `prompts['slot-poster']` | `slotIntroPrompt.ts` | Add lines under each girl posting, by her name, given the slot the opening is for |
 | `prompts['slot-reach-outs']` | `slotIntroPrompt.ts` | Add lines under a girl texting first, and fields to her entry |
 | `prompts.character` | `characterPrompt.ts` | Add lines and fields to character generation |
 | `dmHistoryNote` | `textingPrompt.ts` | Add a note after a DM in the history the prompt quotes |
@@ -180,11 +188,21 @@ else names it.
 | `fileFeedPost` | `loop/feed.ts` | Change a slot post before it is filed, or file it later itself (`held`) |
 | `postLikes` | `loop/feed.ts`, `NewGameView.tsx` | Decide likes on ending, stranger and winter posts |
 | `postVisible` | `feedView.ts`, `loop/feed.ts`, `ContactPage.tsx` | Keep a post off the feed for now |
+| `postOutAt` | `feedView.ts`, `ContactPage.tsx` | When a post kept off came out, so it stands above its slot's posts already showing |
 | `postComments` | `BunnyboardModal.tsx` (`PostSpots.tsx`) | Draw the comments under a post and a control beside its like; one mod at a time |
 | `postPicture` | `BunnyboardModal.tsx` (`PostSpots.tsx`) | Draw a post's picture under its text |
+| `emojiTool` | `BunnyboardModal.tsx` (`TextSpots.tsx`) | Stand an emoji tool beside a box being typed in, in place of the phone's row of quick emoji; one mod at a time |
+| `sentText` | `BunnyboardModal.tsx` (`TextSpots.tsx`) | Draw what somebody sent (a message, a post) and say which messages stand with no bubble; one mod at a time |
 | `endingChoice` | `GameView.tsx` | Offer a way on from the ending, beside "Return to the main menu" |
 | `saveChoice` | `LoadGameModal.tsx` | Offer something for a picked save, beside "Load" |
 | `modDetail` | `ModsModal.tsx` | Draw a page of its own for the mod picked on the Mods screen, its own or one built on it, in place of the list of that mod's options |
+| `updatesTab` | `BunnyboardModal.tsx` | Add a page beside the feed in the Updates tab, with an unread count |
+| `optionPreviews` | `ModsModal.tsx` | Draw a preview under one of the mod's option groups on the Mods screen |
+| `saveNote` | `SaveGameModal.tsx` | Add a line to Save Game about what a save of the scene keeps of the mod's own |
+| `statActivities` | `slotActions.ts` | Offer a training activity in place of one of the landing's stat suggestions |
+| `slotActivityAvailable` | `gameLoop.ts`, `slotActions.ts`, `GameView.tsx` | Say whether a training activity is still there to commit to or resume |
+| `settleSceneStats` | `gameLoop.ts` (`resolveScene`) | Change what a finished scene does to the reader's stats, and the lines that say so |
+| `statFloor` | `gameLoop.ts`, `gameStore.ts` | Say the lowest a stat may fall to; the first mod that answers decides |
 
 The two ways on (`endingChoice`, `saveChoice`) share one shape, `WayOn`. Its `prepare` runs
 while nothing has been torn down, does whatever may fail and reports it, and returns `enter`,
@@ -208,10 +226,12 @@ as a new hook beside the old one.
 ### Not covered yet
 
 - Screens: a mod's menu entries and editor fields, and its panels anywhere but over a scene.
+- Screens: a mod's own panels, menu entries and editor fields, beyond a page beside the feed
+  (`updatesTab`) and a preview on the Mods screen (`optionPreviews`).
 - Main process: IPC, protocols, services, settings and character rules.
-- Saves: a mod's own fields in a save, and what carries into the next semester.
+- Saves: a mod's own fields in a save. Carrying them into the next semester is covered below.
 
-Both are still direct edits, as before.
+These are still direct edits, as before.
 
 ### Tests
 
@@ -259,10 +279,14 @@ Where a branch goes:
 - `prompts.scene` adds context to cast and solo scenes, including continuations and closing requests.
 - `requests.scene`, `requests.dm`, `requests.ledger` and `requests['slot-intro']` extend a completed request in mod-list order. Preserve the request and schema fields received from earlier mods. DM hooks run for normal and regenerated replies because both use the same builder.
 - `slotSettled` receives the scene's starting state, the completed ledger and closing cast after bookkeeping, before clock advancement and the boundary save. It is synchronous so mod state is included in that save.
+- `fileLatePost(post)` in `loop/feed.ts` files a post a mod wrote mid-slot, outside the slot's opening, the way the opening files its own: through `fileFeedPost`, so it can be held like any other. It leaves the slot's teaser and fill as they were drawn.
+- `texts` on a ComfyUI job in `comfyService.ts` fills more prompt nodes by id, for a graph with more prompts than the positive, negative and detailer the job already fills.
 
 These hooks add to the existing API; existing hooks and their arguments are unchanged. Screens, IPC and save fields still use direct integration as documented above.
 
 - `bunnyboardPage` registers an independently gated tab with `id`, `word`, `Mark` and `Page`. Disabling its mod unmounts the page and returns the phone to Chats. Native tab IDs cannot be replaced. Other screen integration remains direct.
+- `optionPreviews` draws a preview under an option group on the Mods screen, keyed by the group's id. The game hands it `optionId`, the option picked (or null), and draws it under the group's switches on the recessed ground. It is asked whether or not the mod is on, so a player sees it before switching the mod on.
+- `updatesTab` puts a page beside the feed in the Updates tab, with `id`, `word`, `Page`, an optional `unread(game)` and an optional `Action`, drawn at the end of the titles' row while the page is showing. With one or more on, Updates draws a row of titles you press, its own first (the one showing drawn as the screen's title, the rest muted over a faded blob), and the game puts each `unread` on the far corner of its title's blob and sums them onto the Updates tile and the landing's Bunnyboard badge. The page is drawn under the title; it brings its own `vu-bb-scroll`. The feed's id, `feed`, cannot be replaced; leaving the tab, or the mod switching off, comes back to the feed.
 
 ### Comments under posts
 
@@ -276,6 +300,19 @@ A mod adds its own fields to `PostComment` by declaration merging. `PostComments
 `PostCommentAction` and `PostPicture` in `components/PostSpots.tsx` draw a post's spots in a
 mod's own screens too.
 
+### Emoji and sent text
+
+The phone's composer stands the row of quick emoji under its field, and draws messages and
+posts as their bare text. A mod that draws either itself registers `emojiTool`, `sentText` or
+both: only one draws each, the first that is on in `MODS` order. `emojiTool` is a component the
+game hands `dead` (the box is shut) and `onPick(emoji)`, which puts the emoji in at the caret;
+with one on, it stands beside the field and the row of quick emoji goes. `sentText` is a `Text`
+component, handed the `text` and `big` (off on a one-line preview), and an optional
+`bare(text)` saying which messages stand with no bubble behind them. `EmojiTool`, `SentText`,
+`useEmojiTool` and `useBareMessage` in `components/TextSpots.tsx` draw them in a mod's own
+screens too, so a mod with a box of its own takes the same tool without importing the mod that
+draws it. What is sent and saved is the text as typed either way.
+
 ### Optional semester carryover
 
 A mod may augment `ModCarryFields` and register its own pure adapter with `registerTermCarry` in `shared/modCarry.ts`, imported by its entry in `shared/modEntries/`. The game's New Game+ calls them: Continue reads every registered field off the ending's save (`modFieldsLeaving` in `renderer/stores/semesterModCarry.ts`, with the outgoing semester's index, the days its dates move back, and the characters) and keeps it on the carry beside the game's own, and the next semester's opening save takes it back in through `carriedModFields`. These adapters retain saved data even with a switch off; they must not trigger generation. The registry itself requires neither Continuing Semesters nor any feature mod.
@@ -286,6 +323,27 @@ Files a mod keeps per playthrough outside the save (pictures, say) need nothing:
 
 ## Shared gameplay extensions
 
+- A mod keeps data with the scene being played by declaring optional fields on
+  `ModSceneFields` in `shared/types.ts` by declaration merging, and reading and writing them on
+  the game store's `sceneMods`, leaving other mods' fields as they are. They are saved as the
+  scene's `mods`, restored with it and cleared when the next scene is cast, so they must be
+  plain data.
+- A slot activity is something a mod offers on the landing in place of a stat suggestion
+  (`statActivities`), such as a game to train a stat with. Committing to one saves it with the
+  scene as `activity`; the scene is cast as usual, held open while the activity is pending, and
+  told to stage only the arrival (`COMMITTED SLOT ACTIVITY` in the system prompt). The mod opens
+  its own surface and calls `finishSlotActivity(owner, id, completed, result)` once; the game
+  saves the result, then sends a closing turn that ends the scene. Once the reply to that closing
+  has landed the activity is closed and the scene runs as any other. A reload resumes a settled
+  activity's closing rather than its play, and `slotActivityAvailable` is asked again at commit
+  and on reload; one no longer available ends without being completed. The game pays nothing
+  for an activity itself: a mod that rewards one does it in `settleSceneStats`.
+- `settleSceneStats` changes the stats a finished scene settles, after the game has resolved
+  them from the ledger. It runs for enabled mods in list order, each handed what the one before
+  left, with the ledger's verdict and the scene's facts. It also runs for the projections before
+  the ending, so return fresh values and write nothing. `statFloor` gives the lowest a stat may
+  fall to wherever the game applies stats; the first mod that answers decides, and the game's own
+  floor stands where none does.
 - `projectSlotMemories` transforms the projected character memories before the crush roll
   and next opening. It runs for enabled mods in list order. Return fresh values; do not write
   stores, award currency, consume an ability or roll randomness. Commit effects at

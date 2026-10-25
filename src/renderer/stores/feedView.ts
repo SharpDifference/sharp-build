@@ -8,7 +8,7 @@ import {
   type TimeSlot
 } from '@shared/types'
 import { seededRand } from '@shared/hash'
-import { postVisible } from '../mods/hooks'
+import { postOutAt, postVisible } from '../mods/hooks'
 import { GRADUATION_DATE } from '../prompts/occasions'
 import { newestFirst } from './feedRolls'
 
@@ -156,7 +156,7 @@ export function updatesFeed(input: {
   for (const made of visibleFriendships(input.npcFriendships, characters, charInfo)) {
     entries.push({ kind: 'friendship', ...made })
   }
-  entries.sort((a, b) => newestFirst(stampOf(a), stampOf(b)))
+  entries.sort((a, b) => newestFirst(stampOf(a), stampOf(b)) || outAtOf(b) - outAtOf(a))
 
   // Every row this slot stamped, as one run in the sorted list. It is not the top of the list:
   // the epilogue's posts are dated past the last slot anybody plays, and sort above it.
@@ -195,6 +195,11 @@ export function updatesFeed(input: {
 function stampOf(entry: FeedEntry): { date: number; time: TimeSlot } {
   if (entry.kind === 'friendship') return entry.pair
   return entry.kind === 'checkIn' ? entry : entry.post
+}
+
+/** When a post came out after its slot began; 0 for anything else. */
+function outAtOf(entry: FeedEntry): number {
+  return entry.kind === 'post' ? postOutAt(entry.post) : 0
 }
 
 /** Whether an entry belongs to exactly that slot. */

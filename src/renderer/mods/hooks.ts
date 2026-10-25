@@ -11,8 +11,10 @@ import type {
   TextingResponse
 } from '@shared/types'
 import type { GameOverReason } from '@shared/gameOver'
+import type { LedgerStats, PlayerStats, StatContext, StatKey, StatusText } from '@shared/playerStats'
 import type { PostComment } from '@shared/postComments'
-import type { PlaythroughRecord } from '@shared/types'
+import type { SlotActivityOffer } from '@shared/slotActivity'
+import type { ModSceneFields, PlaythroughRecord, TimeSlot } from '@shared/types'
 import type { TextingPromptState } from '../prompts/textingPrompt'
 import type { ResolvedSave } from '../stores/saveStore'
 import type { ViewName } from '../stores/uiStore'
@@ -39,6 +41,12 @@ export interface PromptSpots {
   dm: { character: Character; info: CharInfo | undefined; state: TextingPromptState }
   /** The status updates the slot's opening writes, one entry per post. */
   'slot-posts': Record<string, never>
+  /**
+   * One girl posting this slot, under her name in the slot's opening: lines only. The opening
+   * can be written while the slot before it is still playing, so `date` and `time` name the slot
+   * it is for.
+   */
+  'slot-poster': { character: Character; info: CharInfo; date: number; time: TimeSlot }
   /** The girl the slot's opening has texting the reader just to talk, one call per girl. */
   'slot-reach-outs': { character: Character; info: CharInfo; date: number }
   /** A character being generated. */
@@ -118,6 +126,11 @@ export interface ModDetailProps {
   setOption: (optionId: string, on: boolean) => void
 }
 
+/** What the Mods screen hands a preview of one of a mod's option groups: the option picked. */
+export interface OptionPreviewProps {
+  optionId: string | null
+}
+
 /** What a mod offers for a save picked in Load Game, beside loading it. */
 export interface SaveChoice extends WayOn {
   title: string
@@ -142,6 +155,18 @@ export interface SlotSettled {
 
 /** A read-only preview of the finished scene, before the crush roll and next opening. */
 export type SlotMemoryProjection = Pick<SlotSettled, 'before' | 'closingCast'>
+
+/** What a finished scene does to the reader's stats, and the lines that say so. */
+export interface SceneStats {
+  deltas: PlayerStats
+  lines: StatusText[]
+}
+
+/** What the game resolved a scene's stats from: the ledger's verdict and the scene's facts. */
+export interface SceneStatSettlement {
+  ledger: LedgerStats | undefined
+  ctx: StatContext
+}
 
 export interface BunnyboardPage {
   id: string
@@ -199,6 +224,19 @@ export interface SceneReplied {
   ending: boolean
 }
 
+/**
+ * A page of a mod's own beside the feed in the Updates tab, behind a title of its own beside the
+ * feed's. `unread` is what its title and the Updates tile on the rail count; `Action` is drawn at
+ * the end of the titles' row while the page is showing.
+ */
+export interface UpdatesTab {
+  id: string
+  word: string
+  Page: ComponentType
+  Action?: ComponentType
+  unread?: (game: ReturnType<typeof useGameStore.getState>) => number
+}
+
 /** What the row drawing a post hands to whatever draws its comments or acts on them. */
 export interface PostCommentsProps {
   comments: readonly PostComment[]
@@ -207,6 +245,25 @@ export interface PostCommentsProps {
   postId?: string
   /** Somebody he has no contact info for. */
   stranger?: boolean
+}
+
+/** What the game hands a mod's emoji tool beside a box being typed in. */
+export interface EmojiToolProps {
+  /** The box is shut, and the tool with it. */
+  dead?: boolean
+  /** Puts an emoji into the box, where its caret is. */
+  onPick: (emoji: string) => void
+}
+
+/**
+ * How a mod draws what somebody sent — a phone message, a post, a comment — in place of its bare
+ * text. Only one draws it, the first mod that is on and has one ({@link sentText}).
+ */
+export interface SentTextSpot {
+  /** The text drawn; `big` off where it stands on a one-line preview. */
+  Text: ComponentType<{ text: string; big?: boolean }>
+  /** Whether a phone message is drawn bare, with no bubble behind it. */
+  bare?: (text: string) => boolean
 }
 
 /**
@@ -232,9 +289,19 @@ export interface PostPictureProps {
 }
 
 export interface ModHooks {
+  /** Activities the landing may offer for a stat, in place of its own suggestion. */
+  statActivities?: (stat: StatKey) => readonly SlotActivityOffer[]
+  /** Whether an activity offered is still there, asked at commit and on reload. */
+  slotActivityAvailable?: (offer: SlotActivityOffer) => boolean
   bunnyboardPage?: BunnyboardPage
+  /** A page beside the feed in the Updates tab; see {@link UpdatesTab}. */
+  updatesTab?: UpdatesTab
   /** Draws the comments under a post; see {@link PostCommentsSpot}. */
   postComments?: PostCommentsSpot
+  /** An emoji tool beside a box being typed in, in place of the phone's own row of emoji. */
+  emojiTool?: ComponentType<EmojiToolProps>
+  /** Draws what somebody sent; see {@link SentTextSpot}. */
+  sentText?: SentTextSpot
   /** Draws a post's picture under its text, wherever a post is drawn; the first mod on decides. */
   postPicture?: ComponentType<PostPictureProps>
 
@@ -247,6 +314,14 @@ export interface ModHooks {
    * without writing the store, paying rewards, consuming abilities or rolling randomness.
    */
   projectSlotMemories?: (ctx: SlotMemoryProjection, charInfo: Record<string, CharInfo>) => Record<string, CharInfo>
+  /**
+   * Change what a finished scene does to the reader's stats. Runs for the projections before
+   * the ending as well as for the settlement itself, so it must return new values without
+   * writing the store, paying rewards or rolling randomness.
+   */
+  settleSceneStats?: (resolved: SceneStats, settlement: SceneStatSettlement) => SceneStats
+  /** The lowest a stat may fall to; the first mod that answers decides. */
+  statFloor?: (key: StatKey) => number | undefined
 
   prompts?: { [S in PromptSpot]?: PromptAddition<PromptSpots[S]> }
   /** Added to a DM in the history a prompt quotes, after its text. */
@@ -284,6 +359,8 @@ export interface ModHooks {
   postLikes?: (ask: LikesAsk) => number | undefined
   /** Whether a post is on her feed yet; every mod has to agree. */
   postVisible?: (post: SocialPost) => boolean
+  /** When a post came out after its slot began (ms since epoch); the first mod that answers. */
+  postOutAt?: (post: SocialPost) => number | undefined
   /** A way on from the ending, beside the menu; the first mod that answers is offered. */
   endingChoice?: (ctx: {
     reason: GameOverReason
@@ -295,11 +372,18 @@ export interface ModHooks {
    * asked for the same mod; undefined for a mod it has nothing to say about.
    */
   modDetail?: (mod: ModDef) => ComponentType<ModDetailProps> | undefined
+  /**
+   * A preview drawn under one of its option groups on the Mods screen, by the group's id, of
+   * whichever option is picked. Asked whether or not the mod is on, so it shows before it is.
+   */
+  optionPreviews?: Record<string, ComponentType<OptionPreviewProps>>
   /** An offer for a save picked in Load Game, beside loading it; the first mod that answers. */
   saveChoice?: (ctx: {
     playthroughId: string
     save: ResolvedSave & { record: PlaythroughRecord }
   }) => SaveChoice | undefined
+  /** A line on Save Game about what a save of the scene keeps of the mod's own; null for none. */
+  saveNote?: (scene: Readonly<ModSceneFields>) => string | null
 }
 
 interface Registered {
@@ -333,6 +417,16 @@ function activeEntries(): Registered[] {
   return registered
     .filter((entry) => rules.isOn(entry.modId))
     .sort((a, b) => rules.order(a.modId) - rules.order(b.modId))
+}
+
+/** The emoji tool beside a box being typed in: the first mod's that is on, or none. */
+export function emojiTool(): ComponentType<EmojiToolProps> | null {
+  return active().find((hooks) => hooks.emojiTool)?.emojiTool ?? null
+}
+
+/** How sent text is drawn: the first mod's that is on, or none. */
+export function sentText(): SentTextSpot | null {
+  return active().find((hooks) => hooks.sentText)?.sentText ?? null
 }
 
 /** The mod drawing post comments right now: the first that is on and draws them, or none. */
@@ -471,6 +565,15 @@ export function postVisible(post: SocialPost): boolean {
   return active().every((hooks) => hooks.postVisible?.(post) ?? true)
 }
 
+/** When a post came out after its slot began, or 0 for one out from the start. */
+export function postOutAt(post: SocialPost): number {
+  for (const hooks of active()) {
+    const at = hooks.postOutAt?.(post)
+    if (at !== undefined) return at
+  }
+  return 0
+}
+
 /**
  * Prepares a way on for the screen that offered it. Null where the mod declined, and null too
  * where that screen is gone or its game left by the time the mod is ready (`stillHere` false):
@@ -502,6 +605,15 @@ export function modDetail(mod: ModDef): ComponentType<ModDetailProps> | undefine
   return undefined
 }
 
+/** The preview a mod draws under one of its option groups, on or off; none where it has none. */
+export function optionPreview(
+  modId: string,
+  groupId: string
+): ComponentType<OptionPreviewProps> | undefined {
+  return registered.find((entry) => entry.modId === modId && entry.hooks.optionPreviews?.[groupId])
+    ?.hooks.optionPreviews?.[groupId]
+}
+
 /** The offer for a picked save from the first mod that makes one, or none. */
 export function saveChoice(ctx: Parameters<NonNullable<ModHooks['saveChoice']>>[0]): SaveChoice | undefined {
   for (const hooks of active()) {
@@ -531,6 +643,22 @@ export function projectSlotMemories(ctx: SlotMemoryProjection, charInfo: Record<
   return projected
 }
 
+/** The scene's stats as every mod that is on leaves them, in list order; the game's own otherwise. */
+export function settleSceneStats(resolved: SceneStats, settlement: SceneStatSettlement): SceneStats {
+  let settled = resolved
+  for (const hooks of active()) settled = hooks.settleSceneStats?.(settled, settlement) ?? settled
+  return settled
+}
+
+/** The lowest a stat may fall to, from the first mod on that answers; undefined for the game's own floor. */
+export function statFloor(key: StatKey): number | undefined {
+  for (const hooks of active()) {
+    const floor = hooks.statFloor?.(key)
+    if (floor !== undefined) return floor
+  }
+  return undefined
+}
+
 /** Enabled pages follow native tabs; the first registration of an id wins. */
 export function bunnyboardPages(): BunnyboardPage[] {
   const seen = new Set(['chats', 'friends', 'updates', 'profile', 'photos', 'lorebook'])
@@ -539,5 +667,35 @@ export function bunnyboardPages(): BunnyboardPage[] {
     if (!page || seen.has(page.id)) return []
     seen.add(page.id)
     return [page]
+  })
+}
+
+/** The pages beside the feed in the Updates tab, one per id, in mod-list order. */
+export function updatesTabs(): UpdatesTab[] {
+  const seen = new Set(['feed'])
+  return active().flatMap(hooks => {
+    const tab = hooks.updatesTab
+    if (!tab || seen.has(tab.id)) return []
+    seen.add(tab.id)
+    return [tab]
+  })
+}
+
+/** The activities on offer for a stat: each from the mod that is on and owns it, and still available. */
+export function statActivities(stat: StatKey): SlotActivityOffer[] {
+  return activeEntries().flatMap(({ modId, hooks }) =>
+    (hooks.statActivities?.(stat) ?? []).filter(offer => offer.owner === modId && offer.stat === stat && hooks.slotActivityAvailable?.(offer)))
+}
+
+/** Whether the mod that owns a training activity is on and still offers it. */
+export function slotActivityAvailable(offer: SlotActivityOffer): boolean {
+  return activeEntries().some(({ modId, hooks }) => modId === offer.owner && hooks.slotActivityAvailable?.(offer) === true)
+}
+
+/** The lines Save Game shows about the scene being saved, one from each mod that has one. */
+export function saveNotes(scene: Readonly<ModSceneFields>): string[] {
+  return active().flatMap((hooks) => {
+    const note = hooks.saveNote?.(scene)
+    return note ? [note] : []
   })
 }
