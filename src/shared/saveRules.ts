@@ -45,43 +45,15 @@ function versionStep(from: number, to: number): (record: object) => object {
       : record
 }
 
+/** Optional fields added by declaration merging never become mandatory on older saves. */
+type RequiredKeys<T> = { [K in keyof T]-?: {} extends Pick<T, K> ? never : K }[keyof T]
+
 /**
  * What a save must carry; `playthroughId`/`saveId` are stamped from where it was found, and
  * the fields a save written before them lacks, or only some saves carry, are optional on the
  * type and omitted here.
  */
-const SAVE_REQUIRED: Record<
-  keyof Omit<
-    GameSave,
-    | 'playthroughId'
-    | 'saveId'
-    | 'exVenusWhisper'
-    | 'npcFriendships'
-    | 'exNpcWatch'
-    | 'slotRumor'
-    | 'bunnybotSeenTipSent'
-    | 'occasionsDeclined'
-    | 'bio'
-    | 'exPlotTwist'
-    | 'exCharacterDynamics'
-    | 'presetVars'
-    | 'tallies'
-    | 'thumbnail'
-    | 'replays'
-    | 'exStoryMemory'
-    | 'exBreakthrough'
-    | 'exEcho'
-    | 'exReckoning'
-    | 'semester'
-    | 'formerJobs'
-    | 'transcript'
-    | 'homecomingVisitor'
-    | 'sceneEventsFired'
-    | 'readerCold'
-    | 'readerColdsHad'
-  >,
-  true
-> = {
+const SAVE_REQUIRED: Record<RequiredKeys<Omit<GameSave, 'playthroughId' | 'saveId'>>, true> = {
   schemaVersion: true,
   saveDate: true,
   stats: true,
@@ -145,20 +117,7 @@ const RECORD_REQUIRED: Record<keyof Omit<PlaythroughRecord, 'name' | 'mods' | 's
  * What an enrollment must carry; where it is kept names the playthrough it will become, and
  * the fields an enrollment written before them lacks are optional on the type and omitted here.
  */
-const ENROLLMENT_REQUIRED: Record<
-  keyof Omit<
-    Enrollment,
-    | 'bio'
-    | 'tokensGenerated'
-    | 'exCharacterDynamics'
-    | 'exCharacterDynamicsEnabled'
-    | 'exEcho'
-    | 'mods'
-    | 'continued'
-    | 'secrets'
-  >,
-  true
-> = {
+const ENROLLMENT_REQUIRED: Record<RequiredKeys<Enrollment>, true> = {
   schemaVersion: true,
   savedAt: true,
   chars: true,

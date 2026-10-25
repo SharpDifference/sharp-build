@@ -1,4 +1,4 @@
-import { slotSettled } from '../mods/hooks'
+import { projectSlotMemories, slotSettled } from '../mods/hooks'
 import { feedStatusLines } from './bunnyfeedsMemory'
 import { canContinueReckoning, pendingReckoningAftermath } from './reckoning'
 import { withReckoningAftermath } from '../prompts/reckoningPrompt'
@@ -1968,7 +1968,12 @@ async function fetchEndingOpening(
 
   // The finished slot's settles, banked below for the boundary to apply.
   const rumor = rollRumorPass(ledger, projected.charInfo)
-  const seen = withRumorPass(projected.charInfo, rumor)
+  // Read the earned mod weights before rolling a crush or writing the opening. This
+  // is a projection only: rewards and ability use still commit at slotSettled.
+  const seen = projectSlotMemories(
+    { before: game, closingCast: loopState.closingCast ?? [] },
+    withRumorPass(projected.charInfo, rumor)
+  )
   // Safe on the exam prefetch too: a texting-only ledger carries no `stats`, and every other
   // input `resolveScene` reads is fixed before the exam starts.
   const stats = applyStatDeltas(game.stats, resolveScene().deltas)
