@@ -161,3 +161,23 @@ describe('post comments', () => {
     expect(hooks.postCommentsOwner()?.modId).toBe('threads')
   })
 })
+
+describe('emoji tool and sent text', () => {
+  const Tool = () => null
+  const Other = () => null
+  const Text = () => null
+
+  it('are drawn by the first mod on that draws them, and by none once it is off', async () => {
+    const on = { picker: true, plain: true }
+    const hooks = await fresh(on, ['picker', 'plain'])
+    hooks.registerHooks('plain', { emojiTool: Other })
+    hooks.registerHooks('picker', { emojiTool: Tool, sentText: { Text } })
+
+    expect(hooks.emojiTool()).toBe(Tool)
+    expect(hooks.sentText()?.Text).toBe(Text)
+
+    on.picker = false
+    expect(hooks.emojiTool()).toBe(Other)
+    expect(hooks.sentText()).toBeNull()
+  })
+})
