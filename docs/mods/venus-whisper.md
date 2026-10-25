@@ -16,6 +16,8 @@ character profiles, Bunnyboard Updates, and Meanwhile's spectator conversations.
 - Every article ends with **— Lady Harewood**, the columnist’s pen name. Her real identity
   stays secret. This signature is rendered by the app, so it appears on archived issues too
   without rewriting their saved text. NPC comments use their regular names, handles and profile pictures.
+- Player comments show the reader portrait set in the native profile editor, with the usual
+  fallback when no portrait is available. NPC portraits keep their existing behavior.
 - Player comments use the player's Bunnyboard profile name and a name-derived handle (for
   example, Sam Rowe becomes `@sam_rowe`). The base game has no separately editable player
   handle. Older player comments saved as `@reader` display and reach reply prompts with the
@@ -73,7 +75,7 @@ answer. Lady Harewood is a shared public pen name, not a clue to a particular ch
 A preference is writing flavor, not proof that an incident happened. Comments still
 receive ordinary public profiles and are never told the secret role or the private clue data.
 
-Continuing Semesters carries the **same author**, profile snapshot, issues, comments, reply
+Native 0.5.0 New Game+ carries the **same author**, profile snapshot, issues, comments, reply
 links and deletion markers. The identity stays even if she graduates, is omitted from the
 next roster, or her character file is later unavailable. A previously known columnist can
 continue to comment through her saved public profile. Other known readers' public profiles
