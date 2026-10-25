@@ -72,7 +72,7 @@
 
 /* Darts owns the visual treatment of the framework's existing leave/report controls. */
 /* Match the design system's layered outline button, without changing the host component. */
-.vu-minigame-veil[data-game='darts'] #minigame-walk { --paper-offset: 8px 7px; --paper-tilt: -2deg; --paper-face: #fff8ef; --paper-border: 3.5px solid var(--vu-accent); --paper-shadow: var(--vu-shadow); position: relative; isolation: isolate; display: flex; justify-content: center; align-items: center; width: 100%; padding: 14px 24px; border: 0; border-radius: 0 999px 999px 0; background: transparent !important; color: var(--vu-accent) !important; font: 800 16px var(--font-body); transform-origin: left center; }
+.vu-minigame-veil[data-game='darts'] #minigame-walk { --paper-offset: 8px 7px; --paper-tilt: -2deg; --paper-face: var(--vu-surface); --paper-border: 3.5px solid var(--vu-accent); --paper-shadow: var(--vu-shadow); position: relative; isolation: isolate; display: flex; justify-content: center; align-items: center; width: 100%; padding: 14px 24px; border: 0; border-radius: 0 999px 999px 0; background: transparent !important; color: var(--vu-accent) !important; font: 800 16px var(--font-body); transform-origin: left center; }
 .vu-minigame-veil[data-game='darts'] #minigame-walk::before,
 .vu-minigame-veil[data-game='darts'] #minigame-walk::after { content: ''; position: absolute; inset: 0; z-index: -1; border-radius: inherit; background: var(--paper-face); border: var(--paper-border); }
 .vu-minigame-veil[data-game='darts'] #minigame-walk::before { z-index: -2; background: var(--paper-shadow); translate: var(--paper-offset); rotate: var(--paper-tilt); }
