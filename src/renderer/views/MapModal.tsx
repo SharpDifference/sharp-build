@@ -46,7 +46,6 @@ import {
 } from './motion'
 import { ModSlot } from '../mods/ModSlot'
 import '../vu_styles/BunnyMap.css'
-import { ReckoningDungeonMapPin } from './ReckoningDungeon'
 
 export interface MapModalProps {
   /** Drawn by the screen that opened this — a portal inherits no palette. */
@@ -464,7 +463,6 @@ export function MapModal({ theme, onClose, onGo }: MapModalProps): JSX.Element |
           </motion.div>
         </div>
 
-        <ReckoningDungeonMapPin canTravel={!!onGo} onEnter={onClose}/>
         <ModSlot slot="mapOverlay" props={{ canTravel: canGo, close: onClose }} />
 
         <div className="vu-foot">
