@@ -17,7 +17,9 @@
     // The @electron-toolkit base turns this off despite `strict`; on.
     "noImplicitAny": true,
     "paths": {
-      "@shared/*": ["./src/shared/*"]
+      "@shared/*": ["./src/shared/*"],
+      "@vx/modkit/host/*": ["./packages/modkit/src/host/*"],
+      "@vx/modkit/*": ["./packages/modkit/src/*/index.ts"]
     }
   }
 }

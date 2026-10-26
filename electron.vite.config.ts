@@ -8,6 +8,14 @@ import { webpAssets } from './scripts/webpAssets'
 // not in any tsconfig's program, and npm_package_version is unset outside npm.
 const { version } = JSON.parse(readFileSync(resolve('package.json'), 'utf8')) as { version: string }
 
+// The mod kit (`packages/modkit`) resolves to its source: one copy of each module, whichever path imports it.
+const modkit = {
+  '@vx/modkit/host': resolve('packages/modkit/src/host'),
+  '@vx/modkit/shared': resolve('packages/modkit/src/shared'),
+  '@vx/modkit/renderer': resolve('packages/modkit/src/renderer'),
+  '@vx/modkit/main': resolve('packages/modkit/src/main')
+}
+
 export default defineConfig({
   main: {
     build: {
@@ -21,14 +29,16 @@ export default defineConfig({
     },
     resolve: {
       alias: {
-        '@shared': resolve('src/shared')
+        '@shared': resolve('src/shared'),
+        ...modkit
       }
     }
   },
   preload: {
     resolve: {
       alias: {
-        '@shared': resolve('src/shared')
+        '@shared': resolve('src/shared'),
+        ...modkit
       }
     }
   },
@@ -44,7 +54,8 @@ export default defineConfig({
     },
     resolve: {
       alias: {
-        '@shared': resolve('src/shared')
+        '@shared': resolve('src/shared'),
+        ...modkit
       }
     },
     // Shipped PNG art is emitted as WebP, which is what keeps the packaged renderer small.

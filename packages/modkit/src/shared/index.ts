@@ -1,0 +1,45 @@
+/** `@vx/modkit/shared`: what a mod may import on either side of the process boundary. */
+export type {
+  Character,
+  CharacterTrait,
+  CharacterTraitDefinition,
+  CharInfo,
+  CharMemory,
+  ChatMessage,
+  GameOverReason,
+  GameSave,
+  LedgerResponse,
+  LedgerStats,
+  ModDef,
+  ModEnrollmentFields,
+  ModOption,
+  ModOptionGroup,
+  ModSceneFields,
+  ModScope,
+  ModSwitches,
+  PlayerStats,
+  PlaythroughRecord,
+  PostComment,
+  ProjectSession,
+  SceneLine,
+  SlotActivity,
+  SlotActivityOffer,
+  SocialPost,
+  StatContext,
+  StatKey,
+  StatusText,
+  StructuredRequest,
+  TextingResponse,
+  TimeSlot
+} from '../bridge/shared'
+export {
+  hasTrait,
+  memoryStatusLine,
+  modById,
+  modOn,
+  optionKey,
+  optionOn,
+  registerCharacterTrait,
+  registerRomanceRequirement
+} from '../bridge/shared'
+export { KIT_VERSION } from './version'
