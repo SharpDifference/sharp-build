@@ -29,9 +29,12 @@ describe('mods in a sprite or CG draft', () => {
   })
   afterEach(() => vi.resetModules())
 
-  it('add their tags in the order they registered, only while on, before her own negatives', async () => {
+  it('add their tags in id order whatever order they registered, only while on, before her own negatives', async () => {
     const { drafts, prompt } = await fresh()
     const kinds: string[] = []
+    drafts.registerImagePromptDraft('second', {
+      draft: (parts) => ({ appearance: [...parts.appearance, 'second'], negative: parts.negative })
+    })
     drafts.registerImagePromptDraft('first', {
       draft: (parts, { kind }) => {
         kinds.push(kind)
@@ -40,9 +43,6 @@ describe('mods in a sprite or CG draft', () => {
     })
     drafts.registerImagePromptDraft('off', {
       draft: (parts) => ({ appearance: [...parts.appearance, 'off'], negative: parts.negative })
-    })
-    drafts.registerImagePromptDraft('second', {
-      draft: (parts) => ({ appearance: [...parts.appearance, 'second'], negative: parts.negative })
     })
 
     const sprite = prompt.spriteDraft(her, [], 'nude')

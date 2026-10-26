@@ -122,7 +122,7 @@ built by the same `spriteDraft` and `cgSetDraft`. Register once at boot with
 
 - `draft(parts, { character, kind })` is handed the draft's `appearance` and `negative` tags
   and returns them with the mod's own in; `kind` is `sprite`, `nude` or `cg`. Each mod that is
-  on is asked in the order they registered, and her own negatives are added after every mod's.
+  on is asked in id order, like every hook, and her own negatives are added after every mod's.
 - `regen(kept, draft, on)` is what a regenerate reopens on: the edit its button last sent
   (`kept`), refreshed with the mod's tags as they are in the fresh `draft`. It is asked whether
   or not the mod is on, so one that is off can take its own tags back out of a remembered edit.

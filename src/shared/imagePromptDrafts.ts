@@ -35,13 +35,18 @@ export function registerImagePromptDraft(modId: string, draft: ImagePromptDraft)
   drafts.set(modId, draft)
 }
 
-/** A draft's groups through each mod that is on, in the order they registered. */
+/** The registered drafts in mod id order, the order every hook asks in, whatever order they loaded. */
+function inIdOrder(): [string, ImagePromptDraft][] {
+  return [...drafts].sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))
+}
+
+/** A draft's groups through each mod that is on, in mod id order. */
 export function draftedParts(
   parts: ImagePromptParts,
   ctx: { character: Character; kind: ImagePromptKind }
 ): ImagePromptParts {
   let drafted = parts
-  for (const [modId, draft] of drafts) {
+  for (const [modId, draft] of inIdOrder()) {
     if (sharedModOn(modId)) drafted = draft.draft(drafted, ctx)
   }
   return drafted
@@ -50,7 +55,7 @@ export function draftedParts(
 /** A regenerate's remembered edit with each mod's tags as they are now; see {@link ImagePromptDraft.regen}. */
 export function regenDrafted(kept: PromptEdit, draft: PromptEdit): PromptEdit {
   let next = kept
-  for (const [modId, entry] of drafts) {
+  for (const [modId, entry] of inIdOrder()) {
     if (entry.regen) next = entry.regen(next, draft, sharedModOn(modId))
   }
   return next
