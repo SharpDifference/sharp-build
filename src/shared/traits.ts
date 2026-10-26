@@ -103,7 +103,13 @@ export function traitTone(value: string): string | undefined { return characterT
 export function characterTraitOptions(selected: readonly string[] = []): { value: string; label: string; tone?: string; hint?: string }[] {
   return [...nativeTraits, ...extensions().map(entry => entry.definition)]
     .filter(trait => trait.editor !== false || selected.includes(trait.value))
-    .map(trait => ({ value: trait.value, label: trait.value, tone: trait.tone, hint: trait.hint ?? trait.description }))
+    .map(trait => ({
+      value: trait.value,
+      label: trait.value,
+      tone: trait.tone,
+      // Native chips never had description tooltips; extensions may supply their own hint.
+      hint: trait.hint ?? (registered.has(trait.value) ? trait.description : undefined)
+    }))
 }
 
 export function selectedTraitHints(values: readonly string[]): string[] {
