@@ -94,6 +94,16 @@ export function fileLatePost(post: NonNullable<SlotIntroResponse['posts']>[numbe
 export function finishSlotActivity(owner: string, id: string, completed: boolean, result: string): Promise<boolean>;
 
 // @public
+export interface GameModalProps {
+    arg: string | undefined;
+    covered: boolean;
+    // (undocumented)
+    onClose: () => void;
+    openGameMenu: () => void;
+    theme: ScreenTheme;
+}
+
+// @public
 export interface LikesAsk {
     author: string;
     // (undocumented)
@@ -157,6 +167,7 @@ export interface ModHooks {
         nudge: (charId: string) => void;
     }) => void | Promise<void>;
     gameEntered?: () => void;
+    gameModals?: Record<string, ComponentType<GameModalProps>>;
     mapOverlay?: ComponentType<ScreenSlotProps['mapOverlay']>;
     messageAttachment?: ComponentType<ScreenSlotProps['messageAttachment']>;
     modDetail?: (mod: ModDef) => ComponentType<ModDetailProps> | undefined;
@@ -203,6 +214,9 @@ export interface ModHooks {
 
 // @public
 export function modIsOn(id: string, record?: Pick<PlaythroughRecord, 'mods'> | null): boolean;
+
+// @public
+export function openPanel(id: string, arg?: string): boolean;
 
 // @public
 export interface OptionPreviewProps {

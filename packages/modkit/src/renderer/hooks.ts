@@ -208,6 +208,19 @@ export interface ScenePanelProps {
   onClose: () => void
 }
 
+/** What the game hands a mod's panel opened with {@link openPanel}. */
+export interface GameModalProps {
+  /** The half of the day the stage is in, which every modal over it wears. */
+  theme: ScreenTheme
+  /** What `openPanel` was handed beside the id: whose panel it is, say. */
+  arg: string | undefined
+  /** A crossing between screens is over the view. */
+  covered: boolean
+  onClose: () => void
+  /** Closes the panel into the game menu, for a panel the menu opened. */
+  openGameMenu: () => void
+}
+
 /**
  * A mod's place on the scene screen. `Seat` is mounted on the rail for as long as a scene's
  * chrome is, and decides for itself when it has something to offer (`state: 'gone'` otherwise).
@@ -357,6 +370,12 @@ export interface ModHooks {
   afterSceneReply?: (ctx: SceneReplied) => void
   /** A seat on the scene's rail, and the panel it opens over the scene. */
   scenePlay?: ScenePlay
+  /**
+   * Panels over the game view, by id, which {@link openPanel} opens as one of the view's own: the
+   * scene behind takes nothing while one is up. One panel per id, the first mod's that is on.
+   */
+  gameModals?: Record<string, ComponentType<GameModalProps>>
+
   /**
    * After the texts of a girl reaching out just to talk have landed. `reply` is her entry from the
    * slot's opening, with whatever fields `prompts['slot-reach-outs']` added to it.
@@ -665,6 +684,50 @@ export function scenePlays(): { modId: string; play: ScenePlay }[] {
     .filter((entry) => rules.isOn(entry.modId) && entry.hooks.scenePlay)
     .sort((a, b) => rules.order(a.modId) - rules.order(b.modId))
     .map((entry) => ({ modId: entry.modId, play: entry.hooks.scenePlay as ScenePlay }))
+}
+
+/** The clashes over a panel id already warned about, so each is said once. */
+const warnedModalClashes = new Set<string>()
+
+/**
+ * The panel {@link openPanel} opens under an id: the first mod's that is on and has one, or none.
+ * Two mods that are on with a panel under the same id get a warning naming both.
+ */
+export function gameModal(id: string): ComponentType<GameModalProps> | undefined {
+  const owners = activeEntries().filter((entry) => entry.hooks.gameModals?.[id])
+  if (owners.length > 1) {
+    const [winner, ...others] = owners.map((entry) => entry.modId)
+    const clash = `${id}\n${winner}\n${others.join('\n')}`
+    if (!warnedModalClashes.has(clash)) {
+      warnedModalClashes.add(clash)
+      console.warn(
+        `[mods] ${winner} and ${others.join(', ')} both have a panel under "${id}"; ${winner}'s opens`,
+      )
+    }
+  }
+  return owners[0]?.hooks.gameModals?.[id]
+}
+
+/** How {@link openPanel} reaches the game view, while one is up. */
+let panelOpener: ((id: string, arg: string | undefined) => void) | null = null
+
+/** Binds {@link openPanel} to the game view as it mounts; the returned function unbinds it. */
+export function setPanelOpener(open: (id: string, arg: string | undefined) => void): () => void {
+  panelOpener = open
+  return () => {
+    if (panelOpener === open) panelOpener = null
+  }
+}
+
+/**
+ * Opens a mod's panel ({@link ModHooks.gameModals}) over the game view, in place of whatever panel
+ * is open there. `arg` is handed to the panel. False where nothing opens: no game view is up, or
+ * no mod that is on has a panel under `id`.
+ */
+export function openPanel(id: string, arg?: string): boolean {
+  if (!panelOpener || !gameModal(id)) return false
+  panelOpener(id, arg)
+  return true
 }
 
 export function afterReachOut(ctx: {
