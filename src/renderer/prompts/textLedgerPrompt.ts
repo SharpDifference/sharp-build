@@ -5,7 +5,6 @@ import {
   type LedgerResponse,
   type StructuredRequest
 } from '@shared/types'
-import { textLedgerFeedLines } from '../stores/bunnyfeedsMemory'
 import { promptLines } from '../mods/hooks'
 import { objectSchema } from './schema'
 import type { GlobalTextId, TextEdits } from '@shared/presets/types'
@@ -127,8 +126,6 @@ export function buildTextLedgerPrompt(
     '',
     ...messagesBlock(schedule),
     '',
-    // Bunnyfeeds: comments under her posts are the feed's, not these texts'.
-    ...textLedgerFeedLines(textedKeys),
     ...promptLines('text-ledger', { charKeys: textedKeys })
   ].join('\n')
 
