@@ -126,7 +126,7 @@ registerRomanceRequirement(MY_MOD, character =>
 )
 ```
 
-The default enable lookup is `sharedModOn`, bound to current switches/playthrough selection
+The enable lookup is `sharedModOn`, bound once via `setSharedModRules` to current switches/playthrough selection
 by `modsStore`. Disabled callbacks are not called. Register once at boot; the current registry
 holds one rule per mod ID, and a second registration for that ID replaces its rule. Results
 must be pure and finite; non-finite values are ignored. Exceptions propagate to the caller,
@@ -139,6 +139,10 @@ is dropped as a whole. Friendship and affection can still grow; existing lovers 
 After a breakup, a new romance is gated again. Scene Creator's existing prompt-attraction
 override remains intentional. Callers of `foldRelationshipEvents` must supply character and
 stats to enforce optional requirements; its context-free form remains the native fold.
+
+`crushHintUpdate` can reopen a previously met hint when a newly active requirement is unmet.
+A saved `{ met: true }` therefore is not permanent eligibility: the next hint names the missing
+stat, and marks the hint met again once all active requirements are satisfied.
 
 The tests in `test/romanceRequirements.test.ts` use a synthetic registration, not a shipped
 mod. They check order-independent composition, disabled/invalid responses, prompts, direct

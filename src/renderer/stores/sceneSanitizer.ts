@@ -823,8 +823,8 @@ export function projectLedger(
   }
 
   // Last, like the apply, so the cap evicts in the same order.
+  const game = useGameStore.getState()
   for (const [charId, events] of ledgerEvents(ledger, false)) {
-    const game = useGameStore.getState()
     projected[charId] = foldRelationshipEvents(entryFor(charId), events, date, {
       character: game.characters[charId], stats: game.stats
     })
