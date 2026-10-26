@@ -510,3 +510,38 @@
 .vu-contact-foot {
   flex: none;
 }
+
+/* ---- her readings ---------------------------------------------------------- */
+
+/* The tab row a mod's reading of her brings, beside Profile. It sits where a card's own label
+   would, right-aligned under her tag: the page names what it is showing in the same voice
+   everywhere, so these are labels with a divider between rather than a control of their own. */
+.vu-contact-tabs {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  justify-content: flex-end;
+  margin-top: -8px;
+}
+
+.vu-contact-tab {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--vu-text-muted);
+  font: 700 13px var(--font-mono);
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+/* The one being read. A colour, not a fill: this row is type on the page's own ground, and a
+   pill here would be the fourth surface on a screen that holds three. */
+.vu-contact-tab--on {
+  color: var(--vu-accent);
+}
+
+.vu-contact-tabs-slash {
+  color: var(--vu-border);
+  font: 700 13px var(--font-mono);
+}

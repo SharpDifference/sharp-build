@@ -1,3 +1,4 @@
+import type { ChatMessage } from '@shared/types'
 import { motion, useReducedMotion } from 'motion/react'
 import { useEffect, useState, type JSX } from 'react'
 import { photoUrl } from '@shared/photoFiles'
@@ -293,4 +294,10 @@ export function PhotoLightboxHost(): JSX.Element | null {
   }, [])
   if (!shot) return null
   return <Lightbox src={shot} onClose={() => openShot(null)} />
+}
+
+/** A message's picture, in a bubble of its own after her words; nothing for a message without one. */
+export function MessagePhotoAttachment({ message }: { message: ChatMessage }): JSX.Element | null {
+  if (!message.photo || message.sender === 'system') return null
+  return <MessagePhotoBubble photo={message.photo} sender={message.sender} messageId={message.id} />
 }

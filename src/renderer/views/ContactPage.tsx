@@ -25,9 +25,10 @@ import { fullNameOf, type CharMemory, type SecretTier, type StockOutfitSet } fro
 import { formatShortGameDate } from '../prompts/gameDate'
 import { useBunnyboardStore } from '../stores/bunnyboardStore'
 import { profileUrl, spriteUrl, useSpriteVersion } from '../stores/characterStore'
-import { postOutAt, postVisible } from '../mods/hooks'
+import { contactTabs, postOutAt, postVisible } from '../mods/hooks'
+import { ModSlot, SlotBoundary } from '../mods/ModSlot'
+import { useModsStore } from '../stores/modsStore'
 import { newestFirst } from '../stores/feedRolls'
-import { PostPhotoLink, useContactGallery } from './ContactGallery'
 import { useGameStore } from '../stores/gameStore'
 import { noNsfwImagesOf, useSettingsStore } from '../stores/settingsStore'
 import { sendFriendRequest } from '../stores/textingLoop'
@@ -98,6 +99,10 @@ export function ContactPage({
   const [editing, setEditing] = useState<CharMemory | null>(null)
   // Whether the notes panel stands over the page.
   const [notesOpen, setNotesOpen] = useState(false)
+  // Which reading of her the page shows: her profile, or a mod's tab beside it.
+  const [reading, setReading] = useState('profile')
+  // A mod switched on or off adds or takes away its tab.
+  useModsStore((s) => s.switches)
 
   if (!character) return <p className="vu-contact-gone">This account no longer exists.</p>
 
@@ -118,8 +123,10 @@ export function ContactPage({
   // The tag goes through `affectionFor`, never a sum of the memories: feed likes count too.
   const flags = info?.flags ?? emptyFlags()
   const isContact = Boolean(flags.gaveContactInfo)
-  // Her gallery, and the tab strip it brings with it.
-  const gallery = useContactGallery({ charId, isContact, theme })
+  // The mods' readings of her beside Profile, and the one being read; Profile where it went away.
+  const tabs = contactTabs({ charId, isContact })
+  const shownTab = tabs.find(({ tab }) => tab.id === reading)
+  const readingNow = shownTab?.tab.id ?? 'profile'
   const handle = info?.handle
   const feed = (info?.feed ?? []).filter(postVisible).sort((a, b) => newestFirst(a, b) || postOutAt(b) - postOutAt(a))
   // The days she made a friend, among what she posted. The other girl has to be one the
@@ -223,14 +230,35 @@ export function ContactPage({
           )}
         </div>
 
-        {gallery.tabs}
+        {/* Her readings, named the way every section on this page is named: the one being read
+            in accent, the rest quiet. Only while a mod adds one beside Profile. */}
+        {tabs.length > 0 && (
+          <div className="vu-contact-tabs">
+            {[{ id: 'profile', label: 'Profile' }, ...tabs.map(({ tab }) => tab)].map(({ id, label }, index) => (
+              <Fragment key={id}>
+                {index > 0 && <span className="vu-contact-tabs-slash">/</span>}
+                <motion.button
+                  className={`vu-contact-tab${readingNow === id ? ' vu-contact-tab--on' : ''}`}
+                  type="button"
+                  aria-pressed={readingNow === id}
+                  {...gestures(false, quietLift, quietPress)}
+                  onClick={() => setReading(id)}
+                >
+                  {label}
+                </motion.button>
+              </Fragment>
+            ))}
+          </div>
+        )}
 
         {/* Undiscovered is drawn rather than hidden (D4), and a stranger's page is that rule
             carried to the whole screen: every card stands with the one thing that would open it
             named, so nothing she has none of can be read out of an absence. */}
-        {gallery.showing ? (
+        {shownTab ? (
           <motion.div className="vu-contact-cards" variants={CARDS_DEAL}>
-            {gallery.panel}
+            <SlotBoundary key={shownTab.modId} slot="contactTab" modId={shownTab.modId}>
+              <shownTab.tab.Panel charId={charId} isContact={isContact} theme={theme} />
+            </SlotBoundary>
           </motion.div>
         ) : (
         <motion.div className="vu-contact-cards" variants={CARDS_DEAL}>
@@ -390,8 +418,7 @@ export function ContactPage({
                         {formatShortGameDate(entry.post.date, season)} · ♥{' '}
                         {entry.post.likes + (entry.post.liked ? 1 : 0)}
                       </motion.button>
-                      {' '}
-                      <PostPhotoLink charId={charId} photo={entry.post.photo} />
+                      <ModSlot slot="contactPostExtra" props={{ charId, post: entry.post }} />
                     </li>
                   )
                 )}

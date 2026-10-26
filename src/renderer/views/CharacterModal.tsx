@@ -1,6 +1,7 @@
 import { ReflectionPortraitControl } from '../components/ReflectionPortrait'
 import { useState, type JSX, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
+import { ModSlot } from '../mods/ModSlot'
 import { AnimatePresence, motion } from 'motion/react'
 import { VOICE_PITCH_DEFAULT, VOICE_TIER_LABELS, voiceTierOf } from '@shared/audio'
 import { EMOTIONS } from '@shared/emotions'
@@ -156,6 +157,7 @@ export function CharacterModal({
 
           <div className="vu-edit-images">
             <ReflectionPortraitControl charId={charId} name={name} theme={theme} height={character.height}/>
+            <ModSlot slot="editCharacterImages" props={{ charId, name, theme, height: character.height }} />
             <div className="vu-edit-wardrobes">
               {WARDROBES.map(({ target, set, title }) => (
                 <WardrobeColumn

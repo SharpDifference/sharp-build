@@ -22,6 +22,7 @@ const PROPS: { [S in ScreenSlot]: ScreenSlotProps[S] } = {
   phoneOverlay: {},
   mapOverlay: { canTravel: true, close: () => {} },
   photosPageSection: { theme: 'night' },
+  editCharacterImages: { charId: 'c1', name: 'Mina', theme: 'day', height: 1 },
   stageLayer: {
     sceneMode: true,
     cinematic: false,
@@ -40,7 +41,9 @@ const PROPS: { [S in ScreenSlot]: ScreenSlotProps[S] } = {
     blocked: false,
     panelOpen: false,
     openGameMenu: () => {}
-  }
+  },
+  messageAttachment: { message: { id: 'm1', sender: 'contact', text: 'hi', date: 0, time: 0 } },
+  contactPostExtra: { charId: 'c1', post: { id: 'p1', text: 'hi', date: 0, time: 0, likes: 0 } }
 }
 
 const SLOTS = Object.keys(PROPS) as ScreenSlot[]

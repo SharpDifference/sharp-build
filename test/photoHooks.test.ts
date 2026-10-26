@@ -216,17 +216,17 @@ const HOOKS: readonly {
   },
   {
     file: 'src/renderer/views/BunnyboardModal.tsx',
-    needs: ['MessagePhotoBubble', 'messageId={message.id}', '<ModSlot slot="phoneOverlay"', '<PostCommentsView'],
+    needs: ['<ModSlot slot="messageAttachment"', '<ModSlot slot="phoneOverlay"', '<PostCommentsView'],
     why: 'nothing draws the picture on a text, on a post, or the replies under one'
   },
   {
     file: 'src/renderer/views/ContactPage.tsx',
-    needs: ['useContactGallery(', 'gallery.tabs', 'gallery.panel'],
+    needs: ['contactTabs(', '<shownTab.tab.Panel'],
     why: 'her gallery has no tab to open it and nothing to draw'
   },
   {
     file: 'src/renderer/views/ContactPage.tsx',
-    needs: ['<PostPhotoLink charId={charId} photo={entry.post.photo} />'],
+    needs: ['<ModSlot slot="contactPostExtra"'],
     why: "a post's picture cannot be opened from her profile's feed list"
   },
   {
@@ -267,9 +267,8 @@ const HOOKS: readonly {
   {
     file: 'src/renderer/views/EditCharacterModal.tsx',
     needs: [
-      '<BodyFieldsSection',
-      'bodyForm(',
-      'cleanBody(',
+      'editorFields()',
+      'field.write(',
       "} from './bodyDrafts'",
       "import type { PromptGroup } from '@shared/regenTags'"
     ],

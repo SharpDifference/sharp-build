@@ -12,6 +12,7 @@ import {
   type CharacterBody
 } from '@shared/characterBody'
 import { usePhotoSwitches } from '../stores/photoSwitchHooks'
+import type { EditorField } from '../mods/hooks'
 import { gestures, quietLift, quietPress } from './motion'
 import '../vu_styles/BodyFields.css'
 
@@ -155,3 +156,12 @@ const AVERAGE = 'average'
 
 /** What the engine drew, shown under her build and her chest. */
 const DRAWN_FIELDS: readonly BodyField[] = ['hipsThighs', 'buttocks', 'pubicHair']
+
+/** Her body as a field in the character editor: read off her, edited, and written back clean. */
+export const BODY_EDITOR_FIELD: EditorField = {
+  read: (character) => bodyForm(character.body),
+  write: (value) => ({ body: cleanBody(value) }),
+  Field: ({ value, onChange, baseAppearance }) => (
+    <BodyFieldsSection body={value as CharacterBody} baseAppearance={baseAppearance} onChange={onChange} />
+  )
+}

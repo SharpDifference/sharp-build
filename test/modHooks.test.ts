@@ -123,6 +123,20 @@ describe('ways on', () => {
   })
 })
 
+describe('fields in the character editor', () => {
+  const Field = () => null
+  const field = (tag: string) => ({ read: () => tag, write: () => ({}), Field })
+
+  it('come from the mods that are on, in list order, under each mod', async () => {
+    const hooks = await fresh({ off: false }, ['body', 'notes', 'off'])
+    hooks.registerHooks('notes', { editorField: field('notes') })
+    hooks.registerHooks('off', { editorField: field('off') })
+    hooks.registerHooks('body', { editorField: field('body') })
+
+    expect(hooks.editorFields().map(({ modId }: { modId: string }) => modId)).toEqual(['body', 'notes'])
+  })
+})
+
 describe('updates tabs and option previews', () => {
   const Page = () => null
   const Preview = () => null
@@ -140,6 +154,26 @@ describe('updates tabs and option previews', () => {
 
     on.notes = false
     expect(hooks.updatesTabs().map((tab: { word: string }) => tab.word)).toEqual(['Copy'])
+  })
+})
+
+describe('tabs on her contact page', () => {
+  const Panel = () => null
+
+  it('come one per id from the mods that are on, in list order, where each says it stands', async () => {
+    const on = { gallery: true, notes: true, copy: true, hidden: true, off: false }
+    const hooks = await fresh(on, ['gallery', 'notes', 'copy', 'hidden', 'off'])
+    hooks.registerHooks('copy', { contactTab: { id: 'gallery', label: 'Copy', Panel } })
+    hooks.registerHooks('notes', { contactTab: { id: 'notes', label: 'Notes', Panel, shown: ({ isContact }) => isContact } })
+    hooks.registerHooks('gallery', { contactTab: { id: 'gallery', label: 'Gallery', Panel } })
+    hooks.registerHooks('hidden', { contactTab: { id: 'profile', label: 'Mine', Panel } })
+    hooks.registerHooks('off', { contactTab: { id: 'off', label: 'Off', Panel } })
+
+    const labels = (isContact: boolean) =>
+      hooks.contactTabs({ charId: 'c1', isContact }).map(({ tab }: { tab: { label: string } }) => tab.label)
+    // Profile is the page's own, and a tab whose mod says it does not stand for her is left out.
+    expect(labels(true)).toEqual(['Gallery', 'Notes'])
+    expect(labels(false)).toEqual(['Gallery'])
   })
 })
 
