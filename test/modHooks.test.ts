@@ -123,6 +123,20 @@ describe('ways on', () => {
   })
 })
 
+describe('fields in the character editor', () => {
+  const Field = () => null
+  const field = (tag: string) => ({ read: () => tag, write: () => ({}), Field })
+
+  it('come from the mods that are on, in list order, under each mod', async () => {
+    const hooks = await fresh({ off: false }, ['body', 'notes', 'off'])
+    hooks.registerHooks('notes', { editorField: field('notes') })
+    hooks.registerHooks('off', { editorField: field('off') })
+    hooks.registerHooks('body', { editorField: field('body') })
+
+    expect(hooks.editorFields().map(({ modId }: { modId: string }) => modId)).toEqual(['body', 'notes'])
+  })
+})
+
 describe('updates tabs and option previews', () => {
   const Page = () => null
   const Preview = () => null

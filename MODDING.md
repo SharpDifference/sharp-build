@@ -234,6 +234,8 @@ else names it.
 | `phoneOverlay` | `BunnyboardModal.tsx` | Mount a component in the phone's veil while the phone is open, over the phone. Props: none |
 | `mapOverlay` | `MapModal.tsx` | Draw a component on the map, under the places and above its foot. Props: `canTravel` (the map was opened to go somewhere), `close` |
 | `photosPageSection` | `PhotosPage.tsx` | Draw a component on the Photos page, under the grid. Props: `theme` |
+| `editCharacterImages` | `EditCharacterModal.tsx`, `CharacterModal.tsx` | Draw a component first among her images, in the character editor and the character view. Props: `charId`, `name`, `theme`, `height` |
+| `editorField` | `EditCharacterModal.tsx` | Add a field to the character editor, under Generation settings, saved with her |
 | `stageLayer` | `GameView.tsx` | Mount a component over the stage and under the scene's chrome, on every screen of the game view. Props: `sceneMode`, `cinematic`, `covered`, `uiHidden`, `rowShown`, `blocked`, `quiz`, `interjectRow`, `awaitingInput` |
 | `panelLayer` | `GameView.tsx` | Mount a component among the game view's panels, over the chrome, on every screen of the game view. Props: `cinematic`, `covered`, `uiHidden`, `blocked`, `panelOpen`, `openGameMenu` |
 | `messageAttachment` | `BunnyboardModal.tsx` | Draw a component after a phone message's text bubble, or alone where the message has no text. Props: `message` |
@@ -284,6 +286,13 @@ nothing is waiting on the reader), and then the panel sends nothing.
 A hook point is added where mods actually meet, not ahead of need. Once mods use one, it stays
 as it is: renaming it or changing what it passes breaks them. A change that is needed goes in
 as a new hook beside the old one.
+
+A field in the character editor (`editorField`) is `read`, `Field` and `write`. `read` takes
+its value off her as the editor opens; `Field` is drawn under Generation settings, after the
+appearance tags, handed `value`, `onChange`, `charId` and her `baseAppearance` as the form holds
+it; `write` turns the value into what saving puts on her, merged over the game's own fields. Save
+and the unsaved-changes check see it as they see the game's fields. A mod that is off draws no
+field and writes nothing, so what it saved on her stays.
 
 ### Not covered yet
 
