@@ -22,6 +22,7 @@ const PROPS: { [S in ScreenSlot]: ScreenSlotProps[S] } = {
   phoneOverlay: {},
   mapOverlay: { canTravel: true, close: () => {} },
   photosPageSection: { theme: 'night' },
+  editCharacterImages: { charId: 'c1', name: 'Mina', theme: 'day', height: 1 },
   stageLayer: {
     sceneMode: true,
     cinematic: false,

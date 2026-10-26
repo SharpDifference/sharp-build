@@ -414,6 +414,10 @@ export interface ModHooks {
   mapOverlay?: ComponentType<ScreenSlotProps['mapOverlay']>
   /** Drawn on the Photos page, under the grid of photos. */
   photosPageSection?: ComponentType<ScreenSlotProps['photosPageSection']>
+  /** Drawn first among her images, in the character editor and in the character view. */
+  editCharacterImages?: ComponentType<ScreenSlotProps['editCharacterImages']>
+  /** A field of the mod's own in the character editor, saved with her; see {@link EditorField}. */
+  editorField?: EditorField
   /** Mounted over the stage and under the scene's chrome, on every screen of the game view. */
   stageLayer?: ComponentType<ScreenSlotProps['stageLayer']>
   /** Mounted among the game view's panels, over the chrome, on every screen of the game view. */
@@ -440,6 +444,14 @@ export interface ScreenSlotProps {
     close: () => void
   }
   photosPageSection: { theme: ScreenTheme }
+  editCharacterImages: {
+    charId: string
+    /** Her name as it stands, in the editor as it is being typed. */
+    name: string
+    theme: ScreenTheme
+    /** Her height, as a share of full size, the way the stage draws her. */
+    height: number
+  }
   stageLayer: {
     /** A scene is on screen, rather than the landing or a game over. */
     sceneMode: boolean
@@ -817,6 +829,33 @@ export function screenSlot<S extends ScreenSlot>(
     const Component = hooks[slot] as ComponentType<ScreenSlotProps[S]> | undefined
     return Component ? [{ modId, Component }] : []
   })
+}
+
+/** What the game hands a mod's field in the character editor. */
+export interface EditorFieldProps {
+  /** The field's value as the form holds it, from {@link EditorField.read} until it is changed. */
+  value: unknown
+  onChange: (value: unknown) => void
+  charId: string
+  /** Her appearance tags as the form holds them, which a field about her looks may read. */
+  baseAppearance: readonly string[]
+}
+
+/**
+ * A field of a mod's own in the character editor, under Generation settings. `read` takes its
+ * value off her as the editor opens, `Field` edits it with the rest of the form, and `write` is what
+ * saving puts back on her, merged over the rest; Save and the unsaved-changes check see it as
+ * they see the game's own fields. A mod that is off draws no field and writes nothing.
+ */
+export interface EditorField {
+  read: (character: Character) => unknown
+  write: (value: unknown) => Partial<Character>
+  Field: ComponentType<EditorFieldProps>
+}
+
+/** The fields of the mods that are on in the character editor, in list order, under each mod's id. */
+export function editorFields(): { modId: string; field: EditorField }[] {
+  return activeEntries().flatMap(({ modId, hooks }) => (hooks.editorField ? [{ modId, field: hooks.editorField }] : []))
 }
 
 /** The lines Save Game shows about the scene being saved, one from each mod that has one. */
