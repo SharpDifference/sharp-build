@@ -1,7 +1,6 @@
 import { exercisedStats, projectSlotMemories, settleSceneStats, slotActivityAvailable, slotSettled, slotStatusLines, statFloor } from '../mods/hooks'
 import { withSlotActivityPrompt } from '../prompts/slotActivity'
 import { talentProjectWork } from '@shared/talentPerks'
-import { feedStatusLines } from './bunnyfeedsMemory'
 import { canContinueReckoning, pendingReckoningAftermath } from './reckoning'
 import { withReckoningAftermath } from '../prompts/reckoningPrompt'
 import { dynamicFor } from '@shared/characterDynamics'
