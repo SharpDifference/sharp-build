@@ -7,6 +7,7 @@ export type {
   EditorFieldProps,
   EmojiToolProps,
   EndingChoice,
+  GameMenuItemProps,
   GameModalProps,
   LandingToolProps,
   LikesAsk,
@@ -39,6 +40,7 @@ export type {
 } from './hooks'
 export { openPanel, ownsPostComments, postVisible, promptFields, promptLines, promptRequired, registerHooks } from './hooks'
 export type {
+  ManualSaveOffer,
   PromptState,
   ResolvedSave,
   ScreenTheme,

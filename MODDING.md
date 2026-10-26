@@ -213,6 +213,7 @@ else names it.
 | `gameModals` | `GameView.tsx` | Register panels of its own by id, which `openPanel(id, arg?)` from the kit opens over the game view. Props: `theme`, `arg`, `covered`, `onClose`, `openGameMenu` |
 | `railButton` | `SceneChrome.tsx` | Draw a button on the scene's rail, after the Calendar and before the mods' scene seats; not on a created scene or a replay. Props: `Seat` (the rail's own seat), `visible`, `dead` |
 | `landingTool` | `LandingChrome.tsx` | Draw a tool in the landing's corner, after the log and before Settings; not on a created scene or a replay. Props: `Tool` (the landing's own tool), `visible` |
+| `gameMenuEntry` | `GameMenuModal.tsx` | Draw an entry in the game menu, after Mods and before Controls. Props: `Item` (the menu's own entry), `saveOffer` (`'open'` where a save can be written now) |
 | `afterReachOut` | `textingLoop.ts` | Act after the texts of a girl texting first have landed |
 | `playerActs` | `gameLoop.ts` (`submitAction`), `loop/hangouts.ts`, `loop/relax.ts` | Act when the reader commits to something: an action, a hangout begun, or Relax |
 | `gameEntered` | `gameLoop.ts` (`enterGame`) | Act when a game is entered, new or loaded |
@@ -255,7 +256,7 @@ screen to show. The first mod that answers is offered; the game's own choice alw
 While `prepare` runs, the screen that offered the choice keeps every button locked; an answer
 that comes back after that screen closed, or after its game was left, opens nothing.
 
-The places on screen (`settingsSection` to `contactPostExtra` above, `railButton` and `landingTool`) each take a component. Every mod
+The places on screen (`settingsSection` to `contactPostExtra` above, `railButton`, `landingTool` and `gameMenuEntry`) each take a component. Every mod
 that is on and has one there is drawn, in list order, and drawn again when a switch moves or a
 game is entered or left (a `playthrough` mod is on as the game's record says); a mod that is
 off is not drawn. The props are the facts the game has at that place, and only the ones a
@@ -296,8 +297,10 @@ A button on the rail (`railButton`) draws with the rail's own `Seat`, so it look
 the game's seats do. It turns `visible` and `dead` into the seat's `state` as they do: `'gone'`
 where not visible, `'dim'` where dead, `'shown'` otherwise. A tool on the landing (`landingTool`) draws with the
 landing's own `Tool`, handed a `label`, `onClick` and its icon, and stands only while `visible`;
-the corner staggers it in with the game's. A press on either opens the mod's panel with
-`openPanel`.
+the corner staggers it in with the game's. An entry in the game menu (`gameMenuEntry`) draws with
+the menu's own `Item`, handed its words and `onClick`, and `dead` and a `note` for a hover over
+it while dead. A press on any of the three opens the mod's panel with `openPanel`; a panel opened
+from the menu can go back to it with `openGameMenu`.
 
 A panel that sends a turn of its own takes the reader's turn first with `takeTurnFromReply()`
 from `stores/gameLoop.ts`, then sends with `submitAction`. It sends nothing itself: it brings the
@@ -321,9 +324,9 @@ field and writes nothing, so what it saved on her stays.
 
 ### Not covered yet
 
-- Screens: a mod's menu entries, and editor fields, and its
-  own panels beyond those over the game view (`scenePlay`, `gameModals`), a page beside the feed (`updatesTab`), a
-  preview on the Mods screen (`optionPreviews`) and the places on screen above.
+- Screens: a mod's own panels beyond those over the game view (`scenePlay`, `gameModals`), a
+  page beside the feed (`updatesTab`), a preview on the Mods screen (`optionPreviews`) and the
+  places on screen above.
 - Main process: IPC, protocols, services, settings and character rules.
 - Saves: a mod's own fields in a save. Carrying them into the next semester is covered below.
 

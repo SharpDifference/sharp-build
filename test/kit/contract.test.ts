@@ -207,7 +207,8 @@ const PROBES: Record<RendererHook, (id: string) => Probe> = {
   messageAttachment: slot('messageAttachment'),
   contactPostExtra: slot('contactPostExtra'),
   railButton: slot('railButton'),
-  landingTool: slot('landingTool')
+  landingTool: slot('landingTool'),
+  gameMenuEntry: slot('gameMenuEntry')
 }
 
 describe('every hook in the table', () => {

@@ -18,6 +18,7 @@ import type { ModSceneFields, PlaythroughRecord, SceneLine, TimeSlot } from '../
 import type { TextingPromptState } from '../bridge/renderer'
 import type { ResolvedSave } from '../bridge/renderer'
 import type { ViewName } from '../bridge/renderer'
+import type { ManualSaveOffer } from '../bridge/renderer'
 import type { ScreenTheme } from '../bridge/renderer'
 import type { ModDef } from '../bridge/shared'
 
@@ -194,6 +195,16 @@ export interface RailSeatProps {
 /** One tool in the landing's corner, as the game draws its own: icon only, its label on a hover. */
 export interface LandingToolProps {
   label: string
+  onClick: () => void
+  children: ReactNode
+}
+
+/** One entry in the game menu, as the menu draws its own. */
+export interface GameMenuItemProps {
+  /** It stands dimmed and takes nothing. */
+  dead?: boolean
+  /** What a hover over it says while it is dead. */
+  note?: string
   onClick: () => void
   children: ReactNode
 }
@@ -386,6 +397,8 @@ export interface ModHooks {
   railButton?: ComponentType<ScreenSlotProps['railButton']>
   /** Drawn among the landing's tools, after the log and before Settings. */
   landingTool?: ComponentType<ScreenSlotProps['landingTool']>
+  /** Drawn in the game menu, after Mods and before Controls. */
+  gameMenuEntry?: ComponentType<ScreenSlotProps['gameMenuEntry']>
 
   /**
    * After the texts of a girl reaching out just to talk have landed. `reply` is her entry from the
@@ -533,6 +546,12 @@ export interface ScreenSlotProps {
     Tool: ComponentType<LandingToolProps>
     /** Settings is revealed, and with it the mods' tools. */
     visible: boolean
+  }
+  gameMenuEntry: {
+    /** The menu's own entry, so a mod's is drawn, and dealt in, as the game's are. */
+    Item: ComponentType<GameMenuItemProps>
+    /** Whether a save can be written now (`'open'`), only once the reply in flight lands, or not at all. */
+    saveOffer: ManualSaveOffer
   }
 }
 

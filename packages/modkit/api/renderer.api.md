@@ -94,6 +94,16 @@ export function fileLatePost(post: NonNullable<SlotIntroResponse['posts']>[numbe
 export function finishSlotActivity(owner: string, id: string, completed: boolean, result: string): Promise<boolean>;
 
 // @public
+export interface GameMenuItemProps {
+    // (undocumented)
+    children: ReactNode;
+    dead?: boolean;
+    note?: string;
+    // (undocumented)
+    onClick: () => void;
+}
+
+// @public
 export interface GameModalProps {
     arg: string | undefined;
     covered: boolean;
@@ -129,6 +139,9 @@ export interface LikesAsk {
 export function Locked(input: {
     children: ReactNode;
 }): JSX.Element;
+
+// @public
+export type ManualSaveOffer = 'open' | 'waiting' | 'none';
 
 // @public
 export interface ModDetailProps {
@@ -177,6 +190,7 @@ export interface ModHooks {
         nudge: (charId: string) => void;
     }) => void | Promise<void>;
     gameEntered?: () => void;
+    gameMenuEntry?: ComponentType<ScreenSlotProps['gameMenuEntry']>;
     gameModals?: Record<string, ComponentType<GameModalProps>>;
     landingTool?: ComponentType<ScreenSlotProps['landingTool']>;
     mapOverlay?: ComponentType<ScreenSlotProps['mapOverlay']>;
@@ -518,6 +532,11 @@ export interface ScreenSlotProps {
         name: string;
         theme: ScreenTheme;
         height: number;
+    };
+    // (undocumented)
+    gameMenuEntry: {
+        Item: ComponentType<GameMenuItemProps>;
+        saveOffer: ManualSaveOffer;
     };
     // (undocumented)
     landingTool: {

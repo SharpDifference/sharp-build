@@ -1,4 +1,6 @@
 import type { JSX } from 'react'
+import type { GameMenuItemProps } from '../mods/hooks'
+import { ModSlot } from '../mods/ModSlot'
 import { createPortal } from 'react-dom'
 import { motion } from 'motion/react'
 import { DeadNote } from '../components/DeadNote'
@@ -146,6 +148,7 @@ export function GameMenuModal({
               </motion.button>
             </DeadNote>
           )}
+          <ModSlot slot="gameMenuEntry" props={{ Item: MenuItem, saveOffer }} />
           {onControls && (
             <motion.button
               id="game-menu-controls"
@@ -208,5 +211,29 @@ export function GameMenuModal({
       </motion.div>
     </motion.div>,
     host
+  )
+}
+
+/** One entry as the menu draws its own, for a mod's: dealt in with the rest, and dimmed when dead. */
+function MenuItem({ dead = false, note, onClick, children }: GameMenuItemProps): JSX.Element {
+  const button = (
+    <motion.button
+      className="vu-btn vu-btn--outline vu-paper"
+      type="button"
+      variants={dead ? dealtItemDead : dealtItem}
+      {...gestures(dead, lift, press)}
+      disabled={dead}
+      onClick={onClick}
+    >
+      {children}
+    </motion.button>
+  )
+  // An entry that can be dead keeps its wrapper either way, so the menu's layout does not shift.
+  return note === undefined ? (
+    button
+  ) : (
+    <DeadNote note={dead ? note : null} align="center">
+      {button}
+    </DeadNote>
   )
 }
