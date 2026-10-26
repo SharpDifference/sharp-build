@@ -6,8 +6,6 @@ import { ReckoningDungeonView } from './ReckoningDungeon'
 import { dungeonVisible } from '../stores/reckoningDungeon'
 import { EchoPanel } from './EchoPanel'
 import { ensureEchoes } from '../stores/echoAssignments'
-import { StoryMemoryModal } from './StoryMemoryModal'
-import { modIsOn } from '../stores/modsStore'
 import { useModsStore } from '../stores/modsStore'
 import { slotActivityAvailable } from '../mods/hooks'
 import { finishSlotActivity, resumeSlotActivity } from '../stores/slotActivity'
@@ -216,8 +214,6 @@ import { modPanelGone } from './modPanelOwner'
 import { ModSlot } from '../mods/ModSlot'
 import { currentRun, runStale } from '../stores/loop/state'
 import { ModsModal } from './ModsModal'
-import { PlotTwistModal } from './PlotTwistModal'
-import { PLOT_TWIST_MOD } from '@shared/plotTwists'
 import { useModOn } from '../stores/modsStore'
 import { LoadGameModal } from './LoadGameModal'
 import { MilestoneModal } from './MilestoneModal'
@@ -302,11 +298,9 @@ type OpenPanel =
   | { kind: 'appSettings' }
   | { kind: 'controls' }
   | { kind: 'mods' }
-  | { kind: 'plotTwist' }
   | { kind: 'talents' }
   | { kind: 'echo' }
   | { kind: 'reckoning'; charId: string }
-  | { kind: 'storyMemory' }
   /** A mod's own panel over the scene, opened from its seat on the rail. */
   | { kind: 'modPanel'; modId: string }
   /** A mod's panel by its id, opened with the kit's `openPanel`, with what it was handed. */
@@ -603,7 +597,6 @@ function InterruptEndingModal({
 /** Game View: renders `gameStore`; `gameLoop.ts` owns state changes. */
 export function GameView(): JSX.Element {
   const tableOwnsInput = useTableInputLayout((state) => state.layout !== null)
-  const plotTwistOn = useModOn(PLOT_TWIST_MOD)
   const talentsOn = useModOn('campus-talents')
   const echoOn = useModOn('echo')
   const bg = useGameStore((s) => s.bg)
@@ -2809,9 +2802,7 @@ export function GameView(): JSX.Element {
               : { onLoadGame: () => setPanel({ kind: 'loadGame' }) })}
             onFeedback={() => setPanel({ kind: 'feedback' })}
             onSettings={() => setPanel({ kind: 'appSettings' })}
-            onStoryMemory={modIsOn('story-memory') ? () => setPanel({ kind: 'storyMemory' }) : undefined}
             onMods={() => setPanel({ kind: 'mods' })}
-            onPlotTwist={plotTwistOn ? () => setPanel({ kind: 'plotTwist' }) : undefined}
             modsWaiting={busy}
             onControls={() => setPanel({ kind: 'controls' })}
             leaveLabel={
@@ -2855,9 +2846,6 @@ export function GameView(): JSX.Element {
           <SaveGameModal key="save-game" theme={half} onClose={closePanel} />
         )}
 
-        {panel?.kind === 'plotTwist' && (
-          <PlotTwistModal key="plot-twist" theme={half} onClose={closePanel} />
-        )}
 
         <UnspokenLinkGlitch key="unspoken-link-glitch" hidden={blocked||covered||uiHidden||cinematic}/>
         <ReckoningDungeonView
@@ -2896,9 +2884,6 @@ export function GameView(): JSX.Element {
 
         {/* The community mods' switches, the same modal the Main Menu opens, as an arm of
             `OpenPanel` for the reason Settings is. */}
-        {panel?.kind === 'storyMemory' && (
-          <StoryMemoryModal key="storyMemory" theme={half} onClose={() => setPanel({ kind: 'settings' })} />
-        )}
         {panel?.kind === 'mods' && (
           <ModsModal key="mods" theme={half} onClose={closePanel} inGame />
         )}
