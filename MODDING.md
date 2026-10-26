@@ -111,6 +111,39 @@ Shared code holds no switches. Where a rule there has to follow one, give the ru
 a setter, and set it from `modsStore.ts` at boot and whenever a switch moves
 (`useModsStore.subscribe`). Continuing Semesters does this for its seniors option.
 
+## Additive romance requirements
+
+`shared/romanceRequirements.ts` lets a shared mod entry register a pure rule with
+`registerRomanceRequirement(modId, character => minimumsOrNull)`. The character supplies
+`traits` and `preferredStat` and can be absent. Return any subset of Brain, Body and Heart
+**point** minimums. Core takes the maximum for each stat across active providers; this is a
+merge, not first-wins or a multiplier. The native preferred-stat and High Standards checks
+still apply. With no enabled providers, native behavior is unchanged.
+
+```ts
+registerRomanceRequirement(MY_MOD, character =>
+  character?.preferredStat === 'brain' ? { brain: 60, heart: 35 } : null
+)
+```
+
+The default enable lookup is `sharedModOn`, bound to current switches/playthrough selection
+by `modsStore`. Disabled callbacks are not called. Register once at boot; the current registry
+holds one rule per mod ID, and a second registration for that ID replaces its rule. Results
+must be pure and finite; non-finite values are ignored. Exceptions propagate to the caller,
+rather than silently bypassing a failed requirement. This ports the existing `main` contract;
+it does not add a loader, hot-unload lifecycle or a second hook ordering system.
+
+Core reads requirements at crush eligibility/hints, direct crush awards, relationship prompt
+construction, ledger acts, projected milestones and committed milestones. A blocked group act
+is dropped as a whole. Friendship and affection can still grow; existing lovers are exempt.
+After a breakup, a new romance is gated again. Scene Creator's existing prompt-attraction
+override remains intentional. Callers of `foldRelationshipEvents` must supply character and
+stats to enforce optional requirements; its context-free form remains the native fold.
+
+The tests in `test/romanceRequirements.test.ts` use a synthetic registration, not a shipped
+mod. They check order-independent composition, disabled/invalid responses, prompts, direct
+awards, roll eligibility, group acts, projections, saved milestones and the lover exception.
+
 ## Screens and the files in the root
 
 A mod's screens follow `UI_STYLE_GUIDE.md`, but nobody edits it, nor any other file in the root

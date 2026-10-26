@@ -1,3 +1,4 @@
+import { blocksNewRomance } from '@shared/romanceRequirements'
 import { savedModScene } from '@shared/modScene'
 import { statFloor } from '../mods/hooks'
 import { create } from 'zustand'
@@ -2355,6 +2356,7 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
         if (!info) return null
         const flags = info.flags ?? emptyFlags()
         if (flags.hasCrush) return null
+        if (blocksNewRomance(state.characters[charId], state.stats, flags)) return null
         return { ...info, flags: { ...flags, hasCrush: true } }
       })
     ),
@@ -2450,7 +2452,7 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
   applyRelationshipEvents: (charId, events) =>
     set((state) =>
       patchCharInfo(state, charId, (info = blankCharInfo()) =>
-        foldRelationshipEvents(info, events, state.date)
+        foldRelationshipEvents(info, events, state.date, { character: state.characters[charId], stats: state.stats })
       )
     ),
 

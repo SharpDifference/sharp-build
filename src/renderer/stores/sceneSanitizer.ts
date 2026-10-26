@@ -1,5 +1,6 @@
 import { offeredCustomCgs, storedCgOf, type OfferedCg } from '@shared/customCgs'
 import { settleDating, type DatingPassInput, type DatingPassOutcome } from '@shared/dating'
+import { blocksNewRomance } from '@shared/romanceRequirements'
 import {
   isCustomOutfitSlot,
   offeredCustomOutfits,
@@ -457,6 +458,9 @@ export function ledgerActs(ledger: LedgerResponse | null, log = true): IntimateA
       if (log) console.warn('[ledger] act with nobody identifiable in it — dropping it.')
       continue
     }
+    const game = useGameStore.getState()
+    // Drop the whole pairing, rather than inventing a different act without one participant.
+    if (charIds.some(id => blocksNewRomance(game.characters[id], game.stats, game.charInfo[id]?.flags))) continue
     const pairing = `${entry.kind}|${[...charIds].sort().join('|')}`
     const held = byPairing.get(pairing)
     // Seen once is seen: the same pairing reported twice is one act, public if either row was.
@@ -820,7 +824,10 @@ export function projectLedger(
 
   // Last, like the apply, so the cap evicts in the same order.
   for (const [charId, events] of ledgerEvents(ledger, false)) {
-    projected[charId] = foldRelationshipEvents(entryFor(charId), events, date)
+    const game = useGameStore.getState()
+    projected[charId] = foldRelationshipEvents(entryFor(charId), events, date, {
+      character: game.characters[charId], stats: game.stats
+    })
   }
 
   const dating = settleDating(datingInputOf(charInfo, projected, date))

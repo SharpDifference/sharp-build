@@ -1,3 +1,4 @@
+import { blocksNewRomance, missingRomanceStatOf, romanceMinimumsOf } from './romanceRequirements'
 import { likedPostBonus, likedPostWindowOf } from './feed'
 import { RELATIONSHIP_SHARE, STAT_SHARE } from './odds'
 import {
@@ -596,11 +597,16 @@ export function applyEvent(flags: CharFlags, event: RelationshipEvent): CharFlag
 export function foldRelationshipEvents(
   info: CharInfo,
   events: readonly RelationshipEvent[],
-  date: number
+  date: number,
+  romance?: { character: Pick<Character, 'traits' | 'preferredStat'> | undefined; stats: PlayerStats }
 ): CharInfo {
   const before = info.flags ?? emptyFlags()
   let flags = before
-  for (const event of events) flags = applyEvent(flags, event)
+  for (const event of events) {
+    if (romance && blocksNewRomance(romance.character, romance.stats, flags) &&
+      ['kissed', 'sex', 'became_lovers', 'agreed_to_harem'].includes(event)) continue
+    flags = applyEvent(flags, event)
+  }
 
   // The milestones' own memories, stacked with whatever the ledger wrote about the scene.
   const milestones: CharMemory[] = []
@@ -741,6 +747,8 @@ export function missingCrushStatOf(
   character: CrushCharacter,
   stats: PlayerStats
 ): StatKey | null {
+  const extra = missingRomanceStatOf(character, stats)
+  if (extra) return extra
   const preferred = preferredStatOf(character)
   if (stats[preferred] < CRUSH_FLOOR) return preferred
   if (!hasTrait(character, 'High Standards')) return null
@@ -749,12 +757,14 @@ export function missingCrushStatOf(
 
 /** The tier a stat has to reach for her — the high bar for her own, the low for the rest. */
 function crushRequirementOf(character: CrushCharacter, stat: StatKey): StatTier {
-  return stat === preferredStatOf(character) ? PREFERRED_TIER : OTHER_TIER
+  const native = stat === preferredStatOf(character) ? PREFERRED_TIER : OTHER_TIER
+  const minimum = romanceMinimumsOf(character)[stat]
+  return Math.max(native, minimum === undefined ? native : tierOf(minimum)) as StatTier
 }
 
 /** How a status line names what she is waiting on — all three for a girl who wants all three. */
 function hintSubject(character: CrushCharacter, stat: StatKey): string {
-  return hasTrait(character, 'High Standards')
+  return hasTrait(character, 'High Standards') || STAT_KEYS.every(key => romanceMinimumsOf(character)[key] !== undefined)
     ? `${STAT_LABELS.brain}, ${STAT_LABELS.body}, and ${STAT_LABELS.heart}`
     : STAT_LABELS[stat]
 }
@@ -770,8 +780,12 @@ export function crushHintUpdate(
   stats: PlayerStats,
   hint: CrushHint | undefined
 ): { line: string | null; hint: CrushHint | undefined } {
-  // The terminal state: nothing takes a payoff back.
-  if (hint && 'met' in hint) return { line: null, hint }
+  // A newly enabled requirement (or a newly added trait) can raise a previously cleared bar.
+  // Ordinary terminal hints keep their native behavior.
+  if (hint && 'met' in hint) {
+    if (missingRomanceStatOf(character, stats) === null) return { line: null, hint }
+    hint = undefined
+  }
   if (hint && tierOf(stats[hint.stat]) <= hint.tier) return { line: null, hint }
 
   const missing = missingCrushStatOf(character, stats)
@@ -780,7 +794,7 @@ export function crushHintUpdate(
     if (!hint) return { line: null, hint: undefined }
     return {
       line: `Your ${hintSubject(character, hint.stat)} seem${
-        hasTrait(character, 'High Standards') ? '' : 's'
+        hintSubject(character, hint.stat).includes(',') ? '' : 's'
       } to have caught ${name}'s interest...`,
       hint: { met: true }
     }
