@@ -187,6 +187,7 @@ export interface ModHooks {
     prompts?: {
         [S in PromptSpot]?: PromptAddition<PromptSpots[S]>;
     };
+    railButton?: ComponentType<ScreenSlotProps['railButton']>;
     requests?: {
         [S in keyof RequestSpots]?: (request: StructuredRequest, ctx: RequestSpots[S]) => StructuredRequest;
     };
@@ -534,6 +535,12 @@ export interface ScreenSlotProps {
     // (undocumented)
     portraitOverlay: {
         charId: string;
+    };
+    // (undocumented)
+    railButton: {
+        Seat: ComponentType<RailSeatProps>;
+        visible: boolean;
+        dead: boolean;
     };
     // (undocumented)
     settingsSection: {

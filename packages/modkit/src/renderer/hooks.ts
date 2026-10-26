@@ -375,6 +375,8 @@ export interface ModHooks {
    * scene behind takes nothing while one is up. One panel per id, the first mod's that is on.
    */
   gameModals?: Record<string, ComponentType<GameModalProps>>
+  /** Drawn on the scene's rail, after the Calendar and before the mods' scene seats (`scenePlay`). */
+  railButton?: ComponentType<ScreenSlotProps['railButton']>
 
   /**
    * After the texts of a girl reaching out just to talk have landed. `reply` is her entry from the
@@ -509,6 +511,14 @@ export interface ScreenSlotProps {
   }
   messageAttachment: { message: ChatMessage }
   contactPostExtra: { charId: string; post: SocialPost }
+  railButton: {
+    /** The rail's own seat, so a mod's button is drawn as the game's are. */
+    Seat: ComponentType<RailSeatProps>
+    /** The rail is up: false behind a curtain, with the chrome hidden, or before Settings is. */
+    visible: boolean
+    /** The rail stands but takes nothing. */
+    dead: boolean
+  }
 }
 
 export type ScreenSlot = keyof ScreenSlotProps

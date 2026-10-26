@@ -108,7 +108,8 @@ export const HOOKS = [
   slot('stageLayer'),
   slot('panelLayer'),
   slot('messageAttachment'),
-  slot('contactPostExtra')
+  slot('contactPostExtra'),
+  slot('railButton')
 ] as const satisfies readonly HookRow[]
 
 export type HookName = (typeof HOOKS)[number]['name']

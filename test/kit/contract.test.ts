@@ -205,7 +205,8 @@ const PROBES: Record<RendererHook, (id: string) => Probe> = {
   stageLayer: slot('stageLayer'),
   panelLayer: slot('panelLayer'),
   messageAttachment: slot('messageAttachment'),
-  contactPostExtra: slot('contactPostExtra')
+  contactPostExtra: slot('contactPostExtra'),
+  railButton: slot('railButton')
 }
 
 describe('every hook in the table', () => {

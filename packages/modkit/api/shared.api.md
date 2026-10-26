@@ -542,6 +542,12 @@ export const HOOKS: readonly [{
     readonly kind: 'slot';
     readonly dispatch: readonly ['screenSlot'];
     readonly since: '0.1.0';
+}, {
+    readonly name: "railButton";
+    readonly side: 'renderer';
+    readonly kind: 'slot';
+    readonly dispatch: readonly ['screenSlot'];
+    readonly since: '0.1.0';
 }];
 
 // @public
