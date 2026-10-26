@@ -51,9 +51,7 @@ import {
   normalizeComfyUrl
 } from '@shared/comfyModels'
 import { CustomBackgroundsModal } from './CustomBackgroundsModal'
-import { SOUNDTRACK_MOD } from '@shared/soundtracks'
 import { useModOn } from '../stores/modsStore'
-import { SoundtracksModal } from './SoundtracksModal'
 import { ModSlot } from '../mods/ModSlot'
 import { SettingsAdvancedTab } from './SettingsAdvancedTab'
 import { SettingsComfyTab } from './SettingsComfyTab'
@@ -252,9 +250,6 @@ export function AppSettingsModal({ theme, onClose }: AppSettingsModalProps): JSX
   const [studio, setStudio] = useState(false)
   const promptStudio = useModOn(PROMPT_STUDIO_MOD)
   const [backgrounds, setBackgrounds] = useState(false)
-  // Custom Soundtracks' own panel, over this one while the mod is on.
-  const [soundtracks, setSoundtracks] = useState(false)
-  const customSoundtracks = useModOn(SOUNDTRACK_MOD)
   // Holds off a second click while Save's write is in flight.
   const saving = useRef(false)
   // The layer inside the panel a combobox hangs its list on, once it is in the document.
@@ -841,21 +836,6 @@ export function AppSettingsModal({ theme, onClose }: AppSettingsModalProps): JSX
                       ))}
                     </div>
 
-                    {/* In a row of its own, as the backup buttons are, so it sizes to its words. */}
-                    {customSoundtracks && (
-                      <div className="vu-settings-data-actions">
-                        <motion.button
-                          id="settings-soundtracks"
-                          className="vu-pill"
-                          type="button"
-                          disabled={backingUp || restoring}
-                          {...gestures(backingUp || restoring, quietLift, quietPress)}
-                          onClick={() => setSoundtracks(true)}
-                        >
-                          Custom soundtracks
-                        </motion.button>
-                      </div>
-                    )}
                     <ModSlot
                       slot="settingsSection"
                       props={{ theme, busy: backingUp || restoring }}
@@ -1238,11 +1218,6 @@ export function AppSettingsModal({ theme, onClose }: AppSettingsModalProps): JSX
             theme={theme}
             onClose={() => setBackgrounds(false)}
           />
-        )}
-      </AnimatePresence>
-      <AnimatePresence propagate>
-        {soundtracks && (
-          <SoundtracksModal key="soundtracks" theme={theme} onClose={() => setSoundtracks(false)} />
         )}
       </AnimatePresence>
     </>,

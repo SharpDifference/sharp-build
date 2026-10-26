@@ -43,11 +43,16 @@ No saved playthrough is rewritten and no AI prompt or token budget is involved.
 
 ## Source map
 
+The renderer entry registers `settingsSection`. Its lazily loaded `SoundtrackSettings` component owns the existing button and `SoundtracksModal`, including the open/close state. Settings passes its day/night theme and backup/restore busy state through the generic outlet; it no longer imports the mod, stores its open state, or mounts its panel directly. Disabling the mod removes the contribution and runs the modal's existing preview cleanup while retaining imported tracks and assignments. The button's label, placement, styling and busy guard stay the same.
+
+This migrates the settings UI only. Audio cue resolution, file storage, backups and the typed native/web bridge remain on their existing paths until the kit supports their migration.
+
 | File | Responsibility |
 | --- | --- |
 | `src/shared/soundtracks.ts` | Mod definition, thirteen slots, bridge types, limits, legacy map parsing, backup integrity |
 | `src/shared/soundtrackLibrary.ts` | Serialized mutations, temporary selection tokens, shared native/web rules |
 | `src/shared/modEntries/custom-soundtracks.ts` | Registers the independent switch, without `requires` |
+| `src/renderer/modEntries/custom-soundtracks.ts`, `views/SoundtrackSettings.tsx` | Registers the settings contribution and owns its button/panel state |
 | `src/main/services/soundtrackService.ts` | Native file storage, bounded reads, SHA-256 and atomic writes |
 | `src/main/ipc.ts` | Native file dialog and seven typed soundtrack handlers |
 | `src/preload/api.d.ts`, `src/preload/index.ts` | Typed renderer bridge |
