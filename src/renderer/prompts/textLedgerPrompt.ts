@@ -5,6 +5,7 @@ import {
   type LedgerResponse,
   type StructuredRequest
 } from '@shared/types'
+import { promptLines } from '../mods/hooks'
 import { objectSchema } from './schema'
 import { LEDGER_PERSONA, milestoneCastLines } from './scenePrompt'
 import {
@@ -121,7 +122,8 @@ export function buildTextLedgerPrompt(
     ...scheduleBlocks(schedule, true),
     '',
     ...messagesBlock(schedule),
-    ''
+    '',
+    ...promptLines('text-ledger', { charKeys: textedKeys })
   ].join('\n')
 
   return {
