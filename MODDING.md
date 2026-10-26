@@ -263,6 +263,28 @@ These hooks add to the existing API; existing hooks and their arguments are unch
 - `optionPreviews` draws a preview under an option group on the Mods screen, keyed by the group's id. The game hands it `optionId`, the option picked (or null), and draws it under the group's switches on the recessed ground. It is asked whether or not the mod is on, so a player sees it before switching the mod on.
 - `updatesTab` puts a page beside the feed in the Updates tab, with `id`, `word`, `Page`, an optional `unread(game)` and an optional `Action`, drawn at the end of the titles' row while the page is showing. With one or more on, Updates draws a row of titles you press, its own first (the one showing drawn as the screen's title, the rest muted over a faded blob), and the game puts each `unread` on the far corner of its title's blob and sums them onto the Updates tile and the landing's Bunnyboard badge. The page is drawn under the title; it brings its own `vu-bb-scroll`. The feed's id, `feed`, cannot be replaced; leaving the tab, or the mod switching off, comes back to the feed.
 
+### DM request history window
+
+`buildTextingPrompt` accepts an optional `historyLimit` on its `TextingPromptState`.
+This is a request-builder option, not a global hook or a saved preference: the caller that
+owns a replay supplies it for that request. Ordinary texting still includes the newest 20
+stored messages. A finite override is rounded down and clamped to 20–160; missing or
+non-finite values use 20. The pending player message is added once after those messages,
+so the maximum is 160 stored messages plus the pending text. This is a message count,
+not a token or character budget, and does not change stored history or summary retention.
+
+The supplied conversation is read without mutation. A caller rebuilding a rejected reply
+must first supply a snapshot from **before** that reply, with its earlier summary (or null
+when that summary is unavailable); this option does not identify or remove rejected turns.
+The native lorebook scan reads the selected history, and `dmHistoryNote`, `prompts.dm` and
+`requests.dm` still run normally. A larger window can increase request size and cost; use it
+only when the earlier summary is unavailable. Model selection and request dispatch do not change.
+
+The future texting kit can forward this option from `buildDmRequest`. Thread leases, safe
+conversation replacement, mod activation checks and persistence remain the caller's
+responsibility; this capability alone is not a complete regeneration or loader API.
+See `test/dmHistoryWindow.test.ts` for bounded requests, replay snapshots and hook composition.
+
 ### Comments under posts
 
 The game keeps a post's comments (`comments` on `SocialPost`, shaped as `PostComment` in

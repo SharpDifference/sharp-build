@@ -69,6 +69,15 @@ import { weatherLines } from './weather'
 /** How many recent messages ride in the prompt and in each rolling summary. */
 const TEXTING_HISTORY_CAP = 20
 
+/** A replay may need more context when its earlier summary is unavailable. */
+const TEXTING_HISTORY_MAX = 160
+
+/** A bad request must never turn slice(-NaN) into the entire saved conversation. */
+function historyLimitOf(requested: number | undefined): number {
+  if (requested === undefined || !Number.isFinite(requested)) return TEXTING_HISTORY_CAP
+  return Math.max(TEXTING_HISTORY_CAP, Math.min(TEXTING_HISTORY_MAX, Math.floor(requested)))
+}
+
 /** RITA writing one side of a text thread. */
 const TEXTING_PERSONA = [
   'You are RITA, author of steamy reader-POV romance fiction set at fictional universities.',
@@ -84,6 +93,8 @@ const TEXTING_PERSONA = [
 
 /** The prompt-facing slice of state a texting turn needs. */
 export interface TextingPromptState {
+  /** Recent stored messages to include: 20 by default, at most 160; not a token budget. */
+  historyLimit?: number
   date: number
   time: TimeSlot
   /** The reader's accumulated stats, used for relationship requirement guidance. */
@@ -344,7 +355,7 @@ export function buildTextingPrompt(
     (info?.pursuing !== undefined && !visiting) ||
     isAwayForSpringBreak(state.springBreakAway, character.charId, state.date)
   const thread: ChatMessage[] = [
-    ...(conversation?.messages ?? []).slice(-TEXTING_HISTORY_CAP),
+    ...(conversation?.messages ?? []).slice(-historyLimitOf(state.historyLimit)),
     {
       id: 'pending',
       sender: 'player',
