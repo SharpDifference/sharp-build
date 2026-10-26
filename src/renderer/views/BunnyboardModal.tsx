@@ -18,7 +18,7 @@ import {
 import { createPortal } from 'react-dom'
 import { AnimatePresence, motion } from 'motion/react'
 import type { PostComment } from '@shared/postComments'
-import { MessagePhotoBubble, PhotoLightboxHost } from '../components/PhotoBubble'
+import { MessagePhotoBubble } from '../components/PhotoBubble'
 import {
   fullNameOf,
   type Character,
@@ -353,7 +353,6 @@ export function BunnyboardModal({
       exit="gone"
       {...overlayProps}
     >
-      <PhotoLightboxHost />
       <ModSlot slot="phoneOverlay" props={{}} />
       {contact ? (
         <ContactPage key={contact} charId={contact} theme={theme} />
