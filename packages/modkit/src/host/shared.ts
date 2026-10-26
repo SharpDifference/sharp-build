@@ -4,3 +4,5 @@
  */
 export { setSharedModRules } from '../shared/modRules'
 export { carriedModFields, carryModFields, carryPostFields } from '../shared/modCarry'
+export { checkCompat, CORE_SURFACE, hookNamesOf, manifestHooks } from '../shared/compat'
+export type { Compat, CoreSurface, MissingHook } from '../shared/compat'
