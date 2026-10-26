@@ -35,7 +35,7 @@ function slotKey(slot: ScreenSlot): string {
 
 /** One mod's component at a place: nothing from the moment it throws. */
 export class SlotBoundary extends Component<
-  { slot: ScreenSlot; modId: string; children: ReactNode },
+  { slot: string; modId: string; children: ReactNode },
   { failed: boolean }
 > {
   state = { failed: false }

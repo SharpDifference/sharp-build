@@ -236,6 +236,9 @@ else names it.
 | `photosPageSection` | `PhotosPage.tsx` | Draw a component on the Photos page, under the grid. Props: `theme` |
 | `stageLayer` | `GameView.tsx` | Mount a component over the stage and under the scene's chrome, on every screen of the game view. Props: `sceneMode`, `cinematic`, `covered`, `uiHidden`, `rowShown`, `blocked`, `quiz`, `interjectRow`, `awaitingInput` |
 | `panelLayer` | `GameView.tsx` | Mount a component among the game view's panels, over the chrome, on every screen of the game view. Props: `cinematic`, `covered`, `uiHidden`, `blocked`, `panelOpen`, `openGameMenu` |
+| `messageAttachment` | `BunnyboardModal.tsx` | Draw a component after a phone message's text bubble, or alone where the message has no text. Props: `message` |
+| `contactPostExtra` | `ContactPage.tsx` | Draw a component beside a post's like, in the feed on her contact page. Props: `charId`, `post` |
+| `contactTab` | `ContactPage.tsx` | Add a reading of her beside Profile on her contact page: a tab, and a panel drawn in place of her cards |
 
 The two ways on (`endingChoice`, `saveChoice`) share one shape, `WayOn`. Its `prepare` runs
 while nothing has been torn down, does whatever may fail and reports it, and returns `enter`,
@@ -244,7 +247,7 @@ screen to show. The first mod that answers is offered; the game's own choice alw
 While `prepare` runs, the screen that offered the choice keeps every button locked; an answer
 that comes back after that screen closed, or after its game was left, opens nothing.
 
-The places on screen (`settingsSection` to `panelLayer` above) each take a component. Every mod
+The places on screen (`settingsSection` to `contactPostExtra` above) each take a component. Every mod
 that is on and has one there is drawn, in list order, and drawn again when a switch moves or a
 game is entered or left (a `playthrough` mod is on as the game's record says); a mod that is
 off is not drawn. The props are the facts the game has at that place, and only the ones a
@@ -254,6 +257,13 @@ in the phone's veil, so it is there only while the phone is open, and stands ove
 is not a layer over the whole app. `blocked` is the game's own: a panel, a modal or a failure
 standing over the scene. Once mods use one of these places, its name and its props stay as they
 are; a change goes in as a new place beside it.
+
+A tab on her contact page (`contactTab`) is an `id`, a `label`, a `Panel` and an optional
+`shown({ charId, isContact })`. While a mod that is on has one that stands for her, the page draws
+a row of tabs, Profile first, and the picked tab's `Panel` in place of her profile cards, handed
+`charId`, `isContact` and `theme`; the page is her profile again once that tab goes. One tab per
+id, the first in list order, and `profile` is the page's own. `Card` and `Locked` from
+`ContactPage.tsx` draw a panel the way the page draws its own cards.
 
 A place on the scene screen (`scenePlay`) is two components. `Seat` is mounted on the rail for
 as long as the scene's chrome is; the game hands it the rail's own seat to draw with, whether

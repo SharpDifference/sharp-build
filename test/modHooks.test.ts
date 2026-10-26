@@ -143,6 +143,26 @@ describe('updates tabs and option previews', () => {
   })
 })
 
+describe('tabs on her contact page', () => {
+  const Panel = () => null
+
+  it('come one per id from the mods that are on, in list order, where each says it stands', async () => {
+    const on = { gallery: true, notes: true, copy: true, hidden: true, off: false }
+    const hooks = await fresh(on, ['gallery', 'notes', 'copy', 'hidden', 'off'])
+    hooks.registerHooks('copy', { contactTab: { id: 'gallery', label: 'Copy', Panel } })
+    hooks.registerHooks('notes', { contactTab: { id: 'notes', label: 'Notes', Panel, shown: ({ isContact }) => isContact } })
+    hooks.registerHooks('gallery', { contactTab: { id: 'gallery', label: 'Gallery', Panel } })
+    hooks.registerHooks('hidden', { contactTab: { id: 'profile', label: 'Mine', Panel } })
+    hooks.registerHooks('off', { contactTab: { id: 'off', label: 'Off', Panel } })
+
+    const labels = (isContact: boolean) =>
+      hooks.contactTabs({ charId: 'c1', isContact }).map(({ tab }: { tab: { label: string } }) => tab.label)
+    // Profile is the page's own, and a tab whose mod says it does not stand for her is left out.
+    expect(labels(true)).toEqual(['Gallery', 'Notes'])
+    expect(labels(false)).toEqual(['Gallery'])
+  })
+})
+
 
 describe('preparing a way on', () => {
   /** A prepare the test answers by hand, so the screen can be closed while it waits. */

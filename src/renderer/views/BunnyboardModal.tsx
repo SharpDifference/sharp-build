@@ -1369,12 +1369,19 @@ function MessageBubble({ message }: { message: ChatMessage }): JSX.Element {
       </div>
     )
   }
+  // What a mod attaches to the message follows its text, in a bubble of its own: a message that is
+  // only an attachment draws no empty bubble.
   return (
-    <div
-      className={`vu-bb-bubble vu-bb-bubble--${message.sender === 'player' ? 'mine' : 'theirs'}${bare ? ' vu-bb-bubble--bare' : ''}`}
-    >
-      <SentText text={message.text} />
-    </div>
+    <>
+      {message.text && (
+        <div
+          className={`vu-bb-bubble vu-bb-bubble--${message.sender === 'player' ? 'mine' : 'theirs'}${bare ? ' vu-bb-bubble--bare' : ''}`}
+        >
+          <SentText text={message.text} />
+        </div>
+      )}
+      <ModSlot slot="messageAttachment" props={{ message }} />
+    </>
   )
 }
 
