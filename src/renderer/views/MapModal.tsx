@@ -44,6 +44,7 @@ import {
   typedChar,
   veilIn
 } from './motion'
+import { ModSlot } from '../mods/ModSlot'
 import '../vu_styles/BunnyMap.css'
 
 export interface MapModalProps {
@@ -461,6 +462,8 @@ export function MapModal({ theme, onClose, onGo }: MapModalProps): JSX.Element |
             })}
           </motion.div>
         </div>
+
+        <ModSlot slot="mapOverlay" props={{ canTravel: canGo, close: onClose }} />
 
         <div className="vu-foot">
           {/* Nobody silently vanishes: the three lines that are not places, anchored left so

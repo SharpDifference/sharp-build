@@ -23,6 +23,7 @@ import { PhotoProgressModal } from './PhotoProgressModal'
 import { PhotoViewerModal } from './PhotoViewerModal'
 import { dealt, gestures, quietLift, quietPress, slideInQuick, spin } from './motion'
 import { PlusIcon } from './screenIcons'
+import { ModSlot } from '../mods/ModSlot'
 import '../vu_styles/Photos.css'
 
 export interface PhotosPageProps {
@@ -197,6 +198,7 @@ export function PhotosPage({ theme }: PhotosPageProps): JSX.Element {
             />
           ))}
         </motion.ul>
+        <ModSlot slot="photosPageSection" props={{ theme }} />
       </div>
 
       {/* Create, its Generating modal and the viewer a watched photo lands in follow one another,

@@ -191,6 +191,13 @@ else names it.
 | `exercisedStats` | `gameLoop.ts` (`resolveScene`) | Change what the hour exercised, before the game resolves what that pays |
 | `settleSceneStats` | `gameLoop.ts` (`resolveScene`) | Change what a finished scene does to the reader's stats, and the lines that say so |
 | `statFloor` | `gameLoop.ts`, `gameStore.ts` | Say the lowest a stat may fall to; the first mod that answers decides |
+| `settingsSection` | `AppSettingsModal.tsx` | Draw a component in app settings, in the Game tab under the volume sliders. Props: `theme`, `busy` (a backup or restore is running) |
+| `portraitOverlay` | `GameView.tsx` (`PortraitSlot`) | Draw a component in each portrait on the stage, under her sprite. Props: `charId` |
+| `phoneOverlay` | `BunnyboardModal.tsx` | Mount a component in the phone's veil while the phone is open, over the phone. Props: none |
+| `mapOverlay` | `MapModal.tsx` | Draw a component on the map, under the places and above its foot. Props: `canTravel` (the map was opened to go somewhere), `close` |
+| `photosPageSection` | `PhotosPage.tsx` | Draw a component on the Photos page, under the grid. Props: `theme` |
+| `stageLayer` | `GameView.tsx` | Mount a component over the stage and under the scene's chrome, on every screen of the game view. Props: `sceneMode`, `cinematic`, `covered`, `uiHidden`, `rowShown`, `blocked`, `quiz`, `interjectRow`, `awaitingInput` |
+| `panelLayer` | `GameView.tsx` | Mount a component among the game view's panels, over the chrome, on every screen of the game view. Props: `cinematic`, `covered`, `uiHidden`, `blocked`, `panelOpen`, `openGameMenu` |
 
 The two ways on (`endingChoice`, `saveChoice`) share one shape, `WayOn`. Its `prepare` runs
 while nothing has been torn down, does whatever may fail and reports it, and returns `enter`,
@@ -198,6 +205,17 @@ which the game calls once any running game is gone: it stages what the mod needs
 screen to show. The first mod that answers is offered; the game's own choice always stays.
 While `prepare` runs, the screen that offered the choice keeps every button locked; an answer
 that comes back after that screen closed, or after its game was left, opens nothing.
+
+The places on screen (`settingsSection` to `panelLayer` above) each take a component. Every mod
+that is on and has one there is drawn, in list order, and drawn again when a switch moves or a
+game is entered or left (a `playthrough` mod is on as the game's record says); a mod that is
+off is not drawn. The props are the facts the game has at that place, and only the ones a
+mod reads; a component works out its own hidden or blocked state from them. A component that
+throws draws nothing from then on, and the screen around it carries on. `phoneOverlay` is mounted
+in the phone's veil, so it is there only while the phone is open, and stands over the phone: it
+is not a layer over the whole app. `blocked` is the game's own: a panel, a modal or a failure
+standing over the scene. Once mods use one of these places, its name and its props stay as they
+are; a change goes in as a new place beside it.
 
 A place on the scene screen (`scenePlay`) is two components. `Seat` is mounted on the rail for
 as long as the scene's chrome is; the game hands it the rail's own seat to draw with, whether
@@ -221,9 +239,9 @@ as a new hook beside the old one.
 
 ### Not covered yet
 
-- Screens: a mod's menu entries and editor fields, and its own panels beyond one over a scene
-  (`scenePlay`), a page beside the feed (`updatesTab`) and a preview on the Mods screen
-  (`optionPreviews`).
+- Screens: a mod's menu entries, buttons on the rail and the landing, and editor fields, and its
+  own panels beyond one over a scene (`scenePlay`), a page beside the feed (`updatesTab`), a
+  preview on the Mods screen (`optionPreviews`) and the places on screen above.
 - Main process: IPC, protocols, services, settings and character rules.
 - Saves: a mod's own fields in a save. Carrying them into the next semester is covered below.
 
@@ -233,7 +251,9 @@ These are still direct edits, as before.
 
 `test/modHooks.test.ts`: only mods that are on are asked, in list order; likes fall back to the
 game's own; a post a mod holds is not passed on; scene places and landed scene replies go to
-the mods that are on.
+the mods that are on. `test/modSlots.test.ts`: each place on screen draws the components of the
+mods that are on and not those that are off, each in a boundary of its own that turns a throw
+into nothing drawn.
 
 The hook points are naudh1r's design, lifted from his Photo Feature branch, which is the first
 mod on them.
