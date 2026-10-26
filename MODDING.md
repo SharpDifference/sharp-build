@@ -120,19 +120,6 @@ under `docs/mods/`; how a hook point draws goes in its entry here.
 
 ## Hook points
 
-### Additive romance requirements
-
-`shared/romanceRequirements.ts` lets a mod register a pure per-character map of minimum
-Brain, Body and Heart points. `registerRomanceRequirement(modId, rule)` is called from the
-shared mod entry; `sharedModOn` supplies the active-mod lookup from core. Multiple requirements combine
-by taking the highest minimum for each stat. Disabled rules are not consulted. The native
-preferred-stat and High Standards rules still run as usual.
-
-The requirement is checked before crush rolls, in relationship prompt context and when
-projecting or saving romantic milestones. Milestone callers supply character/stats context to
-`foldRelationshipEvents`; ordinary callers without that context keep the native behavior.
-See [Godlike Standards](docs/mods/godlike-standards.md) for the example and its tests.
-
 A switch decides whether a mod acts. Hook points decide **where** it acts without editing the
 game there. At each place mods commonly add to, the game asks once, in one line of its own
 file; a mod answers from its own files. Two mods adding to the same place then never touch the
@@ -204,6 +191,13 @@ else names it.
 | `exercisedStats` | `gameLoop.ts` (`resolveScene`) | Change what the hour exercised, before the game resolves what that pays |
 | `settleSceneStats` | `gameLoop.ts` (`resolveScene`) | Change what a finished scene does to the reader's stats, and the lines that say so |
 | `statFloor` | `gameLoop.ts`, `gameStore.ts` | Say the lowest a stat may fall to; the first mod that answers decides |
+| `settingsSection` | `AppSettingsModal.tsx` | Draw a component in app settings, in the Game tab under the volume sliders. Props: `theme`, `busy` (a backup or restore is running) |
+| `portraitOverlay` | `GameView.tsx` (`PortraitSlot`) | Draw a component in each portrait on the stage, under her sprite. Props: `charId` |
+| `phoneOverlay` | `BunnyboardModal.tsx` | Mount a component in the phone's veil while the phone is open, over the phone. Props: none |
+| `mapOverlay` | `MapModal.tsx` | Draw a component on the map, under the places and above its foot. Props: `canTravel` (the map was opened to go somewhere), `close` |
+| `photosPageSection` | `PhotosPage.tsx` | Draw a component on the Photos page, under the grid. Props: `theme` |
+| `stageLayer` | `GameView.tsx` | Mount a component over the stage and under the scene's chrome, on every screen of the game view. Props: `sceneMode`, `cinematic`, `covered`, `uiHidden`, `rowShown`, `blocked`, `quiz`, `interjectRow`, `awaitingInput` |
+| `panelLayer` | `GameView.tsx` | Mount a component among the game view's panels, over the chrome, on every screen of the game view. Props: `cinematic`, `covered`, `uiHidden`, `blocked`, `panelOpen`, `openGameMenu` |
 
 The two ways on (`endingChoice`, `saveChoice`) share one shape, `WayOn`. Its `prepare` runs
 while nothing has been torn down, does whatever may fail and reports it, and returns `enter`,
@@ -211,6 +205,17 @@ which the game calls once any running game is gone: it stages what the mod needs
 screen to show. The first mod that answers is offered; the game's own choice always stays.
 While `prepare` runs, the screen that offered the choice keeps every button locked; an answer
 that comes back after that screen closed, or after its game was left, opens nothing.
+
+The places on screen (`settingsSection` to `panelLayer` above) each take a component. Every mod
+that is on and has one there is drawn, in list order, and drawn again when a switch moves or a
+game is entered or left (a `playthrough` mod is on as the game's record says); a mod that is
+off is not drawn. The props are the facts the game has at that place, and only the ones a
+mod reads; a component works out its own hidden or blocked state from them. A component that
+throws draws nothing from then on, and the screen around it carries on. `phoneOverlay` is mounted
+in the phone's veil, so it is there only while the phone is open, and stands over the phone: it
+is not a layer over the whole app. `blocked` is the game's own: a panel, a modal or a failure
+standing over the scene. Once mods use one of these places, its name and its props stay as they
+are; a change goes in as a new place beside it.
 
 A place on the scene screen (`scenePlay`) is two components. `Seat` is mounted on the rail for
 as long as the scene's chrome is; the game hands it the rail's own seat to draw with, whether
@@ -220,15 +225,23 @@ panels: the scene behind it takes no key, click or turn until it closes. A field
 the scene's reply (`requests.scene`) comes back whole in `afterSceneReply`, once the reply's
 lines are on the transcript.
 
+A panel that sends a turn of its own takes the reader's turn first with `takeTurnFromReply()`
+from `stores/gameLoop.ts`, then sends with `submitAction`. It sends nothing itself: it brings the
+scene to a decision point a turn can go out from, the way an interjection does. Lines still
+being read are cut, the live scene call and any pending ending are dropped and the cut is written
+as a decision point; over a reply's last line, that line is taken as turned; at a decision point
+already, nothing changes. It returns `false` when none of these applies (the scene is busy, or
+nothing is waiting on the reader), and then the panel sends nothing.
+
 A hook point is added where mods actually meet, not ahead of need. Once mods use one, it stays
 as it is: renaming it or changing what it passes breaks them. A change that is needed goes in
 as a new hook beside the old one.
 
 ### Not covered yet
 
-- Screens: a mod's menu entries and editor fields, and its panels anywhere but over a scene.
-- Screens: a mod's own panels, menu entries and editor fields, beyond a page beside the feed
-  (`updatesTab`) and a preview on the Mods screen (`optionPreviews`).
+- Screens: a mod's menu entries, buttons on the rail and the landing, and editor fields, and its
+  own panels beyond one over a scene (`scenePlay`), a page beside the feed (`updatesTab`), a
+  preview on the Mods screen (`optionPreviews`) and the places on screen above.
 - Main process: IPC, protocols, services, settings and character rules.
 - Saves: a mod's own fields in a save. Carrying them into the next semester is covered below.
 
@@ -238,7 +251,9 @@ These are still direct edits, as before.
 
 `test/modHooks.test.ts`: only mods that are on are asked, in list order; likes fall back to the
 game's own; a post a mod holds is not passed on; scene places and landed scene replies go to
-the mods that are on.
+the mods that are on. `test/modSlots.test.ts`: each place on screen draws the components of the
+mods that are on and not those that are off, each in a boundary of its own that turns a throw
+into nothing drawn.
 
 The hook points are naudh1r's design, lifted from his Photo Feature branch, which is the first
 mod on them.
@@ -364,3 +379,85 @@ Files a mod keeps per playthrough outside the save (pictures, say) need nothing:
   `ModEnrollmentFields`. Save/enrollment validation requires the native required keys;
   optional additions do not make older files invalid. Mods own normalization and carryover.
 - The native `lorebook` Bunnyboard tab is reserved, like Chats and Friends.
+
+## Additive romance requirements
+
+`shared/romanceRequirements.ts` lets a shared mod entry register a pure rule with
+`registerRomanceRequirement(modId, character => minimumsOrNull)`. The character supplies
+`traits` and `preferredStat` and can be absent. Return any subset of Brain, Body and Heart
+**point** minimums. Core takes the maximum for each stat across active providers; this is a
+merge, not first-wins or a multiplier. The native preferred-stat and High Standards checks
+still apply. With no enabled providers, native behavior is unchanged.
+
+```ts
+registerRomanceRequirement(MY_MOD, character =>
+  character?.preferredStat === 'brain' ? { brain: 60, heart: 35 } : null
+)
+```
+
+The default enable lookup is `sharedModOn`, bound to current switches/playthrough selection
+by `modsStore`. Disabled callbacks are not called. Register once at boot; the current registry
+holds one rule per mod ID, and a second registration for that ID replaces its rule. Results
+must be pure and finite; non-finite values are ignored. Exceptions propagate to the caller,
+rather than silently bypassing a failed requirement. This ports the existing `main` contract;
+it does not add a loader, hot-unload lifecycle or a second hook ordering system.
+
+Core reads requirements at crush eligibility/hints, direct crush awards, relationship prompt
+construction, ledger acts, projected milestones and committed milestones. A blocked group act
+is dropped as a whole. Friendship and affection can still grow; existing lovers are exempt.
+After a breakup, a new romance is gated again. Scene Creator's existing prompt-attraction
+override remains intentional. Callers of `foldRelationshipEvents` must supply character and
+stats to enforce optional requirements; its context-free form remains the native fold.
+
+The tests in `test/romanceRequirements.test.ts` use a synthetic registration, not a shipped
+mod. They check order-independent composition, disabled/invalid responses, prompts, direct
+awards, roll eligibility, group acts, projections, saved milestones and the lover exception.
+
+## Character trait registration
+
+`shared/traits.ts` owns the native trait vocabulary and an additive registry. Register from
+the mod's shared entry before the first screen/request. The exact `value` is both the label
+and permanent string in `character.json`; do not rename a shipped value without a migration.
+
+```ts
+const unregister = registerCharacterTrait(MY_MOD, {
+  value: 'My stored trait',
+  description: 'What this trait means',
+  editor: true,          // default: offered by the editor when installed
+  generated: false,     // default: AI must never assign it
+  tone: 'my-mod-gold',   // optional data-tone token; the mod supplies its CSS
+  hint: 'A short explanation for the player.'
+})
+```
+
+This is one **registry** family, not a gameplay rule. Duplicate stored values, including a
+native value, throw an error naming both owners rather than picking by load order. Metadata
+is copied and frozen. Native traits keep their existing order; extensions sort by owner ID
+then stored value. The returned disposer removes only that registration and is safe to call
+twice; it does not change saved characters. The loader/diagnostic UI is separate work.
+
+#### When the registry is read
+
+| Consumer | Timing and policy |
+| --- | --- |
+| Character generator | `generatedCharacterTraits()` snapshots native traits plus explicitly `generated: true` traits whose owner is currently on. The writing pipeline takes one snapshot before building/queuing the request. Prompt text, schema and response parsing share it even if a mod is toggled or unregistered while generation is pending. A later registration can only affect the next request. |
+| Editor | `traitOptions(form.traits)` reads at each render, not module import. Installed metadata is available with the mod switch off, independently of its gameplay effect. `editor: false` prevents new selections; an already-saved value still gets its chip metadata. `selectedTraitHints` supplies the selected explanations. |
+| Character/contact chips | `traitTone` reads installed metadata when rendered; missing providers fall back to ordinary chips. Contact-page discovery conditions are unchanged. Core supplies `data-tone`, not a mod's visual design. |
+| Character card export | `traitDescription` reads metadata while constructing the card; an unknown trait exports its raw name without an `undefined` description. |
+| Scene/DM prompts | This registry does not automatically inject new instructions or enforce gameplay effects. Use the existing prompt hooks or a gameplay rule such as romance requirements. Native trait mechanics are unchanged. |
+
+Registration is currently a boot operation, before requests/screens. Functions reflect later
+registrations on their next call, but registration alone does not force a mounted React screen
+to rerender. An eventual hot installer must remount/refresh affected screens; this PR does not
+claim that loader lifecycle exists.
+
+`CHARACTER_TRAITS` and `TRAIT_DESCRIPTIONS` remain **native-only** constants for compatibility;
+new consumers must use the registry readers above. `isCharacterTrait` means "currently known",
+not "allowed from AI" and not "safe to retain on disk". Generation uses its explicit snapshot.
+Saved `CharacterTrait` strings are open, and load/import/export preserve unknown values.
+`editedCharacterTraits` permits offered additions while retaining existing unknown/hidden tags;
+only an explicit player removal drops one. A missing mod never rewrites the card.
+
+See `test/characterTraits.test.ts` for generator/editor separation, import-before-registration,
+pending-request snapshots, duplicate owners, deterministic order, metadata disposal, UI tone
+and hints, and read/edit/export with a missing provider. No particular mod trait ships in core.

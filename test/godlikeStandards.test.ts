@@ -4,7 +4,7 @@ import { renderToStaticMarkup } from 'react-dom/server'
 import { STAT_KEYS } from '@shared/playerStats'
 import { blocksNewRomance } from '@shared/romanceRequirements'
 import { crushChance, crushHintUpdate, emptyFlags, foldRelationshipEvents, meetsCrushStandards } from '@shared/relationship'
-import { isCharacterTrait, NATIVE_CHARACTER_TRAITS, traitTone } from '@shared/traits'
+import { isCharacterTrait, CHARACTER_TRAITS as NATIVE_CHARACTER_TRAITS, generatedCharacterTraits, selectedTraitHints, traitTone } from '@shared/traits'
 import { portableOf } from '@shared/characterTransfer'
 import type { LedgerResponse } from '@shared/types'
 import { useGameStore } from '../src/renderer/stores/gameStore'
@@ -13,7 +13,7 @@ import { relationshipLines } from '../src/renderer/prompts/relationship'
 import { applyLedger, ledgerActs, projectLedger } from '../src/renderer/stores/sceneSanitizer'
 import { rollCrushSettle } from '../src/renderer/stores/loop/crushes'
 import { TagSelect } from '../src/renderer/components/TagSelect'
-import { TRAIT_OPTIONS } from '../src/renderer/views/characterFields'
+import { traitOptions } from '../src/renderer/views/characterFields'
 import { character, charInfo } from './fixtures'
 
 const allGodly = { brain: 100, body: 100, heart: 100 }
@@ -173,10 +173,24 @@ describe('Godlike standards', () => {
     expect(traitTone('Godlike')).toBe('gold')
     expect(traitTone('High Standards')).toBeUndefined()
     const html = renderToStaticMarkup(createElement(TagSelect, {
-      id: 'test-traits', values: ['High Standards', 'Godlike'], options: TRAIT_OPTIONS, onChange: () => {}
+      id: 'test-traits', values: ['High Standards', 'Godlike'], options: traitOptions(), onChange: () => {}
     }))
     expect(html).toContain('data-tone="gold"')
     expect(html).toContain('Remove Godlike')
-    expect(html).toContain('requires Godly Brain, Body and Heart')
+    expect(html).toContain('Godlike requires Brain, Body and Heart all at Godly')
+  })
+
+  it('keeps one editor-only Godlike registration with its hint while gameplay is switched off', () => {
+    for (const enabled of [true, false, true]) {
+      setOn(enabled)
+      expect(traitOptions().filter(option => option.value === 'Godlike')).toEqual([
+        expect.objectContaining({ value: 'Godlike', label: 'Godlike', tone: 'gold' })
+      ])
+      expect(selectedTraitHints(['Godlike'])).toEqual([
+        'Godlike requires Brain, Body and Heart all at Godly before romance can begin. Applies while Godlike Standards is on.'
+      ])
+      expect(generatedCharacterTraits().map(trait => trait.value)).not.toContain('Godlike')
+      expect(blocksNewRomance(godlike, game().stats)).toBe(enabled)
+    }
   })
 })

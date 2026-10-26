@@ -44,6 +44,7 @@ import {
   typedChar,
   veilIn
 } from './motion'
+import { ModSlot } from '../mods/ModSlot'
 import '../vu_styles/BunnyMap.css'
 import { ReckoningDungeonMapPin } from './ReckoningDungeon'
 
@@ -464,6 +465,7 @@ export function MapModal({ theme, onClose, onGo }: MapModalProps): JSX.Element |
         </div>
 
         <ReckoningDungeonMapPin canTravel={!!onGo} onEnter={onClose}/>
+        <ModSlot slot="mapOverlay" props={{ canTravel: canGo, close: onClose }} />
 
         <div className="vu-foot">
           {/* Nobody silently vanishes: the three lines that are not places, anchored left so

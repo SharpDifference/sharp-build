@@ -24,6 +24,7 @@ import { PhotoViewerModal } from './PhotoViewerModal'
 import { dealt, gestures, quietLift, quietPress, slideInQuick, spin } from './motion'
 import { PlusIcon } from './screenIcons'
 import { EchoPanel } from './EchoPanel'
+import { ModSlot } from '../mods/ModSlot'
 import '../vu_styles/Photos.css'
 
 export interface PhotosPageProps {
@@ -199,6 +200,7 @@ export function PhotosPage({ theme }: PhotosPageProps): JSX.Element {
           ))}
         </motion.ul>
         <EchoPanel hidden={false} gallery theme={theme} />
+        <ModSlot slot="photosPageSection" props={{ theme }} />
       </div>
 
       {/* Create, its Generating modal and the viewer a watched photo lands in follow one another,

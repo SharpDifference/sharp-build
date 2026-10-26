@@ -19,7 +19,7 @@ import {
   memorySentence,
   relationshipTagOf
 } from '@shared/relationship'
-import { isCharacterTrait, traitTone } from '@shared/traits'
+import { traitTone } from '@shared/traits'
 import { pendingSecretOf, SECRET_TIERS } from '@shared/secrets'
 import { fullNameOf, type CharMemory, type SecretTier, type StockOutfitSet } from '@shared/types'
 import { formatShortGameDate } from '../prompts/gameDate'
@@ -142,7 +142,7 @@ export function ContactPage({
   const affection = affectionFor(info, date, character)
   const tag = relationshipTagOf(flags, affection)
   // Each reveal shows on its persisted flag OR the live condition.
-  const traits = (character.traits ?? []).filter(isCharacterTrait)
+  const traits = (character.traits ?? []).filter((trait): trait is string => typeof trait === 'string')
   const showTraits = traits.length > 0 && (flags.knowsTraits || isPositive(affection))
   const showBackstory = Boolean(character.backstory) && (flags.knowsBackstory || isTrusted(affection))
   // Rides `knowsTraits`: same threshold, same one-way rule.
@@ -638,7 +638,7 @@ function Chips({
   empty,
   tone,
   mono,
-  traitColors
+  traitColors = false
 }: {
   words: readonly string[]
   empty?: string

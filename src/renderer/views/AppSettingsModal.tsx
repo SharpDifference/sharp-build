@@ -54,6 +54,7 @@ import { CustomBackgroundsModal } from './CustomBackgroundsModal'
 import { SOUNDTRACK_MOD } from '@shared/soundtracks'
 import { useModOn } from '../stores/modsStore'
 import { SoundtracksModal } from './SoundtracksModal'
+import { ModSlot } from '../mods/ModSlot'
 import { SettingsAdvancedTab } from './SettingsAdvancedTab'
 import { SettingsComfyTab } from './SettingsComfyTab'
 import { PROMPT_STUDIO_MOD } from '@shared/presets/types'
@@ -855,6 +856,10 @@ export function AppSettingsModal({ theme, onClose }: AppSettingsModalProps): JSX
                         </motion.button>
                       </div>
                     )}
+                    <ModSlot
+                      slot="settingsSection"
+                      props={{ theme, busy: backingUp || restoring }}
+                    />
                   </>
                 )}
               </>

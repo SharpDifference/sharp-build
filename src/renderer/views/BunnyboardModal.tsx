@@ -2,6 +2,7 @@ import { TextRegenerate } from '../components/TextRegenerate'
 import { bunnyboardPages, updatesTabs, type UpdatesTab } from '../mods/hooks'
 import { useModsStore, useModOn } from '../stores/modsStore'
 import { INCOMING_TEXTS } from '@shared/modEntries/incoming-texts'
+import { ModSlot } from '../mods/ModSlot'
 import {
   Fragment,
   memo,
@@ -353,6 +354,7 @@ export function BunnyboardModal({
       {...overlayProps}
     >
       <PhotoLightboxHost />
+      <ModSlot slot="phoneOverlay" props={{}} />
       {contact ? (
         <ContactPage key={contact} charId={contact} theme={theme} />
       ) : (
