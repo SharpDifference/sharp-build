@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { STAT_KEYS } from '@shared/playerStats'
-import { blocksNewRomance, registerRomanceRequirement, setRomanceRequirementRules, romanceMinimumsOf } from '@shared/romanceRequirements'
-import { sharedModOn } from '@shared/modRules'
+import { blocksNewRomance, registerRomanceRequirement, romanceMinimumsOf } from '@shared/romanceRequirements'
+import { setSharedModRules } from '@shared/modRules'
 import { crushChance, crushHintUpdate, emptyFlags, foldRelationshipEvents, meetsCrushStandards } from '@shared/relationship'
 import type { LedgerResponse } from '@shared/types'
 import { useGameStore } from '../src/renderer/stores/gameStore'
@@ -14,7 +14,7 @@ const allGodly = { brain: 100, body: 100, heart: 100 }
 const gatedCharacter = character({ charId: 'a', traits: ['Materialist'], preferredStat: 'heart' })
 const game = () => useGameStore.getState()
 let on = false
-const setOn = (value: boolean) => { on = value; setRomanceRequirementRules(id => id === 'test-romance' && on) }
+const setOn = (value: boolean) => { on = value; setSharedModRules(id => id === 'test-romance' && on) }
 registerRomanceRequirement('test-romance', who => who?.traits?.includes('Materialist') ? allGodly : null)
 const ledger: LedgerResponse = {
   memories: [{ charKey: 'sarah_rose', type: 'loved', desc: 'their conversation' }],
@@ -31,7 +31,7 @@ beforeEach(() => {
     stats: { brain: 100, body: 99, heart: 100 }
   })
 })
-afterEach(() => { setRomanceRequirementRules(sharedModOn); vi.restoreAllMocks() })
+afterEach(() => { setSharedModRules(() => false); vi.restoreAllMocks() })
 
 describe('additive romance requirements', () => {
   it.each([false, true])('combines by maximum, independent of registration order (reverse=%s)', reverse => {
@@ -42,7 +42,7 @@ describe('additive romance requirements', () => {
     for (const [id, rule] of reverse ? [...rules].reverse() : rules) {
       registerRomanceRequirement(id, () => rule)
     }
-    setRomanceRequirementRules(id => id === 'test-a' || id === 'test-b')
+    setSharedModRules(id => id === 'test-a' || id === 'test-b')
     expect(romanceMinimumsOf(gatedCharacter)).toEqual({ brain: 100, body: 35, heart: 15 })
   })
 
@@ -50,14 +50,14 @@ describe('additive romance requirements', () => {
     const disabled = vi.fn(() => ({ brain: 1000 }))
     registerRomanceRequirement('test-disabled', disabled)
     registerRomanceRequirement('test-invalid', () => ({ brain: NaN, body: Infinity, heart: 15 }))
-    setRomanceRequirementRules(id => id === 'test-invalid')
+    setSharedModRules(id => id === 'test-invalid')
     expect(romanceMinimumsOf(gatedCharacter)).toEqual({ heart: 15 })
     expect(disabled).not.toHaveBeenCalled()
     expect(blocksNewRomance(gatedCharacter, { brain: 0, body: 0, heart: NaN })).toBe(true)
   })
 
   it('has no optional requirements without an enabled registration', () => {
-    setRomanceRequirementRules(() => false)
+    setSharedModRules(() => false)
     expect(romanceMinimumsOf(gatedCharacter)).toEqual({})
     expect(blocksNewRomance(gatedCharacter, { brain: 0, body: 0, heart: 0 })).toBe(false)
   })
