@@ -196,6 +196,7 @@ else names it.
 | `prompts['slot-posts']` | `slotIntroPrompt.ts` | Add lines about status posts, and fields to each post |
 | `prompts['slot-poster']` | `slotIntroPrompt.ts` | Add lines under each girl posting, by her name, given the slot the opening is for |
 | `prompts['slot-reach-outs']` | `slotIntroPrompt.ts` | Add lines under a girl texting first, and fields to her entry |
+| `prompts['text-ledger']` | `textLedgerPrompt.ts` | Add lines to the texting bookkeeping, below the slot's messages, handed the girls he texted |
 | `prompts.character` | `characterPrompt.ts` | Add lines and fields to character generation |
 | `dmHistoryNote` | `textingPrompt.ts` | Add a note after a DM in the history the prompt quotes |
 | `characterFromDraft` | `characterPrompt.ts` | Fill fields of a generated character from the reply |
