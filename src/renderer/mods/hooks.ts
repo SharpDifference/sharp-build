@@ -14,7 +14,7 @@ import type { GameOverReason } from '@shared/gameOver'
 import type { LedgerStats, PlayerStats, StatContext, StatKey, StatusText } from '@shared/playerStats'
 import type { PostComment } from '@shared/postComments'
 import type { SlotActivityOffer } from '@shared/slotActivity'
-import type { ModSceneFields, PlaythroughRecord, TimeSlot } from '@shared/types'
+import type { ModSceneFields, PlaythroughRecord, SceneLine, TimeSlot } from '@shared/types'
 import type { TextingPromptState } from '../prompts/textingPrompt'
 import type { ResolvedSave } from '../stores/saveStore'
 import type { ViewName } from '../stores/uiStore'
@@ -241,6 +241,11 @@ export interface ModHooks {
   requests?: { [S in keyof RequestSpots]?: (request: StructuredRequest, ctx: RequestSpots[S]) => StructuredRequest }
   /** After bookkeeping settles, before the clock advances and the boundary save is written. */
   slotSettled?: (ctx: SlotSettled) => void
+  /**
+   * Lines in the slot's closing report, after what each girl took away from it, written as the
+   * game writes its own (`memoryStatusLine`). `nextSlot` is the global slot about to begin.
+   */
+  slotStatusLines?: (ctx: { nextSlot: number }) => readonly SceneLine[]
   /**
    * Apply the same memory weights as settlement to a projection. Must return new values
    * without writing the store, paying rewards, consuming abilities or rolling randomness.
@@ -537,6 +542,11 @@ export function modRequest<S extends keyof RequestSpots>(spot: S, ctx: RequestSp
 
 export function slotSettled(ctx: SlotSettled): void {
   for (const hooks of active()) hooks.slotSettled?.(ctx)
+}
+
+/** Every mod's lines for the slot's closing report, after the girls' memories, in list order. */
+export function slotStatusLines(ctx: { nextSlot: number }): SceneLine[] {
+  return active().flatMap((hooks) => [...(hooks.slotStatusLines?.(ctx) ?? [])])
 }
 
 export function projectSlotMemories(ctx: SlotMemoryProjection, charInfo: Record<string, CharInfo>): Record<string, CharInfo> {

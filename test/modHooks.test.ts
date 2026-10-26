@@ -83,6 +83,20 @@ describe('when a post came out', () => {
   })
 })
 
+describe("the slot's closing report", () => {
+  it("takes each line from the mods that are on, in list order, handed the next slot", async () => {
+    const on = { first: true, second: true, off: false }
+    const hooks = await fresh(on, ['first', 'second', 'off'])
+    const line = (text: string) => ({ speaker: null, text }) as never
+    hooks.registerHooks('second', { slotStatusLines: ({ nextSlot }) => [line(`second ${nextSlot}`)] })
+    hooks.registerHooks('off', { slotStatusLines: () => [line('off')] })
+    hooks.registerHooks('first', { slotStatusLines: () => [line('first')] })
+
+    const texts = hooks.slotStatusLines({ nextSlot: 7 }).map((one: { text: string }) => one.text)
+    expect(texts).toEqual(['first', 'second 7'])
+  })
+})
+
 describe('ways on', () => {
   it('offers the first answer from a mod that is on, and none from a mod that is off', async () => {
     const hooks = await fresh({ off: false }, ['off', 'quiet', 'semesters', 'later'])
