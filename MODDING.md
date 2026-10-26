@@ -296,6 +296,37 @@ Fields a mod adds to a feed post that hold a time (the last slot it answered, sa
 
 Files a mod keeps per playthrough outside the save (pictures, say) need nothing: New Game+ continues the same playthrough, so they stay where they are. `registerTermFiles(modId, async ({ from, to }) => …)` is kept for an extension that starts a new playthrough per semester, which calls `carryModFiles({ from, to })` once the new playthrough is written, before it is entered; the game itself never calls it. A copier runs with its mod's switch off too, and one that fails costs only its own files.
 
+## Managed ComfyUI launch environment
+
+Trusted main-process setup can register a synchronous provider with
+`registerComfyLaunchEnvironment(modId, ({ root, platform }) => ({ KEY: value }))` from
+`main/services/comfyLaunchEnvironment.ts`. `root` is the managed ComfyUI installation's
+working directory. Return a plain string-valued object, or `null` to contribute nothing.
+This is a main-process registry, not a renderer hook, IPC endpoint, or permission grant.
+
+The service reads a frozen context immediately before each new managed process is spawned,
+before opening its log. No providers means the existing inherited environment. Contributions
+override inherited values only in the child; `process.env` is never changed by the registry.
+Different keys combine, identical values coalesce, and different values for the same key
+refuse that launch with both owners named. Windows names are compared without case, including
+inherited aliases such as `Path`/`PATH`. Invalid names/values and provider exceptions fail the
+launch with an owner-labelled error; diagnostics do not print environment values.
+
+External servers and an already-running managed server are never changed or restarted by
+this hook. A changed registration affects the **next managed boot**; a running server needs
+an explicit stop/start. The normal start guard still shares one boot between callers.
+
+Duplicate owner registrations fail. The returned disposer unregisters only its own entry and
+is safe to call twice or after a replacement. The trusted host/mod entry owns registration,
+availability and disposal; renderer switches are not implicitly read in main. An inactive
+provider can return `null`. Installation-level configuration needed by installed custom nodes
+may intentionally remain present while their gameplay effects are off. This PR supplies no
+loader or activation policy: a future loader must enforce its reviewed-main-code policy and
+wire that lifecycle before offering custom-source installation.
+
+See `test/comfyLaunchEnvironment.test.ts` and `test/comfyLaunchProcess.test.ts` for composition,
+Windows aliases, errors/disposal, and the real service's launch boundary with mocked processes.
+
 ## Shared gameplay extensions
 
 - A mod keeps data with the scene being played by declaring optional fields on
