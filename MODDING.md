@@ -118,7 +118,7 @@ a setter, and set it from `modsStore.ts` at boot and whenever a switch moves
 `shared/imagePromptDrafts.ts` lets a shared mod entry add to a sprite's or a CG's prompt draft,
 in both processes: the editor's regenerate draft in the renderer and every render in main are
 built by the same `spriteDraft` and `cgSetDraft`. Register once at boot with
-`registerImagePromptDraft(modId, { draft, regen? })`.
+`registerImagePromptDraft(modId, { draft, regen? })`, from `@vx/modkit/shared`.
 
 - `draft(parts, { character, kind })` is handed the draft's `appearance` and `negative` tags
   and returns them with the mod's own in; `kind` is `sprite`, `nude` or `cg`. Each mod that is

@@ -13,10 +13,13 @@ export type ImagePromptKind = 'sprite' | 'nude' | 'cg'
 
 /** The two groups a mod may change. Her own negatives are added after every mod's. */
 export interface ImagePromptParts {
+  /** Her appearance tags, from her own `baseAppearance` and each mod before this one. */
   appearance: string[]
+  /** The draft's negative tags, the game's own and each mod's before this one. */
   negative: string[]
 }
 
+/** A mod's part in her sprite and CG drafts, registered with {@link registerImagePromptDraft}. */
 export interface ImagePromptDraft {
   /** The draft's appearance and negatives with the mod's tags in them; asked only while it is on. */
   draft: (parts: ImagePromptParts, ctx: { character: Character; kind: ImagePromptKind }) => ImagePromptParts

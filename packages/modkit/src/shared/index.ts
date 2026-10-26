@@ -8,6 +8,9 @@ export type {
   ChatMessage,
   GameOverReason,
   GameSave,
+  ImagePromptDraft,
+  ImagePromptKind,
+  ImagePromptParts,
   LedgerResponse,
   LedgerStats,
   ModDef,
@@ -21,6 +24,7 @@ export type {
   PlaythroughRecord,
   PostComment,
   ProjectSession,
+  PromptEdit,
   SceneLine,
   SlotActivity,
   SlotActivityOffer,
@@ -40,6 +44,7 @@ export {
   optionKey,
   optionOn,
   registerCharacterTrait,
+  registerImagePromptDraft,
   registerRomanceRequirement
 } from '../bridge/shared'
 export { sharedModOn } from './modRules'
