@@ -1,5 +1,5 @@
 import { appError } from '@shared/errors'
-import type { AppError, SceneLine, StructuredRequest } from '@shared/types'
+import type { AppError, SceneLine, SceneResponse, StructuredRequest } from '@shared/types'
 import { useGameStore } from '../gameStore'
 import {
   createSceneSanitizer,
@@ -80,9 +80,21 @@ export interface PreviewSink {
   held: SceneLine[]
 }
 
-/** What one scene call comes back with, resolved. */
+/**
+ * What one scene call comes back with, resolved. `reply` is the reply as the model wrote it, for
+ * the mods that asked it for fields of their own.
+ */
 export type SceneCall = Promise<
-  | { ok: true; data: { lines: SceneLine[]; summary: string | null; end: boolean; applied: boolean } }
+  | {
+      ok: true
+      data: {
+        lines: SceneLine[]
+        summary: string | null
+        end: boolean
+        applied: boolean
+        reply: SceneResponse
+      }
+    }
   | { ok: false; error: AppError }
 >
 
@@ -234,7 +246,7 @@ export async function streamScene(
   const { lines, summary, end } = sanitizeScene(result.data, options)
 
   // A prefetch still holding its lines has nothing to reconcile; Begin appends the reply whole.
-  if (sink && !sink.live) return { ok: true, data: { lines, summary, end, applied: false } }
+  if (sink && !sink.live) return { ok: true, data: { lines, summary, end, applied: false, reply: result.data } }
 
   const game = useGameStore.getState()
 
@@ -260,7 +272,7 @@ export async function streamScene(
   // that read the store here would find a scene that has not arrived yet.
   await delivered
 
-  return { ok: true, data: { lines, summary, end, applied: true } }
+  return { ok: true, data: { lines, summary, end, applied: true, reply: result.data } }
 }
 
 /** Hands playback back to a player parked on the spinner at the end of the queue. */

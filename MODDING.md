@@ -167,6 +167,8 @@ else names it.
 | `dmHistoryNote` | `textingPrompt.ts` | Add a note after a DM in the history the prompt quotes |
 | `characterFromDraft` | `characterPrompt.ts` | Fill fields of a generated character from the reply |
 | `afterDmReply` | `textingLoop.ts` | Act after her reply in a DM has landed |
+| `afterSceneReply` | `loop/turn.ts` | Read a landed scene reply as the model wrote it, fields a mod asked for included. A turn's reply only: a scene's closing reply is not handed over |
+| `scenePlay` | `SceneChrome.tsx`, `GameView.tsx` | Stand a seat on the scene's rail, and open a panel of its own over the scene |
 | `afterReachOut` | `textingLoop.ts` | Act after the texts of a girl texting first have landed |
 | `playerActs` | `gameLoop.ts` (`submitAction`), `loop/hangouts.ts`, `loop/relax.ts` | Act when the reader commits to something: an action, a hangout begun, or Relax |
 | `gameEntered` | `gameLoop.ts` (`enterGame`) | Act when a game is entered, new or loaded |
@@ -180,6 +182,7 @@ else names it.
 | `sentText` | `BunnyboardModal.tsx` (`TextSpots.tsx`) | Draw what somebody sent (a message, a post) and say which messages stand with no bubble; one mod at a time |
 | `endingChoice` | `GameView.tsx` | Offer a way on from the ending, beside "Return to the main menu" |
 | `saveChoice` | `LoadGameModal.tsx` | Offer something for a picked save, beside "Load" |
+| `modDetail` | `ModsModal.tsx` | Draw a page of its own for the mod picked on the Mods screen, its own or one built on it, in place of the list of that mod's options |
 | `updatesTab` | `BunnyboardModal.tsx` | Add a page beside the feed in the Updates tab, with an unread count |
 | `optionPreviews` | `ModsModal.tsx` | Draw a preview under one of the mod's option groups on the Mods screen |
 | `saveNote` | `SaveGameModal.tsx` | Add a line to Save Game about what a save of the scene keeps of the mod's own |
@@ -214,15 +217,31 @@ is not a layer over the whole app. `blocked` is the game's own: a panel, a modal
 standing over the scene. Once mods use one of these places, its name and its props stay as they
 are; a change goes in as a new place beside it.
 
+A place on the scene screen (`scenePlay`) is two components. `Seat` is mounted on the rail for
+as long as the scene's chrome is; the game hands it the rail's own seat to draw with, whether
+the rail is up, and `open`. It decides for itself when it has something to offer, and stands
+down (`state: 'gone'`) otherwise. `Panel` is mounted while open, as one of the scene's own
+panels: the scene behind it takes no key, click or turn until it closes. A field a mod adds to
+the scene's reply (`requests.scene`) comes back whole in `afterSceneReply`, once the reply's
+lines are on the transcript.
+
+A panel that sends a turn of its own takes the reader's turn first with `takeTurnFromReply()`
+from `stores/gameLoop.ts`, then sends with `submitAction`. It sends nothing itself: it brings the
+scene to a decision point a turn can go out from, the way an interjection does. Lines still
+being read are cut, the live scene call and any pending ending are dropped and the cut is written
+as a decision point; over a reply's last line, that line is taken as turned; at a decision point
+already, nothing changes. It returns `false` when none of these applies (the scene is busy, or
+nothing is waiting on the reader), and then the panel sends nothing.
+
 A hook point is added where mods actually meet, not ahead of need. Once mods use one, it stays
 as it is: renaming it or changing what it passes breaks them. A change that is needed goes in
 as a new hook beside the old one.
 
 ### Not covered yet
 
-- Screens: a mod's own panels, menu entries, buttons on the rail and the landing, and editor
-  fields, beyond a page beside the feed (`updatesTab`), a preview on the Mods screen
-  (`optionPreviews`) and the places on screen above.
+- Screens: a mod's menu entries, buttons on the rail and the landing, and editor fields, and its
+  own panels beyond one over a scene (`scenePlay`), a page beside the feed (`updatesTab`), a
+  preview on the Mods screen (`optionPreviews`) and the places on screen above.
 - Main process: IPC, protocols, services, settings and character rules.
 - Saves: a mod's own fields in a save. Carrying them into the next semester is covered below.
 
@@ -231,9 +250,10 @@ These are still direct edits, as before.
 ### Tests
 
 `test/modHooks.test.ts`: only mods that are on are asked, in list order; likes fall back to the
-game's own; a post a mod holds is not passed on. `test/modSlots.test.ts`: each place on screen
-draws the components of the mods that are on and not those that are off, each in a boundary of
-its own that turns a throw into nothing drawn.
+game's own; a post a mod holds is not passed on; scene places and landed scene replies go to
+the mods that are on. `test/modSlots.test.ts`: each place on screen draws the components of the
+mods that are on and not those that are off, each in a boundary of its own that turns a throw
+into nothing drawn.
 
 The hook points are naudh1r's design, lifted from his Photo Feature branch, which is the first
 mod on them.
