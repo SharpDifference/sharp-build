@@ -16,6 +16,8 @@ A new link and its background question preparation require a playable night afte
 
 Each of the 22 original aspects has its own named dark inner world and bundled background. The destination follows the **girl's aspect**, not the reader's. The catalog in shared/reckoningDungeons.ts defines all 22; untyped legacy/no-Echo cases use the validated fallback. There is one map entrance, not 22 physical travel locations.
 
+The map entrance is registered by Reckoning's renderer entry through `mapOverlay`. Its lazy adapter forwards the map's travel permission and close callback to the existing `ReckoningDungeonMapPin`; the native map no longer imports or mounts that component directly. Entry still checks nighttime, a safe save point, scene completion and any required spirit, and closes the map only after a successful save. Turning Reckoning off removes the entrance without deleting the saved link. The encounter itself, its exit/recovery path and the preparation watcher remain mounted through their existing GameView paths; this map-only migration does not move those lifecycle-sensitive surfaces into an active-mod-only outlet.
+
 ## Four choices before the questions
 
 The Options button opens the normal game menu from the dungeon and the question screen, including Settings and Mods. Escape also opens it from the dungeon. Closing a menu returns to the same encounter and keeps an unsent Talk reply or question answer. The encounter remains mounted beneath menus, with its controls and whisper effects suspended; opening Options neither spends a reply nor starts generation. Options waits while a Talk, hint or answer request is in flight. Escape from the question screen still pauses the questions as before.
