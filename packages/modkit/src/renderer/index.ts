@@ -8,6 +8,7 @@ export type {
   EmojiToolProps,
   EndingChoice,
   GameModalProps,
+  LandingToolProps,
   LikesAsk,
   ModDetailProps,
   ModHooks,

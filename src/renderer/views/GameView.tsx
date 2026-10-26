@@ -2255,6 +2255,7 @@ export function GameView(): JSX.Element {
           onMap={() => setPanel({ kind: 'map' })}
           onChatLog={() => setPanel({ kind: 'chatLog' })}
           onSettings={() => setPanel({ kind: 'settings' })}
+          modButtons={!created && !replaying}
         />
       ) : (
         /* The three game overs: the ending's authored lines in the app's dialogue box over a

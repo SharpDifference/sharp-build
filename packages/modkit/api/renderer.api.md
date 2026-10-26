@@ -104,6 +104,16 @@ export interface GameModalProps {
 }
 
 // @public
+export interface LandingToolProps {
+    // (undocumented)
+    children: ReactNode;
+    // (undocumented)
+    label: string;
+    // (undocumented)
+    onClick: () => void;
+}
+
+// @public
 export interface LikesAsk {
     author: string;
     // (undocumented)
@@ -168,6 +178,7 @@ export interface ModHooks {
     }) => void | Promise<void>;
     gameEntered?: () => void;
     gameModals?: Record<string, ComponentType<GameModalProps>>;
+    landingTool?: ComponentType<ScreenSlotProps['landingTool']>;
     mapOverlay?: ComponentType<ScreenSlotProps['mapOverlay']>;
     messageAttachment?: ComponentType<ScreenSlotProps['messageAttachment']>;
     modDetail?: (mod: ModDef) => ComponentType<ModDetailProps> | undefined;
@@ -507,6 +518,11 @@ export interface ScreenSlotProps {
         name: string;
         theme: ScreenTheme;
         height: number;
+    };
+    // (undocumented)
+    landingTool: {
+        Tool: ComponentType<LandingToolProps>;
+        visible: boolean;
     };
     // (undocumented)
     mapOverlay: {

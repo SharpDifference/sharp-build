@@ -191,6 +191,13 @@ export interface RailSeatProps {
   children: ReactNode
 }
 
+/** One tool in the landing's corner, as the game draws its own: icon only, its label on a hover. */
+export interface LandingToolProps {
+  label: string
+  onClick: () => void
+  children: ReactNode
+}
+
 /** What the game hands a mod's seat on a scene's rail. */
 export interface SceneSeatProps {
   /** The rail's own seat, so a mod's control is drawn as the game's are. */
@@ -377,6 +384,8 @@ export interface ModHooks {
   gameModals?: Record<string, ComponentType<GameModalProps>>
   /** Drawn on the scene's rail, after the Calendar and before the mods' scene seats (`scenePlay`). */
   railButton?: ComponentType<ScreenSlotProps['railButton']>
+  /** Drawn among the landing's tools, after the log and before Settings. */
+  landingTool?: ComponentType<ScreenSlotProps['landingTool']>
 
   /**
    * After the texts of a girl reaching out just to talk have landed. `reply` is her entry from the
@@ -518,6 +527,12 @@ export interface ScreenSlotProps {
     visible: boolean
     /** The rail stands but takes nothing. */
     dead: boolean
+  }
+  landingTool: {
+    /** The landing's own tool, so a mod's is drawn, and arrives, as the game's are. */
+    Tool: ComponentType<LandingToolProps>
+    /** Settings is revealed, and with it the mods' tools. */
+    visible: boolean
   }
 }
 
