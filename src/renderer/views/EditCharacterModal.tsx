@@ -72,7 +72,7 @@ import { pictureKeySet } from '@shared/settingsRules'
 import { sfwWithholds } from '@shared/sfw'
 import { isGiftCategory } from '@shared/shop'
 import type { GiftCategory } from '@shared/shop'
-import { isCharacterTrait } from '@shared/traits'
+import { editedCharacterTraits, selectedTraitHints } from '@shared/traits'
 import type { CharacterTrait } from '@shared/traits'
 import { fullNameOf } from '@shared/types'
 import type {
@@ -124,7 +124,7 @@ import {
   sheetPlaceholders,
   TAG_FIELDS,
   textList,
-  TRAIT_OPTIONS,
+  traitOptions,
   WARDROBES
 } from './characterFields'
 import { CardIcon, DuplicateIcon, FolderIcon, ResetIcon, SpritesIcon } from './characterIcons'
@@ -1483,10 +1483,13 @@ export function EditCharacterModal({
                     <TagSelect
                       id="edit-traits"
                       values={form.traits}
-                      options={TRAIT_OPTIONS}
-                      onChange={(values) => setField('traits')(values.filter(isCharacterTrait))}
+                      options={traitOptions(form.traits)}
+                      onChange={(values) => setField('traits')(editedCharacterTraits(form.traits, values))}
                       placeholder="Add a trait…"
                     />
+                    {selectedTraitHints(form.traits).map((hint) => (
+                      <p className="vu-field-hint" key={hint}>{hint}</p>
+                    ))}
                   </label>
 
                   {/* The traits' single-valued sibling. */}
