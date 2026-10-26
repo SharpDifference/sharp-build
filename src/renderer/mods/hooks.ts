@@ -49,6 +49,11 @@ export interface PromptSpots {
   'slot-poster': { character: Character; info: CharInfo; date: number; time: TimeSlot }
   /** The girl the slot's opening has texting the reader just to talk, one call per girl. */
   'slot-reach-outs': { character: Character; info: CharInfo; date: number }
+  /**
+   * The texting bookkeeping after a slot of texts, below its messages: lines only. `charKeys` are
+   * the girls he texted, as the call keys them.
+   */
+  'text-ledger': { charKeys: readonly string[] }
   /** A character being generated. */
   character: Record<string, never>
 }
