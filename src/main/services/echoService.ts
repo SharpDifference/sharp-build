@@ -18,6 +18,10 @@ import { assertSafeCharId } from '@shared/characterRules'
 import { expressionRel } from '@shared/characterFiles'
 import { getCharacter, readCharacterImage } from './characterService'
 import { reflectionPortraitPrompt, reflectionStageOf, assertReflectionStage, type ReflectionStage } from '@shared/reflectionPortrait'
+import { registerComfyLaunchEnvironment } from './comfyLaunchEnvironment'
+
+// The managed ComfyUI keeps the transparent-background model under its own root, on every boot.
+registerComfyLaunchEnvironment('echo', ({ root }) => ({ TRANSPARENT_BACKGROUND_FILE_PATH: root }))
 
 const jobs = new Map<string, { owner: number; controller: AbortController }>()
 const folder = (): string => join(getDataPath(),'echoes','art')

@@ -638,7 +638,7 @@ function Chips({
   empty,
   tone,
   mono,
-  traitColors
+  traitColors = false
 }: {
   words: readonly string[]
   empty?: string

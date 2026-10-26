@@ -32,7 +32,7 @@ import { isVoiceTier, VOICE_TIERS, voicePitchOfTier } from '@shared/audio'
 import { ROOM_PROMPT_PREFIX } from '@shared/room'
 import { defaultSpriteScale } from '@shared/spriteScale'
 import { isStatKey, STAT_ATTRACTIONS, STAT_KEYS } from '@shared/playerStats'
-import { NATIVE_CHARACTER_TRAITS as CHARACTER_TRAITS, isCharacterTrait, TRAIT_DESCRIPTIONS } from '@shared/traits'
+import { generatedCharacterTraits, type CharacterTraitDefinition } from '@shared/traits'
 import {
   GIFT_CATEGORIES,
   GIFT_CATEGORY_DESCRIPTIONS,
@@ -154,7 +154,8 @@ export function buildCharacterPrompt(
   seedWord: string,
   namesAreSuggestions = false,
   reference?: ReferenceImage,
-  textEdits?: TextEdits<GlobalTextId>
+  textEdits?: TextEdits<GlobalTextId>,
+  traits: readonly CharacterTraitDefinition[] = generatedCharacterTraits()
 ): StructuredRequest {
   const brief = userPrompt.trim() || 'A college girl.'
   // Sorted, so the prefix stays identical for prompt caching.
@@ -222,7 +223,7 @@ export function buildCharacterPrompt(
     '',
     'TRAITS',
     'Below is a short list of traits. Fill the traits array with every one that genuinely fits the character you just wrote:',
-    ...CHARACTER_TRAITS.map((trait) => `- ${trait}: ${TRAIT_DESCRIPTIONS[trait]}.`),
+    ...traits.map((trait) => `- ${trait.value}: ${trait.description}.`),
     'Only pick a trait if it\'s really true of her. If none of them fit, return an empty array. Most characters get none.',
     '',
     'ATTRACTION',
@@ -363,7 +364,7 @@ export function buildCharacterPrompt(
         }
       },
       // Closed: a trait is a switch code branches on. Empty is the usual answer.
-      traits: enumArray(CHARACTER_TRAITS),
+      traits: enumArray(traits.map(trait => trait.value)),
       // Closed and single-valued: she is drawn to exactly one.
       preferredStat: enumField(STAT_KEYS),
       appearance: {
@@ -465,7 +466,8 @@ function cleanTags(values: readonly string[] | undefined): string[] {
 export function draftToCharacter(
   base: Character,
   draft: CharacterDraft,
-  poses: PoseManifest
+  poses: PoseManifest,
+  traits: readonly CharacterTraitDefinition[] = generatedCharacterTraits()
 ): Character {
   const poseKeys = poseKeysOf(poses)
   const a = draft.appearance ?? ({} as CharacterDraft['appearance'])
@@ -524,8 +526,7 @@ export function draftToCharacter(
     dislikes: cleanTags(draft.dislikes),
     giftPreferences: giftPreferencesOf(draft.giftPreferences),
     // Filtered to the vocabulary: an unrecognized trait switches nothing.
-    traits: (draft.traits ?? []).filter(isCharacterTrait).filter(trait =>
-      (CHARACTER_TRAITS as readonly string[]).includes(trait)),
+    traits: (draft.traits ?? []).filter(value => traits.some(trait => trait.value === value)),
     // Charm on anything outside the vocabulary.
     preferredStat: isStatKey(draft.preferredStat) ? draft.preferredStat : 'heart',
     baseAppearance,

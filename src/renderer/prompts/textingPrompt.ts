@@ -74,6 +74,15 @@ import { textingPersonaFor } from './promptBlocks'
 /** How many recent messages ride in the prompt and in each rolling summary. */
 const TEXTING_HISTORY_CAP = 20
 
+/** A replay may need more context when its earlier summary is unavailable. */
+const TEXTING_HISTORY_MAX = 160
+
+/** A bad request must never turn slice(-NaN) into the entire saved conversation. */
+function historyLimitOf(requested: number | undefined): number {
+  if (requested === undefined || !Number.isFinite(requested)) return TEXTING_HISTORY_CAP
+  return Math.max(TEXTING_HISTORY_CAP, Math.min(TEXTING_HISTORY_MAX, Math.floor(requested)))
+}
+
 /** The prompt-facing slice of state a texting turn needs. */
 export interface TextingPromptState {
   /** Prompt Studio's edits to the global text blocks; absent with the mod off. */
@@ -81,7 +90,7 @@ export interface TextingPromptState {
   storyMemory?: StorySnapshot
   /** Supplied only while the standalone Breakthrough mod is enabled. */
   breakthrough?: BreakthroughState
-  /** A bounded longer window for rebuilding a legacy reply without a pre-reply summary. */
+  /** Recent stored messages to include: 20 by default, at most 160; not a token budget. */
   historyLimit?: number
   exCharacterDynamics?: CharacterDynamics
   date: number
@@ -345,7 +354,7 @@ export function buildTextingPrompt(
     (info?.pursuing !== undefined && !visiting) ||
     isAwayForSpringBreak(state.springBreakAway, character.charId, state.date)
   const thread: ChatMessage[] = [
-    ...(conversation?.messages ?? []).slice(-TEXTING_HISTORY_CAP),
+    ...(conversation?.messages ?? []).slice(-historyLimitOf(state.historyLimit)),
     {
       id: 'pending',
       sender: 'player',
@@ -357,7 +366,7 @@ export function buildTextingPrompt(
   // The new text is the last line of the log, so it gets its own stamp when it lands in a new slot.
   const history = stampedStubs(
     [
-      ...(conversation?.messages ?? []).slice(-Math.max(TEXTING_HISTORY_CAP, Math.min(160, state.historyLimit ?? TEXTING_HISTORY_CAP))),
+      ...(conversation?.messages ?? []).slice(-historyLimitOf(state.historyLimit)),
       ...(incomingDirection === undefined ? [{
         id: 'pending',
         sender: 'player' as const,

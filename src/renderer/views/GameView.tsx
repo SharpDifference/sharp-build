@@ -204,6 +204,7 @@ import { EditPromptModal } from './EditPromptModal'
 import { FeedbackModal } from './FeedbackModal'
 import { GameMenuModal } from './GameMenuModal'
 import { endingChoice, prepareWayOn, scenePlays, updatesTabs, type WayOn } from '../mods/hooks'
+import { ModSlot } from '../mods/ModSlot'
 import { currentRun, runStale } from '../stores/loop/state'
 import { ModsModal } from './ModsModal'
 import { PlotTwistModal } from './PlotTwistModal'
@@ -464,6 +465,7 @@ function PortraitSlot({
       }
     >
       <EchoAura charId={charId} />
+      <ModSlot slot="portraitOverlay" props={{ charId }} />
       {/* Both halves of a change breathe as one, so a crossfade never comes apart. */}
       <motion.div className="vu-stage-breath" animate={breathing}>
         {pair.from && pair.from !== pair.to && (
@@ -2132,6 +2134,20 @@ export function GameView(): JSX.Element {
       <BreakthroughPanel onReckoning={charId => setPanel({kind:'reckoning',charId})} hidden={!sceneMode || cinematic || covered || uiHidden || !rowShown}
         blocked={blocked || !!quizRow || (interjectRow ? interjectRow !== 'open' : !awaitingInput)} />
       {!covered && !uiHidden && <BreakthroughFlourish />}
+      <ModSlot
+        slot="stageLayer"
+        props={{
+          sceneMode,
+          cinematic,
+          covered,
+          uiHidden,
+          rowShown,
+          blocked,
+          quiz: quizRow !== null,
+          interjectRow,
+          awaitingInput
+        }}
+      />
 
       {/* One chrome at a time over the shared stage — the scene, the landing (with the epilogue's
           goodbye menu), or the three game overs — each wearing the slot's own half of the day. */}
@@ -2833,6 +2849,18 @@ export function GameView(): JSX.Element {
         {panel?.kind === 'echo' && (
           <EchoPanel key="echo" hidden={covered || created || replaying} theme={half} onClose={closePanel} />
         )}
+        <ModSlot
+          key="mod-panel-layer"
+          slot="panelLayer"
+          props={{
+            cinematic,
+            covered,
+            uiHidden,
+            blocked,
+            panelOpen: panel !== null,
+            openGameMenu: () => setPanel({ kind: 'settings' })
+          }}
+        />
 
         {panel?.kind === 'loadGame' && (
           <LoadGameModal key="load-game" theme={half} onClose={closePanel} />

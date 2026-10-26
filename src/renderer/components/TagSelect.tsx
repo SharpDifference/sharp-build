@@ -3,7 +3,7 @@ import type { JSX } from 'react'
 interface TagSelectOption {
   value: string
   label: string
-  tone?: 'gold'
+  tone?: string
   hint?: string
 }
 

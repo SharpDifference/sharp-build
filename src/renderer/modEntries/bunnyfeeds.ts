@@ -25,7 +25,7 @@ import {
   writtenComments
 } from '../stores/bunnyfeedsReplies'
 import { useBunnyboardStore } from '../stores/bunnyboardStore'
-import { fileDueFeedMemories } from '../stores/bunnyfeedsMemory'
+import { feedStatusLines, fileDueFeedMemories, textLedgerFeedLines } from '../stores/bunnyfeedsMemory'
 import { takeCommented } from '../stores/bunnyfeedsVisit'
 import { settleFeedReadMark, unreadFeedNotesOf } from '../stores/bunnyfeedsNotes'
 import { useGameStore } from '../stores/gameStore'
@@ -138,7 +138,12 @@ registerHooks(BUNNYFEEDS, {
         writesComments() ? { comments: slotCommentsField() } : {},
       required: () => (writesComments() ? ['comments'] : [])
     },
+    // Comments under her posts are the feed's, not her texts'.
+    'text-ledger': { lines: ({ charKeys }) => textLedgerFeedLines(charKeys) }
   },
+
+  // The feed memories the next slot files, with its answers, in the slot's closing report.
+  slotStatusLines: ({ nextSlot }) => feedStatusLines(nextSlot),
 
   // The roster girls who may reply under each of the slot's posts, described in their own voices.
   requests: {

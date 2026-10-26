@@ -1,8 +1,15 @@
+import { hasTrait, registerCharacterTrait } from '../traits'
 import type { ModDef } from '../mods'
 import { MAX_TIER, pointsForTier } from '../playerStats'
 import { registerRomanceRequirement } from '../romanceRequirements'
-import { hasTrait } from '../traits'
-
+registerCharacterTrait('godlike-standards', {
+  value: 'Godlike',
+  description: 'requires Godly Brain, Body and Heart before beginning a romance',
+  editor: true,
+  generated: false,
+  tone: 'gold',
+  hint: 'Godlike requires Brain, Body and Heart all at Godly before romance can begin. Applies while Godlike Standards is on.'
+})
 registerRomanceRequirement('godlike-standards', character => {
   if (!hasTrait(character, 'Godlike')) return null
   const godly = pointsForTier(MAX_TIER)
