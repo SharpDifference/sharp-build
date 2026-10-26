@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import {
   buildTextLedgerPrompt,
   mergeLedgerReplies,
@@ -82,6 +82,23 @@ describe('buildTextLedgerPrompt', () => {
     const plans = properties.plans.items as Record<string, Record<string, unknown>>
     const chars = plans.properties.chars as Record<string, Record<string, unknown>>
     expect(chars.items.enum).toEqual(['sarah_rose', 'mina_okafor'])
+  })
+})
+
+describe("a mod's lines in the texting bookkeeping", () => {
+  it('go under the messages, from the mods that are on, handed the girls he texted', async () => {
+    vi.resetModules()
+    const hooks = await import('../src/renderer/mods/hooks')
+    const { buildTextLedgerPrompt: build } = await import('../src/renderer/prompts/textLedgerPrompt')
+    hooks.setHookRules({ isOn: (id) => id === 'feed', order: () => 0 })
+    hooks.registerHooks('feed', {
+      prompts: { 'text-ledger': { lines: ({ charKeys }) => [`FEED ${charKeys.join(',')}`] } }
+    })
+    hooks.registerHooks('off', { prompts: { 'text-ledger': { lines: () => ['OFF'] } } })
+
+    const { user } = build(schedule([thread('mina_okafor', 'Mina')]), { 'char-2': charInfo() })
+    expect(user.endsWith('FEED mina_okafor')).toBe(true)
+    expect(user).not.toContain('OFF')
   })
 })
 

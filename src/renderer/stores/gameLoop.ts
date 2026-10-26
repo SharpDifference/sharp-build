@@ -1,4 +1,4 @@
-import { exercisedStats, projectSlotMemories, settleSceneStats, slotActivityAvailable, slotSettled, statFloor } from '../mods/hooks'
+import { exercisedStats, projectSlotMemories, settleSceneStats, slotActivityAvailable, slotSettled, slotStatusLines, statFloor } from '../mods/hooks'
 import { withSlotActivityPrompt } from '../prompts/slotActivity'
 import { GAME_OVER_SCENES, gameCompleteSceneOf, gameOverReasonOf } from '@shared/gameOver'
 import { earnLine, spendLine, spentOf } from '@shared/money'
@@ -2701,13 +2701,17 @@ function showStatusLines(): boolean {
     // What each girl took away from the slot, read against the reader's post-scene
     // stats, so her requirement cannot contradict a tier announced above. How her present landed
     // sits with the rest of her paragraph, so a slot with no ledger still reports it.
-    memories: memoryStatusLines(
-      ledger,
-      after,
-      game.sceneGifts,
-      game.sceneIgnoredInvites,
-      game.sceneTurnedDown
-    ),
+    memories: [
+      ...memoryStatusLines(
+        ledger,
+        after,
+        game.sceneGifts,
+        game.sceneIgnoredInvites,
+        game.sceneTurnedDown
+      ),
+      // Then what the mods report, such as the memories the next slot files for them.
+      ...slotStatusLines({ nextSlot: globalSlotOf(game.date, game.time) + 1 })
+    ],
     // Milestones last, one screen apiece, the thing the player is left on.
     milestones: projected ? milestoneReports(projected) : []
   })
