@@ -1,4 +1,4 @@
-import { exercisedStats, projectSlotMemories, settleSceneStats, slotActivityAvailable, slotSettled, statFloor } from '../mods/hooks'
+import { exercisedStats, projectSlotMemories, settleSceneStats, slotActivityAvailable, slotSettled, slotStatusLines, statFloor } from '../mods/hooks'
 import { withSlotActivityPrompt } from '../prompts/slotActivity'
 import { talentProjectWork } from '@shared/talentPerks'
 import { feedStatusLines } from './bunnyfeedsMemory'
@@ -2747,8 +2747,8 @@ function showStatusLines(): boolean {
         game.sceneIgnoredInvites,
         game.sceneTurnedDown
       ),
-      // Bunnyfeeds: the feed memories the next slot files, with its answers.
-      ...feedStatusLines(globalSlotOf(game.date, game.time) + 1)
+      // Then what the mods report, such as the memories the next slot files for them.
+      ...slotStatusLines({ nextSlot: globalSlotOf(game.date, game.time) + 1 })
     ],
     // Milestones last, one screen apiece, the thing the player is left on.
     milestones: projected ? milestoneReports(projected) : []
