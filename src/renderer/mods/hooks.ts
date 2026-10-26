@@ -418,6 +418,12 @@ export interface ModHooks {
   stageLayer?: ComponentType<ScreenSlotProps['stageLayer']>
   /** Mounted among the game view's panels, over the chrome, on every screen of the game view. */
   panelLayer?: ComponentType<ScreenSlotProps['panelLayer']>
+  /** Drawn after a phone message's text bubble, or alone where the message has no text. */
+  messageAttachment?: ComponentType<ScreenSlotProps['messageAttachment']>
+  /** Drawn beside a post's like, in the feed on her contact page. */
+  contactPostExtra?: ComponentType<ScreenSlotProps['contactPostExtra']>
+  /** A reading of her of the mod's own on her contact page; see {@link ContactTab}. */
+  contactTab?: ContactTab
 }
 
 /**
@@ -470,9 +476,31 @@ export interface ScreenSlotProps {
     /** Opens the game menu. */
     openGameMenu: () => void
   }
+  messageAttachment: { message: ChatMessage }
+  contactPostExtra: { charId: string; post: SocialPost }
 }
 
 export type ScreenSlot = keyof ScreenSlotProps
+
+/** What the game hands a mod's tab on her contact page. */
+export interface ContactTabProps {
+  charId: string
+  /** He has her number: her page is open, not a stranger's. */
+  isContact: boolean
+  theme: ScreenTheme
+}
+
+/**
+ * A reading of her of a mod's own on her contact page: a tab named `label` beside Profile, and
+ * `Panel` drawn in place of her profile cards while it is the one being read. `shown` says whether
+ * the tab stands on her page at all; it is asked on every render, so it may read the store.
+ */
+export interface ContactTab {
+  id: string
+  label: string
+  Panel: ComponentType<ContactTabProps>
+  shown?: (ctx: { charId: string; isContact: boolean }) => boolean
+}
 
 interface Registered {
   modId: string
@@ -807,6 +835,17 @@ export function statActivities(stat: StatKey): SlotActivityOffer[] {
 /** Whether the mod that owns a training activity is on and still offers it. */
 export function slotActivityAvailable(offer: SlotActivityOffer): boolean {
   return activeEntries().some(({ modId, hooks }) => modId === offer.owner && hooks.slotActivityAvailable?.(offer) === true)
+}
+
+/** The tabs beside Profile on her contact page: one per id, from the mods that are on, in list order. */
+export function contactTabs(ctx: { charId: string; isContact: boolean }): { modId: string; tab: ContactTab }[] {
+  const seen = new Set(['profile'])
+  return activeEntries().flatMap(({ modId, hooks }) => {
+    const tab = hooks.contactTab
+    if (!tab || seen.has(tab.id) || tab.shown?.(ctx) === false) return []
+    seen.add(tab.id)
+    return [{ modId, tab }]
+  })
 }
 
 /** The components drawn at one place on screen: each mod's that is on, in list order, under its id. */
