@@ -76,6 +76,7 @@ import { imageTypeOf, isRgbaPng } from '@shared/imageBytes'
 import { killStrayProcesses, killTree, listProcessIds } from './processTree'
 import { tryCutProfile } from './profileService'
 import { sleep } from '@shared/retry'
+import { comfyLaunchEnvironment } from './comfyLaunchEnvironment'
 
 /** Where the app's own server answers. */
 const MANAGED_URL = `http://${COMFY_HOST}`
@@ -348,6 +349,9 @@ async function startOnce(
     return
   }
 
+  // Resolve trusted setup before opening the log or starting a process. External and
+  // already-running servers return above: their environment belongs to their existing boot.
+  const launchEnv = comfyLaunchEnvironment({ root: getComfyUiPath(), platform: process.platform })
   onProgress?.('Starting ComfyUI')
   emit('starting')
   const python = getComfyPythonPath()
@@ -374,7 +378,7 @@ async function startOnce(
     ],
     {
       cwd: getComfyUiPath(),
-      env: { ...process.env, TRANSPARENT_BACKGROUND_FILE_PATH: getComfyUiPath() },
+      env: launchEnv,
       windowsHide: true,
       stdio: ['ignore', logFd ?? 'ignore', logFd ?? 'ignore']
     }

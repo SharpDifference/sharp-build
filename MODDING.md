@@ -126,7 +126,7 @@ registerRomanceRequirement(MY_MOD, character =>
 )
 ```
 
-The default enable lookup is `sharedModOn`, bound to current switches/playthrough selection
+The enable lookup is `sharedModOn`, bound once via `setSharedModRules` to current switches/playthrough selection
 by `modsStore`. Disabled callbacks are not called. Register once at boot; the current registry
 holds one rule per mod ID, and a second registration for that ID replaces its rule. Results
 must be pure and finite; non-finite values are ignored. Exceptions propagate to the caller,
@@ -139,6 +139,10 @@ is dropped as a whole. Friendship and affection can still grow; existing lovers 
 After a breakup, a new romance is gated again. Scene Creator's existing prompt-attraction
 override remains intentional. Callers of `foldRelationshipEvents` must supply character and
 stats to enforce optional requirements; its context-free form remains the native fold.
+
+`crushHintUpdate` can reopen a previously met hint when a newly active requirement is unmet.
+A saved `{ met: true }` therefore is not permanent eligibility: the next hint names the missing
+stat, and marks the hint met again once all active requirements are satisfied.
 
 The tests in `test/romanceRequirements.test.ts` use a synthetic registration, not a shipped
 mod. They check order-independent composition, disabled/invalid responses, prompts, direct
@@ -339,6 +343,28 @@ These hooks add to the existing API; existing hooks and their arguments are unch
 - `optionPreviews` draws a preview under an option group on the Mods screen, keyed by the group's id. The game hands it `optionId`, the option picked (or null), and draws it under the group's switches on the recessed ground. It is asked whether or not the mod is on, so a player sees it before switching the mod on.
 - `updatesTab` puts a page beside the feed in the Updates tab, with `id`, `word`, `Page`, an optional `unread(game)` and an optional `Action`, drawn at the end of the titles' row while the page is showing. With one or more on, Updates draws a row of titles you press, its own first (the one showing drawn as the screen's title, the rest muted over a faded blob), and the game puts each `unread` on the far corner of its title's blob and sums them onto the Updates tile and the landing's Bunnyboard badge. The page is drawn under the title; it brings its own `vu-bb-scroll`. The feed's id, `feed`, cannot be replaced; leaving the tab, or the mod switching off, comes back to the feed.
 
+### DM request history window
+
+`buildTextingPrompt` accepts an optional `historyLimit` on its `TextingPromptState`.
+This is a request-builder option, not a global hook or a saved preference: the caller that
+owns a replay supplies it for that request. Ordinary texting still includes the newest 20
+stored messages. A finite override is rounded down and clamped to 20–160; missing or
+non-finite values use 20. The pending player message is added once after those messages,
+so the maximum is 160 stored messages plus the pending text. This is a message count,
+not a token or character budget, and does not change stored history or summary retention.
+
+The supplied conversation is read without mutation. A caller rebuilding a rejected reply
+must first supply a snapshot from **before** that reply, with its earlier summary (or null
+when that summary is unavailable); this option does not identify or remove rejected turns.
+The native lorebook scan reads the selected history, and `dmHistoryNote`, `prompts.dm` and
+`requests.dm` still run normally. A larger window can increase request size and cost; use it
+only when the earlier summary is unavailable. Model selection and request dispatch do not change.
+
+The future texting kit can forward this option from `buildDmRequest`. Thread leases, safe
+conversation replacement, mod activation checks and persistence remain the caller's
+responsibility; this capability alone is not a complete regeneration or loader API.
+See `test/dmHistoryWindow.test.ts` for bounded requests, replay snapshots and hook composition.
+
 ### Comments under posts
 
 The game keeps a post's comments (`comments` on `SocialPost`, shaped as `PostComment` in
@@ -371,6 +397,37 @@ A mod may augment `ModCarryFields` and register its own pure adapter with `regis
 Fields a mod adds to a feed post that hold a time (the last slot it answered, say) are carried by the mod too: New Game+ moves each post's own date back onto the next semester's clock, and `registerPostCarry(modId, (post, days) => …)` in `shared/modCarry.ts` moves the mod's fields back the same `days` (a global slot moves twice that). Like the adapters, it runs with the switch off.
 
 Files a mod keeps per playthrough outside the save (pictures, say) need nothing: New Game+ continues the same playthrough, so they stay where they are. `registerTermFiles(modId, async ({ from, to }) => …)` is kept for an extension that starts a new playthrough per semester, which calls `carryModFiles({ from, to })` once the new playthrough is written, before it is entered; the game itself never calls it. A copier runs with its mod's switch off too, and one that fails costs only its own files.
+
+## Managed ComfyUI launch environment
+
+Trusted main-process setup can register a synchronous provider with
+`registerComfyLaunchEnvironment(modId, ({ root, platform }) => ({ KEY: value }))` from
+`main/services/comfyLaunchEnvironment.ts`. `root` is the managed ComfyUI installation's
+working directory. Return a plain string-valued object, or `null` to contribute nothing.
+This is a main-process registry, not a renderer hook, IPC endpoint, or permission grant.
+
+The service reads a frozen context immediately before each new managed process is spawned,
+before opening its log. No providers means the existing inherited environment. Contributions
+override inherited values only in the child; `process.env` is never changed by the registry.
+Different keys combine, identical values coalesce, and different values for the same key
+refuse that launch with both owners named. Windows names are compared without case, including
+inherited aliases such as `Path`/`PATH`. Invalid names/values and provider exceptions fail the
+launch with an owner-labelled error; diagnostics do not print environment values.
+
+External servers and an already-running managed server are never changed or restarted by
+this hook. A changed registration affects the **next managed boot**; a running server needs
+an explicit stop/start. The normal start guard still shares one boot between callers.
+
+Duplicate owner registrations fail. The returned disposer unregisters only its own entry and
+is safe to call twice or after a replacement. The trusted host/mod entry owns registration,
+availability and disposal; renderer switches are not implicitly read in main. An inactive
+provider can return `null`. Installation-level configuration needed by installed custom nodes
+may intentionally remain present while their gameplay effects are off. This PR supplies no
+loader or activation policy: a future loader must enforce its reviewed-main-code policy and
+wire that lifecycle before offering custom-source installation.
+
+See `test/comfyLaunchEnvironment.test.ts` and `test/comfyLaunchProcess.test.ts` for composition,
+Windows aliases, errors/disposal, and the real service's launch boundary with mocked processes.
 
 ## Shared gameplay extensions
 
@@ -444,7 +501,7 @@ twice; it does not change saved characters. The loader/diagnostic UI is separate
 | --- | --- |
 | Character generator | `generatedCharacterTraits()` snapshots native traits plus explicitly `generated: true` traits whose owner is currently on. The writing pipeline takes one snapshot before building/queuing the request. Prompt text, schema and response parsing share it even if a mod is toggled or unregistered while generation is pending. A later registration can only affect the next request. |
 | Editor | `traitOptions(form.traits)` reads at each render, not module import. Installed metadata is available with the mod switch off, independently of its gameplay effect. `editor: false` prevents new selections; an already-saved value still gets its chip metadata. `selectedTraitHints` supplies the selected explanations. |
-| Character/contact chips | `traitTone` reads installed metadata when rendered; missing providers fall back to ordinary chips. Contact-page discovery conditions are unchanged. Core supplies `data-tone`, not a mod's visual design. |
+| Character/contact chips | `traitTone` reads installed metadata when rendered. The contact page shows only known traits, behind its existing discovery conditions; a missing provider's tag stays saved but is not drawn there. The character editor/sheet can still show its raw saved name. Native editor chips keep their existing lack of tooltips; extensions use their explicit hint, falling back to their description. Core supplies `data-tone`, not a mod's visual design. |
 | Character card export | `traitDescription` reads metadata while constructing the card; an unknown trait exports its raw name without an `undefined` description. |
 | Scene/DM prompts | This registry does not automatically inject new instructions or enforce gameplay effects. Use the existing prompt hooks or a gameplay rule such as romance requirements. Native trait mechanics are unchanged. |
 
