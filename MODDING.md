@@ -204,8 +204,9 @@ While `prepare` runs, the screen that offered the choice keeps every button lock
 that comes back after that screen closed, or after its game was left, opens nothing.
 
 The places on screen (`settingsSection` to `panelLayer` above) each take a component. Every mod
-that is on and has one there is drawn, in list order, and drawn again when a switch moves; a mod
-that is off is not drawn. The props are the facts the game has at that place, and only the ones a
+that is on and has one there is drawn, in list order, and drawn again when a switch moves or a
+game is entered or left (a `playthrough` mod is on as the game's record says); a mod that is
+off is not drawn. The props are the facts the game has at that place, and only the ones a
 mod reads; a component works out its own hidden or blocked state from them. A component that
 throws draws nothing from then on, and the screen around it carries on. `phoneOverlay` is mounted
 in the phone's veil, so it is there only while the phone is open, and stands over the phone: it

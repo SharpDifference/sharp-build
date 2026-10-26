@@ -410,7 +410,10 @@ export function setHookRules(next: typeof rules): void {
   rules = next
 }
 
-/** Calls back whenever a switch moves; a no-op until the mods store has set the rules. */
+/**
+ * Calls back whenever a switch moves or a game is entered or left; a no-op until the mods store
+ * has set the rules.
+ */
 export function subscribeHookRules(onChange: () => void): () => void {
   return rules.subscribe?.(onChange) ?? (() => {})
 }

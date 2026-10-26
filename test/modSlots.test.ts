@@ -74,6 +74,48 @@ describe('a place on screen', () => {
   })
 })
 
+describe('a playthrough-scoped mod', () => {
+  it('is drawn once a game is entered with it in the record, and not once the game is left', async () => {
+    vi.resetModules()
+    const mods = await import('../src/shared/mods')
+    const { useModsStore } = await import('../src/renderer/stores/modsStore')
+    const { loopState, resetLoopState } = await import('../src/renderer/stores/loop/state')
+    const hooks = await import('../src/renderer/mods/hooks')
+    const slots = await import('../src/renderer/mods/ModSlot')
+    const { playthroughRecord } = await import('./fixtures')
+    const list = mods.MODS as import('../src/shared/mods').ModDef[]
+    const fixture = {
+      id: 'enrolled', name: 'Enrolled', author: 'fixture', version: '1',
+      scope: 'playthrough' as const, defaultOn: false, blurb: ''
+    }
+    list.push(fixture)
+    // Its switch is off, so only the record can put it on screen.
+    useModsStore.setState({ switches: { on: { [fixture.id]: false }, options: {} } })
+    hooks.registerHooks(fixture.id, { phoneOverlay: marker(fixture.id) })
+    const drawn = (): string =>
+      renderToStaticMarkup(
+        createElement(slots.ModSlot<'phoneOverlay'>, { slot: 'phoneOverlay', props: PROPS.phoneOverlay })
+      )
+    // What ModSlot subscribes to, so each call is a redraw.
+    const redraw = vi.fn()
+    const stop = hooks.subscribeHookRules(redraw)
+
+    try {
+      expect(drawn()).toBe('')
+      loopState.record = playthroughRecord({ mods: [fixture.id] })
+      expect(redraw).toHaveBeenCalledOnce()
+      expect(drawn()).toContain(`data-mod="${fixture.id}"`)
+      resetLoopState()
+      expect(redraw).toHaveBeenCalledTimes(2)
+      expect(drawn()).toBe('')
+    } finally {
+      stop()
+      list.splice(list.indexOf(fixture), 1)
+      resetLoopState()
+    }
+  })
+})
+
 describe('a component that throws', () => {
   afterEach(() => vi.restoreAllMocks())
 

@@ -11,7 +11,7 @@ import {
 } from '@shared/mods'
 import type { PlaythroughRecord } from '@shared/types'
 import { setHookRules } from '../mods/hooks'
-import { loopState } from './loop/state'
+import { loopState, subscribeLoopRecord } from './loop/state'
 import { useUiStore } from './uiStore'
 
 interface ModsStoreState {
@@ -67,14 +67,21 @@ export const useModsStore = create<ModsStoreState>((set, get) => {
 
 // The game's hooks ask only the mods that are on, in the order the list names them. Inside a
 // game, a mod scoped to the playthrough is on as the game's record says, not as the switch now
-// stands; on the menus, with no game entered, the switches decide.
+// stands; on the menus, with no game entered, the switches decide. So either one moving is a
+// change: a switch, or the record as a game is entered or left.
 const rules = {
   isOn: (modId: string) => modOn(useModsStore.getState().switches, modId, loopState.record),
   order: (modId: string) => MODS.findIndex((mod) => mod.id === modId),
-  subscribe: (onChange: () => void) =>
-    useModsStore.subscribe((state, before) => {
+  subscribe: (onChange: () => void) => {
+    const stopSwitches = useModsStore.subscribe((state, before) => {
       if (state.switches !== before.switches) onChange()
     })
+    const stopRecord = subscribeLoopRecord(onChange)
+    return () => {
+      stopSwitches()
+      stopRecord()
+    }
+  }
 }
 setHookRules(rules)
 setSharedModRules(rules.isOn)

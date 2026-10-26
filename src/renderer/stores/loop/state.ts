@@ -70,12 +70,34 @@ export interface ProjectWork {
   exam: ExamPeriod
 }
 
+/** The record behind `loopState.record`, and who is told each time it is set or cleared. */
+let enteredRecord: PlaythroughRecord | null = null
+const recordWatchers = new Set<() => void>()
+
+/** Calls back whenever `loopState.record` changes: a game entered, or left. */
+export function subscribeLoopRecord(onChange: () => void): () => void {
+  recordWatchers.add(onChange)
+  return () => {
+    recordWatchers.delete(onChange)
+  }
+}
+
 export const loopState = {
   /** One stay inside a playthrough; continuations bail when it goes stale. */
   runToken: {} as object,
 
-  /** The playthrough record the game being played was entered with, held for a replay's return. */
-  record: null as PlaythroughRecord | null,
+  /**
+   * The playthrough record the game being played was entered with, held for a replay's return.
+   * A playthrough-scoped mod is on as it says, so setting it tells the watchers.
+   */
+  get record(): PlaythroughRecord | null {
+    return enteredRecord
+  },
+  set record(next: PlaythroughRecord | null) {
+    if (next === enteredRecord) return
+    enteredRecord = next
+    for (const watcher of [...recordWatchers]) watcher()
+  },
 
   /** The next slot's opening, paid for and waiting for the boundary. */
   bankedOpening: null as BankedOpening | null,

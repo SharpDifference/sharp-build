@@ -3,7 +3,8 @@ import { screenSlot, subscribeHookRules, type ScreenSlot, type ScreenSlotProps }
 
 /**
  * Every mod's component for one place on screen: each mod that is on, in list order, drawn again
- * when a switch moves. A component that throws draws nothing, and the screen around it stands.
+ * when a switch moves or a game is entered or left. A component that throws draws nothing, and
+ * the screen around it stands.
  */
 export function ModSlot<S extends ScreenSlot>({
   slot,
