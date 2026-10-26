@@ -100,10 +100,12 @@ optionGroups: [{ id: 'loader', label: 'Loading animation', hint: 'The animation 
 | `src/main/services/modsService.ts` | Reads and writes `data/mods.json`. |
 | `src/renderer/stores/modsStore.ts` | The switches in the renderer, and the hooks. |
 | `src/renderer/views/ModsModal.tsx` | The Mods screen. |
-| `src/renderer/mods/hooks.ts` | The hook points (below). |
+| `packages/modkit/` | The mod kit, `@vx/modkit`: the hook points (below), the shared rule and the carry registries, under the three entries a mod imports (`shared`, `renderer`, `main`) and core's own `host` side. Its README says how it is laid out and checked. |
+| `src/renderer/mods/hooks.ts`, `src/renderer/mods/ModSlot.tsx`, `src/shared/modRules.ts`, `src/shared/modCarry.ts` | The old paths of what moved into the kit, re-exporting it, so core's imports are unchanged. |
 | `src/renderer/modEntries/` | One file per mod with hooks, named for its id: its `registerHooks`. |
 | `src/renderer/mods/index.ts` | Loads every file in `modEntries/` at boot. |
 | `test/mods.test.ts` | The rules, tested against a list with every shape of mod. |
+| `test/kit/` | The kit's own checks: a mod file imports only the kit (`boundary.test.ts`), the hook table and the kit's surface agree with the code (`contract.test.ts`), and the per-hook compatibility check (`compat.test.ts`). |
 
 ## A rule in shared code
 
@@ -162,7 +164,8 @@ game there. At each place mods commonly add to, the game asks once, in one line 
 file; a mod answers from its own files. Two mods adding to the same place then never touch the
 same lines, and neither touches the game's code at that place.
 
-Everything is in `src/renderer/mods/hooks.ts`. The game's side, at each place:
+Everything is in `packages/modkit/src/renderer/hooks.ts` (`src/renderer/mods/hooks.ts` re-exports it).
+The game's side, at each place:
 
 ```ts
 ...promptLines('dm', { character, info, state })   // in textingPrompt.ts

@@ -1,0 +1,47 @@
+/**
+ * `@vx/modkit/host/renderer`: core's side of the hooks. The rules the mods store sets, every
+ * dispatcher the game asks at its hook points, and the slot that draws the mods' components. Not
+ * for mods; the boundary test refuses it in a mod file. A mod's side is `../renderer/index.ts`,
+ * and the two together are every runtime export of `hooks.ts` (the contract test holds them so).
+ */
+export {
+  afterDmReply,
+  afterReachOut,
+  afterSceneReply,
+  bunnyboardPages,
+  characterFromDraft,
+  contactTabs,
+  dmHistoryNotes,
+  editorFields,
+  emojiTool,
+  endingChoice,
+  exercisedStats,
+  fileFeedPost,
+  gameEntered,
+  modDetail,
+  modRequest,
+  optionPreview,
+  ownedComments,
+  playerActs,
+  postCommentsOwner,
+  postLikes,
+  postOutAt,
+  postPicture,
+  prepareWayOn,
+  projectSlotMemories,
+  saveChoice,
+  saveNotes,
+  scenePlays,
+  screenSlot,
+  sentText,
+  setHookRules,
+  settleSceneStats,
+  slotActivityAvailable,
+  slotSettled,
+  slotStatusLines,
+  statActivities,
+  statFloor,
+  subscribeHookRules,
+  updatesTabs
+} from '../renderer/hooks'
+export { ModSlot, slotElements, SlotBoundary } from '../renderer/ModSlot'

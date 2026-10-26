@@ -1,0 +1,20 @@
+{
+  "name": "@vx/modkit",
+  "version": "0.1.0",
+  "description": "The mod kit for Venus Extracurriculars: the one part of the game a mod may import.",
+  "license": "AGPL-3.0-only",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./shared": { "types": "./dist/shared.d.ts" },
+    "./renderer": { "types": "./dist/renderer.d.ts" },
+    "./main": { "types": "./dist/main.d.ts" }
+  },
+  "scripts": {
+    "report": "node scripts/report.mjs",
+    "report:check": "node scripts/report.mjs --check"
+  },
+  "devDependencies": {
+    "@microsoft/api-extractor": "7.59.4"
+  }
+}
