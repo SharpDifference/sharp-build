@@ -10,7 +10,6 @@
     "packages/modkit/src/shared/**/*",
     "packages/modkit/src/main/**/*",
     "packages/modkit/src/host/shared.ts",
-    "packages/modkit/src/host/main.ts",
     "packages/modkit/src/bridge/shared.ts",
     "packages/modkit/src/bridge/main.ts"
   ],

@@ -42,4 +42,7 @@ export {
   registerCharacterTrait,
   registerRomanceRequirement
 } from '../bridge/shared'
+export { sharedModOn } from './modRules'
+export { carryModFiles, registerPostCarry, registerTermCarry, registerTermFiles } from './modCarry'
+export type { ModCarryFields, TermCarryContext, TermFilesContext } from './modCarry'
 export { KIT_VERSION } from './version'
