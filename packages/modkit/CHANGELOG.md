@@ -1,5 +1,10 @@
 # @vx/modkit
 
+## 0.2.0
+
+Adds the hooks `gameModals`, `railButton`, `landingTool` and `gameMenuEntry`, and the API
+`openPanel` from `@vx/modkit/renderer`.
+
 ## 0.1.0
 
 The kit exists. Everything a mod could import from core's mod system, under three entry points
