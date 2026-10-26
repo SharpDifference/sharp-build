@@ -34,12 +34,15 @@ import { useGameStore } from '../stores/gameStore'
 import { registerTermFiles } from '@shared/modCarry'
 import { ownsPostComments, registerHooks } from '../mods/hooks'
 import { PhotoComments, PhotoPostPicture } from '../components/PhotoPostSpots'
+import { PhotoLightboxHost } from '../components/PhotoBubble'
 
 /**
  * Photo Feature, plugged into the game through its hooks. Everything it adds to the game's own
  * files is here; the game only asks. The mods store skips it while it is off.
  */
 registerHooks(PHOTO_FEATURE, {
+  // A picture opened at full size, over the phone.
+  phoneOverlay: PhotoLightboxHost,
   prompts: {
     dm: {
       // What she may photograph is settled from the save before she is asked anything.
