@@ -14,6 +14,7 @@ import { formatNumericGameDate, formatWeekday } from '../prompts/gameDate'
 import { weekOf } from '../prompts/occasions'
 import type { RevealKey } from '../prompts/introScript'
 import { scenePlays, type RailSeatProps } from '../mods/hooks'
+import { ModSlot } from '../mods/ModSlot'
 import type { ScreenTheme } from './clockTheme'
 import {
   BunnyIcon,
@@ -131,6 +132,8 @@ export interface SceneChromeProps {
   calendarBadge: number
   bunnyboardBadge: number
   railDead: boolean
+  /** The mods' buttons stand on the rail: not on a created scene or a replay. */
+  modButtons: boolean
   onCalendar: () => void
   onBunnyboard: () => void
   /** Absent when Echo is disabled or this screen has no ordinary playthrough. */
@@ -408,6 +411,13 @@ export function SceneChrome(props: SceneChromeProps): JSX.Element {
           >
             <TalentIcon />
           </RailSeat>
+        )}
+        {/* The mods' buttons, revealed with Settings, the rail's last seat. */}
+        {props.modButtons && (
+          <ModSlot
+            slot="railButton"
+            props={{ Seat: RailSeat, visible: !dark && shown.has('settings'), dead: props.railDead }}
+          />
         )}
         {/* The mods' own seats, each deciding for itself whether it stands. They arrive on the
             rail with the Calendar, the last of the game's own gated seats, hence its reveal. */}

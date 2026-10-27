@@ -20,7 +20,11 @@ export default defineConfig({
   },
   resolve: {
     alias: {
-      '@shared': resolve('src/shared')
+      '@shared': resolve('src/shared'),
+      '@vx/modkit/host': resolve('packages/modkit/src/host'),
+      '@vx/modkit/shared': resolve('packages/modkit/src/shared'),
+      '@vx/modkit/renderer': resolve('packages/modkit/src/renderer'),
+      '@vx/modkit/main': resolve('packages/modkit/src/main')
     }
   },
   plugins: [webpAssets('web'), react()],

@@ -1,17 +1,26 @@
 import { mkdir, readFile } from 'fs/promises'
 import {
   cleanSwitches,
+  modOn,
   NO_SWITCHES,
   photoSwitchesOf,
   withPhotoSettingsCarried,
   type ModSwitches
 } from '@shared/mods'
+import { setSharedModRules } from '@shared/modRules'
 import { setPhotoSwitches } from '@shared/photoSwitches'
 import { getDataPath, getModsPath, getSettingsPath } from '../paths'
 import { readValidatedJson, writeAtomicJson } from './jsonFile'
 
 /** Schema version this build reads and writes. */
 const SCHEMA_VERSION = 1
+
+/**
+ * The switches main last read or wrote. Shared rules ask them here, as the renderer's ask its own
+ * store: main knows no playthrough, so a `playthrough` mod answers as its switch stands.
+ */
+let known: ModSwitches = NO_SWITCHES
+setSharedModRules((modId) => modOn(known, modId))
 
 /** `data/mods.json` as it is on disk. */
 interface ModsFile extends ModSwitches {
@@ -41,7 +50,8 @@ export async function getModSwitches(): Promise<ModSwitches> {
   if (switches !== stored) await setModSwitches(switches)
   // Main's own copy of Photo Feature's switches, for the renders it draws (body details).
   setPhotoSwitches(photoSwitchesOf(switches))
-  return switches
+  known = cleanSwitches(switches)
+  return known
 }
 
 /** Writes every switch and option atomically. */
@@ -53,6 +63,7 @@ export async function setModSwitches(switches: ModSwitches): Promise<void> {
     { code: 'MODS_UNWRITABLE', message: 'Could not save mods.json.' }
   )
   setPhotoSwitches(photoSwitchesOf(switches))
+  known = cleanSwitches(switches)
 }
 
 /**

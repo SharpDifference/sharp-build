@@ -123,6 +123,20 @@ describe('ways on', () => {
   })
 })
 
+describe('fields in the character editor', () => {
+  const Field = () => null
+  const field = (tag: string) => ({ read: () => tag, write: () => ({}), Field })
+
+  it('come from the mods that are on, in list order, under each mod', async () => {
+    const hooks = await fresh({ off: false }, ['body', 'notes', 'off'])
+    hooks.registerHooks('notes', { editorField: field('notes') })
+    hooks.registerHooks('off', { editorField: field('off') })
+    hooks.registerHooks('body', { editorField: field('body') })
+
+    expect(hooks.editorFields().map(({ modId }: { modId: string }) => modId)).toEqual(['body', 'notes'])
+  })
+})
+
 describe('updates tabs and option previews', () => {
   const Page = () => null
   const Preview = () => null
@@ -143,6 +157,65 @@ describe('updates tabs and option previews', () => {
   })
 })
 
+describe('tabs on her contact page', () => {
+  const Panel = () => null
+
+  it('come one per id from the mods that are on, in list order, where each says it stands', async () => {
+    const on = { gallery: true, notes: true, copy: true, hidden: true, off: false }
+    const hooks = await fresh(on, ['gallery', 'notes', 'copy', 'hidden', 'off'])
+    hooks.registerHooks('copy', { contactTab: { id: 'gallery', label: 'Copy', Panel } })
+    hooks.registerHooks('notes', { contactTab: { id: 'notes', label: 'Notes', Panel, shown: ({ isContact }) => isContact } })
+    hooks.registerHooks('gallery', { contactTab: { id: 'gallery', label: 'Gallery', Panel } })
+    hooks.registerHooks('hidden', { contactTab: { id: 'profile', label: 'Mine', Panel } })
+    hooks.registerHooks('off', { contactTab: { id: 'off', label: 'Off', Panel } })
+
+    const labels = (isContact: boolean) =>
+      hooks.contactTabs({ charId: 'c1', isContact }).map(({ tab }: { tab: { label: string } }) => tab.label)
+    // Profile is the page's own, and a tab whose mod says it does not stand for her is left out.
+    expect(labels(true)).toEqual(['Gallery', 'Notes'])
+    expect(labels(false)).toEqual(['Gallery'])
+  })
+})
+
+describe("a mod's panels by id", () => {
+  const Mine = () => null
+  const Copy = () => null
+
+  it('open only while a game view is up, and only where a mod that is on has the id', async () => {
+    const on = { mine: true, copy: true }
+    const hooks = await fresh(on, ['mine', 'copy'])
+    hooks.registerHooks('copy', { gameModals: { notes: Copy } })
+    hooks.registerHooks('mine', { gameModals: { notes: Mine } })
+    const opened = vi.fn()
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+
+    expect(hooks.openPanel('notes')).toBe(false)
+    const unbind = hooks.setPanelOpener(opened)
+    expect(hooks.gameModal('notes')).toBe(Mine)
+    // Two mods on with the same id: the first wins, and the clash is said once, naming both.
+    expect(warn).toHaveBeenCalledOnce()
+    expect(warn.mock.calls[0][0]).toMatch(/mine and copy .*"notes"/)
+    expect(hooks.openPanel('notes', 'c1')).toBe(true)
+    expect(opened).toHaveBeenLastCalledWith('notes', 'c1')
+    expect(hooks.openPanel('other')).toBe(false)
+
+    on.mine = false
+    expect(hooks.gameModal('notes')).toBe(Copy)
+    on.copy = false
+    expect(hooks.openPanel('notes')).toBe(false)
+
+    // A view that has gone does not unbind the one that came up after it.
+    const next = vi.fn()
+    hooks.setPanelOpener(next)
+    unbind()
+    on.mine = true
+    expect(hooks.openPanel('notes')).toBe(true)
+    expect(next).toHaveBeenCalledOnce()
+    expect(opened).toHaveBeenCalledOnce()
+    expect(warn).toHaveBeenCalledOnce()
+    warn.mockRestore()
+  })
+})
 
 describe('preparing a way on', () => {
   /** A prepare the test answers by hand, so the screen can be closed while it waits. */

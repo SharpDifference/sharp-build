@@ -3,6 +3,9 @@ import { cleanBody, type CharacterBody } from '@shared/characterBody'
 import { BodyFieldsSection, bodyForm } from './bodyFields'
 import { useEffect, useRef, useState, type CSSProperties, type JSX } from 'react'
 import { createPortal } from 'react-dom'
+import { editorFields } from '../mods/hooks'
+import { ModSlot, SlotBoundary } from '../mods/ModSlot'
+import { useModsStore } from '../stores/modsStore'
 import { AnimatePresence, motion } from 'motion/react'
 import { CheckField } from '../components/CheckField'
 import { ChipField, useCopyMark } from '../components/ChipField'
@@ -240,6 +243,8 @@ function customCgOfTarget(target: RenderTarget): CustomCgSlot | null {
  * as dirty forever.
  */
 interface Form {
+  /** Each mod's field in the editor, by the mod's id, as its `editorField` read it off her. */
+  mods: Record<string, unknown>
   firstName: string
   lastName: string
   personality: string
@@ -275,6 +280,7 @@ interface Form {
 
 function formOf(character: Character): Form {
   return {
+    mods: Object.fromEntries(editorFields().map(({ modId, field }) => [modId, field.read(character)])),
     firstName: character.firstName,
     lastName: character.lastName,
     personality: character.personality,
@@ -320,6 +326,13 @@ export function EditCharacterModal({
 }: EditCharacterModalProps): JSX.Element | null {
   const charId = character.charId
   const [form, setForm] = useState(() => formOf(character))
+  // A mod switched on or off adds or takes away its field.
+  useModsStore((s) => s.switches)
+  /** A mod's field as the form holds it; read off her where the mod came on after the form did. */
+  const modValue = (modId: string): unknown => {
+    if (modId in form.mods) return form.mods[modId]
+    return editorFields().find((entry) => entry.modId === modId)?.field.read(character)
+  }
   const [editingName, setEditingName] = useState(false)
   const [sizing, setSizing] = useState(false)
   const [gallery, setGallery] = useState(false)
@@ -521,6 +534,8 @@ export function EditCharacterModal({
   const buildNext = (): Character => {
     const next: Character = {
       ...character,
+      // The mods' own fields first, so the game's below win over any a mod writes by mistake.
+      ...Object.assign({}, ...editorFields().map(({ modId, field }) => field.write(modValue(modId)))),
       firstName: form.firstName,
       lastName: form.lastName,
       personality: form.personality,
@@ -1120,6 +1135,7 @@ export function EditCharacterModal({
 
           <div className="vu-edit-images">
             <ReflectionPortraitControl charId={charId} name={name} theme={theme} height={character.height}/>
+            <ModSlot slot="editCharacterImages" props={{ charId, name, theme, height: character.height }} />
             <div className="vu-edit-wardrobes">
               {WARDROBES.map(({ target, set, title }) => (
                 <WardrobeColumn key={target} {...columnFor(target, set, title)} />
@@ -1619,6 +1635,19 @@ export function EditCharacterModal({
                           baseAppearance={form.baseAppearance}
                           onChange={(body) => setForm((current) => ({ ...current, body }))}
                         />
+
+                        {editorFields().map(({ modId, field }) => (
+                          <SlotBoundary key={modId} slot="editorField" modId={modId}>
+                            <field.Field
+                              value={modValue(modId)}
+                              onChange={(value) =>
+                                setForm((current) => ({ ...current, mods: { ...current.mods, [modId]: value } }))
+                              }
+                              charId={charId}
+                              baseAppearance={form.baseAppearance}
+                            />
+                          </SlotBoundary>
+                        ))}
 
                         <ChipField
                           id="edit-negative-tags"
