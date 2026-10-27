@@ -196,9 +196,11 @@ import {
   prepareWayOn,
   scenePlays,
   setPanelOpener,
+  subscribeHookRules,
   updatesTabs,
   type WayOn
 } from '../mods/hooks'
+import { modPanelGone } from './modPanelOwner'
 import { ModSlot } from '../mods/ModSlot'
 import { currentRun, runStale } from '../stores/loop/state'
 import { ModsModal } from './ModsModal'
@@ -702,6 +704,14 @@ export function GameView(): JSX.Element {
   useEffect(() => setPanelOpener((id, arg) => setPanel({ kind: 'gameModal', id, arg })), [])
   /** The mod's panel `openPanel` put up, while its mod is on. */
   const ModPanel = panel?.kind === 'gameModal' ? gameModal(panel.id) : undefined
+  // A mod switched off, here or by a game entered or left, takes its open panel with it: the
+  // panel would draw nothing, yet `blocked` would stay up behind it with no way to close it.
+  const panelGone = useSyncExternalStore(subscribeHookRules, () =>
+    (panel?.kind === 'gameModal' || panel?.kind === 'modPanel') && modPanelGone(panel)
+  )
+  useEffect(() => {
+    if (panelGone) closePanel()
+  }, [panelGone])
   /**
    * The glyphs a gift threw off her, until the last of them has faded. Armed `waiting` when the
    * present is handed over and raised on the line her reply opens with, so what they answer is
