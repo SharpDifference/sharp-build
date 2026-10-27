@@ -1117,6 +1117,8 @@ function ConversationView({
         )}
       </div>
 
+      {!bot && <ModSlot slot="conversationFoot" props={{ charId }} />}
+
       <div className="vu-bb-foot">
         {boss ? (
           <BossActions
