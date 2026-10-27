@@ -154,6 +154,16 @@ export async function getRendererSettings(): Promise<RendererSettings> {
 }
 
 /** Writes `next` whole over the stored settings: a restore, once it has settled what they are. */
+/**
+ * Rewrites the stored settings as `change` leaves them, for the fields main owns (the mod
+ * loader's); the renderer's patches never carry those, and `...current` in a merge keeps them.
+ */
+export async function patchStoredSettings(change: (settings: Settings) => Settings): Promise<Settings> {
+  const next = change(await getSettings())
+  await writeSettingsFile(next)
+  return next
+}
+
 export async function replaceSettings(next: Settings): Promise<void> {
   await writeSettingsFile(next)
 }
