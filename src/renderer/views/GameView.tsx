@@ -1,8 +1,7 @@
 import { TalentPanel } from './TalentPanel'
 import { ensureTalents } from '../modEntries/campus-talents'
-import { UnspokenVoice } from './UnspokenVoice'
 import { UnspokenLinkGlitch } from './UnspokenLinkGlitch'
-import { ReckoningModal, ReckoningContinuation, ReckoningPreparation } from './ReckoningModal'
+import { ReckoningModal } from './ReckoningModal'
 import { ReckoningDungeonView } from './ReckoningDungeon'
 import { dungeonVisible } from '../stores/reckoningDungeon'
 import { EchoAura, EchoPanel } from './EchoPanel'
@@ -2835,15 +2834,12 @@ export function GameView(): JSX.Element {
           <PlotTwistModal key="plot-twist" theme={half} onClose={closePanel} />
         )}
 
-        <ReckoningPreparation key="reckoning-preparation"/>
-        <UnspokenVoice key="unspoken-voice" hidden={blocked||covered||uiHidden||cinematic}/>
         <UnspokenLinkGlitch key="unspoken-link-glitch" hidden={blocked||covered||uiHidden||cinematic}/>
         <ReckoningDungeonView
           key="reckoning-dungeon-view"
           onOptions={() => setPanel({ kind: 'settings' })}
           covered={panel !== null || covered}
         />
-        <ReckoningContinuation key="reckoning-continuation" blocked={blocked||covered}/>
         {panel?.kind === 'reckoning' && <ReckoningModal key={`reckoning-${panel.charId}`} charId={panel.charId} onClose={closePanel} />}
         {panel?.kind === 'talents' && <TalentPanel key="talents" theme={half} onClose={closePanel} />}
         {panel?.kind === 'echo' && (
