@@ -1,4 +1,4 @@
-import { PLOT_TWIST_MOD } from '@shared/plotTwists'
+import { PLOT_TWIST_MOD } from '../../shared/plotTwists'
 import { plotTwistBlock } from '../prompts/plotTwist'
 import { registerHooks } from '../mods/hooks'
 import { createElement, lazy, Suspense } from 'react'

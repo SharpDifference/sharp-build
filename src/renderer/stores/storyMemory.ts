@@ -1,4 +1,4 @@
-import { storySnapshot, type StorySnapshot, type StoryRecall } from '@shared/storyMemory'
+import { storySnapshot, type StorySnapshot, type StoryRecall } from '../../shared/storyMemory'
 import { useGameStore } from './gameStore'
 import { modIsOn } from './modsStore'
 
