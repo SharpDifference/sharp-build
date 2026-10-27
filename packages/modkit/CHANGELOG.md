@@ -1,5 +1,11 @@
 # @vx/modkit
 
+## 0.3.0
+
+Add `conversationFoot`, a screen slot below a person's message history and before the native
+composer. It receives the open `charId`; bot and employer threads do not draw it. Existing hooks
+and APIs keep their shapes.
+
 ## 0.2.0
 
 Adds the hooks `gameModals`, `railButton`, `landingTool` and `gameMenuEntry`, and the API

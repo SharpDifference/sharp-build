@@ -199,6 +199,7 @@ const PROBES: Record<RendererHook, (id: string) => Probe> = {
   settingsSection: slot('settingsSection'),
   portraitOverlay: slot('portraitOverlay'),
   phoneOverlay: slot('phoneOverlay'),
+  conversationFoot: slot('conversationFoot'),
   mapOverlay: slot('mapOverlay'),
   photosPageSection: slot('photosPageSection'),
   editCharacterImages: slot('editCharacterImages'),

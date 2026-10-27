@@ -8,7 +8,10 @@
     "src/main/index.ts",
     "../../src/renderer/env.d.ts",
     "../../src/renderer/signalsmith-stretch.d.ts",
-    "../../src/preload/api.d.ts"
+    "../../src/preload/api.d.ts",
+    // Nothing the bridge reaches imports it, and a mod carrying data in the backup file declares
+    // its field on this module, which must then be in the program.
+    "../../src/shared/backup.ts"
   ],
   "compilerOptions": {
     "noImplicitAny": true,
