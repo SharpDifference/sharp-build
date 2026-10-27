@@ -16,6 +16,8 @@ A new link and its background question preparation require a playable night afte
 
 Each of the 22 original aspects has its own named dark inner world and bundled background. The destination follows the **girl's aspect**, not the reader's. The catalog in shared/reckoningDungeons.ts defines all 22; untyped legacy/no-Echo cases use the validated fallback. There is one map entrance, not 22 physical travel locations.
 
+The map entrance is registered by Reckoning's renderer entry through `mapOverlay`. Its lazy adapter forwards the map's travel permission and close callback to the existing `ReckoningDungeonMapPin`; the native map no longer imports or mounts that component directly. Entry still checks nighttime, a safe save point, scene completion and any required spirit, and closes the map only after a successful save. Turning Reckoning off removes the entrance without deleting the saved link. The encounter itself and its exit/recovery path remain mounted through their existing GameView paths. Ordinary-scene preparation, whispers and continuation use the separate `panelLayer` contribution described below.
+
 ## Four choices before the questions
 
 The Options button opens the normal game menu from the dungeon and the question screen, including Settings and Mods. Escape also opens it from the dungeon. Closing a menu returns to the same encounter and keeps an unsent Talk reply or question answer. The encounter remains mounted beneath menus, with its controls and whisper effects suspended; opening Options neither spends a reply nor starts generation. Options waits while a Talk, hint or answer request is in flight. Escape from the question screen still pauses the questions as before.
@@ -76,6 +78,10 @@ Reading old dialogue is harmless. Submitting a new reply at or before a recorded
 The dungeon does not call native scene settlement or Story Memory extraction. Its ordinary Talk, questions, hints and whispers do not become public conversation history. The ordinary link-establishment sensation and later relief can be part of real-world story continuity; the private mechanics must not leak into characters' knowledge. Native 0.5.0 New Game+ resets transient encounters and carries earned dynamics through the mod carry registry.
 
 ## Source map and validation
+
+The renderer entry registers the map entrance through `mapOverlay` and ordinary-scene preparation, whispers and aftermath continuation through `panelLayer`. Both contributions load lazily and follow Reckoning's required Breakthrough switch. Unmounting the panel contribution releases its preparation watcher and whisper timers; enabling it again resumes from the existing game state. Background preparation remains opt-in, and scene visibility continues to suppress whispers without pausing preparation. Continuation waits while the scene is blocked or covered.
+
+The active dungeon, link-establishment glitch and encounter modal still have their own mounts in GameView. In particular, an already-entered dungeon must remain recoverable when its mod is disabled; it cannot simply disappear with the switch-gated panel contribution.
 
 | Area | Main files |
 | --- | --- |
