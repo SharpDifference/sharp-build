@@ -19,6 +19,7 @@ export type {
   ModOption,
   ModOptionGroup,
   ModSceneFields,
+  ModSlice,
   ModScope,
   ModSwitches,
   PlayerStats,

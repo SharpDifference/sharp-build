@@ -1,6 +1,8 @@
 import { blocksNewRomance } from '@shared/romanceRequirements'
 import { savedModScene } from '@shared/modScene'
 import { statFloor } from '../mods/hooks'
+import { bindSaveFieldStore, readModSlices, writeModSlices } from '@vx/modkit/host/renderer'
+import { useModSessionStore } from './modSessionStore'
 import { create } from 'zustand'
 import {
   affectionFor,
@@ -118,6 +120,7 @@ import {
   type Conversation,
   type GameHistory,
   type GameSave,
+  type ModSlice,
   type NativeGameSave,
   type IntimateAct,
   type PlaythroughRecord,
@@ -308,7 +311,8 @@ const SAVE_KEYS: Record<keyof NativeGameSave, true> & Partial<Record<keyof GameS
   farewellsDone: true,
   endingArtWanted: true,
   scene: true,
-  thumbnail: true
+  thumbnail: true,
+  ex: true
 }
 
 /**
@@ -360,6 +364,14 @@ const SCENE_KEYS: Record<keyof SceneState, true> = {
   opening: true
 }
 
+/** What the Mods screen says of a mod whose data in the loaded save could not be read. */
+const MOD_DATA_UNREADABLE = 'its save data in this game could not be read; it is kept as it was'
+
+/** Whether a save's `ex` is the bag of slices it should be; anything else is not kept. */
+function isModData(ex: unknown): ex is Record<string, ModSlice> {
+  return typeof ex === 'object' && ex !== null && !Array.isArray(ex)
+}
+
 /** The own keys of `record` that `owned` does not list, with their values as read. */
 function restOf(record: object | null | undefined, owned: Record<string, true>) {
   return Object.fromEntries(
@@ -409,6 +421,13 @@ interface GameStoreState {
    * data, or a field from a newer build.
    */
   saveRest: Record<string, unknown>
+  /**
+   * The loaded save's `ex` as read, whole: every mod's slice, a mod not registered this session
+   * included. Written back under the values below.
+   */
+  modData: Record<string, ModSlice>
+  /** The value of each registered mod the loaded save held data for, by id, as its field read it. */
+  modValues: Record<string, unknown>
   /** The playthrough being played; every save this session writes goes into it. */
   playthroughId: string | null
   /** The Scene Creator's scene being played, with no playthrough; null in a game. */
@@ -1552,6 +1571,8 @@ function nextLineFields(
 
 const initialState = {
   saveRest: {} as Record<string, unknown>,
+  modData: {} as Record<string, ModSlice>,
+  modValues: {} as Record<string, unknown>,
   playthroughId: null,
   createdScene: null as CreatedScene | null,
   replaying: null as { over?: true } | null,
@@ -1686,6 +1707,13 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
     // The record read as the semester the save is in; the services refuse a save whose
     // semester the record does not hold.
     const semester = semesterOf(record, save.semester)
+    useModSessionStore.getState().clearDataNotes()
+    const mods = readModSlices(save, (modId, error) => {
+      console.error(`[mods] ${modId}: its save data could not be read`, error)
+      useModSessionStore.getState().noteData(modId, MOD_DATA_UNREADABLE)
+    })
+    const saveRest = restOf(save, SAVE_KEYS)
+    for (const key of mods.consumed) delete saveRest[key]
     set({
       ...initialState,
       loads: get().loads + 1,
@@ -1763,7 +1791,9 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
       graduationSeen: save.graduationSeen,
       farewellsDone: save.farewellsDone,
       endingArtWanted: save.endingArtWanted,
-      saveRest: restOf(save, SAVE_KEYS),
+      saveRest,
+      modData: isModData(save.ex) ? { ...save.ex } : {},
+      modValues: mods.values,
       characters,
       charKeyToId: buildCharKeyToId(characters),
       ...freshStage()
@@ -1833,7 +1863,11 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
         : {}
     ),
 
-  reset: () => set({ ...initialState, loads: get().loads, ...freshStage() }),
+  reset: () => {
+    // The notes are of the game being left.
+    useModSessionStore.getState().clearDataNotes()
+    set({ ...initialState, loads: get().loads, ...freshStage() })
+  },
 
   setAwaitingInput: (awaiting) => set({ awaitingInput: awaiting }),
 
@@ -3260,10 +3294,25 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
       graduationSeen: state.graduationSeen,
       farewellsDone: state.farewellsDone,
       endingArtWanted: state.endingArtWanted,
-      scene: get().captureScene()
+      scene: get().captureScene(),
+      // Omitted while it holds nothing, as an absent optional is.
+      ...(Object.keys(state.modData).length + Object.keys(state.modValues).length > 0
+        ? { ex: writeModSlices(state.modData, state.modValues) }
+        : {})
     }
   }
 }))
+
+// The mods' save fields read and write their values here.
+bindSaveFieldStore({
+  values: () => useGameStore.getState().modValues,
+  set: (modId, value) =>
+    useGameStore.setState((state) => ({ modValues: { ...state.modValues, [modId]: value } })),
+  subscribe: (onChange) =>
+    useGameStore.subscribe((state, before) => {
+      if (state.modValues !== before.modValues) onChange()
+    })
+})
 
 /** The stored conversation with `charId`, or a fresh empty one. */
 function conversationWith(bunnyboard: BunnyboardState, charId: string): Conversation {

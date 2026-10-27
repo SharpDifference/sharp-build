@@ -911,7 +911,9 @@ export function NewGameView(): JSX.Element {
         farewellsDone: [],
         endingArtWanted: false,
         // No scene in progress, so the game opens at the slot boundary.
-        scene: null
+        scene: null,
+        // What the mods kept with the registration, as they left it.
+        ...(resumed?.enrollment.ex ? { ex: resumed.enrollment.ex } : {})
       },
       playthroughId ?? undefined
     )

@@ -135,6 +135,7 @@ export function ModsModal({ theme, onClose, inGame = false, warn }: ModsModalPro
   const table = useModSessionStore((s) => s.table)
   const shiftStart = useModSessionStore((s) => s.shiftStart)
   const running = useModSessionStore((s) => s.running)
+  const dataNotes = useModSessionStore((s) => s.dataNotes)
   // A library has no switch and no row; the mods that need it name it on theirs.
   const listed = MODS.filter((mod) => !mod.library)
   // A folder whose manifest could not be read has no entry in the list: it gets a row of its own, by folder.
@@ -219,6 +220,7 @@ export function ModsModal({ theme, onClose, inGame = false, warn }: ModsModalPro
                     {session && isRunning && session.warnings.length > 0 && (
                       <span className="vu-mods-row-line">{session.warnings.join(' · ')}</span>
                     )}
+                    {dataNotes[mod.id] && <span className="vu-mods-row-line">{dataNotes[mod.id]}</span>}
                   </button>
                   <span className="vu-mods-standing" data-kind={standing.kind}>
                     {standing.text}

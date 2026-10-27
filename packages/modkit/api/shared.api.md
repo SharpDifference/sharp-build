@@ -22,6 +22,7 @@ export interface Character {
     datingPreference: string;
     // (undocumented)
     dislikes: string[];
+    ex?: Record<string, ModSlice>;
     expressionTags: Record<Emotion, string[]>;
     // (undocumented)
     firstName: string;
@@ -79,6 +80,7 @@ export interface CharMemory {
     date: number;
     // (undocumented)
     desc: string;
+    ex?: Record<string, ModSlice>;
     // (undocumented)
     type: MemoryType;
 }
@@ -88,6 +90,7 @@ export interface ChatMessage {
     date: number;
     error?: boolean;
     everydayAsk?: EverydayAsk;
+    ex?: Record<string, ModSlice>;
     id: string;
     invite?: true;
     inviteKind?: InviteKind;
@@ -526,7 +529,7 @@ export interface ImagePromptParts {
 }
 
 // @public
-export const KIT_APIS: readonly ['shared:carryModFiles', 'shared:DEPRECATED_HOOKS', 'shared:hasTrait', 'shared:HOOKS', 'shared:KIT_APIS', 'shared:KIT_VERSION', 'shared:memoryStatusLine', 'shared:modById', 'shared:modOn', 'shared:optionKey', 'shared:optionOn', 'shared:registerCharacterTrait', 'shared:registerImagePromptDraft', 'shared:registerPostCarry', 'shared:registerRomanceRequirement', 'shared:registerTermCarry', 'shared:registerTermFiles', 'shared:REMOVED_HOOKS', 'shared:sharedModOn', 'renderer:Card', 'renderer:EmojiTool', 'renderer:fileLatePost', 'renderer:finishSlotActivity', 'renderer:Locked', 'renderer:modIsOn', 'renderer:openPanel', 'renderer:ownsPostComments', 'renderer:PostCommentAction', 'renderer:PostCommentsView', 'renderer:PostPicture', 'renderer:postVisible', 'renderer:promptFields', 'renderer:promptLines', 'renderer:promptRequired', 'renderer:registerHooks', 'renderer:SentText', 'renderer:submitAction', 'renderer:takeTurnFromReply', 'renderer:useBareMessage', 'renderer:useEmojiTool', 'renderer:useModOn', 'renderer:useModOption', 'main:registerComfyLaunchEnvironment'];
+export const KIT_APIS: readonly ['shared:carryModFiles', 'shared:DEPRECATED_HOOKS', 'shared:hasTrait', 'shared:HOOKS', 'shared:KIT_APIS', 'shared:KIT_VERSION', 'shared:memoryStatusLine', 'shared:modById', 'shared:modOn', 'shared:optionKey', 'shared:optionOn', 'shared:registerCharacterTrait', 'shared:registerImagePromptDraft', 'shared:registerPostCarry', 'shared:registerRomanceRequirement', 'shared:registerTermCarry', 'shared:registerTermFiles', 'shared:REMOVED_HOOKS', 'shared:sharedModOn', 'renderer:Card', 'renderer:EmojiTool', 'renderer:fileLatePost', 'renderer:finishSlotActivity', 'renderer:Locked', 'renderer:modIsOn', 'renderer:openPanel', 'renderer:ownsPostComments', 'renderer:PostCommentAction', 'renderer:PostCommentsView', 'renderer:PostPicture', 'renderer:postVisible', 'renderer:promptFields', 'renderer:promptLines', 'renderer:promptRequired', 'renderer:recordField', 'renderer:registerHooks', 'renderer:saveField', 'renderer:SentText', 'renderer:submitAction', 'renderer:takeTurnFromReply', 'renderer:useBareMessage', 'renderer:useEmojiTool', 'renderer:useModOn', 'renderer:useModOption', 'main:registerComfyLaunchEnvironment'];
 
 // @public
 export const KIT_VERSION = "0.3.0";
@@ -640,6 +643,12 @@ export interface ModSceneFields {
 export type ModScope = 'anytime' | 'playthrough';
 
 // @public
+export interface ModSlice {
+    data: unknown;
+    v: string;
+}
+
+// @public
 export interface ModSwitches {
     on: Record<string, boolean>;
     options: Record<string, boolean>;
@@ -669,6 +678,7 @@ export interface NativeGameSave {
     droppedClasses: Record<string, DroppedClass>;
     endingArtWanted: boolean;
     events: CalendarEvent[];
+    ex?: Record<string, ModSlice>;
     expelled: boolean;
     farewellsDone: string[];
     feedExtras: FeedExtras | null;
@@ -768,6 +778,7 @@ export interface PostComment {
 export interface ProjectSession {
     // (undocumented)
     date: number;
+    ex?: Record<string, ModSlice>;
     summary?: string;
     // (undocumented)
     time: TimeSlot;
@@ -869,6 +880,7 @@ export interface SlotActivityOffer {
 export interface SocialPost {
     comments?: PostComment[];
     date: number;
+    ex?: Record<string, ModSlice>;
     id: string;
     liked?: boolean;
     likedOn?: number;

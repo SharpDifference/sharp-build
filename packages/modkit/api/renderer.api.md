@@ -144,6 +144,11 @@ export function Locked(input: {
 export type ManualSaveOffer = 'open' | 'waiting' | 'none';
 
 // @public
+export interface ModDataRecord {
+    ex?: Record<string, ModSlice>;
+}
+
+// @public
 export interface ModDetailProps {
     mod: ModDef;
     optionOn: (optionId: string) => boolean;
@@ -431,6 +436,22 @@ export interface RailSeatProps {
 }
 
 // @public
+export function recordField<T>(modId: string, spec: RecordFieldSpec<T>): RecordFieldHandle<T>;
+
+// @public
+export interface RecordFieldHandle<T> {
+    read(record: ModDataRecord): T;
+    with<R extends ModDataRecord>(record: R, next: T): R;
+}
+
+// @public
+export interface RecordFieldSpec<T> {
+    empty: T;
+    legacy?: readonly string[];
+    normalize?: (stored: unknown, legacy: Readonly<Record<string, unknown>>, from: string | null) => T;
+}
+
+// @public
 export function registerHooks(modId: string, hooks: ModHooks): void;
 
 // @public (undocumented)
@@ -469,6 +490,24 @@ export interface SaveChoice extends WayOn {
     message: string;
     // (undocumented)
     title: string;
+}
+
+// @public
+export function saveField<T>(modId: string, spec: SaveFieldSpec<T>): SaveFieldHandle<T>;
+
+// @public
+export interface SaveFieldHandle<T> {
+    read(): T;
+    set(next: T): void;
+    use(): T;
+}
+
+// @public
+export interface SaveFieldSpec<T> {
+    carry?: (value: T, context: TermCarryContext) => T | undefined;
+    empty: T;
+    legacy?: readonly string[];
+    normalize?: (stored: unknown, legacy: Readonly<Record<string, unknown>>, from: string | null) => T;
 }
 
 // @public

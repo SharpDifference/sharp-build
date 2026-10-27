@@ -10,6 +10,7 @@ export type {
   ChatMessage,
   GameSave,
   NativeGameSave,
+  ModSlice,
   LedgerResponse,
   ModEnrollmentFields,
   ModSceneFields,

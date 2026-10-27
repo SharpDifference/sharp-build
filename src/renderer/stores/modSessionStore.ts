@@ -29,6 +29,8 @@ interface ModSessionState {
   shiftStart: boolean
   notice: ModNotice | null
   devChange: DevChange | null
+  /** What the game being played could not do with a mod's data, by id: a line for its row. */
+  dataNotes: Readonly<Record<string, string>>
 
   /** Whether an installed mod's code is running; true for a mod that is not installed (an in-repo one). */
   running: (id: string) => boolean
@@ -41,6 +43,10 @@ interface ModSessionState {
   gameEntered: (record: Pick<PlaythroughRecord, 'mods'>) => void
   dismissNotice: () => void
   setDevChange: (change: DevChange | null) => void
+  /** Puts a line about the mod's data in this game on its row. */
+  noteData: (id: string, line: string) => void
+  /** Takes the notes away, as a game is left or another is loaded. */
+  clearDataNotes: () => void
 }
 
 /** What the start notice remembers a mod by: its version, or the fact that its manifest could not be read. */
@@ -61,6 +67,7 @@ export const useModSessionStore = create<ModSessionState>((set, get) => ({
   shiftStart: false,
   notice: null,
   devChange: null,
+  dataNotes: {},
 
   running: (id) => {
     const { table, shiftStart } = get()
@@ -105,5 +112,11 @@ export const useModSessionStore = create<ModSessionState>((set, get) => ({
 
   dismissNotice: () => set({ notice: null }),
 
-  setDevChange: (devChange) => set({ devChange })
+  setDevChange: (devChange) => set({ devChange }),
+
+  noteData: (id, line) => set((state) => ({ dataNotes: { ...state.dataNotes, [id]: line } })),
+
+  clearDataNotes: () => {
+    if (Object.keys(get().dataNotes).length > 0) set({ dataNotes: {} })
+  }
 }))

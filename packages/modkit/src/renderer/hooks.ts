@@ -1,5 +1,6 @@
 import type { ComponentType, ReactNode } from 'react'
 import { checkCompat, hookNamesOf } from '../shared/compat'
+import { declaredHooksNow, refusedAsForeign } from './attribution'
 import type { StructuredRequest, LedgerResponse } from '../bridge/shared'
 import type { PromptState } from '../bridge/renderer'
 import type { SlotIntroInput } from '../bridge/renderer'
@@ -616,30 +617,8 @@ export function subscribeHookRules(onChange: () => void): () => void {
   return rules.subscribe?.(onChange) ?? (() => {})
 }
 
-/**
- * What the loader knows about the installed mods' manifests, for {@link registerHooks} to hold a
- * registration to: `declared` is a mod's `hooks` list, or undefined for a mod with no manifest (an
- * in-repo mod), and `onRefused` is told of a registration that was not pushed, with the reason.
- */
-export interface DeclaredHooks {
-  declared: (modId: string) => readonly string[] | undefined
-  onRefused: (modId: string, message: string) => void
-}
-
-let declaredHooks: DeclaredHooks | null = null
-
-/** The mod whose `renderer.js` the loader is importing right now, or null between imports. */
-let loadingModId: string | null = null
-
-/** Hands {@link registerHooks} the declared lists; null takes them away again. */
-export function setDeclaredHooks(lookup: DeclaredHooks | null): void {
-  declaredHooks = lookup
-}
-
-/** Names the mod being imported, so a registration made during the import is attributed to it. */
-export function setLoadingMod(modId: string | null): void {
-  loadingModId = modId
-}
+export { setDeclaredHooks, setLoadingMod } from './attribution'
+export type { DeclaredHooks } from './attribution'
 
 /**
  * A mod's hooks, registered once from its own files. An installed mod's registration is held to
@@ -647,11 +626,9 @@ export function setLoadingMod(modId: string | null): void {
  * while this one is being imported, is refused and nothing of it is kept.
  */
 export function registerHooks(modId: string, hooks: ModHooks): void {
+  const declaredHooks = declaredHooksNow()
   if (declaredHooks) {
-    if (loadingModId !== null && modId !== loadingModId) {
-      declaredHooks.onRefused(loadingModId, `registered hooks for \`${modId}\`, which is another mod`)
-      return
-    }
+    if (refusedAsForeign(modId, 'hooks')) return
     const declared = declaredHooks.declared(modId)
     if (declared) {
       const compat = checkCompat(declared, hookNamesOf(hooks))
