@@ -2846,8 +2846,6 @@ export function GameView(): JSX.Element {
           <SaveGameModal key="save-game" theme={half} onClose={closePanel} />
         )}
         <UnspokenLinkGlitch key="unspoken-link-glitch" hidden={blocked||covered||uiHidden||cinematic}/>
-
-        <UnspokenLinkGlitch key="unspoken-link-glitch" hidden={blocked||covered||uiHidden||cinematic}/>
         <ReckoningDungeonView
           key="reckoning-dungeon-view"
           onOptions={() => setPanel({ kind: 'settings' })}
