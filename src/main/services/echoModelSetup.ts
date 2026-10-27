@@ -1,6 +1,6 @@
 import { mkdir, readFile, stat, writeFile } from 'fs/promises'
 import { dirname, join } from 'path'
-import { ECHO_LOCAL_MODELS } from '@shared/echoModels'
+import { ECHO_LOCAL_MODELS } from '../../shared/echoModels'
 import { getComfyModelFilePath, getComfyPythonPath } from '../paths'
 import { downloadFile, hashFile } from './downloadService'
 import { resolveTarget } from './comfyService'

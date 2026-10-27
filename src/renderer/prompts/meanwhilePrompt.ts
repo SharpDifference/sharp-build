@@ -1,4 +1,4 @@
-import type { MeanwhileContext, MeanwhileScene } from '@shared/meanwhile'
+import type { MeanwhileContext, MeanwhileScene } from '../../shared/meanwhile'
 import { fullNameOf, type StructuredRequest } from '@shared/types'
 
 /** Only public personality and the native encounter are supplied: no player history or memory retrieval. */

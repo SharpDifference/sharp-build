@@ -1,4 +1,4 @@
-import type { CharInfo, SceneLine, TimeSlot } from './types'
+import type { CharInfo, SceneLine, TimeSlot } from '@vx/modkit/shared'
 import { normalizeTermOrigin, type TermOrigin } from './termOrigin'
 import { isEchoBreakthroughAspect, type EchoBreakthroughAspect } from './echoBreakthrough'
 

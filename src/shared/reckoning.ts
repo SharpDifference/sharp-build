@@ -1,6 +1,6 @@
 import { affectionFor } from './relationship'
 import { dynamicFor, type CharacterDynamics, type GrowthTag } from './characterDynamics'
-import type { Character, CharInfo, SceneLine } from './types'
+import type { Character, CharInfo, SceneLine } from '@vx/modkit/shared'
 import type { BreakthroughState } from './breakthrough'
 import { sha256Hex } from './sha256'
 import { normalizeDungeon, type ReckoningDungeon } from './reckoningDungeonState'

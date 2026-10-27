@@ -49,6 +49,14 @@ bookkeeping at shared integration points.
 ## Framework registration
 
 - `src/shared/modEntries/text-regeneration.ts` supplies its existing mod definition.
-- This mod has no renderer hook registration; its existing switch-gated integration stays in place.
+- `src/renderer/modEntries/text-regeneration.ts` contributes the existing control through the
+  kit's `conversationFoot` screen slot. It loads the control lazily and passes the current
+  `charId`; Bunnyboard no longer imports or mounts Text Regeneration directly.
+- The slot places it between a person's message history and composer, excluding bot and
+  employer threads. Turning the mod off removes the contribution while preserving messages
+  and checkpoints. Busy/blocked threads keep the control's existing disabled-state rules.
+- The component and regeneration transaction are unchanged. The transaction, save lifecycle
+  and conversation fields listed above still depend on game APIs; this screen migration
+  alone does not make the mod independently installable.
 
 The stable IDs, defaults, dependencies, save fields and gameplay behavior are unchanged. Native character notes, scene-creator saves and calendar replays remain separate base-game features. Merge framework updates from `core` into this mod branch; resolve conflicts with `main` on a separate `integrate/text-regeneration` branch.

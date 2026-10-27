@@ -1,4 +1,4 @@
-import type { ModDef } from '../mods'
+import type { ModDef } from '@vx/modkit/shared'
 import '../meanwhileCarry'
 import { MEANWHILE_MOD } from '../meanwhile'
 

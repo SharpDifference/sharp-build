@@ -1,4 +1,3 @@
-import { TextRegenerate } from '../components/TextRegenerate'
 import { bunnyboardPages, updatesTabs, type UpdatesTab } from '../mods/hooks'
 import { useModsStore, useModOn } from '../stores/modsStore'
 import { INCOMING_TEXTS } from '@shared/modEntries/incoming-texts'
@@ -1133,7 +1132,6 @@ function ConversationView({
         )}
       </div>
 
-      {!bot && <TextRegenerate charId={charId} />}
       {!bot && <ModSlot slot="conversationFoot" props={{ charId }} />}
       <div className="vu-bb-foot">
         {boss ? (

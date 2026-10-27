@@ -15,7 +15,7 @@ import {
 import { TitleTab } from '../components/TitleTab'
 import { useModalShell } from '../components/useModalShell'
 import { useGameStore } from '../stores/gameStore'
-import { useModOn } from '../stores/modsStore'
+import { useModOn } from '@vx/modkit/renderer'
 import { manualSaveOffer, writeStoryMemory } from '../stores/loop/saves'
 import { inspectCurrentStoryMemory } from '../stores/storyMemory'
 import { gestures, lift, press, quietLift, quietPress, panelUnderTab, veilIn } from './motion'

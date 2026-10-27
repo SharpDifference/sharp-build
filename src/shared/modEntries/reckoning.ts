@@ -1,4 +1,4 @@
-import type { ModDef } from '../mods'
+import type { ModDef } from '@vx/modkit/shared'
 import { RECKONING_AFFECTION_MIN, type ReckoningState } from '../reckoning'
 import { registerTermCarry } from '../modCarry'
 

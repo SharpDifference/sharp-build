@@ -1,7 +1,7 @@
 import { mkdir, readdir, readFile, writeFile } from 'fs/promises'
 import { join } from 'path'
-import { ECHO_ART_ID } from '@shared/echo'
-import { assertEchoPng, assertSameEchoArt, ECHO_ART_DIR, echoArtEntry, echoArtIds } from '@shared/echoArtwork'
+import { ECHO_ART_ID } from '../../shared/echo'
+import { assertEchoPng, assertSameEchoArt, ECHO_ART_DIR, echoArtEntry, echoArtIds } from '../../shared/echoArtwork'
 import { getDataPath } from '../paths'
 
 export async function backupEchoArtwork(scratch: string): Promise<string[]> {

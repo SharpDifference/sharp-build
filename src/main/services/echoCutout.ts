@@ -1,6 +1,6 @@
 import { BrowserWindow } from 'electron'
 import { join } from 'path'
-import { assertEchoPng, ECHO_CUTOUT_PREPARE_ERROR } from '@shared/echoArtwork'
+import { assertEchoPng, ECHO_CUTOUT_PREPARE_ERROR } from '../../shared/echoArtwork'
 
 let host: BrowserWindow | null = null
 

@@ -1,4 +1,4 @@
-import { isSoundtrackKey, assertSoundtrackDuration, SOUNDTRACK_MOD, SOUNDTRACK_LABELS, type SoundtrackKey } from '@shared/soundtracks'
+import { isSoundtrackKey, assertSoundtrackDuration, SOUNDTRACK_MOD, SOUNDTRACK_LABELS, type SoundtrackKey } from '../../shared/soundtracks'
 import type { AudioKey } from '@shared/audio'
 import { modIsOn } from './modsStore'
 import { soundtrackActive, soundtrackError, useSoundtrackStore } from './soundtrackStore'

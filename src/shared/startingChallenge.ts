@@ -1,4 +1,4 @@
-import type { PlayerStats, StatKey } from './playerStats'
+import type { PlayerStats, StatKey } from '@vx/modkit/shared'
 
 export const STARTING_CHALLENGE_MOD = 'starting-challenge'
 export const STARTING_CHALLENGES = {

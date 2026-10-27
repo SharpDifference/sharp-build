@@ -1,10 +1,10 @@
 import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { motion } from 'motion/react'
-import { TALENTS, TALENT_TREES, talentBalance, talentRank, talentEffect, talentPrerequisitesMet, spentTalents, type TalentTree } from '@shared/campusTalents'
+import { TALENTS, TALENT_TREES, talentBalance, talentRank, talentEffect, talentPrerequisitesMet, spentTalents, type TalentTree } from '../../shared/campusTalents'
 import { MODS, modOn } from '@shared/mods'
-import { readBondFraction } from '@shared/talentBondPoints'
-import { PERSONAL_GROWTH } from '@shared/talentTrading'
+import { readBondFraction } from '../../shared/talentBondPoints'
+import { PERSONAL_GROWTH } from '../../shared/talentTrading'
 import { STAT_LABELS } from '@shared/playerStats'
 import { TalentTrainingControls } from './TalentTrainingControls'
 import { formatMoney } from '@shared/money'
@@ -20,7 +20,7 @@ import { BodyIcon, BrainIcon, EchoIcon, HeartIcon, ShopIcon } from './screenIcon
 import { TalentAbilityControls } from './TalentAbilityControls'
 import type { TalentChange } from '../stores/talentActions'
 import { gestures, lift, press, quietLift, quietPress, rowLift, rowPress, cardLift, chipPress, toggleLift, veilIn, panelUnderTab } from './motion'
-import type { ScreenTheme } from './clockTheme'
+import type { ScreenTheme } from '@vx/modkit/renderer'
 import '../vu_styles/Talents.css'
 
 const TREE_MARKS = {body:BodyIcon, brain:BrainIcon, charm:CharmIcon, heart:HeartIcon, money:ShopIcon, echoes:EchoIcon}

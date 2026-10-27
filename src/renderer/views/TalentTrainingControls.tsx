@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { motion } from 'motion/react'
-import { PERSONAL_GROWTH, quoteTraining, TRAINING_RULES } from '@shared/talentTrading'
+import { PERSONAL_GROWTH, quoteTraining, TRAINING_RULES } from '../../shared/talentTrading'
 import { isStatKey, STAT_LABELS, type StatKey } from '@shared/playerStats'
 import { useGameStore } from '../stores/gameStore'
 import type { TalentChange } from '../stores/talentActions'
