@@ -5,6 +5,7 @@ import { loadInstalledMods } from './mods'
 import { Crossing } from './components/Crossing'
 import { Cursor } from './components/Cursor'
 import { ModalHost } from './components/ModalHost'
+import { ModToast } from './components/ModToast'
 import { ErrorModal } from './components/ErrorModal'
 import { FatalErrorScreen } from './components/FatalErrorScreen'
 import { ManageCharactersView } from './views/ManageCharactersView'
@@ -181,6 +182,8 @@ function App(): JSX.Element {
           <AppModals key="app-modals" />
         )}
       </AnimatePresence>
+      {/* A mod author's developer folder changed under a game: the one toast, over everything. */}
+      <ModToast />
 
       {/* It draws nothing here — it publishes what the pointer is doing onto the document and
           the OS draws the mark. Outside the fatal branch above on purpose: a screen the

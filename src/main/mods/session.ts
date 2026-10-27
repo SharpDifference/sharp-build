@@ -1,11 +1,14 @@
-import { app, ipcMain, type IpcMainInvokeEvent } from 'electron'
+import { app, BrowserWindow, ipcMain, type IpcMainInvokeEvent } from 'electron'
 import { readFileSync } from 'fs'
+import { basename, resolve } from 'path'
 import type { ModSessionTable, ModStatus, SafeStart } from '@shared/modSession'
 import type { Settings } from '@shared/types'
 import { getModsDirPath, getSettingsPath } from '../paths'
 import { patchStoredSettings } from '../services/settingsService'
+import { addDevFolder, devFolders, removeDevFolder, watchDevFolder, type DevChangeKind } from './devFolders'
 import { loadMods, type LoaderResult } from './loader'
 import { handleModProtocol } from './protocol'
+import type { MainContext } from './require'
 
 /**
  * The one mod session of this run: the loader's result, held for the protocol, the bridge and
@@ -56,13 +59,40 @@ export function modSession(): ModSessionTable {
   return result?.table ?? { mods: [], order: [], safeStart: null, loaderError: null, coreVersion: app.getVersion() }
 }
 
-/** Serves `vxmod://`. Must run after `ready`. */
+/**
+ * Re-reads the manifests and reruns every check without requiring any `main.js` again: each one
+ * already required hands back what it exported the first time. What the window reads on its next
+ * load is then this run's table.
+ */
+function rerunChecks(): void {
+  const before = result
+  const { devFolders, allowUnreviewedMain } = loaderSettings()
+  result = loadMods({
+    modsDir: getModsDirPath(),
+    devFolders,
+    allowUnreviewedMain,
+    coreVersion: app.getVersion(),
+    safeStart: safeStartOf(),
+    log: (line) => console.log(line),
+    requireMain: (ctx: MainContext) => {
+      if (before?.mainExports.has(ctx.id)) return before.mainExports.get(ctx.id)
+      // A mod whose main.js was not required at the first start cannot start now: main code is
+      // loaded once, at start.
+      throw new Error('main.js changed or was added since the start; restart to load it')
+    }
+  })
+  // The routes a `main.js` registered at start stand for the session.
+  if (before) result = { ...result, routes: before.routes }
+}
+
+/** Serves `vxmod://`, and watches the developer folders. Must run after `ready`. */
 export function handleModSession(): void {
   handleModProtocol({
     served: () => result?.served ?? new Map(),
     routes: () => result?.routes ?? new Map(),
     hostNames: () => hostNames
   })
+  for (const folder of loaderSettings().devFolders) watchDevFolder(folder, devFolderChanged)
 }
 
 /** Marks a mod the renderer could not load as off for the session, so `vxmod://<id>/…` stops serving it. */
@@ -77,6 +107,20 @@ function markFailed(id: string, status: ModStatus, message: string): void {
   if (servedEntry) served.set(id, { ...servedEntry, loaded: false })
   result = { ...result, served, table: { ...result.table, order: result.table.order.filter((one) => one !== id) } }
   console.warn(`[mods] ${id}: ${status}: ${message}`)
+}
+
+/**
+ * A developer folder changed. For a renderer-side change the checks are rerun first, so the
+ * reload the window makes reads a fresh table; `main.js` cannot be swapped in place, so that is
+ * only told. Every window hears of it and decides what to offer.
+ */
+function devFolderChanged(folder: string, kind: DevChangeKind, files: readonly string[]): void {
+  const id = result?.table.mods.find((mod) => mod.dev && mod.folder === resolve(folder))?.id ?? basename(folder)
+  if (kind === 'renderer') rerunChecks()
+  console.log(`[mods] ${id}: ${kind === 'main' ? 'main.js' : files.join(', ')} changed in ${folder}`)
+  for (const window of BrowserWindow.getAllWindows()) {
+    if (!window.webContents.isDestroyed()) window.webContents.send('mods:devChanged', { id, kind })
+  }
 }
 
 /** Registers `ipcMain.handle` for one channel, answering a `Result` as the rest of the bridge does. */
@@ -100,6 +144,13 @@ export function registerModIpc(handle: Handle): void {
   handle('mods:noticesSeen', async (_event, seen: Record<string, string>) => {
     await patchStoredSettings((settings) => ({ ...settings, modNoticesSeen: { ...settings.modNoticesSeen, ...seen } }))
   })
+  handle('mods:addDevFolder', async (event) => {
+    const folder = await addDevFolder(event)
+    if (folder) watchDevFolder(folder, devFolderChanged)
+    return folder
+  })
+  handle('mods:removeDevFolder', (_event, folder: string) => removeDevFolder(folder))
+  handle('mods:devFolders', () => devFolders())
   handle('mods:restart', () => {
     app.relaunch()
     app.exit(0)

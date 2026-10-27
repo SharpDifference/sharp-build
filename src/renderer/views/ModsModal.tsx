@@ -16,6 +16,8 @@ import { ConfirmModal } from '../components/ConfirmModal'
 import { useModalShell } from '../components/useModalShell'
 import { TitleTab } from '../components/TitleTab'
 import { modDetail, optionPreview } from '../mods/hooks'
+import { isWebBuild } from '../platform'
+import { ModsAuthorsFold } from './ModsAuthorsFold'
 import { notRunningLine, useModSessionStore } from '../stores/modSessionStore'
 import { useModsStore } from '../stores/modsStore'
 import { useUiStore } from '../stores/uiStore'
@@ -375,6 +377,9 @@ export function ModsModal({ theme, onClose, inGame = false, warn }: ModsModalPro
             playthroughs.
           </p>
         </div>
+
+        {/* The browser build installs nothing, so it has no folders to load from. */}
+        {!isWebBuild() && <ModsAuthorsFold />}
 
         <div className="vu-foot">
           <motion.button

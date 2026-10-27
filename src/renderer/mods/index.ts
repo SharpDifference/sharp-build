@@ -11,6 +11,7 @@ import { setDeclaredHooks, setLoadingMod, subscribeHookRules } from '@vx/modkit/
 import { shiftIsHeld } from '../installedMods'
 import { useModSessionStore } from '../stores/modSessionStore'
 import { useSettingsStore } from '../stores/settingsStore'
+import { useUiStore } from '../stores/uiStore'
 import { exposeHost } from './host'
 
 // Held in a binding of its own, not read inline: Vite turns `Object.keys(import.meta.glob(…))`
@@ -44,6 +45,16 @@ function addStyle(id: string, url: string): void {
   styles.set(id, link)
 }
 
+/** What a developer folder's change asks of the window: a reload at once off a game, an offer in one. */
+function onDevChanged(change: { id: string; kind: 'renderer' | 'main' }): void {
+  if (change.kind === 'renderer' && useUiStore.getState().view !== 'game') {
+    console.log(`[mods] ${change.id} changed; reloading`)
+    window.location.reload()
+    return
+  }
+  useModSessionStore.getState().setDevChange(change)
+}
+
 /**
  * Imports every loaded installed mod's `renderer.js`, in load order and one at a time, so a
  * registration is always attributed to the mod being imported, then adds each one's stylesheet.
@@ -54,6 +65,7 @@ export async function loadInstalledMods(isOn: (id: string) => boolean): Promise<
   const store = useModSessionStore.getState()
   const { table } = store
   if (table.mods.length === 0) return
+  window.api.mods.onDevChanged(onDevChanged)
 
   if (shiftIsHeld()) {
     store.setShiftStart()
