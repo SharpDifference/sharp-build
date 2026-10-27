@@ -1,6 +1,4 @@
 import { ReflectionPortraitControl } from '../components/ReflectionPortrait'
-import { cleanBody, type CharacterBody } from '@shared/characterBody'
-import { BodyFieldsSection, bodyForm } from './bodyFields'
 import { useEffect, useRef, useState, type CSSProperties, type JSX } from 'react'
 import { createPortal } from 'react-dom'
 import { editorFields } from '../mods/hooks'
@@ -50,9 +48,8 @@ import {
   cgSetDraft,
   expressionDraft,
   spriteDraft,
-  withRegenTags,
   type PromptEdit
-} from './bodyDrafts'
+} from '@shared/imagePrompt'
 import {
   CUSTOM_OUTFIT_INSTRUCTIONS_MAX,
   CUSTOM_OUTFIT_NAME_MAX,
@@ -74,7 +71,7 @@ import {
   STOCK_POSITIONS
 } from '@shared/positions'
 import { ROOM_PROMPT_LEAD, ROOM_VARIANTS } from '@shared/room'
-import type { PromptGroup } from '@shared/regenTags'
+import { withRegenTags, type PromptGroup } from '@shared/regenTags'
 import { pictureKeySet } from '@shared/settingsRules'
 import { sfwWithholds } from '@shared/sfw'
 import { isGiftCategory } from '@shared/shop'
@@ -265,8 +262,6 @@ interface Form {
   outfit: string[]
   peOutfit: string[]
   swimOutfit: string[]
-  /** Her body, one pooled pick per field; empty where she is average. */
-  body: CharacterBody
   negativeTags: string[]
   roomPrompt: string
   height: number
@@ -300,7 +295,6 @@ function formOf(character: Character): Form {
     outfit: [...character.outfit],
     peOutfit: [...character.peOutfit],
     swimOutfit: [...character.swimOutfit],
-    body: bodyForm(character.body),
     negativeTags: [...(character.negativeTags ?? [])],
     roomPrompt: character.roomPrompt,
     height: character.height,
@@ -554,7 +548,6 @@ export function EditCharacterModal({
       outfit: form.outfit,
       peOutfit: form.peOutfit,
       swimOutfit: form.swimOutfit,
-      body: cleanBody(form.body),
       height: form.height,
       negativeTags: form.negativeTags,
       roomPrompt: form.roomPrompt,
@@ -1629,12 +1622,6 @@ export function EditCharacterModal({
                             mark={copyMark}
                           />
                         ))}
-
-                        <BodyFieldsSection
-                          body={form.body}
-                          baseAppearance={form.baseAppearance}
-                          onChange={(body) => setForm((current) => ({ ...current, body }))}
-                        />
 
                         {editorFields().map(({ modId, field }) => (
                           <SlotBoundary key={modId} slot="editorField" modId={modId}>

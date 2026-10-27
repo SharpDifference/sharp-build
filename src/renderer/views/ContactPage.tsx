@@ -29,7 +29,6 @@ import { contactTabs, postOutAt, postVisible } from '../mods/hooks'
 import { ModSlot, SlotBoundary } from '../mods/ModSlot'
 import { useModsStore } from '../stores/modsStore'
 import { newestFirst } from '../stores/feedRolls'
-import { PostPhotoLink, useContactGallery } from './ContactGallery'
 import { useGameStore } from '../stores/gameStore'
 import { noNsfwImagesOf, useSettingsStore } from '../stores/settingsStore'
 import { sendFriendRequest } from '../stores/textingLoop'
@@ -124,8 +123,6 @@ export function ContactPage({
   // The tag goes through `affectionFor`, never a sum of the memories: feed likes count too.
   const flags = info?.flags ?? emptyFlags()
   const isContact = Boolean(flags.gaveContactInfo)
-  // Her gallery, and the tab strip it brings with it.
-  const gallery = useContactGallery({ charId, isContact, theme })
   // The mods' readings of her beside Profile, and the one being read; Profile where it went away.
   const tabs = contactTabs({ charId, isContact })
   const shownTab = tabs.find(({ tab }) => tab.id === reading)
@@ -233,8 +230,6 @@ export function ContactPage({
           )}
         </div>
 
-        {gallery.tabs}
-
         {/* Her readings, named the way every section on this page is named: the one being read
             in accent, the rest quiet. Only while a mod adds one beside Profile. */}
         {tabs.length > 0 && (
@@ -259,11 +254,7 @@ export function ContactPage({
         {/* Undiscovered is drawn rather than hidden (D4), and a stranger's page is that rule
             carried to the whole screen: every card stands with the one thing that would open it
             named, so nothing she has none of can be read out of an absence. */}
-        {gallery.showing ? (
-          <motion.div className="vu-contact-cards" variants={CARDS_DEAL}>
-            {gallery.panel}
-          </motion.div>
-        ) : shownTab ? (
+        {shownTab ? (
           <motion.div className="vu-contact-cards" variants={CARDS_DEAL}>
             <SlotBoundary key={shownTab.modId} slot="contactTab" modId={shownTab.modId}>
               <shownTab.tab.Panel charId={charId} isContact={isContact} theme={theme} />
@@ -427,8 +418,6 @@ export function ContactPage({
                         {formatShortGameDate(entry.post.date, season)} · ♥{' '}
                         {entry.post.likes + (entry.post.liked ? 1 : 0)}
                       </motion.button>
-                      {' '}
-                      <PostPhotoLink charId={charId} photo={entry.post.photo} />
                       <ModSlot slot="contactPostExtra" props={{ charId, post: entry.post }} />
                     </li>
                   )

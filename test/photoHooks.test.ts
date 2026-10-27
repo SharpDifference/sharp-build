@@ -108,32 +108,24 @@ const HOOKS: readonly {
   {
     file: 'src/shared/imagePrompt.ts',
     within: 'export function spriteDraft(',
-    needs: ["bodyAppearance(character, set === 'nude' ? 'nude' : 'sprite')", 'bodyNegative(character)'],
+    needs: ['draftedParts('],
     why: 'her sprites are drawn without her body, and a petite one with nothing keeping her adult'
   },
   {
     file: 'src/shared/imagePrompt.ts',
     within: 'export function cgSetDraft(',
-    needs: ["bodyAppearance(character, 'cg')", 'bodyNegative(character)'],
+    needs: ['draftedParts('],
     why: 'her CGs are drawn without her body, and a petite one with nothing keeping her adult'
   },
   {
-    file: 'src/main/services/comfyService.ts',
-    within: 'export async function generateSprite(',
-    needs: ['character = await withBodySetting(character)'],
-    why: 'a sprite draws her body whether or not the switch is on'
+    file: 'src/shared/regenTags.ts',
+    needs: ['regenDrafted('],
+    why: 'a regenerate reopens on her body as it was, or with the switch off'
   },
   {
-    file: 'src/main/services/comfyService.ts',
-    within: 'export async function generateCg(',
-    needs: ['character = await withBodySetting(character)'],
-    why: 'a CG draws her body whether or not the switch is on'
-  },
-  {
-    file: 'src/main/services/comfyService.ts',
-    within: 'export async function fixHands(',
-    needs: ['character = await withBodySetting(character)'],
-    why: 'a hand fix redraws her frame with a body the base was drawn without'
+    file: 'src/main/services/modsService.ts',
+    needs: ['setSharedModRules('],
+    why: 'main never sees the switch, so her renders are drawn without her body'
   },
   {
     file: 'src/renderer/stores/textingLoop.ts',
@@ -216,17 +208,17 @@ const HOOKS: readonly {
   },
   {
     file: 'src/renderer/views/BunnyboardModal.tsx',
-    needs: ['MessagePhotoBubble', 'messageId={message.id}', '<ModSlot slot="phoneOverlay"', '<PostCommentsView'],
+    needs: ['<ModSlot slot="messageAttachment"', '<ModSlot slot="phoneOverlay"', '<PostCommentsView'],
     why: 'nothing draws the picture on a text, on a post, or the replies under one'
   },
   {
     file: 'src/renderer/views/ContactPage.tsx',
-    needs: ['useContactGallery(', 'gallery.tabs', 'gallery.panel'],
+    needs: ['contactTabs(', '<shownTab.tab.Panel'],
     why: 'her gallery has no tab to open it and nothing to draw'
   },
   {
     file: 'src/renderer/views/ContactPage.tsx',
-    needs: ['<PostPhotoLink charId={charId} photo={entry.post.photo} />'],
+    needs: ['<ModSlot slot="contactPostExtra"'],
     why: "a post's picture cannot be opened from her profile's feed list"
   },
   {
@@ -267,13 +259,10 @@ const HOOKS: readonly {
   {
     file: 'src/renderer/views/EditCharacterModal.tsx',
     needs: [
-      '<BodyFieldsSection',
-      'bodyForm(',
-      'cleanBody(',
-      "} from './bodyDrafts'",
-      "import type { PromptGroup } from '@shared/regenTags'"
+      'editorFields()',
+      'field.write('
     ],
-    why: 'her body cannot be read or written by hand, and a regenerate draws it with the switch off'
+    why: 'her body cannot be read or written by hand'
   }
 ]
 

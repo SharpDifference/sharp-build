@@ -18,7 +18,6 @@ import {
 import { createPortal } from 'react-dom'
 import { AnimatePresence, motion } from 'motion/react'
 import type { PostComment } from '@shared/postComments'
-import { MessagePhotoBubble } from '../components/PhotoBubble'
 import {
   fullNameOf,
   type Character,
@@ -1412,20 +1411,16 @@ function MessageBubble({ message }: { message: ChatMessage }): JSX.Element {
       </div>
     )
   }
-  // A picture is its own message, the way a phone sends one: her words in one bubble and the
-  // photograph in the next, rather than a snapshot pasted under a sentence.
   // What a mod attaches to the message follows its text, in a bubble of its own: a message that is
   // only an attachment draws no empty bubble.
-  const side = message.sender === 'player' ? 'mine' : 'theirs'
   return (
     <>
       {message.text && (
-        <div className={`vu-bb-bubble vu-bb-bubble--${side}${bare ? ' vu-bb-bubble--bare' : ''}`}>
+        <div
+          className={`vu-bb-bubble vu-bb-bubble--${message.sender === 'player' ? 'mine' : 'theirs'}${bare ? ' vu-bb-bubble--bare' : ''}`}
+        >
           <SentText text={message.text} />
         </div>
-      )}
-      {message.photo && (
-        <MessagePhotoBubble photo={message.photo} sender={message.sender} messageId={message.id} />
       )}
       <ModSlot slot="messageAttachment" props={{ message }} />
     </>

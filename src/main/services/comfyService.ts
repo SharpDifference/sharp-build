@@ -66,7 +66,6 @@ import {
   getWorkflowPath,
   getWorkflowsPath
 } from '../paths'
-import { withBodySetting } from '../bodySetting'
 import { getPoseTags } from './assetService'
 import { redactUrl } from './downloadService'
 import { getSettings } from './settingsService'
@@ -1532,8 +1531,6 @@ export async function generateSprite(
   throwIfCancelled(jobOptions.signal)
   jobOptions.onProgress?.('Preparing')
   const options = await runOptionsOf(jobOptions)
-  // As the body switch has her: her file's body is drawn only while it is on.
-  character = await withBodySetting(character)
 
   const { charId } = character
   const seed = seedOverride ?? character.generationSeed
@@ -1650,8 +1647,6 @@ export async function generateCg(
   throwIfCancelled(jobOptions.signal)
   jobOptions.onProgress?.('Preparing')
   const options = await runOptionsOf(jobOptions)
-  // As the body switch has her: her file's body is drawn only while it is on.
-  character = await withBodySetting(character)
 
   const seed = seedOverride ?? character.generationSeed
   const { lora, logged } = loraOfJob(character)
@@ -1702,8 +1697,6 @@ export async function fixHands(
   jobOptions.onProgress?.('Preparing')
   const options = await runOptionsOf(jobOptions)
   const { target } = options
-  // As the body switch has her: her file's body is drawn only while it is on.
-  character = await withBodySetting(character)
 
   const { charId } = character
   const scope = set ?? 'default'

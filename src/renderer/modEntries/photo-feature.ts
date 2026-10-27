@@ -33,8 +33,10 @@ import {
 import { useGameStore } from '../stores/gameStore'
 import { registerTermFiles } from '@shared/modCarry'
 import { ownsPostComments, registerHooks } from '../mods/hooks'
+import { BODY_EDITOR_FIELD } from '../views/bodyFields'
 import { PhotoComments, PhotoPostPicture } from '../components/PhotoPostSpots'
-import { PhotoLightboxHost } from '../components/PhotoBubble'
+import { MessagePhotoAttachment, PhotoLightboxHost } from '../components/PhotoBubble'
+import { GalleryPanel, galleryShown, PostPhotoExtra } from '../views/ContactGallery'
 
 /**
  * Photo Feature, plugged into the game through its hooks. Everything it adds to the game's own
@@ -43,6 +45,14 @@ import { PhotoLightboxHost } from '../components/PhotoBubble'
 registerHooks(PHOTO_FEATURE, {
   // A picture opened at full size, over the phone.
   phoneOverlay: PhotoLightboxHost,
+  // Her picture in a bubble of its own after a message's words.
+  messageAttachment: MessagePhotoAttachment,
+  // The photo pill beside a post's like on her contact page.
+  contactPostExtra: PostPhotoExtra,
+  // Her gallery, as a tab beside Profile on her contact page.
+  contactTab: { id: 'gallery', label: 'Gallery', Panel: GalleryPanel, shown: galleryShown },
+  // Her body, as a field in the character editor.
+  editorField: BODY_EDITOR_FIELD,
   prompts: {
     dm: {
       // What she may photograph is settled from the save before she is asked anything.

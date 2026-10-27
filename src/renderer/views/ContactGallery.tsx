@@ -10,7 +10,10 @@ import { useExplicitBlocked, usePhotosVisible } from '../stores/photoSwitchHooks
 import { useGameStore } from '../stores/gameStore'
 import { useModOn } from '../stores/modsStore'
 import { EchoPanel } from './EchoPanel'
-import type { ScreenTheme } from './clockTheme'
+import type { ContactTabProps } from '@vx/modkit/renderer'
+import { photosVisible } from '../../shared/photoSwitches'
+import { modIsOn } from '../stores/modsStore'
+import type { SocialPost } from '@shared/types'
 import { Card, Locked } from './ContactPage'
 import { gestures, quietLift, quietPress } from './motion'
 import { EyeIcon, EyeOffIcon } from './screenIcons'
@@ -53,24 +56,6 @@ const SHOT_FILTERS: readonly { key: ShotFilter; label: string }[] = [
  */
 function landed(photo: ChatPhoto | undefined): photo is ChatPhoto & { file: string } {
   return Boolean(photo?.file) && !photo?.pending && !photo?.failed
-}
-
-/** The two readings of her the page offers once she has pictures to show. */
-type ContactTab = 'profile' | 'gallery'
-
-const CONTACT_TABS: readonly { key: ContactTab; label: string }[] = [
-  { key: 'profile', label: 'Profile' },
-  { key: 'gallery', label: 'Gallery' }
-]
-
-/** What the page needs from the gallery: the strip, the panel, and which reading is open. */
-export interface ContactGallery {
-  /** The tab strip, drawn under her name; none while the mod's photos are hidden. */
-  tabs: JSX.Element | null
-  /** True while the gallery is the reading being shown; the page draws its own cards otherwise. */
-  showing: boolean
-  /** The gallery itself, drawn in the profile cards' place. */
-  panel: JSX.Element
 }
 
 /**
@@ -147,16 +132,8 @@ function Shot({
  * existing ones from `base.css`, so nothing about the grid itself is ported: only what a
  * photograph adds to a cell, which is the covering.
  */
-export function useContactGallery({
-  charId,
-  isContact,
-  theme
-}: {
-  charId: string
-  isContact: boolean
-  theme: ScreenTheme
-}): ContactGallery {
-  const [tab, setTab] = useState<ContactTab>('profile')
+/** Her gallery, as a tab beside Profile on her contact page. */
+export function GalleryPanel({ charId, isContact, theme }: ContactTabProps): JSX.Element {
   const [filter, setFilter] = useState<ShotFilter>('all')
   const visible = usePhotosVisible()
   const echoOn = useModOn('echo')
@@ -205,29 +182,7 @@ export function useContactGallery({
   })
   const shown = filter === 'all' ? photos : photos.filter((shot) => shot.from === filter)
 
-  /* Two readings of the same girl, named the way every section on this page is named: the one
-     being read in accent, the other quiet. No pill and no underline — this screen holds one boxed
-     thing per card, and a third surface would make it a pile. */
-  const tabs = (
-    <div className="vu-contact-tabs">
-      {CONTACT_TABS.map(({ key, label }, index) => (
-        <Fragment key={key}>
-          {index > 0 && <span className="vu-contact-tabs-slash">/</span>}
-          <motion.button
-            className={`vu-contact-tab${tab === key ? ' vu-contact-tab--on' : ''}`}
-            type="button"
-            aria-pressed={tab === key}
-            {...gestures(false, quietLift, quietPress)}
-            onClick={() => setTab(key)}
-          >
-            {label}
-          </motion.button>
-        </Fragment>
-      ))}
-    </div>
-  )
-
-  const panel = (
+  return (
     <Card
       className="vu-contact-card--gallery"
       label={isContact ? `Gallery · ${photos.length}` : 'Gallery'}
@@ -278,10 +233,6 @@ export function useContactGallery({
       {isContact && echoOn && <EchoPanel hidden={false} gallery owner={charId} theme={theme} />}
     </Card>
   )
-
-  // Hidden while the mod is off, unless the player keeps them: her page is the game's own again.
-  if (!visible && !echoOn) return { tabs: null, showing: false, panel }
-  return { tabs, showing: tab === 'gallery', panel }
 }
 
 /**
@@ -315,5 +266,21 @@ export function PostPhotoLink({
       </svg>
       Photo
     </motion.button>
+  )
+}
+
+/** Whether her gallery's tab stands on her page: while the mod's photos show, or Echo's do. */
+export function galleryShown(): boolean {
+  return photosVisible() || modIsOn('echo')
+}
+
+/** The photo pill beside a post's like on her contact page, after a space. */
+export function PostPhotoExtra({ charId, post }: { charId: string; post: SocialPost }): JSX.Element | null {
+  if (!post.photo?.file) return null
+  return (
+    <>
+      {' '}
+      <PostPhotoLink charId={charId} photo={post.photo} />
+    </>
   )
 }
