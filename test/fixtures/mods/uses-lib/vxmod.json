@@ -1,0 +1,21 @@
+{
+  "manifest": 1,
+  "id": "uses-lib",
+  "name": "Uses lib",
+  "author": "morrowkiln",
+  "version": "1.0.0",
+  "blurb": "Uses lib, a fixture of the loader's tests.",
+  "source": "https://github.com/venus-extracurriculars/uses-lib",
+  "kit": "0.3.0",
+  "hooks": [
+    "settingsSection",
+    "renderer:registerHooks",
+    "lib:greet"
+  ],
+  "main": false,
+  "scope": "anytime",
+  "defaultOn": true,
+  "requires": {
+    "lib": "^1.0.0"
+  }
+}
