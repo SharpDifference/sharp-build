@@ -1,4 +1,4 @@
-import { mkdtemp, rm, writeFile, unlink } from 'fs/promises'
+import { mkdir, mkdtemp, rm, writeFile, unlink } from 'fs/promises'
 import { existsSync } from 'fs'
 import { tmpdir } from 'os'
 import { join } from 'path'
@@ -213,6 +213,29 @@ describe('the loader on the folders', () => {
   it('blocks a mod whose requirement is missing', () => {
     installFixture(root, 'uses-lib')
     expect(messageOf(run(), 'uses-lib')).toBe('needs lib, which is not installed')
+  })
+
+  it('runs a mod without an optional dependency whose main.js failed, with a warning', async () => {
+    installFixture(root, 'hello-mod')
+    const helloManifest = JSON.parse(require('fs').readFileSync(join(FIXTURES, 'hello-mod', 'vxmod.json'), 'utf8')) as Record<string, unknown>
+    await writeFile(join(root, 'mods', 'hello-mod', '1.0.0', 'vxmod.json'), JSON.stringify({ ...helloManifest, optional: { helper: '*' } }))
+    const helperFolder = join(root, 'mods', 'helper', '1.0.0')
+    await mkdir(helperFolder, { recursive: true })
+    await writeFile(join(helperFolder, 'vxmod.json'), JSON.stringify({ ...helloManifest, id: 'helper', name: 'Helper', options: undefined }))
+    await writeFile(join(helperFolder, 'main.js'), 'module.exports = {}')
+    const seen: MainContext[] = []
+    const result = run({
+      allowUnreviewedMain: true,
+      requireMain: (ctx) => {
+        if (ctx.id === 'helper') throw new Error('boom')
+        seen.push(ctx)
+        return {}
+      }
+    })
+    expect(statusOf(result, 'helper')).toBe('failed')
+    expect(statusOf(result, 'hello-mod')).toBe('loaded')
+    expect(seen.map((ctx) => [ctx.id, [...ctx.dependencies]])).toEqual([['hello-mod', []]])
+    expect(lines).toContain('[mods] hello-mod: optional helper is installed but did not load; running without it')
   })
 })
 

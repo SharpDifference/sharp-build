@@ -286,15 +286,19 @@ function requireCandidates(
     const candidate = byId.get(id)
     const manifest = candidate?.entry.manifest
     if (!candidate || !manifest || candidate.entry.status !== 'loaded') continue
-    const dependencies = new Set([...Object.keys(manifest.requires ?? {}), ...(optionalPresent[id] ?? [])])
-    const gone = [...dependencies].find((dep) => {
-      const required = byId.get(dep)
-      return manifest.requires?.[dep] !== undefined && (!required || required.entry.status !== 'loaded')
-    })
+    const required = Object.keys(manifest.requires ?? {})
+    const gone = required.find((dep) => byId.get(dep)?.entry.status !== 'loaded')
     if (gone) {
       fail(candidate, 'blocked', `needs ${byId.get(gone)?.entry.manifest?.name ?? gone}, which did not load`)
       continue
     }
+    // An optional dependency that was ordered first but whose main.js then failed is as if absent.
+    const optional = (optionalPresent[id] ?? []).filter((dep) => {
+      if (byId.get(dep)?.entry.status === 'loaded') return true
+      input.warn(`[mods] ${id}: optional ${dep} is installed but did not load; running without it`)
+      return false
+    })
+    const dependencies = new Set([...required, ...optional])
     if (!candidate.hasMain) continue
     try {
       const exported = requireMain({
