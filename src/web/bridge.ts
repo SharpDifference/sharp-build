@@ -78,6 +78,7 @@ import * as presets from './presets'
 import { readStudioPrompts, writeStudioPrompts } from './studioPrompts'
 import { pickStudioBackup, saveStudioBackup } from './studioBackup'
 import { readModSwitches, writeModSwitches } from './mods'
+import { readStoryAssistantConfig, writeStoryAssistantConfig } from './storyAssistant'
 import { soundtrackLibrary, pickSoundtrack } from './soundtracks'
 import { getPoseManifest, getQuickstart, readAudio } from './assets'
 import { offerDownload } from './download'
@@ -216,6 +217,11 @@ export function buildApi(): VenusUniversityApi {
     mods: {
       get: () => result('read the mod switches', readModSwitches),
       set: (switches) => result('save the mod switches', () => writeModSwitches(switches))
+    },
+    storyAssistant: {
+      get: () => result('read the Story Assistant prompt', readStoryAssistantConfig),
+      set: (config) =>
+        result('save the Story Assistant prompt', () => writeStoryAssistantConfig(config))
     },
     app: {
       // There is no window to close: the page is somebody else's tab.

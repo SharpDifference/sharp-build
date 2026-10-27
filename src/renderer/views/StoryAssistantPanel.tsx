@@ -1,18 +1,20 @@
-import { useEffect, useRef, useState, type JSX, type KeyboardEvent } from 'react'
+import { useEffect, useState, type JSX, type KeyboardEvent } from 'react'
 import { createPortal } from 'react-dom'
 import { motion } from 'motion/react'
-import {
-  ASSISTANT_ACTION_LIMIT,
-  ASSISTANT_QUESTION_LIMIT,
-  type StoryAssistantReply
-} from '@shared/storyAssistant'
+import { ASSISTANT_ACTION_LIMIT, ASSISTANT_QUESTION_LIMIT } from '@shared/storyAssistant'
 import { TextField } from '../components/TextField'
 import { TitleTab } from '../components/TitleTab'
 import { useModalShell } from '../components/useModalShell'
 import type { ScenePanelProps, SceneSeatProps } from '../mods/hooks'
 import { submitAction, takeTurnFromReply } from '../stores/gameLoop'
 import { useGameStore } from '../stores/gameStore'
-import { askAssistant, assistantSeatOf, keptRead } from '../stores/storyAssistant'
+import {
+  askAssistant,
+  assistantNowOf,
+  assistantSeatOf,
+  useAssistantNow,
+  useAssistantStore
+} from '../stores/storyAssistant'
 import {
   gestures,
   lift,
@@ -28,7 +30,7 @@ import {
 import '../vu_styles/StoryAssistant.css'
 
 /** The assistant's mark: a speech bubble with a thought trailing in it. */
-function AssistantIcon(): JSX.Element {
+export function AssistantIcon(): JSX.Element {
   return (
     <svg
       width={24}
@@ -76,57 +78,32 @@ function enterRuns(go: () => void): (event: KeyboardEvent) => void {
  */
 export function StoryAssistantPanel({ theme, onClose }: ScenePanelProps): JSX.Element | null {
   const seat = useGameStore(assistantSeatOf)
-  const [kept] = useState(keptRead)
-  const [question, setQuestion] = useState(kept?.question ?? '')
-  const [read, setRead] = useState<StoryAssistantReply | null>(kept?.reply ?? null)
-  const [asking, setAsking] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+  const { read: current, asking: underWay, failed } = useAssistantNow()
+  const [question, setQuestion] = useState(() => current?.question ?? underWay?.question ?? '')
   const [turn, setTurn] = useState('')
+  const [sendError, setSendError] = useState<string | null>(null)
+  const read = current?.reply ?? null
+  const asking = underWay !== null
+  const error = sendError ?? failed?.message ?? null
 
-  // The call in flight, by its cancel group; only the newest one's answer is shown.
-  const ticket = useRef<string | null>(null)
-  const asks = useRef(0)
-  const cancel = (): void => {
-    if (ticket.current) void window.api.jobs.cancelGroup(ticket.current)
-    ticket.current = null
-  }
-  useEffect(() => cancel, [])
-
-  async function ask(words: string): Promise<void> {
-    cancel()
-    const group = `story-assistant:${++asks.current}`
-    ticket.current = group
-    setAsking(true)
-    setError(null)
-    try {
-      const reply = await askAssistant(words, group)
-      if (ticket.current !== group) return
-      setRead(reply)
-    } catch (thrown) {
-      if (ticket.current !== group) return
-      setError(thrown instanceof Error ? thrown.message : String(thrown))
-    } finally {
-      if (ticket.current === group) {
-        ticket.current = null
-        setAsking(false)
-      }
-    }
-  }
-
-  // Opened with nothing kept for this point of the scene, it reads the scene straight away.
+  // Opened with nothing for this point of the scene, nor a read on its way, it reads the scene at
+  // once. Closing the panel leaves a read under way to land in the bubble over the stage.
   useEffect(() => {
-    if (!kept) void ask('')
+    const now = assistantNowOf(useAssistantStore.getState(), useGameStore.getState())
+    if (!now.read && !now.asking && !now.failed) void askAssistant('')
   }, [])
 
   const askDead = asking || seat !== 'shown'
   const sendDead = !turn.trim() || seat !== 'shown'
   const askNow = (): void => {
-    if (!askDead) void ask(question)
+    if (askDead) return
+    setSendError(null)
+    void askAssistant(question)
   }
   const send = (): void => {
     if (sendDead) return
     if (!takeTurnFromReply()) {
-      setError('The scene cannot take a turn right now.')
+      setSendError('The scene cannot take a turn right now.')
       return
     }
     void submitAction(turn.trim())

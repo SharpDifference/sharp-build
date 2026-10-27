@@ -10,6 +10,33 @@ export const ASSISTANT_SUGGESTIONS_MAX = 4
 /** The most characters one suggestion's action keeps, which is what the box it fills takes. */
 export const ASSISTANT_ACTION_LIMIT = 600
 
+/** The most characters the player's own prompt takes. */
+export const ASSISTANT_PROMPT_LIMIT = 20000
+
+/** The option that reads the scene at every decision point without being asked. */
+export const ASSISTANT_POPUP = 'popup'
+
+/** The two options of the choices group: exactly four ways forward, or as many as fit. */
+export const ASSISTANT_CHOICES = { four: 'choices-four', fit: 'choices-fit' } as const
+
+/** How many ways forward a read is asked for. */
+export type ChoiceCount = 'four' | 'fit'
+
+/**
+ * What the player keeps for the mod beside its switches, in `data/story-assistant.json`: the
+ * prompt in place of the shipped one, absent while the shipped one stands.
+ */
+export interface StoryAssistantConfig {
+  prompt?: string
+}
+
+/** The config as stored: a blank or oversized prompt is no prompt. */
+export function cleanAssistantConfig(raw: unknown): StoryAssistantConfig {
+  const record = raw && typeof raw === 'object' ? (raw as Record<string, unknown>) : {}
+  const prompt = typeof record.prompt === 'string' ? record.prompt.trim() : ''
+  return prompt && prompt.length <= ASSISTANT_PROMPT_LIMIT ? { prompt } : {}
+}
+
 /** One way forward: a few words naming it, and the turn it would send. */
 export interface AssistantSuggestion {
   label: string

@@ -67,6 +67,10 @@ const api: VenusUniversityApi = {
     get: () => ipcRenderer.invoke('mods:get'),
     set: (switches) => ipcRenderer.invoke('mods:set', switches)
   },
+  storyAssistant: {
+    get: () => ipcRenderer.invoke('storyAssistant:get'),
+    set: (config) => ipcRenderer.invoke('storyAssistant:set', config)
+  },
   app: {
     quit: () => ipcRenderer.invoke('app:quit')
   },

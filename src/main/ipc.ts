@@ -19,6 +19,7 @@ import { readStudioBackupFile, saveStudioBackup } from './services/studioBackupS
 import type { StoryRecallRequest } from '@shared/storyMemory'
 import type { WhisperDraft, WhisperReply } from '@shared/venusWhisper'
 import type { MeanwhileResponse } from '@shared/meanwhile'
+import type { StoryAssistantConfig } from '@shared/storyAssistant'
 import {
   app,
   BrowserWindow,
@@ -206,6 +207,10 @@ import { generateRoomImage, writeRoomUpload } from './services/roomService'
 import { applySettingsPatch, getRendererSettings, getSettings } from './services/settingsService'
 import { getGrabBags, setGrabBags } from './services/grabBagService'
 import { getModSwitches, setModSwitches } from './services/modsService'
+import {
+  getStoryAssistantConfig,
+  setStoryAssistantConfig
+} from './services/storyAssistantService'
 import {
   readLorebook,
   readWorldInfoFile,
@@ -442,6 +447,10 @@ export function registerIpcHandlers(): void {
   handle('storyMemory:inspect', (_event, payload: StoryRecallRequest) => inspectStoryMemory(payload))
   handle('mods:get', () => getModSwitches())
   handle('mods:set', (_event, switches: ModSwitches) => setModSwitches(switches))
+  handle('storyAssistant:get', () => getStoryAssistantConfig())
+  handle('storyAssistant:set', (_event, config: StoryAssistantConfig) =>
+    setStoryAssistantConfig(config)
+  )
   // The caller has already saved; main writes nothing on its way out.
   handle('app:quit', () => {
     app.quit()

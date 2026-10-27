@@ -16,6 +16,7 @@ import type { StudioBackupFile } from '@shared/presets/studioBackup'
 import type { StudioPrompts } from '@shared/presets/studioPrompts'
 import type { Preset, PresetImport, PresetListing } from '@shared/presets/types'
 import type { SoundtracksApi } from '@shared/soundtracks'
+import type { StoryAssistantConfig } from '@shared/storyAssistant'
 import type { LorebookRecord, WorldInfoFile, WorldInfoImport } from '@shared/lorebookRecord'
 import type {
   PhotoEntry,
@@ -157,6 +158,12 @@ export interface VenusUniversityApi {
     get: () => Promise<Result<ModSwitches>>
     /** Replaces every switch and option. */
     set: (switches: ModSwitches) => Promise<Result<void>>
+  }
+  storyAssistant: {
+    /** What Story Assistant keeps beside its switches (`shared/storyAssistant.ts`). */
+    get: () => Promise<Result<StoryAssistantConfig>>
+    /** Replaces it. */
+    set: (config: StoryAssistantConfig) => Promise<Result<void>>
   }
   app: {
     /** Ends the app; main writes nothing, the caller has already saved. */

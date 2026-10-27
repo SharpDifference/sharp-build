@@ -1,4 +1,5 @@
 import { globalSlotOf } from '@shared/jobs'
+import { optionOn } from '@shared/mods'
 import { STAT_ATTRACTIONS } from '@shared/playerStats'
 import {
   affectionFor,
@@ -9,8 +10,16 @@ import {
   relationshipTagOf
 } from '@shared/relationship'
 import { memoryBudgetFor } from '@shared/settingsRules'
-import { storyAssistantReplyOf, type StoryAssistantReply } from '@shared/storyAssistant'
+import {
+  ASSISTANT_CHOICES,
+  cleanAssistantConfig,
+  STORY_ASSISTANT,
+  storyAssistantReplyOf,
+  type StoryAssistantConfig,
+  type StoryAssistantReply
+} from '@shared/storyAssistant'
 import type { Character, SceneLine, SceneSummaryMark, TimeSlot } from '@shared/types'
+import { create } from 'zustand'
 import { formatChatDivider, formatDateBanner } from '../prompts/gameDate'
 import { isGraduationSlot } from '../prompts/graduation'
 import { isOrientationSlot } from '../prompts/introScript'
@@ -18,6 +27,7 @@ import { memoryLines, notesLines, secretLines } from '../prompts/scenePrompt'
 import { transcriptStubs } from '../prompts/schedulePrompt'
 import {
   buildStoryAssistantPrompt,
+  DEFAULT_ASSISTANT_PROMPT,
   wholeWord,
   type AssistantContext,
   type AssistantGirl
@@ -25,6 +35,7 @@ import {
 import { upcomingPlanLines } from '../prompts/upcomingPlans'
 import { useGameStore } from './gameStore'
 import { settingNow } from './lorebookStore'
+import { useModsStore } from './modsStore'
 import { replyRowOfferOf } from './loop/playback'
 import {
   lessNsfwTextNow,
@@ -53,46 +64,121 @@ export function assistantSeatOf(s: GameState): AssistantSeat {
   return s.awaitingInput || replyRowOfferOf(s) === 'open' ? 'shown' : 'dim'
 }
 
-/** The point in the scene one read was taken at; any change to the scene since makes it stale. */
-interface ReadPoint {
+/** The point in the scene a read is taken at; any change to the scene since makes it stale. */
+interface ScenePoint {
   playthroughId: string | null
   loads: number
   transcript: readonly SceneLine[]
   marks: readonly SceneSummaryMark[]
-  question: string
 }
 
-/** The point the scene stands at now, for a read asked with `question`. */
-function pointNow(question: string): ReadPoint {
-  const game = useGameStore.getState()
+/** The point a game stands at. */
+function pointOf(game: Pick<GameState, 'playthroughId' | 'loads' | 'currentSceneTranscript' | 'sceneSummaries'>): ScenePoint {
   return {
     playthroughId: game.playthroughId,
     loads: game.loads,
     transcript: game.currentSceneTranscript,
-    marks: game.sceneSummaries,
-    question: question.trim()
+    marks: game.sceneSummaries
   }
 }
 
 /** Whether two points are one: the same game and the very same scene, line for line. */
-function samePoint(a: ReadPoint, b: ReadPoint): boolean {
+function samePoint(a: ScenePoint, b: ScenePoint): boolean {
   return (
     a.playthroughId === b.playthroughId &&
     a.loads === b.loads &&
     a.transcript === b.transcript &&
-    a.marks === b.marks &&
-    a.question === b.question
+    a.marks === b.marks
   )
 }
 
-/** The last read that came back, and the point it was taken at. */
-let kept: { point: ReadPoint; reply: StoryAssistantReply } | null = null
+/** A read that came back: where it was taken, what was asked, and what the assistant said. */
+export interface AssistantRead {
+  point: ScenePoint
+  question: string
+  reply: StoryAssistantReply
+}
 
-/** The last read, while the scene still stands where it was taken; null once it has moved. */
-export function keptRead(): { question: string; reply: StoryAssistantReply } | null {
-  if (!kept) return null
-  const now = pointNow(kept.point.question)
-  return samePoint(kept.point, now) ? { question: kept.point.question, reply: kept.reply } : null
+/** Story Assistant's state: its config, and the newest read, read under way or failure. */
+interface AssistantState {
+  config: StoryAssistantConfig
+  read: AssistantRead | null
+  /** A read under way, by the cancel group it went out under. */
+  asking: { point: ScenePoint; question: string; group: string } | null
+  failed: { point: ScenePoint; question: string; message: string } | null
+}
+
+export const useAssistantStore = create<AssistantState>(() => ({
+  config: {},
+  read: null,
+  asking: null,
+  failed: null
+}))
+
+/** The config's one read, once something that needs it is on screen. */
+let configRead: Promise<void> | null = null
+
+/** Reads the player's prompt off the bridge, once; a config that cannot be read leaves the shipped one. */
+export function loadAssistantConfig(): Promise<void> {
+  configRead ??= window.api.storyAssistant.get().then((result) => {
+    if (result.ok) useAssistantStore.setState({ config: result.data })
+    else console.warn('[story-assistant] could not read the config:', result.error.message)
+  })
+  return configRead
+}
+
+/**
+ * Keeps `text` as the player's prompt, or goes back to the shipped one where it is blank or the
+ * shipped text itself; null once written, or the sentence saying why it was not.
+ */
+export async function saveAssistantPrompt(text: string): Promise<string | null> {
+  const trimmed = text.trim()
+  const config: StoryAssistantConfig =
+    trimmed && trimmed !== DEFAULT_ASSISTANT_PROMPT ? { prompt: trimmed } : {}
+  const result = await window.api.storyAssistant.set(config)
+  if (!result.ok) return result.error.message
+  useAssistantStore.setState({ config: cleanAssistantConfig(config) })
+  return null
+}
+
+/** What the assistant has where the scene stands now: a read, one under way, or a failure. */
+export interface AssistantNow {
+  read: AssistantRead | null
+  asking: AssistantState['asking']
+  failed: AssistantState['failed']
+}
+
+/** {@link AssistantNow} off the two stores; anything taken at another point is none. */
+export function assistantNowOf(state: AssistantState, game: GameState): AssistantNow {
+  const now = pointOf(game)
+  const at = <T extends { point: ScenePoint }>(entry: T | null): T | null =>
+    entry && samePoint(entry.point, now) ? entry : null
+  return { read: at(state.read), asking: at(state.asking), failed: at(state.failed) }
+}
+
+/** {@link AssistantNow} for a component, kept current as either store moves. */
+export function useAssistantNow(): AssistantNow {
+  const state = useAssistantStore()
+  // Each a field of its own, so the hook answers to the scene moving and nothing else.
+  useGameStore((s) => s.currentSceneTranscript)
+  useGameStore((s) => s.sceneSummaries)
+  useGameStore((s) => s.loads)
+  useGameStore((s) => s.playthroughId)
+  return assistantNowOf(state, useGameStore.getState())
+}
+
+/** Cancels the read under way, if any; its answer is then dropped unseen. */
+export function cancelAssistant(): void {
+  const { asking } = useAssistantStore.getState()
+  if (!asking) return
+  void window.api.jobs.cancelGroup(asking.group)
+  useAssistantStore.setState({ asking: null })
+}
+
+/** Cancels a read under way that the scene has since moved past. */
+export function cancelStaleAssistant(): void {
+  const { asking } = useAssistantStore.getState()
+  if (asking && !samePoint(asking.point, pointOf(useGameStore.getState()))) cancelAssistant()
 }
 
 /** How many earlier slots are carried whatever they were about. */
@@ -182,24 +268,46 @@ function contextNow(question: string): AssistantContext {
     summary: game.sceneSummary,
     lines: transcriptStubs(sceneSoFar(), cast, true),
     question,
+    prompt: useAssistantStore.getState().config.prompt ?? '',
+    choices: optionOn(useModsStore.getState().switches, STORY_ASSISTANT, ASSISTANT_CHOICES.fit)
+      ? 'fit'
+      : 'four',
     lessNsfwText: lessNsfwTextNow()
   }
 }
 
+/** Tells the asks apart, so only the newest one's answer lands. */
+let asks = 0
+
 /**
- * Asks for a read of the scene where it stands, `question` answered where one is given. The reply
- * is kept for the panel to reopen on; one that lands after the scene has moved is refused.
+ * Asks for a read of the scene where it stands, `question` answered where one is given, in place
+ * of any read still under way. What comes back is kept on the store; an answer that lands after
+ * the scene has moved, or after a later ask, is dropped unseen.
  */
-export async function askAssistant(question: string, group: string): Promise<StoryAssistantReply> {
-  const point = pointNow(question)
+export async function askAssistant(question: string): Promise<void> {
+  cancelAssistant()
+  const point = pointOf(useGameStore.getState())
+  const asked = question.trim()
+  const group = `story-assistant:${++asks}`
+  useAssistantStore.setState({ asking: { point, question: asked, group }, failed: null })
+  await loadAssistantConfig()
+  if (useAssistantStore.getState().asking?.group !== group) return
   const result = await window.api.llm.completeStoryAssistant(
-    buildStoryAssistantPrompt(contextNow(point.question)),
+    buildStoryAssistantPrompt(contextNow(asked)),
     group
   )
-  if (!samePoint(point, pointNow(question))) throw new Error('The scene moved on. Ask again.')
-  if (!result.ok) throw new Error(result.error.message)
-  const reply = storyAssistantReplyOf(result.data)
-  if (!reply) throw new Error('The assistant came back with nothing to say. Ask again.')
-  kept = { point, reply }
-  return reply
+  if (useAssistantStore.getState().asking?.group !== group) return
+  if (!samePoint(point, pointOf(useGameStore.getState()))) {
+    useAssistantStore.setState({ asking: null })
+    return
+  }
+  const reply = result.ok ? storyAssistantReplyOf(result.data) : null
+  if (reply) {
+    useAssistantStore.setState({ asking: null, read: { point, question: asked, reply } })
+    return
+  }
+  const message = result.ok
+    ? 'The assistant came back with nothing to say.'
+    : result.error.message
+  useAssistantStore.setState({ asking: null, failed: { point, question: asked, message } })
 }

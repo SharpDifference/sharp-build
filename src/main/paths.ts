@@ -246,6 +246,11 @@ export function getModsPath(): string {
   return join(getDataPath(), 'mods.json')
 }
 
+/** `/data/story-assistant.json` — what Story Assistant keeps beside its switches: its prompt. */
+export function getStoryAssistantPath(): string {
+  return join(getDataPath(), 'story-assistant.json')
+}
+
 /** `/data/saves` — one folder per playthrough. */
 export function getSavesPath(): string {
   return join(getDataPath(), 'saves')
