@@ -113,6 +113,20 @@ Shared code holds no switches. Where a rule there has to follow one, give the ru
 a setter, and set it from `modsStore.ts` at boot and whenever a switch moves
 (`useModsStore.subscribe`). Continuing Semesters does this for its seniors option.
 
+## Sprite and CG prompt drafts
+
+`shared/imagePromptDrafts.ts` lets a shared mod entry add to a sprite's or a CG's prompt draft,
+in both processes: the editor's regenerate draft in the renderer and every render in main are
+built by the same `spriteDraft` and `cgSetDraft`. Register once at boot with
+`registerImagePromptDraft(modId, { draft, regen? })`, from `@vx/modkit/shared`.
+
+- `draft(parts, { character, kind })` is handed the draft's `appearance` and `negative` tags
+  and returns them with the mod's own in; `kind` is `sprite`, `nude` or `cg`. Each mod that is
+  on is asked in id order, like every hook, and her own negatives are added after every mod's.
+- `regen(kept, draft, on)` is what a regenerate reopens on: the edit its button last sent
+  (`kept`), refreshed with the mod's tags as they are in the fresh `draft`. It is asked whether
+  or not the mod is on, so one that is off can take its own tags back out of a remembered edit.
+
 ## Additive romance requirements
 
 `shared/romanceRequirements.ts` lets a shared mod entry register a pure rule with
@@ -487,7 +501,9 @@ Windows aliases, errors/disposal, and the real service's launch boundary with mo
   stores, award currency, consume an ability or roll randomness. Commit effects at
   `slotSettled` instead. With no active handler, the native projection passes through.
 - `sharedModOn` in `shared/modRules.ts` uses the same live lookup as renderer hooks,
-  without importing renderer stores. It defaults off before binding. A mod's renderer entry
+  without importing renderer stores. It defaults off before binding. In main,
+  `modsService.ts` binds it to the switches main last read or wrote; main knows no
+  playthrough, so a `playthrough` mod answers there as its switch stands. A mod's renderer entry
   owns any mod-specific setup; framework stores should not import feature modules.
 - Mods may add optional fields to `GameSave`, `CharMemory` and `ProjectSession` by
   TypeScript declaration merging in their own modules. Enrollment additions go on
