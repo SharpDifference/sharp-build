@@ -72,7 +72,9 @@ switch is left as the player set it.
 - `data/mods.json`: the player's switches and options, `{ schemaVersion, on, options }`. A mod
   or option missing from it is at its default, so adding a mod needs no migration. Ids this
   build does not know are kept.
-- `playthrough.json`: `mods`, the `playthrough` mods that playthrough started with.
+- `playthrough.json`: `mods`, the `playthrough` mods that playthrough started with, and
+  `modVersions`, the version of every mod that was on as it started.
+- A save's `ex`: each mod's own data, under its id (see Mod data below).
 
 
 ## Installed mods
@@ -136,6 +138,8 @@ else the highest, with a line in the log. The loader deletes nothing and writes 
 - A library (`library: true`) has no switch and no row; it is on while a mod that is on requires
   it, and `exports` names what its `renderer.js` exports for them to import as
   `vxmod://<lib>/renderer.js`.
+- `dataPath`, optional, names a folder the mod already keeps its data in, for `modDataPath` to
+  find it there (see Mod data below).
 
 ### What runs, and where
 
@@ -176,6 +180,202 @@ else the highest, with a line in the log. The loader deletes nothing and writes 
   standing in for an installed copy of the same id). While the game runs, a change to the folder
   reloads the window, at once off a game and on offer in one; a changed `main.js` offers a restart.
 
+## Mod data
+
+A mod keeps its data in one of four places: in the save, with the game; on a record inside the
+save, such as a character or a message; in memory, for as long as a game or the window lasts; or
+in a folder of its own, outside the save. The kit gives each a way in, and core keeps what a mod
+wrote whether the mod is on, off, not running or not installed. Each of these is a kit API, so a
+mod built outside the repo names the ones it uses in its manifest's `hooks`
+(`renderer:saveField`, `renderer:writeModField`, `main:modDataPath`, `main:backupPart`,
+`main:characterTransferPart`, …).
+
+### The save keeps what it does not own
+
+Core writes back every top-level key of a save, and every key of its scene, that it does not own,
+untouched. The records inside the save (characters, memories, messages, conversations, posts,
+project sessions) keep theirs the same way. A build that does not know a mod never drops its
+data: a save played with the mod, loaded and saved without it, still holds everything the mod
+wrote.
+
+### A mod's slice of the save: `saveField`
+
+A save holds `ex`: one slice per mod, under the mod's id, each `{ v, data }`. `data` is what the
+mod wrote, plain JSON, and `v` the version of the mod that wrote it. Core never reads inside a
+slice. A mod declares its slice once, from its own files, with `saveField` from
+`@vx/modkit/renderer`:
+
+```ts
+import { saveField } from '@vx/modkit/renderer'
+
+export const storyMemory = saveField<StoryMemory>('story-memory', {
+  empty: { entries: [] },
+  legacy: ['exStoryMemory'],             // its old top-level key
+  normalize: (stored, legacy, from) =>
+    stored !== undefined
+      ? (stored as StoryMemory)
+      : { entries: (legacy.exStoryMemory as StoryEntry[] | undefined) ?? [] },
+  carry: (value) => ({ entries: value.entries.filter((entry) => entry.lasting) })
+})
+```
+
+The handle holds the mod's value in the game being played:
+
+- `read()` is the value, or `empty` where the save holds nothing for the mod; `use()` is the same
+  for a component, which renders again when the value changes.
+- `set(next)` replaces the value in memory. It goes out with the next save of any kind.
+- `write(next, { expect })` writes it to disk now, at a safe point (below).
+
+`normalize(stored, legacy, from)` runs on every load, for every mod that registered a field, on or
+off, whenever the save holds the mod's slice or one of its `legacy` keys. It is handed copies:
+`stored` is the slice's data as read (undefined where there is none), `legacy` the old keys the
+save holds, and `from` the version that wrote the slice, or null for legacy or pre-kit data. It
+returns the value, and must be pure. Without it, the value is the stored data, or `empty`. A
+`normalize` that throws leaves the save's data as read and the mod at `empty` for that game; the
+error is logged, and the mod's row on the Mods screen says its data in this game could not be read
+and is kept as it was.
+
+`legacy` is how a mod moves out of the top-level keys it wrote before the kit. Its `normalize`
+reads the old key from `legacy` and returns the value; once it has returned, core removes the old
+key, and the next save holds the value in the mod's slice instead. Legacy keys are read only
+through `normalize`: without one, they stay in the save as they are. The move is one way. A save
+a migrated mod has written no longer holds the old key, so an older version of the mod finds
+nothing there.
+
+Core keeps the slices of mods not registered this session, because they are not installed or did
+not run, and writes them back on every save. Removing a mod loses nothing, and putting it back
+finds its data where it was.
+
+**On a record.** `recordField(id, { empty, legacy, normalize })` is the same for the `ex` on a
+record inside the save: a character, a memory, a message, a conversation, a post, a project
+session. Its handle is pure: `read(record)` is the mod's value on that record, and
+`with(record, next)` is a new record holding it, without the legacy keys. Nothing in core writes
+the record back for the mod yet; that comes with each record's hook.
+
+**New games and the next semester.** An enrollment has an `ex` of its own, and the playthrough's
+first save starts with it. At New Game+, the next semester's first save starts with what each
+mod's `carry(value, context)` makes of its value; `context` is the one `registerTermCarry`'s
+adapters are handed (the outgoing semester, the days its dates move back, the characters). A mod
+without `carry`, or whose `carry` returns undefined, starts the next semester empty. A slice no
+mod read in the game being left is carried as it was. A `carry` that throws is logged, and the
+value is carried as it stands.
+
+**Mods that merge fields into `GameSave`.** The in-repo mods that declare their fields on
+`GameSave` by declaration merging, and carry them with `registerTermCarry`, keep working as they
+are until each moves. A mod moves in two steps. First it declares its `saveField`, with a
+`normalize` that reads its old key from `legacy` first, and reads and writes through the handle
+from then on. Then, at move-out, it drops the merged declaration and its carry adapter.
+
+### Writing at a safe point
+
+A safe point is a moment the game could take a save: nothing on its way from the model, nothing
+waiting to be filed, the moments the Save Game button is open. `safePoint()` says where things
+stand: `'open'`, `'waiting'` (the game has to settle first) or `'none'` (no game, or a game that is
+over). `useSafePoint()` is the same for a component.
+
+`writeModField(id, next, { expect })` writes the mod's value into the autosave at a safe point,
+behind every save already on its way, and changes the live value only once the file is on disk;
+until then `read()` answers what it did before. `writeModFields(id, { … }, { expect })` writes
+several values in one file: the mod's own and those of the mods its `requires` lists, and no
+other mod's. `expect` is, per id, the value the edit was made from, as `read()` gave it; once that
+is no longer the live value, the write is refused. The handle's `write` is `writeModField` for its
+own id.
+
+Both return a `Result`: `{ ok: true, data: null }`, or `{ ok: false, error }` with an `AppError`'s
+`code` and `message`. A refusal writes nothing and changes nothing, and comes back as the error,
+never as a throw:
+
+| Code | When |
+| --- | --- |
+| `MOD_WRITE_FOREIGN` | An id is neither the mod's own nor one it requires, or the field was refused when it was registered |
+| `MOD_WRITE_OFF` | The mod is off for the game loaded (a `playthrough` mod as the game's record says), as the write was asked for or at its turn |
+| `MOD_WRITE_NO_GAME` | No game is loaded |
+| `MOD_WRITE_STALE` | A value `expect` names has moved, as the write was asked for or at its turn, or the game was left or another loaded before its turn came |
+| `MOD_WRITE_WAIT` | It is not a safe point, as the write was asked for or at its turn; try again once `safePoint()` is `'open'` |
+| `SAVE_WRITE_FAILED` | The write itself failed; where the disk gave an error of its own, that comes back instead |
+
+### Which versions a game was played with
+
+A new playthrough's record keeps `modVersions`: the version of every mod that was on as it
+started, `playthrough` and `anytime` alike, by id, and `{}` where none were. A record without it
+was written before mods recorded their versions. Such a game loads as it always did, with one
+quiet line, once per playthrough a session: "This game was started before mods recorded their
+versions." Where a game names a `playthrough` mod that is not running, its notice also says which
+version the game was played with, when that is not the one installed. `modVersions` is the version
+a game started with; a slice's `v`, and `from` in `normalize`, is the version that last wrote it.
+
+### State that is never saved: `modState`
+
+`modState(id, { initial, lifetime })` from `@vx/modkit/renderer` is a small store of the mod's own
+that is never saved: not in a save, not in a backup. Its handle has `get()`, `set(next)`, `use()`
+for a component, and `subscribe(onChange)`, which calls back with the new value and returns the
+unsubscribe. `set` with the value it already holds (`Object.is`) does nothing. With
+`lifetime: 'game'` it goes back to `initial` whenever a game is entered or left, a created scene or
+a replay included; with `'session'` it lasts until the window closes. One per id.
+
+### Outside the save
+
+What a mod keeps beyond the save (pictures, a cache, an archive) goes in a folder of its own,
+reached from its `main.js` through `@vx/modkit/main`.
+
+`modDataPath(id, playthroughId?)` is that folder: `data/mod-data/<id>/` for what belongs to no one
+game, and `data/saves/<pid>/mod-data/<id>/` for what belongs to one playthrough. It is created on
+the first call, and its full path is returned. A playthrough that is not on disk is refused
+(`MOD_DATA_NO_PLAYTHROUGH`): the call makes the mod's folder, never the playthrough's. The folder is
+apart from the install folder, so updating or removing the mod never touches it.
+
+An installed mod that already keeps a folder of its own names it in the manifest:
+
+```json
+"dataPath": { "data": "my-mod", "playthrough": "my-mod/cache" }
+```
+
+`data` is under `data/`, `playthrough` under each playthrough's folder. Each is one or two
+lower-case folder names, and the first is never one core keeps there (`saves`, `characters`,
+`photos`, `mod-data` and the rest of `CORE_DATA_NAMES` and `CORE_PLAYTHROUGH_NAMES` in the kit's
+`manifest.ts`); a manifest that breaks this is refused. `modDataPath` then resolves to that folder.
+Moving to the default is the author's choice, and core moves nothing.
+
+**Backups.** A mod's folders go into the game's backup only through its part. `backupPart(id,
+{ export, prepare })` gives it a share, in two phases.
+
+- At export, after the game has gathered its own, `export({ scratch, playthroughIds })` is handed
+  its own folder in the backup, `mods/<id>/`, and every playthrough the backup carries. It writes
+  its files there and returns `{ json, files }`: `json`, plain JSON, goes in the backup's record
+  as `mods[id]`, `{ version, json, files }`; `files` names what it wrote, as paths under
+  `scratch`, and without it everything it wrote is carried. A part that throws, or names a file it
+  did not write, is left out with a warning, and the backup goes ahead.
+- At import, every part's `prepare(json, { dir, list }, legacy)` runs before anything is written,
+  reads its share and returns `{ commit, discard }`. Then core writes its own share, then every
+  `commit()`, in order. A `prepare` that throws stops the import with nothing written, and the
+  restores already prepared are discarded; so are they all if core's own share fails. A `commit`
+  that throws ends the import naming the mod, with the game's share already back.
+
+A restore replaces all of `data/saves`, so a mod's per-playthrough folders under
+`saves/<pid>/mod-data/` are gone by the time `commit()` runs, and it writes them back there. A
+backup holding a share for a mod that has no part here keeps it as it came, under
+`data/mod-data/<id>/.backup/<ms>/` with its `backup.json` entry beside it, for the mod to claim
+once it is installed. `legacy` is what an older backup holds that the game does not read:
+`record`, the record's keys core does not own, and `dirs`, its top-level folders core does not
+write, as absolute paths in the unpacked backup.
+
+**Characters.** `characterTransferPart(id, { export, validate, adopt, duplicate })` carries the
+mod's data with a character exported, imported or duplicated.
+
+- `export(charId, dir)` returns the json that goes in the export's manifest as `mods[id]`, and
+  writes any files into `dir`, the mod's own `mods/<id>/` folder in the export, never her folder.
+  A part that throws is left out with a warning.
+- On import, every part's `validate(json, dir, legacy)` runs before she is adopted; a throw refuses
+  the import. Then each part's `adopt(charId, json, dir, legacy)` takes its share in for her new
+  id and returns its rollback. `json` is undefined where the export carries none, and `legacy` is
+  the manifest's keys core does not own.
+- `duplicate(fromId, toId)` copies the mod's data to her duplicate and returns its rollback.
+
+Adopting and duplicating are all or nothing: a part that throws rolls back those before it, last
+first, and her folder is removed. An export's share for a mod that has no part here is left out.
+
+`backupPart` and `characterTransferPart` each take one registration per id; a second throws.
+
 ## Options that are one choice
 
 Options that are one choice among several share a `group`, and the mod names the group in
@@ -203,6 +403,9 @@ optionGroups: [{ id: 'loader', label: 'Loading animation', hint: 'The animation 
 | `src/renderer/views/ModsModal.tsx` | The Mods screen. |
 | `packages/modkit/` | The mod kit, `@vx/modkit`: the hook points (below), the shared rule and the carry registries, under the three entries a mod imports (`shared`, `renderer`, `main`) and core's own `host` side. Its README says how it is laid out and checked. |
 | `src/renderer/mods/hooks.ts`, `src/renderer/mods/ModSlot.tsx`, `src/shared/modRules.ts`, `src/shared/modCarry.ts` | The old paths of what moved into the kit, re-exporting it, so core's imports are unchanged. |
+| `packages/modkit/src/renderer/saveField.ts`, `modState.ts` | A mod's slice of the save and of a record, its writes at a safe point, and its unsaved state. |
+| `src/renderer/stores/gameStore.ts`, `src/renderer/stores/loop/saves.ts` | Where the slices are read on a load and written back (`SAVE_KEYS`, `SCENE_KEYS` list what core owns), and the write lane a mod's write takes (`writeModSlices`). |
+| `src/main/services/modDataService.ts`, `modParts.ts`, `src/shared/modParts.ts` | A mod's folders outside the save (`modDataPath`), and its parts of a backup and of a character's transfer, which `backupService.ts` and `characterTransferService.ts` run. |
 | `src/renderer/modEntries/` | One file per mod with hooks, named for its id: its `registerHooks`. |
 | `src/renderer/mods/index.ts` | Loads every file in `modEntries/` at boot, then imports each installed mod's `renderer.js`. |
 | `src/shared/modSession.ts` | The session table: what the loader found and what became of each installed mod. |
@@ -450,7 +653,9 @@ field and writes nothing, so what it saved on her stays.
   places on screen above.
 - Main process: IPC, services, settings and character rules. Protocols are covered: a mod's
   `main.js` exports routes under `vxmod://<id>/@/…`.
-- Saves: a mod's own fields in a save. Carrying them into the next semester is covered below.
+- Saves: a mod's slice of a record inside the save (`recordField`) is the mod's to write back
+  until that record has a hook. Its slice of the save itself, and carrying that into the next
+  semester, are covered (Mod data, above).
 
 These are still direct edits, as before.
 
@@ -507,7 +712,7 @@ Where a branch goes:
 - `fileLatePost(post)` in `loop/feed.ts` files a post a mod wrote mid-slot, outside the slot's opening, the way the opening files its own: through `fileFeedPost`, so it can be held like any other. It leaves the slot's teaser and fill as they were drawn.
 - `texts` on a ComfyUI job in `comfyService.ts` fills more prompt nodes by id, for a graph with more prompts than the positive, negative and detailer the job already fills.
 
-These hooks add to the existing API; existing hooks and their arguments are unchanged. Screens, IPC and save fields still use direct integration as documented above.
+These hooks add to the existing API; existing hooks and their arguments are unchanged. Screens and IPC still use direct integration as documented above; a mod's save data has `saveField` (Mod data).
 
 - `bunnyboardPage` registers an independently gated tab with `id`, `word`, `Mark` and `Page`. Disabling its mod unmounts the page and returns the phone to Chats. Native tab IDs cannot be replaced. Other screen integration remains direct.
 - `optionPreviews` draws a preview under an option group on the Mods screen, keyed by the group's id. The game hands it `optionId`, the option picked (or null), and draws it under the group's switches on the recessed ground. It is asked whether or not the mod is on, so a player sees it before switching the mod on.
@@ -561,6 +766,10 @@ screens too, so a mod with a box of its own takes the same tool without importin
 draws it. What is sent and saved is the text as typed either way.
 
 ### Optional semester carryover
+
+A mod's slice of the save is carried by its `saveField`'s `carry` (Mod data, above), and that is
+the way forward. The adapters below keep working for the mods that merge their fields into
+`GameSave`, until each moves.
 
 A mod may augment `ModCarryFields` and register its own pure adapter with `registerTermCarry` in `shared/modCarry.ts`, imported by its entry in `shared/modEntries/`. The game's New Game+ calls them: Continue reads every registered field off the ending's save (`modFieldsLeaving` in `renderer/stores/semesterModCarry.ts`, with the outgoing semester's index, the days its dates move back, and the characters) and keeps it on the carry beside the game's own, and the next semester's opening save takes it back in through `carriedModFields`. These adapters retain saved data even with a switch off; they must not trigger generation. The registry itself requires neither Continuing Semesters nor any feature mod.
 
@@ -638,8 +847,10 @@ Windows aliases, errors/disposal, and the real service's launch boundary with mo
   `modsService.ts` binds it to the switches main last read or wrote; main knows no
   playthrough, so a `playthrough` mod answers there as its switch stands. A mod's renderer entry
   owns any mod-specific setup; framework stores should not import feature modules.
-- Mods may add optional fields to `GameSave`, `CharMemory` and `ProjectSession` by
-  TypeScript declaration merging in their own modules. Enrollment additions go on
+- A mod keeps its own data in a save with `saveField`, and on a record inside it with
+  `recordField` (Mod data, above); that is the way forward. Adding optional fields to `GameSave`,
+  `CharMemory` and `ProjectSession` by TypeScript declaration merging in the mod's own modules
+  still works, for the mods that do it until each moves. Enrollment additions go on
   `ModEnrollmentFields`. Save/enrollment validation requires the native required keys;
   optional additions do not make older files invalid. Mods own normalization and carryover.
 - The native `lorebook` Bunnyboard tab is reserved, like Chats and Friends.

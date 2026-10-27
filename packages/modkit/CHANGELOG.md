@@ -1,5 +1,31 @@
 # @vx/modkit
 
+## 0.4.0
+
+Mod data. A mod keeps its data in the save, on the records inside it, in memory for a game or a
+session, and in folders of its own outside the save; core keeps every save key it does not own
+through a load and a save.
+
+- `saveField` and `recordField` in `renderer`, with `SaveFieldSpec`, `SaveFieldHandle`,
+  `RecordFieldSpec`, `RecordFieldHandle` and `ModDataRecord`: a mod's slice, `{ v, data }`, under
+  its id in the `ex` of a save or a record, read through the mod's own `normalize` on every load
+  and carried into the next semester by its `carry`.
+- `writeModField`, `writeModFields`, `safePoint` and `useSafePoint` in `renderer`: a write to the
+  save at a safe point, refused with a code rather than thrown.
+- `modState` in `renderer`, with `ModStateSpec` and `ModStateHandle`: state that is never saved,
+  for a game or for the session.
+- `modDataPath`, `backupPart` and `characterTransferPart` in `main`, with `BackupPart`,
+  `BackupPartContext`, `BackupPartExport`, `BackupPartLegacy`, `BackupPartRestore` and
+  `CharacterTransferPart`: a mod's folders outside the save, and its share of a backup and of a
+  character's export, import and duplicate.
+- New types in `shared`: `ModSlice`; `NativeGameSave`, the save's own fields, which `GameSave` now
+  extends; and `Result` and `AppError`, which a write returns.
+- The manifest's optional `dataPath`, for a mod that already keeps a folder of its own.
+- `modVersions` on the playthrough record: the version of every mod on as a playthrough started.
+
+Existing hooks and APIs keep their shapes; declaration merging into `GameSave` and
+`registerTermCarry` work as before.
+
 ## 0.3.0
 
 The loader. Installed mods are read from `data/mods/<id>/<version>/` and from the developer

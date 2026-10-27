@@ -46,6 +46,16 @@ installed manifest at start, checks its `hooks` with `checkCompat`, orders the m
 require and loads them; `registerHooks` then holds each registration to its manifest through
 `setDeclaredHooks`. `MODDING.md` says what the fields mean.
 
+## Mod data
+
+What a mod keeps, and where: `saveField` and `recordField` for its slice of a save and of a record
+inside it, `writeModField` and `writeModFields` for a write at a safe point, and `modState` for
+state that is never saved, all in `renderer`; `modDataPath`, `backupPart` and
+`characterTransferPart` in `main`, for what is kept outside the save. `MODDING.md` says what each
+one guarantees. The binders that hand them core's side, `bindSaveFieldStore`, `bindModWrites` and
+`bindGameBoundary` in the host's renderer entry, are core's: the game store and the save lane call
+them, and a mod never does.
+
 ## Checks
 
 - `npm test` at the root runs `test/kit/*`: the boundary test, the compatibility check's tests

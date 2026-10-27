@@ -542,7 +542,7 @@ export interface ImagePromptParts {
 export const KIT_APIS: readonly ['shared:carryModFiles', 'shared:DEPRECATED_HOOKS', 'shared:hasTrait', 'shared:HOOKS', 'shared:KIT_APIS', 'shared:KIT_VERSION', 'shared:memoryStatusLine', 'shared:modById', 'shared:modOn', 'shared:optionKey', 'shared:optionOn', 'shared:registerCharacterTrait', 'shared:registerImagePromptDraft', 'shared:registerPostCarry', 'shared:registerRomanceRequirement', 'shared:registerTermCarry', 'shared:registerTermFiles', 'shared:REMOVED_HOOKS', 'shared:sharedModOn', 'renderer:Card', 'renderer:EmojiTool', 'renderer:fileLatePost', 'renderer:finishSlotActivity', 'renderer:Locked', 'renderer:modIsOn', 'renderer:modState', 'renderer:openPanel', 'renderer:ownsPostComments', 'renderer:PostCommentAction', 'renderer:PostCommentsView', 'renderer:PostPicture', 'renderer:postVisible', 'renderer:promptFields', 'renderer:promptLines', 'renderer:promptRequired', 'renderer:recordField', 'renderer:registerHooks', 'renderer:safePoint', 'renderer:saveField', 'renderer:SentText', 'renderer:submitAction', 'renderer:takeTurnFromReply', 'renderer:useBareMessage', 'renderer:useEmojiTool', 'renderer:useModOn', 'renderer:useModOption', 'renderer:useSafePoint', 'renderer:writeModField', 'renderer:writeModFields', 'main:backupPart', 'main:characterTransferPart', 'main:modDataPath', 'main:registerComfyLaunchEnvironment'];
 
 // @public
-export const KIT_VERSION = "0.3.0";
+export const KIT_VERSION = "0.4.0";
 
 // @public (undocumented)
 export type KitApiName = (typeof KIT_APIS)[number];
