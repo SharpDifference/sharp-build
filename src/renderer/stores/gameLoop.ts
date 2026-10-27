@@ -3027,7 +3027,7 @@ export function enterGame(
   // Held for a replay's return, which enters the same game again.
   loopState.record = record
   // A `playthrough` mod this game started with that is not running this session is named once.
-  useModSessionStore.getState().gameEntered(record)
+  useModSessionStore.getState().gameEntered(record, save.playthroughId)
   const game = useGameStore.getState()
   game.loadSave(save, record, characters)
   // A read nothing on screen is waiting on: the profile is not open yet.

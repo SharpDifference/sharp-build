@@ -17,11 +17,25 @@ export interface DevChange {
   kind: 'renderer' | 'main'
 }
 
-/** What one of the two notices says: its title, and a line per mod. */
+/**
+ * What one of the notices says: its title, and a line per mod. `unversioned` alone is the quiet
+ * one, a line under the game and no mods: the game being entered was started before mods
+ * recorded their versions.
+ */
 export interface ModNotice {
-  kind: 'start' | 'game'
+  kind: 'start' | 'game' | 'unversioned'
   mods: ModSessionEntry[]
+  /**
+   * On the game's notice, by id: the version this game was played with, for each mod named whose
+   * installed version is another.
+   */
+  playedWith?: Readonly<Record<string, string>>
+  /** On the game's notice: the game was started before mods recorded their versions, said there too. */
+  unversioned?: boolean
 }
+
+/** The line a game started before mods recorded their versions is entered with. */
+export const UNVERSIONED_LINE = 'This game was started before mods recorded their versions.'
 
 interface ModSessionState {
   table: ModSessionTable
@@ -31,6 +45,8 @@ interface ModSessionState {
   devChange: DevChange | null
   /** What the game being played could not do with a mod's data, by id: a line for its row. */
   dataNotes: Readonly<Record<string, string>>
+  /** The playthroughs told this session that they were started before mods recorded their versions. */
+  unversionedTold: ReadonlySet<string>
 
   /** Whether an installed mod's code is running; true for a mod that is not installed (an in-repo one). */
   running: (id: string) => boolean
@@ -39,8 +55,12 @@ interface ModSessionState {
   setShiftStart: () => void
   /** Raises the start notice for the mods not running that the player has not been told of at this version. */
   noticeAtStart: (seen: Readonly<Record<string, string>>) => void
-  /** Raises the game's notice where its record names a `playthrough` mod that is not running. */
-  gameEntered: (record: Pick<PlaythroughRecord, 'mods'>) => void
+  /**
+   * Raises the game's notice where its record names a `playthrough` mod that is not running, and
+   * says once a session of a playthrough whose record holds no versions that it was started
+   * before mods recorded them.
+   */
+  gameEntered: (record: Pick<PlaythroughRecord, 'mods' | 'modVersions'>, playthroughId: string) => void
   dismissNotice: () => void
   setDevChange: (change: DevChange | null) => void
   /** Puts a line about the mod's data in this game on its row. */
@@ -68,6 +88,7 @@ export const useModSessionStore = create<ModSessionState>((set, get) => ({
   notice: null,
   devChange: null,
   dataNotes: {},
+  unversionedTold: new Set(),
 
   running: (id) => {
     const { table, shiftStart } = get()
@@ -102,12 +123,36 @@ export const useModSessionStore = create<ModSessionState>((set, get) => ({
     void window.api.mods.noticesSeen(Object.fromEntries(silent.map((mod) => [mod.id, noticeKeyOf(mod)])))
   },
 
-  gameEntered: (record) => {
-    const { table, running } = get()
+  gameEntered: (record, playthroughId) => {
+    const { table, running, notice, unversionedTold } = get()
     const missing = table.mods.filter(
       (mod) => record.mods?.includes(mod.id) && modById(mod.id, MODS)?.scope === 'playthrough' && !running(mod.id)
     )
-    if (missing.length > 0) set({ notice: { kind: 'game', mods: missing } })
+    // No map is a record from before the versions were kept (a new one holds an empty map where
+    // no mod was on); a build with no mod has nothing to say of it. Said once a session, however often the same game is entered.
+    const unversioned =
+      record.modVersions === undefined && MODS.some((mod) => !mod.library) && !unversionedTold.has(playthroughId)
+    const told = unversioned ? { unversionedTold: new Set([...unversionedTold, playthroughId]) } : {}
+    if (missing.length > 0) {
+      const playedWith = Object.fromEntries(
+        missing.flatMap((mod) => {
+          const played = record.modVersions?.[mod.id]
+          return played !== undefined && played !== modById(mod.id, MODS)?.version ? [[mod.id, played]] : []
+        })
+      )
+      set({
+        notice: {
+          kind: 'game',
+          mods: missing,
+          ...(Object.keys(playedWith).length > 0 ? { playedWith } : {}),
+          ...(unversioned ? { unversioned } : {})
+        },
+        ...told
+      })
+    } else if (unversioned && notice === null) {
+      // The quiet one never stands in for a notice already up; it is said on a later entry instead.
+      set({ notice: { kind: 'unversioned', mods: [] }, ...told })
+    }
   },
 
   dismissNotice: () => set({ notice: null }),
