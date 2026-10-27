@@ -435,6 +435,8 @@
   "src/renderer/stores/bunnyfeedsThreads.ts -> @shared/jobs",
   "src/renderer/stores/bunnyfeedsThreads.ts -> @shared/postComments",
   "src/renderer/stores/bunnyfeedsThreads.ts -> @shared/types",
+  "src/renderer/stores/echoAssignments.ts -> ./gameStore",
+  "src/renderer/stores/echoAssignments.ts -> @shared/echo",
   "src/renderer/stores/meanwhile.ts -> ./gameStore",
   "src/renderer/stores/meanwhile.ts -> ./loop/saves",
   "src/renderer/stores/meanwhile.ts -> ./modsStore",

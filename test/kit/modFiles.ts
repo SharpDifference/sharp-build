@@ -63,6 +63,7 @@ export const MOD_FILES: Record<string, ModSet> = {
       'src/main/services/reflection*',
       'src/renderer/art/echoCutout*',
       'src/renderer/echoCutout.html',
+      'src/renderer/stores/echoAssignments.ts',
       'src/renderer/views/EchoPanel.tsx',
       'assets/echo-public/**',
       'assets/workflows/echoCutout.py',
