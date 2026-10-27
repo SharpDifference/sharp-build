@@ -1,6 +1,6 @@
 import { useEffect, useState, type JSX } from 'react'
 import { motion, useReducedMotion } from 'motion/react'
-import { BREAKTHROUGH_MOD } from '@shared/breakthrough'
+import { BREAKTHROUGH_MOD } from '../../shared/breakthrough'
 import { echoBreakthroughAbility, ECHO_BREAKTHROUGH_OPTION } from '@shared/echoBreakthrough'
 import { aspectOf } from '@shared/echo'
 import { optionOn } from '@shared/mods'

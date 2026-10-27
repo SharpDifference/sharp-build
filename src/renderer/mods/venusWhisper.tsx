@@ -1,4 +1,4 @@
-import { VENUS_WHISPER_MOD, whisperRecall, whisperHasUnread, whisperTerm } from '@shared/venusWhisper'
+import { VENUS_WHISPER_MOD, whisperRecall, whisperHasUnread, whisperTerm } from '../../shared/venusWhisper'
 import { useGameStore } from '../stores/gameStore'
 import { startWhisperDelivery } from '../stores/whisperDelivery'
 import { VenusWhisperPage } from '../views/VenusWhisperModal'
@@ -6,7 +6,7 @@ import { WhisperIcon } from '../components/BunnyboardFeatureIcons'
 import { modIsOn, useModsStore } from '../stores/modsStore'
 import { registerHooks } from './hooks'
 import { recordWhisperObservations } from '../stores/whisperObservations'
-import { whisperIdentityLines } from '@shared/whisperIdentity'
+import { whisperIdentityLines } from '../../shared/whisperIdentity'
 import { recordWhisperConfession, whisperConfessionRequest, whisperIdentityContext } from '../stores/whisperIdentity'
 
 function Mark() {

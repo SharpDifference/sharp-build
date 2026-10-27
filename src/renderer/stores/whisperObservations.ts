@@ -1,5 +1,5 @@
 import { jobDefOf } from '@shared/jobs'
-import { ensureWhisperAuthor, observeWhisperSlot, type WhisperPresence } from '@shared/venusWhisper'
+import { ensureWhisperAuthor, observeWhisperSlot, type WhisperPresence } from '../../shared/venusWhisper'
 import type { SlotSettled } from '../mods/hooks'
 import { useGameStore } from './gameStore'
 import { charAwayNow, charClassNow, charHiddenLocationNow, charJobNow } from './timetable'

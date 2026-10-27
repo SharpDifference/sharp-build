@@ -1,4 +1,4 @@
-import { breakthroughFacts, type BreakthroughPending, type BreakthroughState } from '@shared/breakthrough'
+import { breakthroughFacts, type BreakthroughPending, type BreakthroughState } from '../../shared/breakthrough'
 import { fullNameOf, type Character, type TimeSlot } from '@shared/types'
 
 /** Kept separate from retrieval so a future index can deduplicate these stable event IDs. */

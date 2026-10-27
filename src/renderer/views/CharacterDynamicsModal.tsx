@@ -5,7 +5,7 @@ import {
   DYNAMICS_REASON_LIMIT, PERSONALITY_NUDGES, STARTING_RELATIONSHIPS,
   dynamicFor, emptyCharacterDynamics, invalidDynamicsReasons, settleCharacterDynamics,
   type CharacterDynamic, type CharacterDynamics, type PersonalityNudge
-} from '@shared/characterDynamics'
+} from '../../shared/characterDynamics'
 import { fullNameOf, type Character } from '@shared/types'
 import { SelectField } from '../components/SelectField'
 import { TextField } from '../components/TextField'

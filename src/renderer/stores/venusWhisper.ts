@@ -1,10 +1,10 @@
 import { postVisible } from '../mods/hooks'
-import { whisperTerm } from '@shared/venusWhisper'
+import { whisperTerm } from '../../shared/venusWhisper'
 import {
   VENUS_WHISPER_MOD, WHISPER_COMMENTS, WHISPER_TEXT, ensureWhisperAuthor, whisperAddressees, whisperCommenters,
   whisperWednesday, whisperWeekOccupied, whisperDiscussionOpen, whisperSpotlight, whisperIssueId, whisperMentions, whisperPeople, whisperPlayerHandle, whisperSources, validateWhisperComments,
   validateWhisperDraft, withWhisperIssue, type VenusWhisper, type WhisperComment, type WhisperIssue
-} from '@shared/venusWhisper'
+} from '../../shared/venusWhisper'
 import { fullNameOf } from '@shared/types'
 import { create } from 'zustand'
 import { anonymousVoice, buildWhisperIssue, buildWhisperReplies } from '../prompts/venusWhisperPrompt'

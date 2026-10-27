@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { motion } from 'motion/react'
-import { abilityRank, TALENT_ABILITIES, valueSuggestions } from '@shared/talentAbilities'
+import { abilityRank, TALENT_ABILITIES, valueSuggestions } from '../../shared/talentAbilities'
 import { shopDefOf, type ItemDef } from '@shared/shop'
 import { fullNameOf } from '@shared/types'
 import { formatMoney } from '@shared/money'

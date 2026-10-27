@@ -1,6 +1,6 @@
 import { charKeyOf, type Character, type StructuredRequest } from '@shared/types'
-import { whisperTerm, WHISPER_TITLE, WHISPER_PEN_NAME } from '@shared/venusWhisper'
-import { settleWhisperConfession, whisperCanConfess, whisperIdentityKnown, type WhisperIdentityContext } from '@shared/whisperIdentity'
+import { whisperTerm, WHISPER_TITLE, WHISPER_PEN_NAME } from '../../shared/venusWhisper'
+import { settleWhisperConfession, whisperCanConfess, whisperIdentityKnown, type WhisperIdentityContext } from '../../shared/whisperIdentity'
 import type { PromptState } from '../prompts/scenePrompt'
 import type { RequestSpots, SlotSettled } from '../mods/hooks'
 import { useGameStore } from './gameStore'

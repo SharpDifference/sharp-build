@@ -1,5 +1,5 @@
 import { createElement, lazy, Suspense } from 'react'
-import { SOUNDTRACK_MOD } from '@shared/soundtracks'
+import { SOUNDTRACK_MOD } from '../../shared/soundtracks'
 import { registerHooks, type ScreenSlotProps } from '../mods/hooks'
 
 const LazySettings = lazy(() => import('../views/SoundtrackSettings').then(module => ({

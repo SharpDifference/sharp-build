@@ -1,7 +1,7 @@
 import { useEffect, useState, type JSX } from 'react'
 import { createPortal } from 'react-dom'
 import { AnimatePresence, motion } from 'motion/react'
-import { isSoundtrackKey, SOUNDTRACK_LABELS, SOUNDTRACK_MOD, type SoundtrackKey } from '@shared/soundtracks'
+import { isSoundtrackKey, SOUNDTRACK_LABELS, SOUNDTRACK_MOD, type SoundtrackKey } from '../../shared/soundtracks'
 import { toAppError } from '@shared/errors'
 import { CheckField } from '../components/CheckField'
 import { ConfirmModal } from '../components/ConfirmModal'

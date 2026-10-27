@@ -3,7 +3,7 @@ import { useReflectionPortrait, useReflectionStage } from '../components/Reflect
 import { reflectionStageTransform } from '@shared/reflectionPortrait'
 import { useEffect,useState,type CSSProperties,type JSX } from 'react'
 import { createPortal } from 'react-dom'
-import { THE_UNSPOKEN,RECKONING_DUNGEONS,DUNGEON_WARN_REPLIES,DUNGEON_MAX_REPLIES } from '@shared/reckoningDungeons'
+import { THE_UNSPOKEN,RECKONING_DUNGEONS,DUNGEON_WARN_REPLIES,DUNGEON_MAX_REPLIES } from '../../shared/reckoningDungeons'
 import { aspectOf } from '@shared/echo'
 import { ECHO_BREAKTHROUGH_ABILITIES } from '@shared/echoBreakthrough'
 import { useGameStore } from '../stores/gameStore'

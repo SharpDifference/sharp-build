@@ -1,4 +1,4 @@
-import { assignEchoes } from '@shared/echo'
+import { assignEchoes } from '../../shared/echo'
 import { useGameStore } from './gameStore'
 
 /** Shared by Echo's lifecycle and manager without importing its hook registration. */
