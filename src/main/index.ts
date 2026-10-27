@@ -6,6 +6,8 @@ import { handleImageProtocols, registerImageSchemes } from './imageProtocols'
 import { handlePhotoProtocol } from './photoProtocol'
 import { registerIpcHandlers } from './ipc'
 import { installConsoleLog } from './logFile'
+import { modScheme } from './mods/protocol'
+import { handleModSession, startModSession } from './mods/session'
 import { redact } from './redact'
 import { migrateEditedCast } from './services/castMigration'
 import { sweepStaging } from './services/characterService'
@@ -210,8 +212,12 @@ function createWindow(fullscreen: boolean): void {
 // Before anything can print: the app log wraps the console for the whole run.
 installConsoleLog()
 
-// Custom schemes must be declared before the app is ready.
-registerImageSchemes()
+// The installed mods: their manifests read and checked, and each `main.js` required, before the
+// window exists. Synchronous, so the table is whole when the preload asks for it.
+startModSession()
+
+// Custom schemes must be declared before the app is ready, in one call.
+registerImageSchemes([modScheme()])
 
 app
   .whenReady()
@@ -220,6 +226,7 @@ app
 
     handleImageProtocols()
     handlePhotoProtocol()
+    handleModSession()
 
     app.on('browser-window-created', (_, window) => {
       optimizer.watchWindowShortcuts(window)

@@ -192,7 +192,7 @@ export interface GameSave {
 export function hasTrait(character: Pick<Character, 'traits'> | undefined, trait: CharacterTrait): boolean;
 
 // @public
-export type HookKind = 'add' | 'merge' | 'pipeline' | 'first' | 'any' | 'event' | 'owner' | 'slot';
+export type HookKind = 'add' | 'merge' | 'pipeline' | 'first' | 'any' | 'event' | 'owner' | 'slot' | 'registry';
 
 // @public (undocumented)
 export type HookName = (typeof HOOKS)[number]['name'];
@@ -566,6 +566,12 @@ export const HOOKS: readonly [{
     readonly kind: 'slot';
     readonly dispatch: readonly ['screenSlot'];
     readonly since: '0.2.0';
+}, {
+    readonly name: 'protocols';
+    readonly side: 'main';
+    readonly kind: 'registry';
+    readonly dispatch: readonly ["collectRoutes"];
+    readonly since: '0.3.0';
 }];
 
 // @public
@@ -653,6 +659,7 @@ export interface ModDef {
     blurb: string;
     defaultOn: boolean;
     id: string;
+    library?: boolean;
     // (undocumented)
     name: string;
     offNote?: string;

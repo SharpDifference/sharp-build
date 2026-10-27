@@ -206,6 +206,7 @@ import { generateRoomImage, writeRoomUpload } from './services/roomService'
 import { applySettingsPatch, getRendererSettings, getSettings } from './services/settingsService'
 import { getGrabBags, setGrabBags } from './services/grabBagService'
 import { getModSwitches, setModSwitches } from './services/modsService'
+import { registerModIpc } from './mods/session'
 import {
   readLorebook,
   readWorldInfoFile,
@@ -442,6 +443,8 @@ export function registerIpcHandlers(): void {
   handle('storyMemory:inspect', (_event, payload: StoryRecallRequest) => inspectStoryMemory(payload))
   handle('mods:get', () => getModSwitches())
   handle('mods:set', (_event, switches: ModSwitches) => setModSwitches(switches))
+  // The installed mods' session: the table, the host shims' names, a mod the window could not load.
+  registerModIpc(handle)
   // The caller has already saved; main writes nothing on its way out.
   handle('app:quit', () => {
     app.quit()

@@ -65,7 +65,21 @@ const api: VenusUniversityApi = {
   },
   mods: {
     get: () => ipcRenderer.invoke('mods:get'),
-    set: (switches) => ipcRenderer.invoke('mods:set', switches)
+    set: (switches) => ipcRenderer.invoke('mods:set', switches),
+    // Synchronous and once: the table is small, and the window's first module reads it.
+    session: ipcRenderer.sendSync('mods:session'),
+    exposeHost: (names) => ipcRenderer.invoke('mods:exposeHost', names),
+    failed: (id, status, message) => ipcRenderer.invoke('mods:failed', id, status, message),
+    noticesSeen: (seen) => ipcRenderer.invoke('mods:noticesSeen', seen),
+    addDevFolder: () => ipcRenderer.invoke('mods:addDevFolder'),
+    removeDevFolder: (folder) => ipcRenderer.invoke('mods:removeDevFolder', folder),
+    devFolders: () => ipcRenderer.invoke('mods:devFolders'),
+    onDevChanged: (listener) => {
+      const wrapped = (_event: unknown, change: Parameters<typeof listener>[0]): void => listener(change)
+      ipcRenderer.on('mods:devChanged', wrapped)
+      return () => ipcRenderer.removeListener('mods:devChanged', wrapped)
+    },
+    restart: () => ipcRenderer.invoke('mods:restart')
   },
   app: {
     quit: () => ipcRenderer.invoke('app:quit')

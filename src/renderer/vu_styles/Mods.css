@@ -350,3 +350,88 @@
   display: flex;
   gap: 11px;
 }
+
+/* An installed mod's second line: why it is not running this session, or its quieter warnings. */
+.vu-mods-row-line {
+  color: var(--vu-text-muted);
+  font: 500 12px var(--font-body);
+  line-height: 1.35;
+}
+
+.vu-mods-row-line[data-kind='needs'] {
+  color: var(--vu-text);
+}
+
+/* A folder whose manifest could not be read: a row by the folder's name, with nothing to switch. */
+.vu-mods-row[data-kind='unreadable'] {
+  background: var(--vu-warn-tint);
+}
+
+.vu-mods-row[data-kind='unreadable'] .vu-mods-pick {
+  cursor: default;
+}
+
+/* The fold for mod authors under the legend: the folders loaded as mods, and the picker. */
+.vu-mods-authors .vu-disc-body {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.vu-mods-folders {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.vu-mods-folder {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 4px 4px 4px 14px;
+  border-radius: 12px;
+  background: var(--vu-surface);
+}
+
+.vu-mods-folder-path {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--vu-text);
+  font: 700 12px var(--font-mono);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* The notice at start: a line per mod that is not running. */
+.vu-mods-notice-list {
+  margin: 0;
+  padding-left: 22px;
+}
+
+/* The one toast: a developer folder changed under a game. Over everything, at the foot. */
+.vu-mods-toast {
+  position: fixed;
+  right: 28px;
+  bottom: 28px;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  max-width: min(680px, calc(100% - 56px));
+  padding: 12px 14px 12px 20px;
+  border-radius: 18px;
+  background: var(--vu-surface);
+  color: var(--vu-text);
+  font: 500 14px var(--font-body);
+}
+
+.vu-mods-toast-text {
+  flex: 1;
+  min-width: 0;
+}

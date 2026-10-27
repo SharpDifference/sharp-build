@@ -35,7 +35,9 @@ export {
   scenePlays,
   screenSlot,
   sentText,
+  setDeclaredHooks,
   setHookRules,
+  setLoadingMod,
   setPanelOpener,
   settleSceneStats,
   slotActivityAvailable,
@@ -46,4 +48,5 @@ export {
   subscribeHookRules,
   updatesTabs
 } from '../renderer/hooks'
+export type { DeclaredHooks } from '../renderer/hooks'
 export { ModSlot, slotElements, SlotBoundary } from '../renderer/ModSlot'

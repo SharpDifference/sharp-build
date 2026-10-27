@@ -22,7 +22,8 @@ export const SETTINGS_SCHEMA_VERSION = 1
  * hand-edited stream switch, the hand-edited ComfyUI build, which ComfyUI draws with its URL
  * and both sources' model picks and LoRA weights, Gemini's secondary model, the group
  * volumes, the browser build's key-remembering, the sampling fields, the memory and secret
- * budgets and the custom scene persona are all optional.
+ * budgets, the custom scene persona and the installed mods' three main-written fields are all
+ * optional.
  */
 const SETTINGS_REQUIRED: Record<
   keyof Omit<
@@ -66,6 +67,9 @@ const SETTINGS_REQUIRED: Record<
     | 'memoryBudgets'
     | 'secretBudget'
     | 'scenePersona'
+    | 'devModFolders'
+    | 'allowUnreviewedMain'
+    | 'modNoticesSeen'
   >,
   true
 > = {

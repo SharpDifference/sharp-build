@@ -16,6 +16,7 @@
     "typecheck:test": "tsc --noEmit -p tsconfig.test.json",
     "typecheck": "npm run typecheck:node && npm run typecheck:web && npm run typecheck:test",
     "test": "vitest run",
+    "test:electron": "node test/e2e/mods.e2e.mjs",
     "dev:web": "vite -c vite.web.config.ts",
     "build:web": "vite build -c vite.web.config.ts",
     "release": "node scripts/release.mjs",

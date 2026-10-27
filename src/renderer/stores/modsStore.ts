@@ -5,6 +5,7 @@ import { useGameStore } from './gameStore'
 import { create } from 'zustand'
 import { toAppError } from '@shared/errors'
 import {
+  modById,
   MODS,
   modOn,
   NO_SWITCHES,
@@ -18,6 +19,7 @@ import { setPhotoSwitches } from '@shared/photoSwitches'
 import type { PlaythroughRecord } from '@shared/types'
 import { setHookRules } from '../mods/hooks'
 import { loopState, subscribeLoopRecord } from './loop/state'
+import { useModSessionStore } from './modSessionStore'
 import { useUiStore } from './uiStore'
 
 interface ModsStoreState {
@@ -102,17 +104,37 @@ useModsStore.subscribe((state) => tellSharedRules(state.switches))
 // game, a mod scoped to the playthrough is on as the game's record says, not as the switch now
 // stands; on the menus, with no game entered, the switches decide. So either one moving is a
 // change: a switch, or the record as a game is entered or left.
+//
+// An installed mod is also on only while it is running this session: one that is not (it needs
+// an update, something it requires is missing, its code failed) is asked nothing, wherever its
+// switch stands, and nothing is written. A library has no switch: it is on while a mod that is
+// on requires it.
+function isOn(modId: string, seen: readonly string[] = []): boolean {
+  if (!useModSessionStore.getState().running(modId)) return false
+  const mod = modById(modId)
+  if (mod?.library) {
+    return MODS.some(
+      (other) => other.requires?.includes(modId) && !seen.includes(other.id) && isOn(other.id, [...seen, modId])
+    )
+  }
+  return modOn(useModsStore.getState().switches, modId, enrollmentRecord ?? loopState.record)
+}
+
 const rules = {
-  isOn: (modId: string) => modOn(useModsStore.getState().switches, modId, enrollmentRecord ?? loopState.record),
+  isOn: (modId: string) => isOn(modId),
   order: (modId: string) => MODS.findIndex((mod) => mod.id === modId),
   subscribe: (onChange: () => void) => {
     const stopSwitches = useModsStore.subscribe((state, before) => {
       if (state.switches !== before.switches) onChange()
     })
     const stopRecord = subscribeLoopRecord(onChange)
+    const stopSession = useModSessionStore.subscribe((state, before) => {
+      if (state.table !== before.table || state.shiftStart !== before.shiftStart) onChange()
+    })
     return () => {
       stopSwitches()
       stopRecord()
+      stopSession()
     }
   }
 }
@@ -121,12 +143,13 @@ setSharedModRules(rules.isOn)
 
 /** Whether a mod is on, for code outside a component; see `modOn` for what a record changes. */
 export function modIsOn(id: string, record?: Pick<PlaythroughRecord, 'mods'> | null): boolean {
-  return modOn(useModsStore.getState().switches, id, record === undefined ? enrollmentRecord : record)
+  return useModSessionStore.getState().running(id) && modOn(useModsStore.getState().switches, id, record === undefined ? enrollmentRecord : record)
 }
 
 /** Whether a mod is on, for a component: it renders again when the switch moves. */
 export function useModOn(id: string, record?: Pick<PlaythroughRecord, 'mods'> | null): boolean {
-  return useModsStore((s) => modOn(s.switches, id, record))
+  const running = useModSessionStore((s) => s.running(id))
+  return useModsStore((s) => running && modOn(s.switches, id, record))
 }
 
 /** Where one of a mod's options stands, for a component. */

@@ -17,8 +17,31 @@ vi.mock('@shared/mods', async (original) => ({
   modOn: (switches: { on: Record<string, boolean> }, id: string) => switches.on[id] === true
 }))
 
-const { getModSwitches, setModSwitches } = await import('../src/main/services/modsService')
+const { bindModSession, getModSwitches, setModSwitches } = await import('../src/main/services/modsService')
 const { sharedModOn } = await import('../src/shared/modRules')
+const { EMPTY_SESSION } = await import('../src/shared/modSession')
+
+/** A session table holding `photos` at the given status. */
+function sessionWith(status: 'loaded' | 'failed'): import('../src/shared/modSession').ModSessionTable {
+  return {
+    ...EMPTY_SESSION,
+    mods: [
+      {
+        id: 'photos',
+        manifest: null,
+        def: { id: 'photos', name: 'Photos', author: 'a', version: '1.0.0', scope: 'anytime', defaultOn: true, blurb: '' },
+        status,
+        message: status === 'failed' ? 'main.js threw: boom' : null,
+        warnings: [],
+        folder: 'C:\\mods\\photos\\1.0.0',
+        dev: false,
+        renderer: null,
+        style: null
+      }
+    ],
+    order: status === 'loaded' ? ['photos'] : []
+  }
+}
 
 describe('shared rules in main', () => {
   beforeEach(async () => {
@@ -41,5 +64,15 @@ describe('shared rules in main', () => {
 
     await setModSwitches({ on: { photos: false }, options: {} })
     expect(sharedModOn('photos')).toBe(false)
+  })
+
+  it('answer off for an installed mod the session table does not show as loaded, whatever its switch', async () => {
+    await setModSwitches({ on: { photos: true }, options: {} })
+    bindModSession(() => sessionWith('failed'))
+    expect(sharedModOn('photos')).toBe(false)
+    bindModSession(() => sessionWith('loaded'))
+    expect(sharedModOn('photos')).toBe(true)
+    bindModSession(() => EMPTY_SESSION)
+    expect(sharedModOn('photos')).toBe(true)
   })
 })

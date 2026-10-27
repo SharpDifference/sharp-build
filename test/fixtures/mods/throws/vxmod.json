@@ -1,0 +1,17 @@
+{
+  "manifest": 1,
+  "id": "throws",
+  "name": "Throws",
+  "author": "morrowkiln",
+  "version": "1.0.0",
+  "blurb": "Throws, a fixture of the loader's tests.",
+  "source": "https://github.com/venus-extracurriculars/throws",
+  "kit": "0.3.0",
+  "hooks": [
+    "settingsSection",
+    "renderer:registerHooks"
+  ],
+  "main": false,
+  "scope": "anytime",
+  "defaultOn": true
+}
