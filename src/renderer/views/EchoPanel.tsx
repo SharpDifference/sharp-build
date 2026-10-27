@@ -18,7 +18,7 @@ import { ensureEchoes } from '../stores/echoAssignments'
 import { useDismissLayer } from '../components/useModalShell'
 import { EchoNotice } from '../components/EchoNotice'
 import { EchoSwitchDialog } from '../components/EchoSwitchDialog'
-import type { ScreenTheme } from './clockTheme'
+import type { ScreenTheme } from '@vx/modkit/renderer'
 import '../vu_styles/Echo.css'
 
 function useTalentEchoRates() {

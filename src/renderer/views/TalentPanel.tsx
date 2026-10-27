@@ -20,7 +20,7 @@ import { BodyIcon, BrainIcon, EchoIcon, HeartIcon, ShopIcon } from './screenIcon
 import { TalentAbilityControls } from './TalentAbilityControls'
 import type { TalentChange } from '../stores/talentActions'
 import { gestures, lift, press, quietLift, quietPress, rowLift, rowPress, cardLift, chipPress, toggleLift, veilIn, panelUnderTab } from './motion'
-import type { ScreenTheme } from './clockTheme'
+import type { ScreenTheme } from '@vx/modkit/renderer'
 import '../vu_styles/Talents.css'
 
 const TREE_MARKS = {body:BodyIcon, brain:BrainIcon, charm:CharmIcon, heart:HeartIcon, money:ShopIcon, echoes:EchoIcon}

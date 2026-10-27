@@ -1,4 +1,4 @@
-import type { Character } from './types'
+import type { Character } from '@vx/modkit/shared'
 import { ECHO_ASPECTS, assignEchoes, normalizeEcho, type EchoAspect, type EchoState } from './echo'
 import { explainEchoAspect } from './echoReasons'
 

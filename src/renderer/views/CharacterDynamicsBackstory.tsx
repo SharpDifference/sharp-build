@@ -5,7 +5,7 @@ import { PERSONALITY_NUDGES, STARTING_RELATIONSHIPS, type CharacterDynamic } fro
 import { fullNameOf, type Character } from '@shared/types'
 import { TitleTab } from '../components/TitleTab'
 import { useModalShell } from '../components/useModalShell'
-import type { ScreenTheme } from './clockTheme'
+import type { ScreenTheme } from '@vx/modkit/renderer'
 import { gestures, lift, panelUnderTab, press, quietLift, quietPress, veilIn } from './motion'
 import '../vu_styles/CharacterDynamicsBackstory.css'
 

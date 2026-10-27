@@ -11,7 +11,7 @@ import { useModalShell } from '../components/useModalShell'
 import { useAudioStore } from '../stores/audioStore'
 import { useModOn } from '../stores/modsStore'
 import { useSoundtrackStore } from '../stores/soundtrackStore'
-import type { ScreenTheme } from './clockTheme'
+import type { ScreenTheme } from '@vx/modkit/renderer'
 import { gestures, panelUnderTab, quietLift, quietPress, veilIn } from './motion'
 import '../vu_styles/Soundtracks.css'
 

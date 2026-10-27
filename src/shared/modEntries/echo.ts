@@ -1,4 +1,4 @@
-import type { ModDef } from '../mods'
+import type { ModDef } from '@vx/modkit/shared'
 import { normalizeEcho, type EchoState } from '../echo'
 import { registerTermCarry } from '../modCarry'
 import { ECHO_BREAKTHROUGH_OPTION } from '../echoBreakthrough'

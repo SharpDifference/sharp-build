@@ -1,6 +1,6 @@
 import { normalizeBreakthrough, type BreakthroughState } from './breakthrough'
 import { registerTermCarry, type TermCarryContext } from './modCarry'
-import type { GameSave } from './types'
+import type { GameSave } from '@vx/modkit/shared'
 
 declare module './modCarry' { interface ModCarryFields { exBreakthrough?: BreakthroughState } }
 

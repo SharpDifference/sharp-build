@@ -1,5 +1,5 @@
 import { appError } from './errors'
-import type { ModDef } from './mods'
+import type { ModDef } from '@vx/modkit/shared'
 import type { Result } from './types'
 
 export const SOUNDTRACK_MOD = 'custom-soundtracks'

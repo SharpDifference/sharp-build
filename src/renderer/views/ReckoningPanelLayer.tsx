@@ -1,5 +1,5 @@
 import type { JSX } from 'react'
-import type { ScreenSlotProps } from '../mods/hooks'
+import type { ScreenSlotProps } from '@vx/modkit/renderer'
 import { ReckoningContinuation, ReckoningPreparation } from './ReckoningModal'
 import { UnspokenVoice } from './UnspokenVoice'
 

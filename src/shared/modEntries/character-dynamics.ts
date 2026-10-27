@@ -1,4 +1,4 @@
-import type { ModDef } from '../mods'
+import type { ModDef } from '@vx/modkit/shared'
 import { CHARACTER_DYNAMICS_MOD } from '../characterDynamics'
 import '../characterDynamicsCarry'
 

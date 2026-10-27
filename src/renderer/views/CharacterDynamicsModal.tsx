@@ -12,7 +12,7 @@ import { TextField } from '../components/TextField'
 import { TitleTab } from '../components/TitleTab'
 import { useModalShell } from '../components/useModalShell'
 import { spriteUrl } from '../stores/characterStore'
-import type { ScreenTheme } from './clockTheme'
+import type { ScreenTheme } from '@vx/modkit/renderer'
 import { gestures, lift, panelUnderTab, press, quietLift, quietPress, veilIn } from './motion'
 import '../vu_styles/CharacterDynamics.css'
 

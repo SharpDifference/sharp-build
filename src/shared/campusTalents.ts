@@ -1,5 +1,5 @@
 import { sharedModOn } from './modRules'
-import type { CharInfo, CharMemory, TimeSlot } from './types'
+import type { CharInfo, CharMemory, TimeSlot } from '@vx/modkit/shared'
 import { normalizeTalentAbilities, type TalentAbilityState } from './talentAbilityState'
 import { readTalentGrowth, type TalentGrowth } from './talentGrowth'
 import { readBondFraction, talentBondRate, TALENT_BP_REWARDS } from './talentBondPoints'

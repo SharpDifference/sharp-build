@@ -1,7 +1,7 @@
 import { talentAffinity, talentMemories, talentMemoryKey, type TalentState } from './campusTalents'
 import { echoAffinity, type EchoState } from './echo'
 import { talentHeartBonus } from './talentPerks'
-import type { CharInfo, CharMemory } from './types'
+import type { CharInfo, CharMemory } from '@vx/modkit/shared'
 
 /** The same earned weights for the opening preview and the final save; neither pays rewards. */
 export function settleTalentMemories(

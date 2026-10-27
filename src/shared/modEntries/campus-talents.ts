@@ -1,4 +1,4 @@
-import type { ModDef } from '../mods'
+import type { ModDef } from '@vx/modkit/shared'
 import { normalizeTalents, type TalentState } from '../campusTalents'
 import { registerTermCarry } from '../modCarry'
 import { trainingAfterBreak } from '../talentTrading'

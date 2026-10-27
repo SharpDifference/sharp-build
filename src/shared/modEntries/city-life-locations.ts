@@ -1,4 +1,4 @@
-import type { ModDef } from '../mods'
+import type { ModDef } from '@vx/modkit/shared'
 import { CITY_LIFE_LOCATIONS_MOD } from '../cityLife'
 
 const mod: ModDef = { id: CITY_LIFE_LOCATIONS_MOD, name: 'City Life locations', author: 'Maestro Leeds', version: '1.1.0',
