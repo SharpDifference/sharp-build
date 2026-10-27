@@ -11,15 +11,23 @@ const dynamicsOn = (): boolean => modIsOn(CHARACTER_DYNAMICS_MOD, loopState.reco
 const LazyMapPin = lazy(() => import('../views/ReckoningDungeon').then(module => ({
   default: module.ReckoningDungeonMapPin
 })))
+const LazyPanelLayer = lazy(() => import('../views/ReckoningPanelLayer').then(module => ({
+  default: module.ReckoningPanelLayer
+})))
 
 function DungeonEntrance({ canTravel, close }: ScreenSlotProps['mapOverlay']): ReturnType<typeof createElement> {
   return createElement(Suspense, { fallback: null },
     createElement(LazyMapPin, { canTravel, onEnter: close }))
 }
 
+function ScenePresence(props: ScreenSlotProps['panelLayer']): ReturnType<typeof createElement> {
+  return createElement(Suspense, { fallback: null }, createElement(LazyPanelLayer, props))
+}
+
 // Character Dynamics supplies this history when enabled. Do not duplicate its prompt.
 registerHooks('reckoning', {
   mapOverlay: DungeonEntrance,
+  panelLayer: ScenePresence,
   prompts: {
     scene: { lines: ({ cast, state }) => [...(dynamicsOn() ? [] : earnedGrowthLines(cast, state.exCharacterDynamics)),...unspokenSceneBoundary(state.exReckoning)] },
     dm: { lines: ({ character, state }) => dynamicsOn() ? [] : earnedGrowthLines([character], state.exCharacterDynamics) }
