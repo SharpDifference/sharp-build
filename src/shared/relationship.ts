@@ -427,6 +427,26 @@ export function relationshipTagOf(flags: CharFlags, affection: number): string {
   return RELATIONSHIP_TAG[dispositionOf(affection)]
 }
 
+/** Which of her contact page's cards and fields are open to the reader. */
+export interface ContactReveals {
+  /** Her profile and memories: she has given him her number. */
+  profile: boolean
+  /** Her traits and her type. */
+  traits: boolean
+  backstory: boolean
+  loveLife: boolean
+}
+
+/** What her contact page shows: each field on its persisted flag or on the live condition. */
+export function contactRevealsOf(flags: CharFlags, affection: number): ContactReveals {
+  return {
+    profile: flags.gaveContactInfo,
+    traits: flags.knowsTraits || isPositive(affection),
+    backstory: flags.knowsBackstory || isTrusted(affection),
+    loveLife: flags.knowsLoveLife || flags.isLover
+  }
+}
+
 /** The reader's own standing, in the dates and names the READER block prints. */
 export interface ReaderStanding {
   /** Who he is with, oldest relationship first, and who he left for each of them. */

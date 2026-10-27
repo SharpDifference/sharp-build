@@ -231,6 +231,8 @@ export interface VenusUniversityApi {
     /** Writes a bounded, noncanonical spectator conversation; never streams. */
     completeReckoning: (request: StructuredRequest, group: string) => Promise<Result<unknown>>
     completeMeanwhile: (request: StructuredRequest, group: string) => Promise<Result<MeanwhileResponse>>
+    /** Sends Story Assistant's read of the scene; never streams, and the reply is sanitized by the caller. */
+    completeStoryAssistant: (request: StructuredRequest, group: string) => Promise<Result<unknown>>
     /** Sends Bunnyfeeds' thread prompt. Never streams. */
     completeFeedThreads: (
       request: StructuredRequest,

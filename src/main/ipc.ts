@@ -540,6 +540,11 @@ export function registerIpcHandlers(): void {
     runAbortable(group, signal => completeStructured<MeanwhileResponse>(request, signal))
   )
 
+  // Story Assistant's read of the scene; the renderer sanitizes what comes back.
+  handle('llm:completeStoryAssistant', (_event, request: StructuredRequest, group: string) =>
+    runAbortable(group, (signal) => completeStructured<unknown>(request, signal))
+  )
+
   // Bunnyfeeds' thread call: answers what the reader wrote under her posts.
   handle('llm:completeFeedThreads', (_event, request: StructuredRequest, group: string) =>
     runAbortable(group, (signal) => completeStructured<FeedThreadsResponse>(request, signal))

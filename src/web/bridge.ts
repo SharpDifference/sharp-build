@@ -315,6 +315,10 @@ export function buildApi(): VenusUniversityApi {
         result('write the Meanwhile conversation', () =>
           runAbortable(group, signal => completeStructured<MeanwhileResponse>(request, signal))
         ),
+      completeStoryAssistant: (request, group) =>
+        result('read the scene', () =>
+          runAbortable(group, (signal) => completeStructured<unknown>(request, signal))
+        ),
       completeFeedThreads: (request, group) =>
         result('answer the feed', () =>
           runAbortable(group, (signal) => completeStructured<FeedThreadsResponse>(request, signal))

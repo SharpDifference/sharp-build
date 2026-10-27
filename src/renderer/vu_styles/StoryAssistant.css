@@ -1,0 +1,51 @@
+/* Story Assistant: the question, the read of the scene and its ways forward, then the turn they
+   fill. Only the body scrolls, padded for what a hovered row lifts past its own box. */
+.vu-assistant-body {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: 18px;
+  min-height: 0;
+  max-height: 700px;
+  margin: -4px -6px;
+  padding: 8px 12px 14px;
+  overflow: hidden auto;
+}
+
+/* What the assistant makes of the scene, spoken to the player. */
+.vu-assistant-read {
+  margin: 0;
+  color: var(--vu-text);
+  font-size: 18px;
+  line-height: 1.6;
+}
+
+/* A read under way, or the sentence a failed one comes back with. */
+.vu-assistant-state {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 29px;
+  margin: 0;
+  color: var(--vu-text-muted);
+  font-size: 16px;
+  font-style: italic;
+}
+
+/* One way forward: a few words naming it over the turn it would send. */
+.vu-assistant-way {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+}
+
+.vu-assistant-wayname {
+  color: var(--vu-text);
+  font: 600 16px var(--font-body);
+}
+
+.vu-assistant-wayaction {
+  color: var(--vu-text-body);
+  font: 500 15px var(--font-body);
+  line-height: 1.5;
+}

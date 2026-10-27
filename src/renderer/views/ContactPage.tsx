@@ -10,10 +10,9 @@ import { npcEnemiesOf, npcFriendsOf } from '@shared/npcRelationships'
 import { STAT_ATTRACTIONS } from '@shared/playerStats'
 import {
   affectionFor,
+  contactRevealsOf,
   dedupedMemories,
   emptyFlags,
-  isPositive,
-  isTrusted,
   loveLifeBlurb,
   memoriesFor,
   memorySentence,
@@ -117,7 +116,9 @@ export function ContactPage({
     .map(({ memory }) => memory)
   // The tag goes through `affectionFor`, never a sum of the memories: feed likes count too.
   const flags = info?.flags ?? emptyFlags()
-  const isContact = Boolean(flags.gaveContactInfo)
+  const affection = affectionFor(info, date, character)
+  const reveals = contactRevealsOf(flags, affection)
+  const isContact = reveals.profile
   // Her gallery, and the tab strip it brings with it.
   const gallery = useContactGallery({ charId, isContact, theme })
   const handle = info?.handle
@@ -139,17 +140,14 @@ export function ContactPage({
   // A graduate's page says she graduated where a year would be, and lives in no dorm.
   const pursuing = info?.pursuing
   const dorm = info && pursuing === undefined ? dormLabel(info.dorm) : ''
-  const affection = affectionFor(info, date, character)
   const tag = relationshipTagOf(flags, affection)
-  // Each reveal shows on its persisted flag OR the live condition.
   const traits = (character.traits ?? []).filter(isCharacterTrait)
-  const showTraits = traits.length > 0 && (flags.knowsTraits || isPositive(affection))
-  const showBackstory = Boolean(character.backstory) && (flags.knowsBackstory || isTrusted(affection))
-  // Rides `knowsTraits`: same threshold, same one-way rule.
-  const showPreferred = flags.knowsTraits || isPositive(affection)
+  const showTraits = traits.length > 0 && reveals.traits
+  const showBackstory = Boolean(character.backstory) && reveals.backstory
+  const showPreferred = reveals.traits
   // The same paragraph the prompts are given.
   const loveLife = loveLifeBlurb(character, flags)
-  const showLoveLife = Boolean(loveLife) && (flags.knowsLoveLife || flags.isLover)
+  const showLoveLife = Boolean(loveLife) && reveals.loveLife
   // What she has told him, and the one she tells next: waiting on a scene alone with her once
   // its tier is reached, otherwise on the lowest tier still to come.
   const toldSecrets = info?.toldSecrets ?? []
