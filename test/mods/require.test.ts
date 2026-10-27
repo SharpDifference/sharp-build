@@ -71,6 +71,35 @@ describe('requiring main.js', () => {
     await expect(main("require('../outside.js')")).rejects.toThrow("is outside the mod's folder")
   })
 
+  it('holds a nested file to the kit proxy and the folder', async () => {
+    await mkdir(join(root, 'mod', 'lib'), { recursive: true })
+    await writeFile(join(root, 'mod', 'lib', 'kit.js'), "module.exports = require('@vx/modkit/shared').modOn")
+    await writeFile(join(root, 'mod', 'lib', 'escape.js'), "module.exports = require('../../outside.js')")
+    await writeFile(join(root, 'outside.js'), "module.exports = 'escaped'")
+    await expect(main("require('./lib/kit.js')")).rejects.toBeInstanceOf(UndeclaredApiError)
+    await expect(main("require('./lib/escape.js')")).rejects.toThrow("is outside the mod's folder")
+  })
+
+  it('runs a file required twice once', async () => {
+    await mkdir(join(root, 'mod'), { recursive: true })
+    await writeFile(join(root, 'mod', 'count.js'), 'module.exports = { runs: (globalThis.__vuRequireRuns = (globalThis.__vuRequireRuns ?? 0) + 1) }')
+    await writeFile(join(root, 'mod', 'other.js'), "module.exports = require('./count.js')")
+    try {
+      const exported = (await main("module.exports = [require('./count.js'), require('./other.js')]")) as unknown[]
+      expect((globalThis as { __vuRequireRuns?: number }).__vuRequireRuns).toBe(1)
+      expect(exported[0]).toBe(exported[1])
+    } finally {
+      delete (globalThis as { __vuRequireRuns?: number }).__vuRequireRuns
+    }
+  })
+
+  it('reads a .json file and finds a file named without its extension', async () => {
+    await mkdir(join(root, 'mod'), { recursive: true })
+    await writeFile(join(root, 'mod', 'data.json'), '{ "level": 3 }')
+    await writeFile(join(root, 'mod', 'helper.js'), "module.exports = 'helped'")
+    expect(await main("module.exports = [require('./data.json'), require('./helper')]")).toEqual([{ level: 3 }, 'helped'])
+  })
+
   it('names the file in a stack trace', async () => {
     await expect(main("throw new Error('at top level')")).rejects.toSatisfy((err: Error) => err.stack?.includes(join(root, 'mod', 'main.js')) === true)
   })

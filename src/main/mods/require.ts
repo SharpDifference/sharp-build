@@ -1,6 +1,6 @@
-import { readFileSync, realpathSync } from 'fs'
+import { readFileSync, realpathSync, statSync } from 'fs'
 import { createRequire, isBuiltin } from 'module'
-import { dirname, resolve, sep } from 'path'
+import { dirname, extname, resolve, sep } from 'path'
 import { compileFunction } from 'vm'
 import * as kitShared from '@vx/modkit/shared'
 import * as kitMain from '@vx/modkit/main'
@@ -8,7 +8,10 @@ import * as kitMain from '@vx/modkit/main'
 /**
  * Requiring a mod's `main.js`: one CommonJS file with its dependencies bundled, run with a
  * `require` of the loader's rather than Node's, because its imports of the kit must reach core's
- * own copy, which is bundled into `out/main/index.js` and has no file to resolve to.
+ * own copy, which is bundled into `out/main/index.js` and has no file to resolve to. A file of the
+ * mod's own that it requires is compiled and run the same way, with the same `require`, so the kit
+ * proxy and the folder check hold for every file the mod runs; a `.node` addon is the one thing
+ * handed to Node's own loader.
  */
 
 /** What the loader knows about the mod whose `main.js` is being required. */
@@ -24,6 +27,20 @@ export interface MainContext {
   readonly dependencies: ReadonlySet<string>
   /** What each loaded dependency's `main.js` exported, by id, for `vxmod:<id>`. */
   readonly libraries: ReadonlyMap<string, unknown>
+}
+
+/** A module as its code sees it: `module.exports`, or what is there so far while it runs. */
+interface Module {
+  exports: unknown
+}
+
+/**
+ * A {@link MainContext} during one `requireMain`: `file` is the file being run, and `modules`
+ * holds every file of the mod's run so far, by real path, so each runs once and a require cycle
+ * gets the partial exports.
+ */
+interface Loading extends MainContext {
+  readonly modules: Map<string, Module>
 }
 
 /** A read of a kit API the manifest does not declare: the build and the manifest disagree. */
@@ -66,14 +83,24 @@ function realPathOf(path: string): string | null {
   }
 }
 
+/** Whether `path` is a file. */
+function isFile(path: string): boolean {
+  return statSync(path, { throwIfNoEntry: false })?.isFile() === true
+}
+
+/** The file a relative specifier names: the exact path, else the path with `.js`, `.json` or `.node` appended. */
+function fileFor(path: string): string | null {
+  return [path, `${path}.js`, `${path}.json`, `${path}.node`].find(isFile) ?? null
+}
+
 /** Whether `path` is `folder` or under it, after symlinks, as Windows compares paths. */
 function inside(path: string, folder: string): boolean {
   const normalize = (p: string): string => (process.platform === 'win32' ? p.toLowerCase() : p)
   return normalize(path) === normalize(folder) || normalize(path).startsWith(normalize(folder) + sep)
 }
 
-/** The `require` a mod's `main.js` is handed. */
-function requireFor(ctx: MainContext): (specifier: string) => unknown {
+/** The `require` a file of the mod's is handed. */
+function requireFor(ctx: Loading): (specifier: string) => unknown {
   const nodeRequire = createRequire(ctx.file)
   return (specifier: string): unknown => {
     if (specifier === '@vx/modkit/shared') return kitProxy(kitShared, 'shared', ctx.declared)
@@ -89,27 +116,52 @@ function requireFor(ctx: MainContext): (specifier: string) => unknown {
     }
     if (specifier === 'electron' || isBuiltin(specifier)) return nodeRequire(specifier)
     if (specifier.startsWith('./') || specifier.startsWith('../')) {
-      const real = realPathOf(resolve(dirname(ctx.file), specifier))
+      const file = fileFor(resolve(dirname(ctx.file), specifier))
+      const real = file === null ? null : realPathOf(file)
       const folder = realPathOf(ctx.folder)
       if (real === null || folder === null || !inside(real, folder)) {
         throw new Error(`\`${specifier}\` is outside the mod's folder, or does not exist`)
       }
-      return nodeRequire(real)
+      const loaded = ctx.modules.get(real)
+      if (loaded !== undefined) return loaded.exports
+      const extension = extname(real).toLowerCase()
+      if (extension === '.node') return nodeRequire(real)
+      if (extension === '.json') {
+        const module: Module = { exports: JSON.parse(readFileSync(real, 'utf8')) }
+        ctx.modules.set(real, module)
+        return module.exports
+      }
+      return run({ ...ctx, file: real }, real)
     }
     throw new Error(`cannot require "${specifier}": a dependency must be bundled into main.js`)
   }
 }
 
 /**
- * Compiles and runs a mod's `main.js` and answers its `module.exports`. Stack traces name the
- * mod's file. A throw at top level, or a read of an undeclared kit API, comes out as is.
+ * Compiles and runs `ctx.file` as CommonJS, registered in `ctx.modules` under `key` before it
+ * runs, and answers its `module.exports`. Stack traces name the file. A throw comes out as is and
+ * drops the file from `ctx.modules`, so a later require runs it again.
  */
-export function requireMain(ctx: MainContext): unknown {
+function run(ctx: Loading, key: string): unknown {
   const source = readFileSync(ctx.file, 'utf8')
-  const run = compileFunction(source, ['exports', 'require', 'module', '__filename', '__dirname'], {
+  const compiled = compileFunction(source, ['exports', 'require', 'module', '__filename', '__dirname'], {
     filename: ctx.file
   })
-  const module = { exports: {} as unknown }
-  run(module.exports, requireFor(ctx), module, ctx.file, dirname(ctx.file))
+  const module: Module = { exports: {} }
+  ctx.modules.set(key, module)
+  try {
+    compiled(module.exports, requireFor(ctx), module, ctx.file, dirname(ctx.file))
+  } catch (err) {
+    ctx.modules.delete(key)
+    throw err
+  }
   return module.exports
+}
+
+/**
+ * Compiles and runs a mod's `main.js` and answers its `module.exports`. A throw at top level, or a
+ * read of an undeclared kit API, in it or in any file it requires, comes out as is.
+ */
+export function requireMain(ctx: MainContext): unknown {
+  return run({ ...ctx, modules: new Map() }, realPathOf(ctx.file) ?? ctx.file)
 }

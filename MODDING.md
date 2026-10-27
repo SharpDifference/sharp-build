@@ -144,8 +144,11 @@ else the highest, with a line in the log. The loader deletes nothing and writes 
   it acts. `main.js` is one CommonJS file with its dependencies bundled, and its `require` reaches
   only the kit (`@vx/modkit/shared`, `@vx/modkit/main`, answering the APIs the manifest declares
   and throwing on any other), `vxmod:<id>` for a required library, `electron`, Node's own modules
-  and a file inside the mod's folder. In this step it exports `protocols`: routes under
-  `vxmod://<id>/@/<route>/…`, each `{ route, handle(request) }`. A mod never has a scheme of its own.
+  and a file inside the mod's folder. `main.js` is expected to be that one bundled file; a file of
+  the mod's own that it requires runs under the same `require`, so nothing in it reaches past the
+  kit or the folder either, and a `.node` addon is the one thing handed to Node's own loader. In
+  this step it exports `protocols`: routes under `vxmod://<id>/@/<route>/…`, each
+  `{ route, handle(request) }`. A mod never has a scheme of its own.
 - **The window**, in `boot()` before the first screen: each loaded mod's `renderer.js` is imported
   from `vxmod://<id>/renderer.js`, one at a time in load order, and its `style.css` added, kept
   only while the mod is on. `react`, `react/jsx-runtime`, `react-dom`, `react-dom/client`,
