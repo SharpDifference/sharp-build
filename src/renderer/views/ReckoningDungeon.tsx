@@ -7,7 +7,7 @@ import { THE_UNSPOKEN,RECKONING_DUNGEONS,DUNGEON_WARN_REPLIES,DUNGEON_MAX_REPLIE
 import { aspectOf } from '@shared/echo'
 import { ECHO_BREAKTHROUGH_ABILITIES } from '@shared/echoBreakthrough'
 import { useGameStore } from '../stores/gameStore'
-import { useModOn,useModOption } from '../stores/modsStore'
+import { useModOn,useModOption } from '@vx/modkit/renderer'
 import { spriteUrl,useSpriteVersion } from '../stores/characterStore'
 import { useAudioStore } from '../stores/audioStore'
 import { dungeonOutcomeText,dungeonVisible,dungeonVisitAllowed,dungeonEntryAllowed,enterReckoningDungeon,leaveReckoningDungeon,talkInReckoningDungeon,openDungeonConversation,useDungeonInsight,useDungeonRequest } from '../stores/reckoningDungeon'

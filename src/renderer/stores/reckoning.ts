@@ -1,6 +1,6 @@
 import { CHARACTER_DYNAMICS_MOD, dynamicFor, type GrowthTag } from '@shared/characterDynamics'
 import { anchorReckoning, applyReckoningVerdict, hasReckoningAffection, parseReckoningThoughts, parseReckoningVerdict, RECKONING_AFFECTION_MIN, RECKONING_MOD, type ReckoningContext, type ReckoningSession } from '../../shared/reckoning'
-import { optionOn } from '@shared/mods'
+import { optionOn } from '@vx/modkit/shared'
 import { create } from 'zustand'
 import { profileAspect } from '@shared/echo'
 import { fullNameOf, charKeyOf } from '@shared/types'

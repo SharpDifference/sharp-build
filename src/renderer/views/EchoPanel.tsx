@@ -1,5 +1,5 @@
 import { talentAffinity, talentAbilityCost } from '@shared/campusTalents'
-import { optionOn } from '@shared/mods'
+import { optionOn } from '@vx/modkit/shared'
 import { useEffect, useRef, useState, type CSSProperties, type JSX } from 'react'
 import { ECHO_ASPECTS, aspectOf, changePlayerEcho, echoAffinity, echoCreatureOf, editEchoCreature, editEchoSettings, editEchoStage, matchingEcho, normalizeEcho, renameEcho, withEchoArtwork, type EchoAspect, type EchoIdentity, type EchoState } from '../../shared/echo'
 import { chooseSetupEchoAspect } from '../../shared/echoSetup'

@@ -6,7 +6,7 @@ import { join } from 'path'
 import { ECHO_ART_ID, echoImagePrompt, echoLocalImagePrompt, normalizeEchoIdentity, type EchoArtRequest } from '../../shared/echo'
 import { generateImage } from '@shared/llm/cloudImage'
 import { getDataPath } from '../paths'
-import { modOn, optionOn } from '@shared/mods'
+import { modOn, optionOn } from '@vx/modkit/shared'
 import { getModSwitches } from './modsService'
 import { clearEchoMatte } from './echoMatte'
 import { generateLocalEcho } from './echoLocalImage'
@@ -18,7 +18,7 @@ import { assertSafeCharId } from '@shared/characterRules'
 import { expressionRel } from '@shared/characterFiles'
 import { getCharacter, readCharacterImage } from './characterService'
 import { reflectionPortraitPrompt, reflectionStageOf, assertReflectionStage, type ReflectionStage } from '@shared/reflectionPortrait'
-import { registerComfyLaunchEnvironment } from './comfyLaunchEnvironment'
+import { registerComfyLaunchEnvironment } from '@vx/modkit/main'
 
 // The managed ComfyUI keeps the transparent-background model under its own root, on every boot.
 registerComfyLaunchEnvironment('echo', ({ root }) => ({ TRANSPARENT_BACKGROUND_FILE_PATH: root }))

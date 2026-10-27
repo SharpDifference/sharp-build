@@ -8,7 +8,7 @@ import { fullNameOf, type Character, type SceneLine, type StructuredRequest } fr
 import { breakthroughAdvantage } from '../prompts/breakthroughPrompt'
 import { echoBreakthroughPrompt } from '../prompts/echoBreakthroughPrompt'
 import { echoBreakthroughAbility, ECHO_BREAKTHROUGH_OPTION, type EchoBreakthroughAspect } from '@shared/echoBreakthrough'
-import { optionOn } from '@shared/mods'
+import { optionOn } from '@vx/modkit/shared'
 import { useGameStore } from './gameStore'
 import { modIsOn, useModsStore } from './modsStore'
 import { interjectOfferOf, replyRowOfferOf } from './loop/playback'
