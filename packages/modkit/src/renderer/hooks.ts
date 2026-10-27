@@ -18,6 +18,7 @@ import type { ModSceneFields, PlaythroughRecord, SceneLine, TimeSlot } from '../
 import type { TextingPromptState } from '../bridge/renderer'
 import type { ResolvedSave } from '../bridge/renderer'
 import type { ViewName } from '../bridge/renderer'
+import type { ManualSaveOffer } from '../bridge/renderer'
 import type { ScreenTheme } from '../bridge/renderer'
 import type { ModDef } from '../bridge/shared'
 
@@ -191,6 +192,23 @@ export interface RailSeatProps {
   children: ReactNode
 }
 
+/** One tool in the landing's corner, as the game draws its own: icon only, its label on a hover. */
+export interface LandingToolProps {
+  label: string
+  onClick: () => void
+  children: ReactNode
+}
+
+/** One entry in the game menu, as the menu draws its own. */
+export interface GameMenuItemProps {
+  /** It stands dimmed and takes nothing. */
+  dead?: boolean
+  /** What a hover over it says while it is dead. */
+  note?: string
+  onClick: () => void
+  children: ReactNode
+}
+
 /** What the game hands a mod's seat on a scene's rail. */
 export interface SceneSeatProps {
   /** The rail's own seat, so a mod's control is drawn as the game's are. */
@@ -206,6 +224,19 @@ export interface ScenePanelProps {
   /** The half of the day the stage is in, which every modal over it wears. */
   theme: ScreenTheme
   onClose: () => void
+}
+
+/** What the game hands a mod's panel opened with {@link openPanel}. */
+export interface GameModalProps {
+  /** The half of the day the stage is in, which every modal over it wears. */
+  theme: ScreenTheme
+  /** What `openPanel` was handed beside the id: whose panel it is, say. */
+  arg: string | undefined
+  /** A crossing between screens is over the view. */
+  covered: boolean
+  onClose: () => void
+  /** Closes the panel into the game menu, for a panel the menu opened. */
+  openGameMenu: () => void
 }
 
 /**
@@ -358,6 +389,18 @@ export interface ModHooks {
   /** A seat on the scene's rail, and the panel it opens over the scene. */
   scenePlay?: ScenePlay
   /**
+   * Panels over the game view, by id, which {@link openPanel} opens as one of the view's own: the
+   * scene behind takes nothing while one is up. One panel per id, the first mod's that is on.
+   */
+  gameModals?: Record<string, ComponentType<GameModalProps>>
+  /** Drawn on the scene's rail, after the Calendar and before the mods' scene seats (`scenePlay`). */
+  railButton?: ComponentType<ScreenSlotProps['railButton']>
+  /** Drawn among the landing's tools, after the log and before Settings. */
+  landingTool?: ComponentType<ScreenSlotProps['landingTool']>
+  /** Drawn in the game menu, after Mods and before Controls. */
+  gameMenuEntry?: ComponentType<ScreenSlotProps['gameMenuEntry']>
+
+  /**
    * After the texts of a girl reaching out just to talk have landed. `reply` is her entry from the
    * slot's opening, with whatever fields `prompts['slot-reach-outs']` added to it.
    */
@@ -490,6 +533,26 @@ export interface ScreenSlotProps {
   }
   messageAttachment: { message: ChatMessage }
   contactPostExtra: { charId: string; post: SocialPost }
+  railButton: {
+    /** The rail's own seat, so a mod's button is drawn as the game's are. */
+    Seat: ComponentType<RailSeatProps>
+    /** The rail is up: false behind a curtain, with the chrome hidden, or before Settings is. */
+    visible: boolean
+    /** The rail stands but takes nothing. */
+    dead: boolean
+  }
+  landingTool: {
+    /** The landing's own tool, so a mod's is drawn, and arrives, as the game's are. */
+    Tool: ComponentType<LandingToolProps>
+    /** Settings is revealed, and with it the mods' tools. */
+    visible: boolean
+  }
+  gameMenuEntry: {
+    /** The menu's own entry, so a mod's is drawn, and dealt in, as the game's are. */
+    Item: ComponentType<GameMenuItemProps>
+    /** Whether a save can be written now (`'open'`), only once the reply in flight lands, or not at all. */
+    saveOffer: ManualSaveOffer
+  }
 }
 
 export type ScreenSlot = keyof ScreenSlotProps
@@ -665,6 +728,50 @@ export function scenePlays(): { modId: string; play: ScenePlay }[] {
     .filter((entry) => rules.isOn(entry.modId) && entry.hooks.scenePlay)
     .sort((a, b) => rules.order(a.modId) - rules.order(b.modId))
     .map((entry) => ({ modId: entry.modId, play: entry.hooks.scenePlay as ScenePlay }))
+}
+
+/** The clashes over a panel id already warned about, so each is said once. */
+const warnedModalClashes = new Set<string>()
+
+/**
+ * The panel {@link openPanel} opens under an id: the first mod's that is on and has one, or none.
+ * Two mods that are on with a panel under the same id get a warning naming both.
+ */
+export function gameModal(id: string): ComponentType<GameModalProps> | undefined {
+  const owners = activeEntries().filter((entry) => entry.hooks.gameModals?.[id])
+  if (owners.length > 1) {
+    const [winner, ...others] = owners.map((entry) => entry.modId)
+    const clash = `${id}\n${winner}\n${others.join('\n')}`
+    if (!warnedModalClashes.has(clash)) {
+      warnedModalClashes.add(clash)
+      console.warn(
+        `[mods] ${winner} and ${others.join(', ')} both have a panel under "${id}"; ${winner}'s opens`,
+      )
+    }
+  }
+  return owners[0]?.hooks.gameModals?.[id]
+}
+
+/** How {@link openPanel} reaches the game view, while one is up. */
+let panelOpener: ((id: string, arg: string | undefined) => void) | null = null
+
+/** Binds {@link openPanel} to the game view as it mounts; the returned function unbinds it. */
+export function setPanelOpener(open: (id: string, arg: string | undefined) => void): () => void {
+  panelOpener = open
+  return () => {
+    if (panelOpener === open) panelOpener = null
+  }
+}
+
+/**
+ * Opens a mod's panel ({@link ModHooks.gameModals}) over the game view, in place of whatever panel
+ * is open there. `arg` is handed to the panel. False where nothing opens: no game view is up, or
+ * no mod that is on has a panel under `id`.
+ */
+export function openPanel(id: string, arg?: string): boolean {
+  if (!panelOpener || !gameModal(id)) return false
+  panelOpener(id, arg)
+  return true
 }
 
 export function afterReachOut(ctx: {

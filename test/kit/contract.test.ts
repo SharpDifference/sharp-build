@@ -193,6 +193,7 @@ const PROBES: Record<RendererHook, (id: string) => Probe> = {
   bunnyboardPage: (id) => thing('bunnyboardPage', { id, word: 'W', Mark: Comp, Page: Comp }, (host) => host.bunnyboardPages().some((page) => page.id === id))(id),
   updatesTab: (id) => thing('updatesTab', { id, word: 'W', Page: Comp }, (host) => host.updatesTabs().some((tab) => tab.id === id))(id),
   scenePlay: thing('scenePlay', { Seat: Comp, Panel: Comp }, (host, id) => host.scenePlays().some((one) => one.modId === id)),
+  gameModals: (id) => thing('gameModals', { [id]: Comp }, (host) => host.gameModal(id) === Comp)(id),
   contactTab: (id) => thing('contactTab', { id, label: 'L', Panel: Comp }, (host) => host.contactTabs({ charId: 'c', isContact: true }).some((one) => one.modId === id))(id),
   editorField: thing('editorField', { read: () => null, write: () => ({}), Field: Comp }, (host, id) => host.editorFields().some((one) => one.modId === id)),
   settingsSection: slot('settingsSection'),
@@ -204,7 +205,10 @@ const PROBES: Record<RendererHook, (id: string) => Probe> = {
   stageLayer: slot('stageLayer'),
   panelLayer: slot('panelLayer'),
   messageAttachment: slot('messageAttachment'),
-  contactPostExtra: slot('contactPostExtra')
+  contactPostExtra: slot('contactPostExtra'),
+  railButton: slot('railButton'),
+  landingTool: slot('landingTool'),
+  gameMenuEntry: slot('gameMenuEntry')
 }
 
 describe('every hook in the table', () => {
