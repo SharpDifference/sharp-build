@@ -353,6 +353,7 @@ else names it.
 | `settingsSection` | `AppSettingsModal.tsx` | Draw a component in app settings, in the Game tab under the volume sliders. Props: `theme`, `busy` (a backup or restore is running) |
 | `portraitOverlay` | `GameView.tsx` (`PortraitSlot`) | Draw a component in each portrait on the stage, under her sprite. Props: `charId` |
 | `phoneOverlay` | `BunnyboardModal.tsx` | Mount a component in the phone's veil while the phone is open, over the phone. Props: none |
+| `conversationFoot` | `BunnyboardModal.tsx` | Draw below a person's message history and before the composer; not on bot or employer threads. Props: `charId` |
 | `mapOverlay` | `MapModal.tsx` | Draw a component on the map, under the places and above its foot. Props: `canTravel` (the map was opened to go somewhere), `close` |
 | `photosPageSection` | `PhotosPage.tsx` | Draw a component on the Photos page, under the grid. Props: `theme` |
 | `editCharacterImages` | `EditCharacterModal.tsx`, `CharacterModal.tsx` | Draw a component first among her images, in the character editor and the character view. Props: `charId`, `name`, `theme`, `height` |
@@ -636,6 +637,30 @@ Windows aliases, errors/disposal, and the real service's launch boundary with mo
   `ModEnrollmentFields`. Save/enrollment validation requires the native required keys;
   optional additions do not make older files invalid. Mods own normalization and carryover.
 - The native `lorebook` Bunnyboard tab is reserved, like Chats and Friends.
+
+## Conversation footer
+
+`conversationFoot` is an additive screen slot below a person's message history, outside its
+scrolling list, and immediately before the native composer or its stand-in. It receives
+`{ charId: string }`. BunnyBot, VenusBot and employer threads do not draw this slot. Each enabled
+mod contributes its own component in mod-list order, inside its own error boundary; no provider
+means no markup or additional spacing. Changing the open conversation remounts the contribution.
+
+```ts
+import { registerHooks } from '@vx/modkit/renderer'
+
+registerHooks(MY_MOD, { conversationFoot: MyConversationTools })
+```
+
+The slot grants a place to draw, not permission to send or replace messages. It remains present
+when a person's thread is read-only or busy, so a mod may explain a disabled action. The mod's
+action must use its existing thread/save guards and cancellation rules. It must not infer that
+mounting the component means a send or regeneration is allowed. The slot itself performs no
+model call, persistence, history replacement or composer change.
+
+This retires Text Regeneration's direct `TextRegenerate` import and mount in
+`BunnyboardModal.tsx` when that mod registers its component on main. Its transaction API is
+separate; this hook alone does not make Text Regeneration a standalone mod.
 
 ## Character trait registration
 

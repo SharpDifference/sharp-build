@@ -15,6 +15,10 @@ reached through the page's import map.
   `setLoadingMod` in the host's renderer entry); an in-repo mod registers as before.
 - `ModDef.library`: a library mod has no switch and no row on the Mods screen.
 
+Add `conversationFoot`, a screen slot below a person's message history and before the native
+composer. It receives the open `charId`; bot and employer threads do not draw it. Existing hooks
+and APIs keep their shapes.
+
 ## 0.2.0
 
 Adds the hooks `gameModals`, `railButton`, `landingTool` and `gameMenuEntry`, and the API
