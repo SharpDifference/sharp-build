@@ -15,6 +15,8 @@ import type { Season, TextMark } from '@shared/types'
 import type { Weather } from '@shared/weather'
 import type { SlotAction, SlotActionTone } from '../stores/slotActions'
 import type { ScreenTheme } from './clockTheme'
+import type { LandingToolProps } from '../mods/hooks'
+import { ModSlot } from '../mods/ModSlot'
 import { useAudioStore } from '../stores/audioStore'
 import { MoneyCard } from '../components/MoneyCard'
 import { StatRadar } from '../components/StatRadar'
@@ -178,6 +180,8 @@ export interface LandingChromeProps {
   onMap: () => void
   onChatLog: () => void
   onSettings: () => void
+  /** The mods' tools stand in the corner: not on a created scene or a replay. */
+  modButtons: boolean
   /**
    * What a click on the dialogue box does, where one would do anything at all — handed down to
    * the box, which is the only part of the screen that wears the hand for it.
@@ -558,6 +562,9 @@ export function LandingChrome(props: LandingChromeProps): JSX.Element {
             <TalentIcon />
           </motion.button>
         )}
+        {props.modButtons && (
+          <ModSlot slot="landingTool" props={{ Tool: LandingTool, visible: shown.has('settings') }} />
+        )}
         {/* Never gated: the way out must be reachable from wherever the reader is stuck. */}
         <motion.button
           className="vu-landing-tool"
@@ -588,6 +595,23 @@ export function LandingChrome(props: LandingChromeProps): JSX.Element {
         onAdvance={props.onAdvance}
       />
     </motion.div>
+  )
+}
+
+/** One tool in the corner as the game draws its own, for a mod's: the container staggers it in. */
+function LandingTool({ label, onClick, children }: LandingToolProps): JSX.Element {
+  return (
+    <motion.button
+      type="button"
+      className="vu-landing-tool"
+      variants={landingApp}
+      aria-label={label}
+      title={label}
+      {...gestures(false, quietLift, quietPress)}
+      onClick={onClick}
+    >
+      {children}
+    </motion.button>
   )
 }
 

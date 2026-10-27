@@ -1413,6 +1413,8 @@ function MessageBubble({ message }: { message: ChatMessage }): JSX.Element {
   }
   // A picture is its own message, the way a phone sends one: her words in one bubble and the
   // photograph in the next, rather than a snapshot pasted under a sentence.
+  // What a mod attaches to the message follows its text, in a bubble of its own: a message that is
+  // only an attachment draws no empty bubble.
   const side = message.sender === 'player' ? 'mine' : 'theirs'
   return (
     <>
@@ -1424,6 +1426,7 @@ function MessageBubble({ message }: { message: ChatMessage }): JSX.Element {
       {message.photo && (
         <MessagePhotoBubble photo={message.photo} sender={message.sender} messageId={message.id} />
       )}
+      <ModSlot slot="messageAttachment" props={{ message }} />
     </>
   )
 }
