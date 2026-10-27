@@ -480,7 +480,7 @@ export async function writeModSlices(
     if (foreign !== undefined) {
       return refused('MOD_WRITE_FOREIGN', `${modId} cannot write the save data of ${foreign}.`)
     }
-    if (!modIsOn(modId)) return refused('MOD_WRITE_OFF', 'That mod is off.')
+    if (!modIsOn(modId, loopState.record)) return refused('MOD_WRITE_OFF', 'That mod is off.')
     const start = useGameStore.getState()
     const playthroughId = start.playthroughId
     if (!playthroughId) return refused('MOD_WRITE_NO_GAME', 'There is no game to save into.')
@@ -498,7 +498,11 @@ export async function writeModSlices(
       // A stay left before the write's turn skips it, which leaves this as the answer.
       let outcome: Result<null> = refused('MOD_WRITE_STALE', STALE_MESSAGE)
       await queueWrite(async () => {
-        if (!sameGame() || !modIsOn(modId) || staleIn(options.expect) !== undefined) return
+        if (!sameGame() || staleIn(options.expect) !== undefined) return
+        if (!modIsOn(modId, loopState.record)) {
+          outcome = refused('MOD_WRITE_OFF', 'That mod is off.')
+          return
+        }
         if (saveOffer(false) !== 'open') {
           outcome = refused('MOD_WRITE_WAIT', WAIT_MESSAGE)
           return

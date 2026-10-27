@@ -1,7 +1,7 @@
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { installMods, type ModDef } from '@shared/mods'
 import type { GameSave, Result, SaveDraft } from '@shared/types'
-import { restoreApi, sceneLines, stubApi } from './fixtures'
+import { playthroughRecord, restoreApi, sceneLines, stubApi } from './fixtures'
 
 /**
  * A mod's write to its own save data, and to that of the mods it requires: refused, writing
@@ -28,7 +28,8 @@ beforeAll(() =>
     def('writer-mod', '1.2.0', { requires: ['lib-mod'] }),
     def('lib-mod', '0.3.0'),
     def('other-mod', '2.0.0'),
-    def('off-mod', '1.0.0', { defaultOn: false })
+    def('off-mod', '1.0.0', { defaultOn: false }),
+    def('game-mod', '1.0.0', { scope: 'playthrough' })
   ])
 )
 
@@ -94,6 +95,19 @@ describe('writeModSlices refusals', () => {
     const result = await kit.writeModField('writer-mod', { count: 2 }, { expect: before })
     expect(result.ok ? null : result.error.code).toBe('MOD_WRITE_STALE')
     expect(autosave).not.toHaveBeenCalled()
+  })
+
+  it('judges a playthrough mod by the game it is loaded into, not by its switch', async () => {
+    const { autosave } = stubAutosave()
+    loopState.record = playthroughRecord({ mods: [] })
+    const off = await writeModSlices('game-mod', { 'game-mod': 1 })
+    expect(off.ok ? null : off.error.code).toBe('MOD_WRITE_OFF')
+    expect(autosave).not.toHaveBeenCalled()
+
+    loopState.record = playthroughRecord({ mods: ['game-mod'] })
+    const on = await writeModSlices('game-mod', { 'game-mod': 1 })
+    expect(on.ok).toBe(true)
+    expect(autosave).toHaveBeenCalledOnce()
   })
 
   it('answers a failed disk write with its error and changes nothing', async () => {
