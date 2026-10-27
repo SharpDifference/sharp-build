@@ -327,7 +327,7 @@ export interface PromptSpots {
         character: Character;
         info: CharInfo;
         date: number;
-        time: TimeSlot;
+        time: TimeSlot_2;
     };
     'slot-posts': Record<string, never>;
     'slot-reach-outs': {
@@ -425,7 +425,7 @@ export interface PromptState {
     textedWith?: readonly string[];
     textingSummaries?: Record<string, string[]>;
     // (undocumented)
-    time: TimeSlot;
+    time: TimeSlot_2;
     upcomingPlans?: Record<string, string[]>;
     visitJobId: string | null;
     weather?: readonly Weather[];
@@ -660,7 +660,7 @@ export interface SlotIntroInput {
     stats?: PlayerStats;
     // (undocumented)
     storyMemory?: StorySnapshot;
-    time: TimeSlot;
+    time: TimeSlot_2;
     visitors: readonly IntroVisitor[];
     weather?: readonly Weather[];
 }
@@ -717,7 +717,7 @@ export interface TextingPromptState {
     // (undocumented)
     storyMemory?: StorySnapshot;
     // (undocumented)
-    time: TimeSlot;
+    time: TimeSlot_2;
     upcomingPlans?: Record<string, string[]>;
     weather?: readonly Weather[];
 }
