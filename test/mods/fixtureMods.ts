@@ -1,5 +1,7 @@
-import { mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from 'fs'
-import { join, relative, resolve } from 'path'
+import { createHash } from 'crypto'
+import { existsSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from 'fs'
+import { dirname, join, relative, resolve } from 'path'
+import type { InstalledFile } from '../../src/main/mods/layout'
 import { zipSync } from 'fflate'
 import { unpackRelease } from '../../src/main/mods/unpack'
 
@@ -27,11 +29,23 @@ export function zipFixture(id: string): Uint8Array {
   return zipSync(filesUnder(join(FIXTURES, id)))
 }
 
-/** Installs one fixture under `<root>/mods/<id>/<version>/` the way an install does, and answers the version folder. */
+/** Installs one fixture under `<root>/mods/<id>/<version>/` the way an install does, recorded as approved, and answers the version folder. */
 export function installFixture(root: string, id: string, version = '1.0.0'): string {
   const folder = join(root, 'mods', id, version)
-  unpackRelease(zipFixture(id), folder)
+  const zip = zipFixture(id)
+  unpackRelease(zip, folder)
+  recordInstall(root, id, version, zip)
   return folder
+}
+
+/** Writes the installer's record of one install into `<root>/mods/installed.json`: the zip's hash and the source's approval. */
+export function recordInstall(root: string, id: string, version: string, zip: Uint8Array, approved = true): void {
+  const path = join(root, 'mods', 'installed.json')
+  const file: InstalledFile = existsSync(path) ? (JSON.parse(readFileSync(path, 'utf8')) as InstalledFile) : { schemaVersion: 1, mods: {} }
+  const record = { source: `https://github.com/venus-extracurriculars/${id}`, sha256: createHash('sha256').update(zip).digest('hex'), approved, installedAt: '2026-10-27T00:00:00Z' }
+  const mods = { ...file.mods, [id]: { ...file.mods[id], [version]: record } }
+  mkdirSync(dirname(path), { recursive: true })
+  writeFileSync(path, JSON.stringify({ ...file, mods }, null, 2))
 }
 
 /** Writes a mod folder's `current` file. */

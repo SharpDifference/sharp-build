@@ -4,7 +4,7 @@ import { checkCompat, hookNameKind, modDefOf, parseManifest } from '@vx/modkit/h
 import { satisfies } from '../../../packages/modkit/src/shared/range'
 import { MODS } from '@shared/mods'
 import { modFileUrl, type ModSessionEntry, type ModSessionTable, type ModStatus, type SafeStart } from '@shared/modSession'
-import { findInstalledMods } from './layout'
+import { findInstalledMods, readInstalled } from './layout'
 import { orderMods, type OrderInput } from './order'
 import { requireMain as requireMainFile, UndeclaredApiError, type MainContext } from './require'
 import type { ServedMod } from './resolve'
@@ -67,16 +67,6 @@ function isFile(path: string): boolean {
   return statSync(path, { throwIfNoEntry: false })?.isFile() ?? false
 }
 
-/** `install.json`'s word on the source, where the installer wrote one; a folder put there by hand has none. */
-function approvedOf(folder: string): boolean {
-  try {
-    const record = JSON.parse(readFileSync(join(folder, 'install.json'), 'utf8')) as { approved?: unknown }
-    return record.approved === true
-  } catch {
-    return false
-  }
-}
-
 /**
  * A row with no definition, under the folder's name: a manifest that could not be read, or a copy
  * of a mod the build already carries. It stands for no mod of the list, so a mod of that id in
@@ -91,8 +81,12 @@ function unreadable(id: string, folder: string, dev: boolean, message: string): 
   }
 }
 
-/** Reads one folder's manifest into a candidate: refused where it cannot be read or disagrees with the folder. */
-function readCandidate(folder: string, expect: { id: string; version: string } | null, dev: boolean): Candidate {
+/**
+ * Reads one folder's manifest into a candidate: refused where it cannot be read or disagrees with
+ * the folder. `approved` is the installer's word on the install, read from its record beside the
+ * folders; nothing inside the folder counts.
+ */
+function readCandidate(folder: string, expect: { id: string; version: string } | null, dev: boolean, approved: boolean): Candidate {
   const name = expect?.id ?? basename(folder)
   const manifestPath = join(folder, 'vxmod.json')
   let json: unknown
@@ -122,7 +116,7 @@ function readCandidate(folder: string, expect: { id: string; version: string } |
       style: isFile(join(folder, 'style.css')) ? modFileUrl(manifest.id, 'style.css') : null
     },
     hasMain,
-    approved: dev ? false : approvedOf(folder),
+    approved,
     declaredCore: manifest.hooks.filter((hook) => hookNameKind(hook).kind !== 'export')
   }
   if (manifest.main !== hasMain) {
@@ -140,7 +134,8 @@ function fail(candidate: Candidate, status: ModStatus, message: string): void {
 /** Every folder's candidate: the installed mods, then the developer folders, one entry per id. */
 function findCandidates(input: LoaderInput): Candidate[] {
   const found = findInstalledMods(input.modsDir)
-  for (const note of found.notes) input.log(`[mods] ${note}`)
+  const installed = readInstalled(input.modsDir)
+  for (const note of [...found.notes, ...installed.notes]) input.log(`[mods] ${note}`)
   const candidates: Candidate[] = []
   for (const mod of found.mods) {
     for (const note of mod.notes) input.log(`[mods] ${note}`)
@@ -148,10 +143,10 @@ function findCandidates(input: LoaderInput): Candidate[] {
       candidates.push(unreadable(mod.id, mod.folder, false, mod.problem ?? 'no version folder'))
       continue
     }
-    candidates.push(readCandidate(mod.folder, { id: mod.id, version: mod.version }, false))
+    candidates.push(readCandidate(mod.folder, { id: mod.id, version: mod.version }, false, installed.approved(mod.id, mod.version)))
   }
 
-  const devCandidates = input.devFolders.map((folder) => readCandidate(resolve(folder), null, true))
+  const devCandidates = input.devFolders.map((folder) => readCandidate(resolve(folder), null, true, false))
   for (const dev of devCandidates) {
     if (dev.entry.manifest === null) {
       candidates.push(dev)

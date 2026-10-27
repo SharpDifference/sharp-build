@@ -44,7 +44,13 @@ function check(name, ok, detail = '') {
 /** A temp data folder with the named fixtures installed under `mods/<id>/1.0.0/`. */
 function dataFolder(ids, settings = SETTINGS) {
   const data = mkdtempSync(join(tmpdir(), 'vu-e2e-'))
+  mkdirSync(join(data, 'mods'), { recursive: true })
   for (const id of ids) cpSync(join(fixtures, id), join(data, 'mods', id, '1.0.0'), { recursive: true })
+  // The installer's record, approving each one's main.js. The hash is the zip's; these are folder copies.
+  const records = Object.fromEntries(
+    ids.map((id) => [id, { '1.0.0': { source: `https://github.com/venus-extracurriculars/${id}`, sha256: '', approved: true, installedAt: '2026-10-27T00:00:00Z' } }])
+  )
+  writeFileSync(join(data, 'mods', 'installed.json'), JSON.stringify({ schemaVersion: 1, mods: records }, null, 2))
   writeFileSync(join(data, 'settings.json'), JSON.stringify(settings, null, 2))
   writeFileSync(join(data, 'mods.json'), MODS_JSON)
   return data

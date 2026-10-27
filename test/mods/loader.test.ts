@@ -7,7 +7,7 @@ import { zipSync } from 'fflate'
 import { loadMods, type LoaderInput, type LoaderResult } from '../../src/main/mods/loader'
 import { unpackRelease } from '../../src/main/mods/unpack'
 import type { MainContext } from '../../src/main/mods/require'
-import { FIXTURES, installFixture, setCurrent, snapshot } from './fixtureMods'
+import { FIXTURES, installFixture, recordInstall, setCurrent, snapshot, zipFixture } from './fixtureMods'
 
 /**
  * The loader on the fixture set, installed under a temp data folder exactly as an install lays a
@@ -110,9 +110,15 @@ describe('the loader on the fixture set', () => {
   })
 
   it('does not permit main-process code from an unreviewed source unless the setting says so', async () => {
-    await unlink(join(root, 'mods', 'hello-mod', '1.0.0', 'install.json'))
+    // Approval is the installer's record beside the folders; a file inside the folder is anyone's to write.
+    await unlink(join(root, 'mods', 'installed.json'))
+    await writeFile(join(root, 'mods', 'hello-mod', '1.0.0', 'install.json'), '{ "approved": true }')
     expect(statusOf(run(), 'hello-mod')).toBe('not-permitted')
     expect(statusOf(run({ allowUnreviewedMain: true }), 'hello-mod')).toBe('loaded')
+    recordInstall(root, 'hello-mod', '1.0.0', zipFixture('hello-mod'), false)
+    expect(statusOf(run(), 'hello-mod')).toBe('not-permitted')
+    recordInstall(root, 'hello-mod', '1.0.0', zipFixture('hello-mod'), true)
+    expect(statusOf(run(), 'hello-mod')).toBe('loaded')
   })
 
   it('reads the manifests but runs nothing with --no-mods', () => {

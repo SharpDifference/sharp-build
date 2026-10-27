@@ -87,7 +87,8 @@ data/mods/<id>/<version>/vxmod.json  the release, unpacked as it came
                          main.js      optional: runs in the main process, CommonJS
                          style.css    optional
                          assets/      optional
-                         install.json written by the installer, not by the author
+data/mods/installed.json             the installer's record of each install, by id and version:
+                                     where the zip came from, its hash, whether the source is approved
 ```
 
 `<id>` follows the id rule above and `<version>` is strict `major.minor.patch`; both must match the
@@ -164,8 +165,10 @@ else the highest, with a line in the log. The loader deletes nothing and writes 
   disabled, and says why under the name (`needs an update: `x` is not in this core`; `needs
   Mini-games, which did not load`; `main.js threw: …`); a notice at start names each such mod once
   per version; entering a game whose record names a `playthrough` mod that is not running says so.
-  A mod whose main-process code comes from a source the build has not reviewed is not permitted
-  to run unless `allowUnreviewedMain` is on in `settings.json`; a developer folder's always is.
+  A mod whose main-process code comes from a source the build has not reviewed (`installed.json`,
+  written by the installer alone, does not record its version as approved; a file inside the mod's
+  folder says nothing) is not permitted to run unless `allowUnreviewedMain` is on in
+  `settings.json`; a developer folder's always is.
 - **Starting without mods**: `--no-mods` on the command line reads the manifests and runs
   nothing; Shift held while the window comes up skips every installed mod's window code.
 - **For mod authors**: the fold at the foot of the Mods screen loads a mod from a folder holding

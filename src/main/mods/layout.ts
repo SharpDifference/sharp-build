@@ -5,11 +5,12 @@ import { compareVersions, parseVersion, type Version } from '../../../packages/m
 /**
  * Where the installed mods are on disk, and which version of each is in use:
  *
+ *     data/mods/installed.json             the installer's record of each install, by id and version
  *     data/mods/<id>/current               one line, the version in use (optional)
  *     data/mods/<id>/<version>/vxmod.json  a release, unpacked
  *
- * Reads folder listings and the `current` files only: no manifest is opened, and nothing is
- * written, moved or deleted.
+ * Reads folder listings, the `current` files and the installer's record only: no manifest is
+ * opened, and nothing is written, moved or deleted.
  */
 
 /** The shape a folder under `data/mods/` must be named in to be read as a mod id. */
@@ -17,6 +18,36 @@ const MOD_ID = /^[a-z0-9]+(-[a-z0-9]+)*$/
 
 /** The file in an id folder that names the version in use. */
 const CURRENT_FILE = 'current'
+
+/** The installer's record, beside the id folders. */
+const INSTALLED_FILE = 'installed.json'
+
+/** One install as the installer recorded it. */
+export interface InstallRecord {
+  /** Where the zip came from. */
+  readonly source: string
+  /** The zip's hash. */
+  readonly sha256: string
+  /** Whether the source is on the build's approved list, which lets the mod's `main.js` run. */
+  readonly approved: boolean
+  readonly installedAt: string
+}
+
+/**
+ * `data/mods/installed.json`: the installer's records by id, then by version. The installer alone
+ * writes it, outside every mod's folder, so a record inside a folder says nothing.
+ */
+export interface InstalledFile {
+  readonly schemaVersion: 1
+  readonly mods: Readonly<Record<string, Readonly<Record<string, InstallRecord>>>>
+}
+
+export interface InstalledRecords {
+  /** Whether the installer recorded this id at this version as coming from an approved source. */
+  readonly approved: (id: string, version: string) => boolean
+  /** Lines for the log where the file is there but not readable. */
+  readonly notes: readonly string[]
+}
 
 export interface ModFolder {
   /** The folder's name under `data/mods/`, which the manifest's id must match. */
@@ -96,6 +127,23 @@ function pickVersion(id: string, idFolder: string): ModFolder {
   const version = highest(versions)
   notes.push(`${id}: several versions and no "current"; using ${version}`)
   return picked(version)
+}
+
+/** Reads the installer's record under `modsDir`. No file, or one that cannot be read, approves nothing. */
+export function readInstalled(modsDir: string): InstalledRecords {
+  const path = join(resolve(modsDir), INSTALLED_FILE)
+  const notes: string[] = []
+  let mods: Record<string, Record<string, { approved?: unknown } | undefined> | undefined> = {}
+  try {
+    const parsed = JSON.parse(readFileSync(path, 'utf8')) as { mods?: unknown } | null
+    if (parsed && typeof parsed === 'object' && parsed.mods && typeof parsed.mods === 'object') mods = parsed.mods as typeof mods
+    else notes.push(`${INSTALLED_FILE} has no "mods"; no install counts as approved`)
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== 'ENOENT') {
+      notes.push(`${INSTALLED_FILE} cannot be read: ${(error as Error).message}; no install counts as approved`)
+    }
+  }
+  return { approved: (id, version) => mods[id]?.[version]?.approved === true, notes }
 }
 
 /** Lists the mods installed under `modsDir`, one entry per id folder, sorted by id. A missing `modsDir` is no mods. */
