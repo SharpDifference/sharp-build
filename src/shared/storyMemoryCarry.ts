@@ -1,6 +1,6 @@
 import { normalizeStoryMemory, storySnapshot, type StoryFact, type StoryMemory } from './storyMemory'
-import { registerTermCarry, type TermCarryContext } from './modCarry'
-import type { GameSave } from './types'
+import { registerTermCarry } from './modCarry'
+import type { TermCarryContext, GameSave } from '@vx/modkit/shared'
 
 declare module './modCarry' { interface ModCarryFields { exStoryMemory?: StoryMemory } }
 

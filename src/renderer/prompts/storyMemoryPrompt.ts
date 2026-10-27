@@ -1,4 +1,4 @@
-import { STORY_CATEGORIES, lightStoryFacts, rankedStoryFacts, recallPayload, type StorySnapshot, type StoryMemoryMode } from '@shared/storyMemory'
+import { STORY_CATEGORIES, lightStoryFacts, rankedStoryFacts, recallPayload, type StorySnapshot, type StoryMemoryMode } from '../../shared/storyMemory'
 import type { Season, StructuredRequest } from '@shared/types'
 import { formatShortGameDate, formatTimeSlot } from './gameDate'
 

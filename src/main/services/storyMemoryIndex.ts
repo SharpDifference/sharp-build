@@ -8,7 +8,7 @@ import {
   type StoryRecall,
   type StoryRecallRequest,
   type StoryRecord
-} from '@shared/storyMemory'
+} from '../../shared/storyMemory'
 
 /** This connection contains a single save snapshot, never a union of playthrough branches. */
 export function recallFromSqlite(db: DatabaseSync, payload: StoryRecallRequest): StoryRecall {

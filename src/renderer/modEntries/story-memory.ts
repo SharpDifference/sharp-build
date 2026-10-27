@@ -1,5 +1,5 @@
-import { acceptStoryFacts, recallPayload, STORY_MEMORY_LIGHT_OPTION } from '@shared/storyMemory'
-import { optionOn } from '@shared/mods'
+import { acceptStoryFacts, recallPayload, STORY_MEMORY_LIGHT_OPTION } from '../../shared/storyMemory'
+import { optionOn } from '@vx/modkit/shared'
 import { useModsStore } from '../stores/modsStore'
 import { withNativeStoryRecall, withStoryExtraction } from '../prompts/storyMemoryPrompt'
 import { currentStorySnapshot } from '../stores/storyMemory'

@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type JSX } from 'react'
 import { motion } from 'motion/react'
-import { TEXT_REGENERATION_MOD } from '@shared/textRegeneration'
+import { TEXT_REGENERATION_MOD } from '../../shared/textRegeneration'
 import { useModOn } from '../stores/modsStore'
 import { useGameStore } from '../stores/gameStore'
 import { useBunnyboardStore } from '../stores/bunnyboardStore'

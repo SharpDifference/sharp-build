@@ -1,4 +1,4 @@
-import { activePlotTwist } from '@shared/plotTwists'
+import { activePlotTwist } from '../../shared/plotTwists'
 
 /** Narrative direction, separated from the output contract and from mechanical state. */
 export function plotTwistBlock(value: string | undefined): string[] {
