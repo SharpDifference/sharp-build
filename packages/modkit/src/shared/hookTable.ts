@@ -185,6 +185,7 @@ export const KIT_APIS = [
   'renderer:promptRequired',
   'renderer:recordField',
   'renderer:registerHooks',
+  'renderer:safePoint',
   'renderer:saveField',
   'renderer:SentText',
   'renderer:submitAction',
@@ -193,6 +194,9 @@ export const KIT_APIS = [
   'renderer:useEmojiTool',
   'renderer:useModOn',
   'renderer:useModOption',
+  'renderer:useSafePoint',
+  'renderer:writeModField',
+  'renderer:writeModFields',
   'main:registerComfyLaunchEnvironment'
 ] as const
 

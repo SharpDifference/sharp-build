@@ -39,7 +39,7 @@ export type {
   WayOn
 } from './hooks'
 export { openPanel, ownsPostComments, postVisible, promptFields, promptLines, promptRequired, registerHooks } from './hooks'
-export { recordField, saveField } from './saveField'
+export { recordField, safePoint, saveField, useSafePoint, writeModField, writeModFields } from './saveField'
 export type { ModDataRecord, RecordFieldHandle, RecordFieldSpec, SaveFieldHandle, SaveFieldSpec } from './saveField'
 export type {
   ManualSaveOffer,

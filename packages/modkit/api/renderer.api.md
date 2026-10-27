@@ -485,6 +485,9 @@ export interface ResolvedSave {
 }
 
 // @public
+export function safePoint(): ManualSaveOffer;
+
+// @public
 export interface SaveChoice extends WayOn {
     label: string;
     message: string;
@@ -500,6 +503,9 @@ export interface SaveFieldHandle<T> {
     read(): T;
     set(next: T): void;
     use(): T;
+    write(next: T, options?: {
+        expect?: T;
+    }): Promise<Result<null>>;
 }
 
 // @public
@@ -763,6 +769,9 @@ export function useModOn(id: string, record?: Pick<PlaythroughRecord, 'mods'> | 
 export function useModOption(modId: string, optionId: string): boolean;
 
 // @public
+export function useSafePoint(): ManualSaveOffer;
+
+// @public
 export type ViewName = 'boot' | 'setup'
 /** The key stage alone, from the menu's top slot when no key is set. */
 | 'apiKey'
@@ -782,6 +791,16 @@ export interface WayOn {
     // (undocumented)
     prepare: () => Promise<(() => ViewName) | null>;
 }
+
+// @public
+export function writeModField<T>(modId: string, next: T, options?: {
+    expect?: T;
+}): Promise<Result<null>>;
+
+// @public
+export function writeModFields(modId: string, next: Readonly<Record<string, unknown>>, options?: {
+    expect?: Readonly<Record<string, unknown>>;
+}): Promise<Result<null>>;
 
 // (No @packageDocumentation comment for this package)
 

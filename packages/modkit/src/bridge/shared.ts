@@ -4,6 +4,7 @@
  * API report, and nothing else in the kit reaches core (the boundary test checks).
  */
 export type {
+  AppError,
   Character,
   CharInfo,
   CharMemory,
@@ -16,6 +17,7 @@ export type {
   ModSceneFields,
   PlaythroughRecord,
   ProjectSession,
+  Result,
   SceneLine,
   SocialPost,
   StructuredRequest,

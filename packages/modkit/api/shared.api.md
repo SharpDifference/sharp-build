@@ -5,6 +5,16 @@
 ```ts
 
 // @public
+export interface AppError {
+    // (undocumented)
+    code: string;
+    // (undocumented)
+    detail?: string;
+    // (undocumented)
+    message: string;
+}
+
+// @public
 export function carryModFiles(context: TermFilesContext): Promise<void>;
 
 // @public
@@ -529,7 +539,7 @@ export interface ImagePromptParts {
 }
 
 // @public
-export const KIT_APIS: readonly ['shared:carryModFiles', 'shared:DEPRECATED_HOOKS', 'shared:hasTrait', 'shared:HOOKS', 'shared:KIT_APIS', 'shared:KIT_VERSION', 'shared:memoryStatusLine', 'shared:modById', 'shared:modOn', 'shared:optionKey', 'shared:optionOn', 'shared:registerCharacterTrait', 'shared:registerImagePromptDraft', 'shared:registerPostCarry', 'shared:registerRomanceRequirement', 'shared:registerTermCarry', 'shared:registerTermFiles', 'shared:REMOVED_HOOKS', 'shared:sharedModOn', 'renderer:Card', 'renderer:EmojiTool', 'renderer:fileLatePost', 'renderer:finishSlotActivity', 'renderer:Locked', 'renderer:modIsOn', 'renderer:openPanel', 'renderer:ownsPostComments', 'renderer:PostCommentAction', 'renderer:PostCommentsView', 'renderer:PostPicture', 'renderer:postVisible', 'renderer:promptFields', 'renderer:promptLines', 'renderer:promptRequired', 'renderer:recordField', 'renderer:registerHooks', 'renderer:saveField', 'renderer:SentText', 'renderer:submitAction', 'renderer:takeTurnFromReply', 'renderer:useBareMessage', 'renderer:useEmojiTool', 'renderer:useModOn', 'renderer:useModOption', 'main:registerComfyLaunchEnvironment'];
+export const KIT_APIS: readonly ['shared:carryModFiles', 'shared:DEPRECATED_HOOKS', 'shared:hasTrait', 'shared:HOOKS', 'shared:KIT_APIS', 'shared:KIT_VERSION', 'shared:memoryStatusLine', 'shared:modById', 'shared:modOn', 'shared:optionKey', 'shared:optionOn', 'shared:registerCharacterTrait', 'shared:registerImagePromptDraft', 'shared:registerPostCarry', 'shared:registerRomanceRequirement', 'shared:registerTermCarry', 'shared:registerTermFiles', 'shared:REMOVED_HOOKS', 'shared:sharedModOn', 'renderer:Card', 'renderer:EmojiTool', 'renderer:fileLatePost', 'renderer:finishSlotActivity', 'renderer:Locked', 'renderer:modIsOn', 'renderer:openPanel', 'renderer:ownsPostComments', 'renderer:PostCommentAction', 'renderer:PostCommentsView', 'renderer:PostPicture', 'renderer:postVisible', 'renderer:promptFields', 'renderer:promptLines', 'renderer:promptRequired', 'renderer:recordField', 'renderer:registerHooks', 'renderer:safePoint', 'renderer:saveField', 'renderer:SentText', 'renderer:submitAction', 'renderer:takeTurnFromReply', 'renderer:useBareMessage', 'renderer:useEmojiTool', 'renderer:useModOn', 'renderer:useModOption', 'renderer:useSafePoint', 'renderer:writeModField', 'renderer:writeModFields', 'main:registerComfyLaunchEnvironment'];
 
 // @public
 export const KIT_VERSION = "0.3.0";
@@ -839,6 +849,15 @@ export interface RemovedHook {
     // (undocumented)
     readonly replacedBy?: string;
 }
+
+// @public
+export type Result<T> = {
+    ok: true;
+    data: T;
+} | {
+    ok: false;
+    error: AppError;
+};
 
 // @public
 export interface SceneLine {

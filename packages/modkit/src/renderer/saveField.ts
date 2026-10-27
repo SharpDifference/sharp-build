@@ -1,5 +1,6 @@
 import { useSyncExternalStore } from 'react'
-import { modById, type ModSlice } from '../bridge/shared'
+import { modById, type ModSlice, type Result } from '../bridge/shared'
+import type { ManualSaveOffer } from '../bridge/renderer'
 import type { TermCarryContext } from '../shared/modCarry'
 import { declaredHooksNow, refusedAsForeign } from './attribution'
 
@@ -43,6 +44,8 @@ export interface SaveFieldHandle<T> {
   use(): T
   /** Replaces the value in memory; it goes out with the next save of any kind. */
   set(next: T): void
+  /** Writes `next` to disk at a safe point, and takes it into the game once it is there: {@link writeModField}. */
+  write(next: T, options?: { expect?: T }): Promise<Result<null>>
 }
 
 /** What a mod keeps on one kind of record: its value's empty state, and how it is read. */
@@ -123,7 +126,8 @@ function sliceFor(modId: string, value: unknown): ModSlice {
 
 /** A handle for a refused registration: it reads `empty` and writes nothing. */
 function inertHandle<T>(empty: T): SaveFieldHandle<T> {
-  return { read: () => empty, use: () => empty, set: () => {} }
+  const write = async (): Promise<Result<null>> => failed('MOD_WRITE_FOREIGN', 'That save field was refused.')
+  return { read: () => empty, use: () => empty, set: () => {}, write }
 }
 
 /**
@@ -154,7 +158,8 @@ export function saveField<T>(modId: string, spec: SaveFieldSpec<T>): SaveFieldHa
     set: (next) => {
       if (!store) throw new Error(`[mods] ${modId}: its save field was set before the game store was loaded`)
       store.set(modId, next)
-    }
+    },
+    write: (next, options) => writeModField(modId, next, options)
   }
 }
 
@@ -254,4 +259,65 @@ export function carryModSlices(
     }
   }
   return ex
+}
+
+/** Where a mod's writes to its save data go: core's write lane, bound at its load. */
+export interface ModWrites {
+  /** Writes each id's next value, the caller's own and those of the mods it requires, at a safe point. */
+  write: (
+    modId: string,
+    next: Readonly<Record<string, unknown>>,
+    options?: { expect?: Readonly<Record<string, unknown>> }
+  ) => Promise<Result<null>>
+  /** Whether a save can be taken now, has to wait for the loop to settle, or never can. */
+  safePoint: () => ManualSaveOffer
+  /** Calls back whenever what {@link ModWrites.safePoint} answers may have moved. */
+  subscribe: (onChange: () => void) => () => void
+}
+
+let modWrites: ModWrites | null = null
+
+/** Hands the mods core's write lane; null takes it away again. */
+export function bindModWrites(next: ModWrites | null): void {
+  modWrites = next
+}
+
+function failed(code: string, message: string): Result<null> {
+  return { ok: false, error: { code, message } }
+}
+
+/**
+ * Writes `next` as the mod's own save data, and as the data of mods its `requires` lists, in one
+ * save: at a point a save can be taken at, behind every save already on its way, and into the
+ * live game only once it is on disk. `expect` is, per id, the value the edit was made from; the
+ * write is refused once that is no longer the live value. A refusal writes nothing and changes
+ * nothing, and comes back as the result's error, never as a throw: `MOD_WRITE_WAIT` (not a safe
+ * point), `MOD_WRITE_STALE`, `MOD_WRITE_OFF`, `MOD_WRITE_FOREIGN`, `MOD_WRITE_NO_GAME`, or the
+ * disk's own error.
+ */
+export async function writeModFields(
+  modId: string,
+  next: Readonly<Record<string, unknown>>,
+  options?: { expect?: Readonly<Record<string, unknown>> }
+): Promise<Result<null>> {
+  if (!modWrites) return failed('MOD_WRITE_NO_GAME', 'There is no game to save into.')
+  return modWrites.write(modId, next, options)
+}
+
+/** {@link writeModFields} for the mod's own data alone; `expect` is the value it edited from. */
+export function writeModField<T>(modId: string, next: T, options?: { expect?: T }): Promise<Result<null>> {
+  const expect = options && Object.hasOwn(options, 'expect') ? { expect: { [modId]: options.expect } } : undefined
+  return writeModFields(modId, { [modId]: next }, expect)
+}
+
+/** Whether a save, and so a {@link writeModFields}, can be taken now (`open`), has to wait, or never can. */
+export function safePoint(): ManualSaveOffer {
+  return modWrites?.safePoint() ?? 'none'
+}
+
+const subscribeSafePoint = (onChange: () => void): (() => void) => modWrites?.subscribe(onChange) ?? (() => {})
+
+/** {@link safePoint}, for a component: it renders again when the answer moves. */
+export function useSafePoint(): ManualSaveOffer {
+  return useSyncExternalStore(subscribeSafePoint, safePoint, safePoint)
 }

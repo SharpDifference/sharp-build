@@ -1,5 +1,6 @@
 /** `@vx/modkit/shared`: what a mod may import on either side of the process boundary. */
 export type {
+  AppError,
   Character,
   CharacterTrait,
   CharacterTraitDefinition,
@@ -27,6 +28,7 @@ export type {
   PostComment,
   ProjectSession,
   PromptEdit,
+  Result,
   SceneLine,
   SlotActivity,
   SlotActivityOffer,
