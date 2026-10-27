@@ -72,6 +72,25 @@ export const EMPTY_SESSION: ModSessionTable = {
   coreVersion: ''
 }
 
+/**
+ * The table's row standing for the mod of that id: the one with a definition. A row without one
+ * (a manifest that could not be read, a copy of a mod the build already carries) is listed by its
+ * folder and stands for no mod.
+ */
+export function sessionRow(table: ModSessionTable, id: string): ModSessionEntry | undefined {
+  return table.mods.find((mod) => mod.id === id && mod.def !== null)
+}
+
+/**
+ * Whether a mod's code is running this session: true for one the table does not hold (an in-repo
+ * one), else only while its row is `loaded` and nothing stopped every installed mod.
+ */
+export function isRunning(table: ModSessionTable, id: string): boolean {
+  const row = sessionRow(table, id)
+  if (!row) return true
+  return row.status === 'loaded' && table.loaderError === null && table.safeStart === null
+}
+
 /** The mods that are running this session, by id. */
 export function loadedIds(table: ModSessionTable): Set<string> {
   return new Set(table.mods.filter((mod) => mod.status === 'loaded').map((mod) => mod.id))

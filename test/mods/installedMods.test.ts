@@ -34,8 +34,11 @@ const entry = (id: string, status: ModSessionEntry['status'], over: Partial<ModD
   style: null
 })
 
+/** A second copy of zebra, refused for being part of the build already: a row with no definition. */
+const zebraCopy: ModSessionEntry = { ...entry('zebra', 'refused'), def: null, message: 'already part of this build', folder: 'C:\\mods\\zebra\\1.0.0' }
+
 const table: ModSessionTable = {
-  mods: [entry('zebra', 'loaded'), entry('apple', 'needs-update'), entry('lib', 'loaded', { library: true }), entry('user', 'loaded', { requires: ['lib'] })],
+  mods: [entry('zebra', 'loaded'), entry('apple', 'needs-update'), entry('lib', 'loaded', { library: true }), entry('user', 'loaded', { requires: ['lib'] }), zebraCopy],
   order: ['lib', 'user', 'zebra'],
   safeStart: null,
   loaderError: null,
@@ -65,7 +68,7 @@ describe('MODS with the installed mods', () => {
     const { withMod, NO_SWITCHES } = await import('@shared/mods')
     useModsStore.setState({ switches: withMod(NO_SWITCHES, 'apple', true) })
     expect(modIsOn('apple')).toBe(false)
-    expect(modIsOn('zebra')).toBe(true)
+    // The refused copy of zebra stands for no mod: zebra itself runs on.
     expect(modIsOn('zebra')).toBe(true)
   })
 

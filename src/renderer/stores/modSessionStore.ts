@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 import { modById, MODS } from '@shared/mods'
-import type { ModSessionEntry, ModSessionTable, ModStatus } from '@shared/modSession'
+import { isRunning, sessionRow, type ModSessionEntry, type ModSessionTable, type ModStatus } from '@shared/modSession'
 import type { PlaythroughRecord } from '@shared/types'
 import { startTable } from '../installedMods'
 
@@ -64,14 +64,13 @@ export const useModSessionStore = create<ModSessionState>((set, get) => ({
 
   running: (id) => {
     const { table, shiftStart } = get()
-    const mod = table.mods.find((one) => one.id === id)
-    if (!mod) return true
-    return mod.status === 'loaded' && table.loaderError === null && table.safeStart === null && !shiftStart
+    if (!sessionRow(table, id)) return true
+    return isRunning(table, id) && !shiftStart
   },
 
   markFailed: (id, status, message) => {
     const { table } = get()
-    const mod = table.mods.find((one) => one.id === id)
+    const mod = sessionRow(table, id)
     if (!mod || mod.status !== 'loaded') return
     console.error(`[mods] ${id}: ${status}: ${message}`)
     set({
@@ -89,7 +88,8 @@ export const useModSessionStore = create<ModSessionState>((set, get) => ({
   noticeAtStart: (seen) => {
     const { table, running } = get()
     // A library that is not running is named by its dependents' rows, not by a line of its own.
-    const silent = table.mods.filter((mod) => !running(mod.id) && !mod.def?.library && seen[mod.id] !== noticeKeyOf(mod))
+    // A row with no definition stands for no mod, so it is named by itself.
+    const silent = table.mods.filter((mod) => (mod.def === null || !running(mod.id)) && !mod.def?.library && seen[mod.id] !== noticeKeyOf(mod))
     if (silent.length === 0) return
     set({ notice: { kind: 'start', mods: silent } })
     void window.api.mods.noticesSeen(Object.fromEntries(silent.map((mod) => [mod.id, noticeKeyOf(mod)])))

@@ -11,7 +11,7 @@ import {
   type ModDef,
   type ModSwitches
 } from '@shared/mods'
-import type { ModSessionEntry } from '@shared/modSession'
+import { sessionRow, type ModSessionEntry } from '@shared/modSession'
 import { ConfirmModal } from '../components/ConfirmModal'
 import { useModalShell } from '../components/useModalShell'
 import { TitleTab } from '../components/TitleTab'
@@ -139,7 +139,7 @@ export function ModsModal({ theme, onClose, inGame = false, warn }: ModsModalPro
   const listed = MODS.filter((mod) => !mod.library)
   // A folder whose manifest could not be read has no entry in the list: it gets a row of its own, by folder.
   const unreadable = table.mods.filter((mod) => mod.def === null)
-  const sessionOf = (id: string): ModSessionEntry | undefined => table.mods.find((mod) => mod.id === id && mod.def !== null)
+  const sessionOf = (id: string): ModSessionEntry | undefined => sessionRow(table, id)
   const [selectedId, setSelectedId] = useState(listed[0]?.id ?? null)
 
   const { host, overlayProps } = useModalShell(close)
@@ -242,7 +242,7 @@ export function ModsModal({ theme, onClose, inGame = false, warn }: ModsModalPro
                   <span className="vu-mods-name">{folderName(mod.folder)}</span>
                   <span className="vu-mods-meta">{mod.dev ? 'developer folder' : 'installed folder'}</span>
                   <span className="vu-mods-row-line" data-kind="needs">
-                    Could not be read: {mod.message}
+                    Not running this session: {mod.message}
                   </span>
                 </span>
               </li>

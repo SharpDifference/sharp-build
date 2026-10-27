@@ -2,6 +2,7 @@ import { existsSync, readFileSync, statSync } from 'fs'
 import { basename, join, resolve } from 'path'
 import { checkCompat, hookNameKind, modDefOf, parseManifest } from '@vx/modkit/host/shared'
 import { satisfies } from '../../../packages/modkit/src/shared/range'
+import { MODS } from '@shared/mods'
 import { modFileUrl, type ModSessionEntry, type ModSessionTable, type ModStatus, type SafeStart } from '@shared/modSession'
 import { findInstalledMods } from './layout'
 import { orderMods, type OrderInput } from './order'
@@ -76,7 +77,11 @@ function approvedOf(folder: string): boolean {
   }
 }
 
-/** A row for a folder whose manifest could not be read, under the folder's name. */
+/**
+ * A row with no definition, under the folder's name: a manifest that could not be read, or a copy
+ * of a mod the build already carries. It stands for no mod of the list, so a mod of that id in
+ * the build keeps running.
+ */
 function unreadable(id: string, folder: string, dev: boolean, message: string): Candidate {
   return {
     entry: { id, manifest: null, def: null, status: 'refused', message, warnings: [], folder, dev, renderer: null, style: null },
@@ -100,6 +105,8 @@ function readCandidate(folder: string, expect: { id: string; version: string } |
   const parsed = parseManifest(json, expect)
   if (!parsed.ok) return unreadable(name, folder, dev, parsed.error)
   const manifest = parsed.manifest
+  // The build's own copy is in the bundle already; a second one would answer every hook twice.
+  if (MODS.some((mod) => mod.id === manifest.id)) return unreadable(name, folder, dev, 'already part of this build')
   const hasMain = isFile(join(folder, 'main.js'))
   const candidate: Candidate = {
     entry: {
