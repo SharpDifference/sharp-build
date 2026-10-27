@@ -26,12 +26,16 @@ export interface LoaderInput {
   readonly devFolders: readonly string[]
   /** Whether main-process code from a source the build has not reviewed may run. */
   readonly allowUnreviewedMain: boolean
-  /** The game's version, which a manifest's `game` range is held against and the table names. */
+  /** The build's version (`BUILD.version`), which the table and the messages name as core's. */
   readonly coreVersion: string
+  /** The game's version (`app.getVersion()`), which a manifest's `game` range is held against. */
+  readonly gameVersion: string
   /** Why nothing is to run this session, where that is so. */
   readonly safeStart: SafeStart
   /** Where the loader's own lines go. */
   readonly log: (line: string) => void
+  /** Where its warnings go: a line about something it went on without. */
+  readonly warn: (line: string) => void
   /** Requires one `main.js`; the real one unless a test, or a rerun, stands in. */
   readonly requireMain?: (ctx: MainContext) => unknown
 }
@@ -165,8 +169,8 @@ function findCandidates(input: LoaderInput): Candidate[] {
   return candidates
 }
 
-/** Holds each readable manifest's hooks and APIs to core, and its `game` range to this version. */
-function checkCandidates(candidates: Candidate[], coreVersion: string): void {
+/** Holds each readable manifest's hooks and APIs to core, and its `game` range to the game's version. */
+function checkCandidates(candidates: Candidate[], gameVersion: string): void {
   for (const candidate of candidates) {
     const manifest = candidate.entry.manifest
     if (!manifest || candidate.entry.status !== 'loaded') continue
@@ -178,14 +182,14 @@ function checkCandidates(candidates: Candidate[], coreVersion: string): void {
     for (const hook of compat.deprecated) {
       candidate.entry.warnings.push(`uses \`${hook.name}\`, going in core ${hook.goesIn} (replaced by \`${hook.replacedBy}\`)`)
     }
-    if (manifest.game !== undefined && !satisfies(coreVersion, manifest.game)) {
-      candidate.entry.warnings.push(`made for Venus University ${manifest.game}; this is ${coreVersion}`)
+    if (manifest.game !== undefined && !satisfies(gameVersion, manifest.game)) {
+      candidate.entry.warnings.push(`made for Venus University ${manifest.game}; this is ${gameVersion}`)
     }
   }
 }
 
 /** Blocks what cannot load for what it requires, and answers the load order of the rest. */
-function orderCandidates(candidates: Candidate[]): { order: readonly string[]; optionalPresent: Readonly<Record<string, readonly string[]>> } {
+function orderCandidates(candidates: Candidate[], warn: (line: string) => void): { order: readonly string[]; optionalPresent: Readonly<Record<string, readonly string[]>> } {
   const byId = new Map(candidates.filter((one) => one.entry.manifest).map((one) => [one.entry.id, one]))
   const inputs: OrderInput[] = [...byId.values()].map((one) => ({
     id: one.entry.id,
@@ -201,6 +205,9 @@ function orderCandidates(candidates: Candidate[]): { order: readonly string[]; o
     if (candidate) fail(candidate, 'blocked', message)
   }
   for (const [id, warnings] of Object.entries(ordered.warnings)) byId.get(id)?.entry.warnings.push(...warnings)
+  for (const [id, skipped] of Object.entries(ordered.optionalSkipped)) {
+    for (const dep of skipped) warn(`[mods] ${id}: optional ${dep} is installed but did not load; running without it`)
+  }
 
   // A library's exports are a contract like a hook's: a name a dependent uses must still be there.
   for (const id of ordered.order) {
@@ -331,8 +338,8 @@ export function loadMods(input: LoaderInput): LoaderResult {
   let candidates: Candidate[] = []
   try {
     candidates = findCandidates(input)
-    checkCandidates(candidates, input.coreVersion)
-    const { order, optionalPresent } = orderCandidates(candidates)
+    checkCandidates(candidates, input.gameVersion)
+    const { order, optionalPresent } = orderCandidates(candidates, input.warn)
     permitCandidates(candidates, input.allowUnreviewedMain)
     if (input.safeStart !== null) {
       input.log(`[mods] started without mods (${input.safeStart}): nothing installed runs this session`)

@@ -31,6 +31,8 @@ export interface Ordered {
   readonly optionalPresent: Readonly<Record<string, readonly string[]>>
   /** Per mod, quieter notes: an optional dependency present but out of range, left out. */
   readonly warnings: Readonly<Record<string, readonly string[]>>
+  /** Per mod, the ids of its `optional` dependencies present and in range that did not load, left out. */
+  readonly optionalSkipped: Readonly<Record<string, readonly string[]>>
 }
 
 type ById = ReadonlyMap<string, OrderInput>
@@ -139,6 +141,7 @@ export function orderMods(mods: readonly OrderInput[]): Ordered {
   const blocked: Record<string, string> = {}
   const optionalPresent: Record<string, string[]> = {}
   const warnings: Record<string, string[]> = {}
+  const optionalSkipped: Record<string, string[]> = {}
 
   for (const [id, path] of cycles) {
     if (byId.get(id)?.loadable) blocked[id] = `requires itself through ${path.join(' → ')}`
@@ -155,8 +158,11 @@ export function orderMods(mods: readonly OrderInput[]): Ordered {
     }
     order.push(id)
     loaded.add(id)
-    const present = optionalInRange(mod, byId).filter((dep) => loaded.has(dep))
+    const inRange = optionalInRange(mod, byId)
+    const present = inRange.filter((dep) => loaded.has(dep))
+    const skipped = inRange.filter((dep) => !loaded.has(dep))
     if (present.length > 0) optionalPresent[id] = present
+    if (skipped.length > 0) optionalSkipped[id] = skipped
   }
-  return { order, blocked, optionalPresent, warnings }
+  return { order, blocked, optionalPresent, warnings, optionalSkipped }
 }

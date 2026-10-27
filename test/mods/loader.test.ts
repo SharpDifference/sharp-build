@@ -34,9 +34,11 @@ function run(over: Partial<LoaderInput> = {}): LoaderResult {
     modsDir: join(root, 'mods'),
     devFolders: [],
     allowUnreviewedMain: false,
-    coreVersion: '0.6.0',
+    coreVersion: '0.1.0',
+    gameVersion: '0.6.0',
     safeStart: null,
     log: (line) => lines.push(line),
+    warn: (line) => lines.push(line),
     ...over
   })
 }
@@ -187,13 +189,12 @@ describe('the loader on the folders', () => {
 
   it('warns, and still loads, a mod made for another version of the game', () => {
     installFixture(root, 'hello-mod')
-    const manifest = JSON.parse(String(Buffer.from(JSON.stringify({})))) as object
-    void manifest
-    const result = run({ coreVersion: '0.9.0' })
+    const result = run({ gameVersion: '0.9.0' })
     expect(statusOf(result, 'hello-mod')).toBe('loaded')
+    expect(result.table.coreVersion).toBe('0.1.0')
     const bounded = { ...JSON.parse(require('fs').readFileSync(join(FIXTURES, 'hello-mod', 'vxmod.json'), 'utf8')), game: '>=0.6.0 <0.8.0' }
     require('fs').writeFileSync(join(root, 'mods', 'hello-mod', '1.0.0', 'vxmod.json'), JSON.stringify(bounded))
-    const warned = run({ coreVersion: '0.9.0' })
+    const warned = run({ gameVersion: '0.9.0' })
     expect(statusOf(warned, 'hello-mod')).toBe('loaded')
     expect(warned.table.mods.find((mod) => mod.id === 'hello-mod')?.warnings).toEqual(['made for Venus University >=0.6.0 <0.8.0; this is 0.9.0'])
   })

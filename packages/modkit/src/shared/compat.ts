@@ -25,7 +25,7 @@ export const CORE_SURFACE: CoreSurface = {
 /** A hook or API the manifest names that core does not have. */
 export interface MissingHook {
   readonly name: string
-  /** The core release that dropped it; absent for a name core never had. */
+  /** The build's release that dropped it (`BUILD.version`); absent for a name core never had. */
   readonly removedIn?: string
   readonly replacedBy?: string
 }

@@ -39,7 +39,7 @@ const table: ModSessionTable = {
   order: ['lib', 'user', 'zebra'],
   safeStart: null,
   loaderError: null,
-  coreVersion: '0.6.0'
+  coreVersion: '0.1.0'
 }
 
 beforeEach(() => {

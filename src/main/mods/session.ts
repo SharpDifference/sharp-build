@@ -2,6 +2,7 @@ import { app, BrowserWindow, ipcMain, type IpcMainInvokeEvent } from 'electron'
 import { readFileSync } from 'fs'
 import { basename, resolve } from 'path'
 import type { ModSessionTable, ModStatus, SafeStart } from '@shared/modSession'
+import { BUILD } from '@shared/mods'
 import type { Settings } from '@shared/types'
 import { getModsDirPath, getSettingsPath } from '../paths'
 import { patchStoredSettings } from '../services/settingsService'
@@ -48,15 +49,17 @@ export function startModSession(): void {
     modsDir: getModsDirPath(),
     devFolders,
     allowUnreviewedMain,
-    coreVersion: app.getVersion(),
+    coreVersion: BUILD.version,
+    gameVersion: app.getVersion(),
     safeStart: safeStartOf(),
-    log: (line) => console.log(line)
+    log: (line) => console.log(line),
+    warn: (line) => console.warn(line)
   })
 }
 
 /** The table as it stands; empty until {@link startModSession} has run. */
 export function modSession(): ModSessionTable {
-  return result?.table ?? { mods: [], order: [], safeStart: null, loaderError: null, coreVersion: app.getVersion() }
+  return result?.table ?? { mods: [], order: [], safeStart: null, loaderError: null, coreVersion: BUILD.version }
 }
 
 /**
@@ -71,9 +74,11 @@ function rerunChecks(): void {
     modsDir: getModsDirPath(),
     devFolders,
     allowUnreviewedMain,
-    coreVersion: app.getVersion(),
+    coreVersion: BUILD.version,
+    gameVersion: app.getVersion(),
     safeStart: safeStartOf(),
     log: (line) => console.log(line),
+    warn: (line) => console.warn(line),
     requireMain: (ctx: MainContext) => {
       if (before?.mainExports.has(ctx.id)) return before.mainExports.get(ctx.id)
       // A mod whose main.js was not required at the first start cannot start now: main code is

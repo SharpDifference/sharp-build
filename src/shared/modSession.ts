@@ -56,7 +56,10 @@ export interface ModSessionTable {
   safeStart: SafeStart
   /** The loader itself threw: every installed mod is off for the session, and this says why. */
   loaderError: string | null
-  /** Core's version, as the messages name it. */
+  /**
+   * The build's version (`BUILD.version`), which the messages name as core's. A manifest's `game`
+   * range is held to the game's own version instead.
+   */
   coreVersion: string
 }
 

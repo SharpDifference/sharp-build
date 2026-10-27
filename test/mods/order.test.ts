@@ -9,7 +9,7 @@ function mod(id: string, over: Partial<OrderInput> = {}): OrderInput {
 describe('orderMods', () => {
   it('loads a chain from the bottom up', () => {
     const result = orderMods([mod('c', { requires: { b: '^1.0.0' } }), mod('b', { requires: { a: '*' } }), mod('a')])
-    expect(result).toEqual({ order: ['a', 'b', 'c'], blocked: {}, optionalPresent: {}, warnings: {} })
+    expect(result).toEqual({ order: ['a', 'b', 'c'], blocked: {}, optionalPresent: {}, warnings: {}, optionalSkipped: {} })
   })
 
   it('loads a diamond with its shared dependency first and its joining mod last', () => {
@@ -71,17 +71,19 @@ describe('orderMods', () => {
     expect(result.blocked).toEqual({ 'photo-feature': 'needs Mini-games, which did not load' })
   })
 
-  it('loads an optional dependency in range first, and passes over one absent or out of range', () => {
+  it('loads an optional dependency in range first, and passes over one absent, out of range or not loaded', () => {
     const result = orderMods([
-      mod('album', { optional: { zine: '^1.0.0', ghost: '*', 'photo-feature': '^2.0.0' } }),
+      mod('album', { optional: { zine: '^1.0.0', ghost: '*', 'photo-feature': '^2.0.0', broken: '*' } }),
       mod('zine'),
-      mod('photo-feature', { version: '1.4.0' })
+      mod('photo-feature', { version: '1.4.0' }),
+      mod('broken', { loadable: false })
     ])
     expect(result).toEqual({
       order: ['photo-feature', 'zine', 'album'],
       blocked: {},
       optionalPresent: { album: ['zine'] },
-      warnings: { album: ['optional photo-feature ^2.0.0: 1.4.0 is installed, left out'] }
+      warnings: { album: ['optional photo-feature ^2.0.0: 1.4.0 is installed, left out'] },
+      optionalSkipped: { album: ['broken'] }
     })
   })
 })

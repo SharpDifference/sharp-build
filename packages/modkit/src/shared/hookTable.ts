@@ -126,14 +126,14 @@ export interface DeprecatedHook {
   readonly name: string
   /** The hook that replaces it. */
   readonly replacedBy: string
-  /** The core release it goes in. */
+  /** The build's release it goes in (`BUILD.version`), not the game's. */
   readonly goesIn: string
 }
 
 /** A hook that is gone: what the compatibility check names in "needs an update". */
 export interface RemovedHook {
   readonly name: string
-  /** The core release that dropped it. */
+  /** The build's release that dropped it (`BUILD.version`), not the game's. */
   readonly removedIn: string
   readonly replacedBy?: string
 }
