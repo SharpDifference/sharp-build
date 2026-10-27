@@ -79,6 +79,8 @@ export interface CharMemory {
     date: number;
     // (undocumented)
     desc: string;
+    echoAffinity?: 'matching' | 'competing';
+    echoBoosted?: boolean;
     // (undocumented)
     type: MemoryType;
 }
@@ -88,6 +90,7 @@ export interface ChatMessage {
     date: number;
     error?: boolean;
     everydayAsk?: EverydayAsk;
+    exReplyTo?: string;
     id: string;
     invite?: true;
     inviteKind?: InviteKind;
@@ -138,7 +141,15 @@ export interface GameSave {
     droppedClasses: Record<string, DroppedClass>;
     endingArtWanted: boolean;
     events: CalendarEvent[];
+    // (undocumented)
+    exBreakthrough?: BreakthroughState;
+    exCharacterDynamics?: CharacterDynamics;
+    // (undocumented)
+    exEcho?: EchoState;
+    exNpcWatch?: MeanwhileStore;
     expelled: boolean;
+    exReckoning?: ReckoningState;
+    exStoryMemory?: StoryMemory;
     farewellsDone: string[];
     feedExtras: FeedExtras | null;
     // (undocumented)
@@ -165,6 +176,7 @@ export interface GameSave {
     outingSlots: Record<string, number>;
     playerSchedule: Record<number, string>;
     playthroughId: string;
+    presetVars?: Record<string, string>;
     readerCold?: ColdCase;
     readerColdsHad?: number[];
     replays?: GameReplays;
@@ -619,6 +631,7 @@ export interface LedgerResponse {
         event: RelationshipEvent;
     }>;
     expelled?: boolean;
+    exStoryFacts?: unknown;
     memories?: Array<{
         charKey: string;
         type: MemoryType;
@@ -912,10 +925,14 @@ export interface StructuredRequest {
     kind?: PromptKind;
     logFrom?: number;
     minThinking?: ThinkingLevel;
+    parts?: GamePart[];
+    preset?: PresetRequest;
+    sceneSpot?: SceneSpotTag;
     schema: {
         name: string;
         schema: Record<string, unknown>;
     };
+    storyMemory?: StoryRecallRequest;
     // (undocumented)
     system: string;
     // (undocumented)
