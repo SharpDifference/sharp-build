@@ -4,8 +4,8 @@ import { UnspokenLinkGlitch } from './UnspokenLinkGlitch'
 import { ReckoningModal } from './ReckoningModal'
 import { ReckoningDungeonView } from './ReckoningDungeon'
 import { dungeonVisible } from '../stores/reckoningDungeon'
-import { EchoAura, EchoPanel } from './EchoPanel'
-import { ensureEchoes } from '../modEntries/echo'
+import { EchoPanel } from './EchoPanel'
+import { ensureEchoes } from '../stores/echoAssignments'
 import { StoryMemoryModal } from './StoryMemoryModal'
 import { modIsOn } from '../stores/modsStore'
 import { useModsStore } from '../stores/modsStore'
@@ -463,7 +463,6 @@ function PortraitSlot({
           : undefined
       }
     >
-      <EchoAura charId={charId} />
       <ModSlot slot="portraitOverlay" props={{ charId }} />
       {/* Both halves of a change breathe as one, so a crossfade never comes apart. */}
       <motion.div className="vu-stage-breath" animate={breathing}>
