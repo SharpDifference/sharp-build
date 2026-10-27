@@ -5,6 +5,9 @@
 Adds the hooks `gameModals`, `railButton`, `landingTool` and `gameMenuEntry`, and the API
 `openPanel` from `@vx/modkit/renderer`.
 
+- `registerImagePromptDraft` in `shared`, with its types: a mod's tags in her sprite and CG prompt
+  drafts, asked in id order while it is on, in the editor and in every render alike.
+
 ## 0.1.0
 
 The kit exists. Everything a mod could import from core's mod system, under three entry points

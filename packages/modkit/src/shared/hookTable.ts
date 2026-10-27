@@ -156,6 +156,7 @@ export const KIT_APIS = [
   'shared:optionKey',
   'shared:optionOn',
   'shared:registerCharacterTrait',
+  'shared:registerImagePromptDraft',
   'shared:registerPostCarry',
   'shared:registerRomanceRequirement',
   'shared:registerTermCarry',
