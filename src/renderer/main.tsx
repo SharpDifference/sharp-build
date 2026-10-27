@@ -1,5 +1,7 @@
 // First of all, so the console is wrapped before anything else in the renderer can print.
 import './consoleLog'
+// Then the installed mods' entries join `MODS`, before any module can read the list.
+import './installedMods'
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import { MotionConfig } from 'motion/react'

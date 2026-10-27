@@ -1,7 +1,7 @@
 import { useEffect, useState, type JSX } from 'react'
 import { AnimatePresence } from 'motion/react'
 import { writerReady } from '@shared/settingsRules'
-import './mods'
+import { loadInstalledMods } from './mods'
 import { Crossing } from './components/Crossing'
 import { Cursor } from './components/Cursor'
 import { ModalHost } from './components/ModalHost'
@@ -31,7 +31,7 @@ import { useGameStore } from './stores/gameStore'
 import { useGrabBagStore } from './stores/grabBagStore'
 import { convertLegacyImages } from './stores/legacyImageStore'
 import { useSaveStore } from './stores/saveStore'
-import { useModsStore } from './stores/modsStore'
+import { modIsOn, useModsStore } from './stores/modsStore'
 import { useSettingsStore } from './stores/settingsStore'
 import { comfySourceOf } from '@shared/comfyModels'
 import { comfySettled, useSetupStore } from './stores/setupStore'
@@ -86,6 +86,10 @@ async function boot(): Promise<void> {
 
   // Non-fatal too: with no switches read, every community mod runs at its default.
   await useModsStore.getState().load()
+
+  // The installed mods' code, imported one at a time, every registration made before any screen
+  // draws. One that fails is off for the session, and the notice under the cover says so.
+  await loadInstalledMods((id) => modIsOn(id))
 
   // The graph opens as soon as the sliders it mixes against are in.
   useAudioStore.getState().start()

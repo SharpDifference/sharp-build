@@ -1,0 +1,109 @@
+import { create } from 'zustand'
+import { modById, MODS } from '@shared/mods'
+import type { ModSessionEntry, ModSessionTable, ModStatus } from '@shared/modSession'
+import type { PlaythroughRecord } from '@shared/types'
+import { startTable } from '../installedMods'
+
+/**
+ * The installed mods this session: main's table as the window started with it, and what the
+ * window itself found while importing each `renderer.js`. The hooks ask here whether a mod is
+ * running before they ask its switch; the Mods screen reads each row's standing here; the notice
+ * at start and the game's own notice are raised from here.
+ */
+
+/** A developer folder changed on disk; what the toast offers depends on which file. */
+export interface DevChange {
+  id: string
+  kind: 'renderer' | 'main'
+}
+
+/** What one of the two notices says: its title, and a line per mod. */
+export interface ModNotice {
+  kind: 'start' | 'game'
+  mods: ModSessionEntry[]
+}
+
+interface ModSessionState {
+  table: ModSessionTable
+  /** Shift was held at start: nothing installed was imported, whatever the table says. */
+  shiftStart: boolean
+  notice: ModNotice | null
+  devChange: DevChange | null
+
+  /** Whether an installed mod's code is running; true for a mod that is not installed (an in-repo one). */
+  running: (id: string) => boolean
+  /** Turns a mod off for the session: nothing of it is asked, its files stop being served, its data is kept. */
+  markFailed: (id: string, status: ModStatus, message: string) => void
+  setShiftStart: () => void
+  /** Raises the start notice for the mods not running that the player has not been told of at this version. */
+  noticeAtStart: (seen: Readonly<Record<string, string>>) => void
+  /** Raises the game's notice where its record names a `playthrough` mod that is not running. */
+  gameEntered: (record: Pick<PlaythroughRecord, 'mods'>) => void
+  dismissNotice: () => void
+  setDevChange: (change: DevChange | null) => void
+}
+
+/** What the start notice remembers a mod by: its version, or the fact that its manifest could not be read. */
+export function noticeKeyOf(mod: ModSessionEntry): string {
+  return mod.manifest?.version ?? 'unreadable'
+}
+
+/** The one line a row and the notice say of a mod that is not running. */
+export function notRunningLine(mod: ModSessionEntry, table: ModSessionTable, shiftStart: boolean): string {
+  if (table.loaderError) return table.loaderError
+  if (shiftStart) return 'started with Shift held: no installed mod is running'
+  if (table.safeStart === 'flag') return 'started with --no-mods: no installed mod is running'
+  return mod.message ?? mod.status
+}
+
+export const useModSessionStore = create<ModSessionState>((set, get) => ({
+  table: startTable,
+  shiftStart: false,
+  notice: null,
+  devChange: null,
+
+  running: (id) => {
+    const { table, shiftStart } = get()
+    const mod = table.mods.find((one) => one.id === id)
+    if (!mod) return true
+    return mod.status === 'loaded' && table.loaderError === null && table.safeStart === null && !shiftStart
+  },
+
+  markFailed: (id, status, message) => {
+    const { table } = get()
+    const mod = table.mods.find((one) => one.id === id)
+    if (!mod || mod.status !== 'loaded') return
+    console.error(`[mods] ${id}: ${status}: ${message}`)
+    set({
+      table: {
+        ...table,
+        mods: table.mods.map((one) => (one.id === id ? { ...one, status, message } : one)),
+        order: table.order.filter((one) => one !== id)
+      }
+    })
+    void window.api.mods.failed(id, status, message)
+  },
+
+  setShiftStart: () => set({ shiftStart: true }),
+
+  noticeAtStart: (seen) => {
+    const { table, running } = get()
+    // A library that is not running is named by its dependents' rows, not by a line of its own.
+    const silent = table.mods.filter((mod) => !running(mod.id) && !mod.def?.library && seen[mod.id] !== noticeKeyOf(mod))
+    if (silent.length === 0) return
+    set({ notice: { kind: 'start', mods: silent } })
+    void window.api.mods.noticesSeen(Object.fromEntries(silent.map((mod) => [mod.id, noticeKeyOf(mod)])))
+  },
+
+  gameEntered: (record) => {
+    const { table, running } = get()
+    const missing = table.mods.filter(
+      (mod) => record.mods?.includes(mod.id) && modById(mod.id, MODS)?.scope === 'playthrough' && !running(mod.id)
+    )
+    if (missing.length > 0) set({ notice: { kind: 'game', mods: missing } })
+  },
+
+  dismissNotice: () => set({ notice: null }),
+
+  setDevChange: (devChange) => set({ devChange })
+}))
