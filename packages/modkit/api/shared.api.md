@@ -495,6 +495,12 @@ export const HOOKS: readonly [{
     readonly dispatch: readonly ['screenSlot'];
     readonly since: '0.1.0';
 }, {
+    readonly name: 'conversationFoot';
+    readonly side: 'renderer';
+    readonly kind: 'slot';
+    readonly dispatch: readonly ["screenSlot"];
+    readonly since: '0.2.0';
+}, {
     readonly name: "mapOverlay";
     readonly side: 'renderer';
     readonly kind: 'slot';
@@ -545,7 +551,7 @@ export type HookSide = 'shared' | 'renderer' | 'main';
 export const KIT_APIS: readonly ['shared:carryModFiles', 'shared:DEPRECATED_HOOKS', 'shared:hasTrait', 'shared:HOOKS', 'shared:KIT_APIS', 'shared:KIT_VERSION', 'shared:memoryStatusLine', 'shared:modById', 'shared:modOn', 'shared:optionKey', 'shared:optionOn', 'shared:registerCharacterTrait', 'shared:registerPostCarry', 'shared:registerRomanceRequirement', 'shared:registerTermCarry', 'shared:registerTermFiles', 'shared:REMOVED_HOOKS', 'shared:sharedModOn', 'renderer:Card', 'renderer:EmojiTool', 'renderer:fileLatePost', 'renderer:finishSlotActivity', 'renderer:Locked', 'renderer:modIsOn', 'renderer:ownsPostComments', 'renderer:PostCommentAction', 'renderer:PostCommentsView', 'renderer:PostPicture', 'renderer:postVisible', 'renderer:promptFields', 'renderer:promptLines', 'renderer:promptRequired', 'renderer:registerHooks', 'renderer:SentText', 'renderer:submitAction', 'renderer:takeTurnFromReply', 'renderer:useBareMessage', 'renderer:useEmojiTool', 'renderer:useModOn', 'renderer:useModOption', 'main:registerComfyLaunchEnvironment'];
 
 // @public
-export const KIT_VERSION = "0.1.0";
+export const KIT_VERSION = "0.2.0";
 
 // @public (undocumented)
 export type KitApiName = (typeof KIT_APIS)[number];

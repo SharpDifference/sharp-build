@@ -410,6 +410,8 @@ export interface ModHooks {
   portraitOverlay?: ComponentType<ScreenSlotProps['portraitOverlay']>
   /** Mounted in the phone's veil for as long as the phone is open. */
   phoneOverlay?: ComponentType<ScreenSlotProps['phoneOverlay']>
+  /** Below a person's message history, before the native composer. Not drawn for bot threads. */
+  conversationFoot?: ComponentType<ScreenSlotProps['conversationFoot']>
   /** Drawn on the map, under the places and above its foot. */
   mapOverlay?: ComponentType<ScreenSlotProps['mapOverlay']>
   /** Drawn on the Photos page, under the grid of photos. */
@@ -443,6 +445,10 @@ export interface ScreenSlotProps {
   }
   portraitOverlay: { charId: string }
   phoneOverlay: Record<string, never>
+  conversationFoot: {
+    /** The open person's conversation key. The contribution remounts when the thread changes. */
+    charId: string
+  }
   mapOverlay: {
     /** The map was opened to go somewhere, not only to look. */
     canTravel: boolean

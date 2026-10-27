@@ -101,6 +101,7 @@ export const HOOKS = [
   slot('settingsSection'),
   slot('portraitOverlay'),
   slot('phoneOverlay'),
+  { name: 'conversationFoot', side: 'renderer', kind: 'slot', dispatch: ['screenSlot'], since: '0.2.0' },
   slot('mapOverlay'),
   slot('photosPageSection'),
   slot('editCharacterImages'),

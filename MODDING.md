@@ -495,6 +495,30 @@ Windows aliases, errors/disposal, and the real service's launch boundary with mo
   optional additions do not make older files invalid. Mods own normalization and carryover.
 - The native `lorebook` Bunnyboard tab is reserved, like Chats and Friends.
 
+## Conversation footer
+
+`conversationFoot` is an additive screen slot below a person's message history, outside its
+scrolling list, and immediately before the native composer or its stand-in. It receives
+`{ charId: string }`. BunnyBot, VenusBot and employer threads do not draw this slot. Each enabled
+mod contributes its own component in mod-list order, inside its own error boundary; no provider
+means no markup or additional spacing. Changing the open conversation remounts the contribution.
+
+```ts
+import { registerHooks } from '@vx/modkit/renderer'
+
+registerHooks(MY_MOD, { conversationFoot: MyConversationTools })
+```
+
+The slot grants a place to draw, not permission to send or replace messages. It remains present
+when a person's thread is read-only or busy, so a mod may explain a disabled action. The mod's
+action must use its existing thread/save guards and cancellation rules. It must not infer that
+mounting the component means a send or regeneration is allowed. The slot itself performs no
+model call, persistence, history replacement or composer change.
+
+This retires Text Regeneration's direct `TextRegenerate` import and mount in
+`BunnyboardModal.tsx` when that mod registers its component on main. Its transaction API is
+separate; this hook alone does not make Text Regeneration a standalone mod.
+
 ## Character trait registration
 
 `shared/traits.ts` owns the native trait vocabulary and an additive registry. Register from

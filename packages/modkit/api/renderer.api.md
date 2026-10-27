@@ -144,6 +144,7 @@ export interface ModHooks {
     }) => Partial<Character>;
     contactPostExtra?: ComponentType<ScreenSlotProps['contactPostExtra']>;
     contactTab?: ContactTab;
+    conversationFoot?: ComponentType<ScreenSlotProps['conversationFoot']>;
     dmHistoryNote?: (message: ChatMessage) => string;
     editCharacterImages?: ComponentType<ScreenSlotProps['editCharacterImages']>;
     editorField?: EditorField;
@@ -485,6 +486,10 @@ export interface ScreenSlotProps {
     contactPostExtra: {
         charId: string;
         post: SocialPost;
+    };
+    // (undocumented)
+    conversationFoot: {
+        charId: string;
     };
     // (undocumented)
     editCharacterImages: {
