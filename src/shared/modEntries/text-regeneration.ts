@@ -1,4 +1,4 @@
-import type { ModDef } from '../mods'
+import type { ModDef } from '@vx/modkit/shared'
 import { TEXT_REGENERATION_MOD } from '../textRegeneration'
 
 const mod: ModDef = {

@@ -1,4 +1,4 @@
-import { modOn, optionOn } from '@shared/mods'
+import { modOn, optionOn } from '@vx/modkit/shared'
 import {
   assertStoryRecall,
   formatStoryRecall,
@@ -7,8 +7,8 @@ import {
   STORY_MEMORY_LIGHT_OPTION,
   type StoryRecall,
   type StoryRecallRequest
-} from '@shared/storyMemory'
-import type { StructuredRequest } from '@shared/types'
+} from '../shared/storyMemory'
+import type { StructuredRequest } from '@vx/modkit/shared'
 import { readModSwitches } from './mods'
 
 /** Browser saves already live in IndexedDB; the native SQLite cache is desktop-only. */

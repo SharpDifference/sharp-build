@@ -1,6 +1,6 @@
 import { existsSync, statSync } from 'node:fs'
 import { join } from 'node:path'
-import { modOn, optionOn } from '@shared/mods'
+import { modOn, optionOn } from '@vx/modkit/shared'
 import {
   assertStoryRecall,
   formatStoryRecall,
@@ -9,8 +9,8 @@ import {
   STORY_MEMORY_LIGHT_OPTION,
   type StoryRecall,
   type StoryRecallRequest
-} from '@shared/storyMemory'
-import type { StructuredRequest } from '@shared/types'
+} from '../../shared/storyMemory'
+import type { StructuredRequest } from '@vx/modkit/shared'
 import { getPlaythroughPath } from '../paths'
 import { getModSwitches } from './modsService'
 import { recallFromSqlite } from './storyMemoryIndex'

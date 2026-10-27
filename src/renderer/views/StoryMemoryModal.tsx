@@ -11,7 +11,7 @@ import {
   type StoryFact,
   type StoryMemory,
   type StoryRecord
-} from '@shared/storyMemory'
+} from '../../shared/storyMemory'
 import { TitleTab } from '../components/TitleTab'
 import { useModalShell } from '../components/useModalShell'
 import { useGameStore } from '../stores/gameStore'
