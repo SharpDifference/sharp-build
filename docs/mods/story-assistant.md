@@ -6,12 +6,12 @@ It needs no other mod.
 ## Playing
 
 On the reader's turn in a cast scene — at the action box, or over a finished reply's last line
-where the row there lets a turn through — the assistant reads the scene. What it makes of it
-stands in a speech bubble over the dialogue box, its mark speaking from the bubble's foot, and
-its ways forward stand over the bubble as a visual novel's menu: pressing one sends it as the
-reader's turn, exactly as typing it into the action box would. The action box stays open beneath
-for a turn of the player's own. While a read is on its way the bubble says so; a read that fails
-says why in the bubble, with **Retry**, and is never sent again on its own.
+where the row there lets a turn through — the assistant reads the scene, and its ways forward
+stand over the dialogue box as a visual novel's menu: pressing one sends it as the reader's
+turn, exactly as typing it into the action box would. The action box stays open beneath for a
+turn of the player's own. While a read is on its way one line where the menu will stand says
+so; a read that fails says why there, with **Retry**, and is never sent again on its own. What
+the assistant makes of the scene is shown in the panel alone.
 
 None of it is offered where there is no cast scene to talk about: a solo scene, an exam, a
 replay, a created scene, the orientation, the graduation epilogue, and a scene once it has
@@ -23,11 +23,13 @@ still arriving or being read. It opens a panel that shows the same read: **Ask a
 takes a question in place of the general read, **Ask** sends it, **Read again** asks for a fresh
 read. Picking a way forward there copies its words into **Your turn**, where the player can
 change them before **Send**. Whatever the panel last read — a question's answer included —
-stands in the bubble and the menu once it closes.
+offers its ways forward in the menu once it closes.
 
 There is one read per point of the scene. Any change to the scene — a new line, a rewind's cut, a
-rewritten line, a load — retires it and cancels one still on its way. Reads live in memory only:
-nothing is written to a save, and switching the mod off leaves nothing behind.
+rewritten line, a load — retires it and cancels one still on its way; a copy of the same lines is
+the same point. The pop-up asks only on a scene with lines on it, and reads the store afresh as
+it does, so a point is never asked twice. Reads live in memory only: nothing is written to a
+save, and switching the mod off leaves nothing behind.
 
 ## Options
 
@@ -81,7 +83,7 @@ Each read is one structured call on the channel `llm:completeStoryAssistant`, on
 model at the player's own effort; it is not routed to the secondary model and no preset is
 applied. With **Pop up every turn** on that is one call per turn of every cast scene. Asking
 again, the scene moving on and leaving the game cancel the call in flight; closing the panel does
-not, so a read asked for there still lands in the bubble. The reply is sanitized in the renderer
+not, so a read asked for there still lands in the menu. The reply is sanitized in the renderer
 (`storyAssistantReplyOf`): blank and repeated ways forward are dropped and at most four kept.
 
 ## Code map
@@ -93,7 +95,7 @@ not, so a read asked for there still lands in the bubble. The reply is sanitized
 | `src/shared/relationship.ts` | `contactRevealsOf`, the contact page's reveal rule, shared with the page |
 | `src/renderer/prompts/storyAssistantPrompt.ts` | The shipped prompt, the pure request builder and the name masking |
 | `src/renderer/stores/storyAssistant.ts` | The seat's gate, the store holding the config and the read, the context read off the stores, and the call |
-| `src/renderer/views/StoryAssistantStage.tsx` | The bubble and the menu over the stage, and the pop-up's own ask |
+| `src/renderer/views/StoryAssistantStage.tsx` | The menu over the stage, its waiting and failure line, and the pop-up's own ask |
 | `src/renderer/views/StoryAssistantPanel.tsx` | The rail seat, the panel and the mark |
 | `src/renderer/views/StoryAssistantPage.tsx` | The mod's page on the Mods screen |
 | `src/renderer/vu_styles/StoryAssistant.css` | All three surfaces' layout |
@@ -105,11 +107,10 @@ not, so a read asked for there still lands in the bubble. The reply is sanitized
 
 Over the stage, one column stands between the dialogue box's own insets and ends clear of the
 speaker label over the box, so neither the box nor who is talking is covered; the column takes no
-pointer, only what is in it does. The bubble is a rounded rectangle on the surface face with the
-paper shadow, its foot corner tight where the mark speaks from it, the mark in an accent disc,
-and it grows from that corner (`bubbleIn`). The choices are answers, so they take the action
-shape, flat on the left, on the surface face; each holds its few words over the turn it sends,
-and the menu deals them in as the bubble lands.
+pointer, only what is in it does. The choices are answers, so they take the action shape, flat on
+the left, on the surface face with the paper shadow; each holds its few words over the turn it
+sends, and the menu deals them in one after another. The waiting or failure line is a full pill
+on the same face, muted and italic, with its Retry a `.vu-pill`.
 
 The panel is the shared `.vu-sheet` under a title tab, its foot Back, Ask or Read again, then
 Send. The question and the turn are ordinary fields; the read is body text at reading size;

@@ -82,13 +82,18 @@ function pointOf(game: Pick<GameState, 'playthroughId' | 'loads' | 'currentScene
   }
 }
 
-/** Whether two points are one: the same game and the very same scene, line for line. */
+/**
+ * Whether two points are one: the same game and the very same scene, line for line. A copy of the
+ * same lines is the same point; a cut, a new line or a rewritten one — a new line object — is not.
+ */
 function samePoint(a: ScenePoint, b: ScenePoint): boolean {
   return (
     a.playthroughId === b.playthroughId &&
     a.loads === b.loads &&
-    a.transcript === b.transcript &&
-    a.marks === b.marks
+    a.transcript.length === b.transcript.length &&
+    a.transcript.every((line, at) => line === b.transcript[at]) &&
+    a.marks.length === b.marks.length &&
+    a.marks.every((mark, at) => mark.at === b.marks[at].at && mark.summary === b.marks[at].summary)
   )
 }
 
