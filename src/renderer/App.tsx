@@ -16,6 +16,7 @@ import { SetupView } from './views/SetupView'
 import { AppSettingsModal } from './views/AppSettingsModal'
 import { CreditsModal } from './views/CreditsModal'
 import { ModsModal } from './views/ModsModal'
+import { ModsNoticeModal } from './views/ModsNoticeModal'
 import { DownloadModal } from './views/DownloadModal'
 import { FeedbackModal } from './views/FeedbackModal'
 import { LoadGameModal } from './views/LoadGameModal'
@@ -32,6 +33,7 @@ import { useGrabBagStore } from './stores/grabBagStore'
 import { convertLegacyImages } from './stores/legacyImageStore'
 import { useSaveStore } from './stores/saveStore'
 import { modIsOn, useModsStore } from './stores/modsStore'
+import { useModSessionStore } from './stores/modSessionStore'
 import { useSettingsStore } from './stores/settingsStore'
 import { comfySourceOf } from '@shared/comfyModels'
 import { comfySettled, useSetupStore } from './stores/setupStore'
@@ -137,6 +139,7 @@ function App(): JSX.Element {
   const download = useUiStore((s) => s.download)
   const offer = useUpdateStore((s) => s.offer)
   const updateFailure = useUpdateStore((s) => s.failure)
+  const modNotice = useModSessionStore((s) => s.notice)
   // The Game View's own key: a save switched over a running game replaces
   // this store's state under the curtain, and its React state — crossfade pairs, `sending`,
   // `uiHidden` — is a fact about the save on screen and must not outlive it.
@@ -174,7 +177,7 @@ function App(): JSX.Element {
       {/* The gate itself is what a closing modal has to outlive, so it is the presence's
           child: the exits run inside it, and it unmounts once they finish. */}
       <AnimatePresence>
-        {(modals.length > 0 || error || download || offer || updateFailure) && (
+        {(modals.length > 0 || error || download || offer || updateFailure || modNotice) && (
           <AppModals key="app-modals" />
         )}
       </AnimatePresence>
@@ -199,6 +202,7 @@ function AppModals(): JSX.Element {
   const dismissError = useUiStore((s) => s.dismissError)
   const offer = useUpdateStore((s) => s.offer)
   const updateFailure = useUpdateStore((s) => s.failure)
+  const modNotice = useModSessionStore((s) => s.notice)
 
   const [theme] = useState(heldScreenTheme)
 
@@ -210,6 +214,7 @@ function AppModals(): JSX.Element {
         {modals.includes('settings') && <AppSettingsModal key="settings" theme={theme} />}
         {modals.includes('credits') && <CreditsModal key="credits" theme={theme} />}
         {modals.includes('mods') && <ModsModal key="mods" theme={theme} />}
+        {modNotice && <ModsNoticeModal key="mods-notice" theme={theme} notice={modNotice} />}
         {modals.includes('feedback') && <FeedbackModal key="feedback" theme={theme} />}
         {modals.includes('support') && <SupportModal key="support" theme={theme} />}
         {modals.includes('loadGame') && <LoadGameModal key="load-game" theme={theme} />}
