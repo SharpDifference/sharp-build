@@ -25,6 +25,13 @@ still follow the framework's existing storage/backup rules.
 
 ## Architecture summary
 
+The renderer entry owns a `gameMenuEntry` and a `story-memory` panel in `gameModals`.
+Its lazy UI adapter opens the panel with the kit's `openPanel`. Reading remains available
+while the scene settles; the editor retains its own write restrictions. Back and Escape
+return to the game menu, including when the panel was opened through the registry. The core
+menu and GameView no longer import or name Story Memory's panel. Recall, indexing, persistence
+and prompt hooks are unchanged by this UI migration.
+
 Story Memory keeps lasting facts and recall corrections in `GameSave.exStoryMemory`.
 An enabled ledger extracts candidates backed by generated scene evidence; the slot boundary
 validates and files them. Pure builders attach a local snapshot, and the platform bridge

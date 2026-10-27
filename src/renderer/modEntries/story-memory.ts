@@ -5,8 +5,18 @@ import { withNativeStoryRecall, withStoryExtraction } from '../prompts/storyMemo
 import { currentStorySnapshot } from '../stores/storyMemory'
 import { useGameStore } from '../stores/gameStore'
 import { registerHooks } from '../mods/hooks'
+import { createElement, lazy, Suspense } from 'react'
+import type { GameModalProps, ScreenSlotProps } from '@vx/modkit/renderer'
+
+const screens = () => import('../views/StoryMemoryEntry')
+const Menu = lazy(() => screens().then(module => ({ default: module.StoryMemoryMenuEntry })))
+const Panel = lazy(() => screens().then(module => ({ default: module.StoryMemoryPanel })))
 
 registerHooks('story-memory', {
+  gameMenuEntry: (props: ScreenSlotProps['gameMenuEntry']) => createElement(Suspense, { fallback: null }, createElement(Menu, props)),
+  gameModals: {
+    'story-memory': (props: GameModalProps) => createElement(Suspense, { fallback: null }, createElement(Panel, props))
+  },
   requests: {
     scene: (request, { cast, state, query }) => withNativeStoryRecall(
       request, state.storyMemory, cast.map(c => c.charId), query, state.calendar.season),

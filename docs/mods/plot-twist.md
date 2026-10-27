@@ -5,9 +5,15 @@ the shared mod framework. It does not need Story Memory, SQLite, or another comm
 
 ## Shared framework integration
 
-Plot Twist uses discovered entries and shared hooks in the current 0.5.0-based community build.
+Plot Twist uses discovered entries and shared hooks in the community build.
 Other feature mods are optional. Native character notes, scene creation and calendar replays
 remain separate base-game features.
+
+Its renderer entry contributes a `gameMenuEntry` and the `plot-twist` panel in `gameModals`.
+The menu adapter calls the kit's `openPanel`, preserves the native safe-save gate, and lazily
+loads the existing editor. Closing returns to the game. GameView and GameMenuModal no longer
+import or name the Plot Twist panel. The saved text, write transaction and prompt behavior are
+unchanged; this UI migration alone does not make the mod a standalone package.
 
 ## Player behavior
 
@@ -36,12 +42,15 @@ facts; this is narrative guidance, not guaranteed obedience or a direct mechanic
 | `src/renderer/stores/loop/promptState.ts` | Reads the switch when building request state |
 | `src/renderer/prompts/plotTwist.ts` | Pure story-direction prompt block |
 | `src/renderer/prompts/scenePrompt.ts` | Cast opening, continuation and closing; solo-scene hook |
-| `src/renderer/views/GameMenuModal.tsx` | Optional native animated menu entry |
-| `src/renderer/views/GameView.tsx` | Mounts the editor as a blocking panel, preventing scene input underneath |
+| `src/renderer/modEntries/plot-twist.ts` | Registers the prompt, lazy menu entry and panel provider |
+| `src/renderer/views/PlotTwistEntry.tsx` | Uses the kit's menu item, safe-save status and `openPanel`; adapts the existing editor |
+| `src/renderer/views/GameMenuModal.tsx` | Generic `gameMenuEntry` outlet, without a Plot Twist callback |
+| `src/renderer/views/GameView.tsx` | Generic blocking panel host, without a Plot Twist import or panel case |
 | `src/renderer/views/PlotTwistModal.tsx` | Draft editing, counter, apply/clear, pending/error feedback |
 | `src/renderer/vu_styles/PlotTwist.css` | Native day/night colors, text-well scrolling and fixed actions |
 | `test/plotTwist.test.ts` | Legacy data, save checkpoints, write ordering, failures, and stale completions |
 | `test/plotTwistPrompt.test.ts` | On/off routing into actual scene builders and immutable captured requests |
+| `test/maestroMenuHooks.test.ts` | Menu/panel registration, switches, safe-save gating, theme and return destination |
 
 ## Save compatibility and transaction
 
