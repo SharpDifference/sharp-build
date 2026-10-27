@@ -1,13 +1,25 @@
 import { assignEchoes, settleEchoMemories } from '@shared/echo'
-import { registerHooks } from '../mods/hooks'
+import { createElement, lazy, Suspense } from 'react'
+import { registerHooks, type ScreenSlotProps } from '../mods/hooks'
 import { useGameStore } from '../stores/gameStore'
-export function ensureEchoes(): void {
-  const g = useGameStore.getState()
-  if (!g.playthroughId || g.replaying || g.createdScene) return
-  const exEcho = assignEchoes(g.exEcho,g.playthroughId,g.characters,`${g.playerFirstName} ${g.playerLastName}`,g.bio)
-  if (JSON.stringify(exEcho) !== JSON.stringify(g.exEcho)) useGameStore.setState({ exEcho })
+import { ensureEchoes } from '../stores/echoAssignments'
+
+// Registering gameplay hooks must not initialize screen stores or their Electron listeners.
+const screens = () => import('../views/EchoPanel')
+const LazyAura = lazy(() => screens().then(module => ({ default: module.EchoAura })))
+const LazyGallery = lazy(() => screens().then(module => ({ default: module.EchoGallerySection })))
+
+function EchoPortrait(props: ScreenSlotProps['portraitOverlay']): ReturnType<typeof createElement> {
+  return createElement(Suspense, { fallback: null }, createElement(LazyAura, props))
 }
+
+function EchoPhotos(props: ScreenSlotProps['photosPageSection']): ReturnType<typeof createElement> {
+  return createElement(Suspense, { fallback: null }, createElement(LazyGallery, props))
+}
+
 registerHooks('echo', {
+  portraitOverlay: EchoPortrait,
+  photosPageSection: EchoPhotos,
   gameEntered: ensureEchoes,
   projectSlotMemories: ({ before }, charInfo) => {
     if (!before.playthroughId || before.replaying || before.createdScene) return charInfo

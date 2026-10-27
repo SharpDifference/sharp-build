@@ -14,7 +14,7 @@ import { useGameStore } from '../stores/gameStore'
 import { useModOn, modIsOn, useModsStore } from '../stores/modsStore'
 import { useSettingsStore } from '../stores/settingsStore'
 import { manualSaveOffer, writeEcho } from '../stores/loop/saves'
-import { ensureEchoes } from '../modEntries/echo'
+import { ensureEchoes } from '../stores/echoAssignments'
 import { useDismissLayer } from '../components/useModalShell'
 import { EchoNotice } from '../components/EchoNotice'
 import { EchoSwitchDialog } from '../components/EchoSwitchDialog'
@@ -147,6 +147,11 @@ export interface EchoSetupContext {
   onChange:(value:EchoState)=>void
   onContinue:(value:EchoState)=>Promise<void>
 }
+/** Optional Photos-page contribution; the stage and manager do not depend on that page. */
+export function EchoGallerySection({theme}: {theme:ScreenTheme}): JSX.Element {
+  return <EchoPanel hidden={false} gallery theme={theme} />
+}
+
 export function EchoPanel({hidden,gallery=false,owner,onClose,setup,theme}: {hidden:boolean;gallery?:boolean;owner?:string;onClose?:()=>void;setup?:EchoSetupContext;theme?:ScreenTheme}): JSX.Element | null {
   const storedGame = useGameStore(s => s), enabled = useModOn('echo')
   const setupRef=useRef(setup);setupRef.current=setup

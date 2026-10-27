@@ -44,6 +44,12 @@ Every aspect has a one-exchange ability costing 25, 50 or 75 spirit. Activations
 
 ## Saves, backups and source map
 
+### Screen-hook integration
+
+Echo registers `portraitOverlay` and `photosPageSection` from its renderer mod entry. The native portrait and Photos page render the generic `ModSlot` outlets; they no longer mount Echo directly at those two locations. The portrait contribution reuses `EchoAura`, including the saved placement, opacity, floating motion, owner visibility, and replay/created-scene gates. The optional Photos contribution reuses the existing gallery and manager with the page's theme. Neither hook requires Photo Feature, and switching Echo off removes both contributions without erasing its saved data.
+
+`renderer/stores/echoAssignments.ts` holds the shared assignment helper used by the entry, manager and game view, avoiding a manager-to-entry import cycle. The standalone manager, new-game setup, Reckoning staging and contact-specific gallery remain on their existing paths. This is a partial migration onto existing screen hooks, not a standalone downloadable Echo package; the remaining menu/modal, contact-gallery, kit, asset and main-process integration still needs the corresponding framework support.
+
 Echo identity, locks, staging and affinity markers are validated in the exEcho save extension. Native New Game+ carries them through modCarry; turning the mod off preserves the data. Whole-game desktop/browser backups include finished Echo artwork and reject conflicting immutable image IDs. Loose save JSON does not embed image bytes or recovery originals. This tree has no separate single-playthrough export.
 
 Unheard Soul artwork is a separate character image, not an Echo replacement. Its desktop editor offers the configured image API or Local ComfyUI with her neutral portrait as a reference, independently of the Echo creature's Megaten artwork option. Its character export/import/duplicate and whole-game backup support are described in [Breaking Through the Silence](reckoning.md). The browser supports ordinary Echo artwork but currently uses the inverted normal portrait for Unheard Souls; their custom image editor and portable extension are desktop-only.
