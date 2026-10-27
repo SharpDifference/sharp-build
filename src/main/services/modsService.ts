@@ -10,7 +10,8 @@ const SCHEMA_VERSION = 1
 
 /**
  * The switches main last read or wrote. Shared rules ask them here, as the renderer's ask its own
- * store: main knows no playthrough, so a `playthrough` mod answers as its switch stands. An
+ * store: main knows no playthrough, so a `playthrough` mod answers as its switch stands. The rule
+ * reads `MODS`, which holds the installed mods once the mod session has added them, and an
  * installed mod that is not running this session (its `main.js` threw after registering, say)
  * answers off whatever its switch, as the window's rule has it.
  */

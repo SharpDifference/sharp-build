@@ -2,7 +2,7 @@ import { app, BrowserWindow, ipcMain, type IpcMainInvokeEvent } from 'electron'
 import { readFileSync } from 'fs'
 import { basename, resolve } from 'path'
 import type { ModSessionTable, ModStatus, SafeStart } from '@shared/modSession'
-import { BUILD } from '@shared/mods'
+import { BUILD, installMods, MODS } from '@shared/mods'
 import type { Settings } from '@shared/types'
 import { getModsDirPath, getSettingsPath } from '../paths'
 import { bindModSession } from '../services/modsService'
@@ -19,6 +19,22 @@ import type { MainContext } from './require'
  */
 
 let result: LoaderResult | null = null
+
+/**
+ * The ids of the mods built into this copy of the game, read before the loader adds an installed one
+ * to the list: what it refuses a second copy of.
+ */
+const BUILT_IN_IDS: readonly string[] = MODS.map((mod) => mod.id)
+
+/**
+ * Holds a loader run as the session's, and adds every mod it found to `MODS`, for every status, as the
+ * window does from its copy of the table: main's shared rules ask the one list, and an installed mod
+ * the list did not hold would answer off whatever its switch.
+ */
+function hold(next: LoaderResult): void {
+  result = next
+  installMods(next.table.mods.flatMap((mod) => (mod.def ? [mod.def] : [])))
+}
 
 /** The export names of the host modules, as the renderer reported them once it had parked them. */
 let hostNames: Readonly<Record<string, readonly string[]>> | null = null
@@ -46,16 +62,19 @@ function safeStartOf(): SafeStart {
 /** Runs the loader. Called once, before the schemes are registered. */
 export function startModSession(): void {
   const { devFolders, allowUnreviewedMain } = loaderSettings()
-  result = loadMods({
-    modsDir: getModsDirPath(),
-    devFolders,
-    allowUnreviewedMain,
-    coreVersion: BUILD.version,
-    gameVersion: app.getVersion(),
-    safeStart: safeStartOf(),
-    log: (line) => console.log(line),
-    warn: (line) => console.warn(line)
-  })
+  hold(
+    loadMods({
+      modsDir: getModsDirPath(),
+      devFolders,
+      allowUnreviewedMain,
+      builtIn: BUILT_IN_IDS,
+      coreVersion: BUILD.version,
+      gameVersion: app.getVersion(),
+      safeStart: safeStartOf(),
+      log: (line) => console.log(line),
+      warn: (line) => console.warn(line)
+    })
+  )
   bindModSession(modSession)
 }
 
@@ -72,10 +91,11 @@ export function modSession(): ModSessionTable {
 function rerunChecks(): void {
   const before = result
   const { devFolders, allowUnreviewedMain } = loaderSettings()
-  result = loadMods({
+  const next = loadMods({
     modsDir: getModsDirPath(),
     devFolders,
     allowUnreviewedMain,
+    builtIn: BUILT_IN_IDS,
     coreVersion: BUILD.version,
     gameVersion: app.getVersion(),
     safeStart: safeStartOf(),
@@ -89,7 +109,7 @@ function rerunChecks(): void {
     }
   })
   // The routes a `main.js` registered at start stand for the session.
-  if (before) result = { ...result, routes: before.routes }
+  hold(before ? { ...next, routes: before.routes } : next)
 }
 
 /** Serves `vxmod://`, and watches the developer folders. Must run after `ready`. */

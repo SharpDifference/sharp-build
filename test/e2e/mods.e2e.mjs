@@ -127,6 +127,8 @@ await scenario('hello-mod loads', ['hello-mod'], async ({ page, cspViolations })
   check('useModOn answers on', (await page.textContent('#hello-mod-on')) === 'on')
   const ping = await page.evaluate(() => fetch('vxmod://hello-mod/@/ping').then((r) => r.text()))
   check("fetch('vxmod://hello-mod/@/ping') answers ok (its main.js ran)", ping === 'ok', ping)
+  const mainOn = await page.evaluate(() => fetch('vxmod://hello-mod/@/on').then((r) => r.text()))
+  check("its main.js sees itself on through sharedModOn", mainOn === 'true', mainOn)
   check('the console has no CSP violation', cspViolations.length === 0, cspViolations.join(' | '))
 })
 

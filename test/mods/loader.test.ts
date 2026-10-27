@@ -34,6 +34,7 @@ function run(over: Partial<LoaderInput> = {}): LoaderResult {
     modsDir: join(root, 'mods'),
     devFolders: [],
     allowUnreviewedMain: false,
+    builtIn: [],
     coreVersion: '0.1.0',
     gameVersion: '0.6.0',
     safeStart: null,
