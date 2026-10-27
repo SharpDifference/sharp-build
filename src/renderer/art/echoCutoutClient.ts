@@ -1,5 +1,5 @@
-import { assertEchoPng, ECHO_ART_MAX_BYTES, ECHO_CUTOUT_PREPARE_ERROR } from '@shared/echoArtwork'
-import { refineWhiteEchoEdges } from '@shared/echoCutoutEdges'
+import { assertEchoPng, ECHO_ART_MAX_BYTES, ECHO_CUTOUT_PREPARE_ERROR } from '../../shared/echoArtwork'
+import { refineWhiteEchoEdges } from '../../shared/echoCutoutEdges'
 
 let worker: Worker | null = null
 let serial = 0

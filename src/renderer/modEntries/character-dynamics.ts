@@ -1,4 +1,4 @@
-import { CHARACTER_DYNAMICS_MOD } from '@shared/characterDynamics'
+import { CHARACTER_DYNAMICS_MOD } from '../../shared/characterDynamics'
 import { registerHooks } from '../mods/hooks'
 import { characterDynamicsLines, withCharacterDynamics } from '../prompts/characterDynamics'
 

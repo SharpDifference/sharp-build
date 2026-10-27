@@ -1,6 +1,6 @@
 import { normalizeMeanwhile, type MeanwhileStore } from './meanwhile'
 import { registerTermCarry, type TermCarryContext } from './modCarry'
-import type { GameSave } from './types'
+import type { GameSave } from '@vx/modkit/shared'
 
 declare module './modCarry' { interface ModCarryFields { exNpcWatch?: MeanwhileStore } }
 

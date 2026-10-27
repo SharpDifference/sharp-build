@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import { assertSoundtrackDuration, SOUNDTRACK_MOD, type SoundtrackKey, type SoundtrackMap } from '@shared/soundtracks'
+import { assertSoundtrackDuration, SOUNDTRACK_MOD, type SoundtrackKey, type SoundtrackMap } from '../../shared/soundtracks'
 import { toAppError } from '@shared/errors'
 import type { Result } from '@shared/types'
 import { modIsOn } from './modsStore'

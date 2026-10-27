@@ -1,4 +1,4 @@
-import { challengeStatFloor, STARTING_CHALLENGE_MOD } from '@shared/startingChallenge'
+import { challengeStatFloor, STARTING_CHALLENGE_MOD } from '../../shared/startingChallenge'
 import { registerHooks } from '../mods/hooks'
 import { useGameStore } from '../stores/gameStore'
 

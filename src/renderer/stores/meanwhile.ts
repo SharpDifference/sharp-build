@@ -1,4 +1,4 @@
-import { MEANWHILE_MOD, meanwhileEvents, validateMeanwhile, type MeanwhileScene } from '@shared/meanwhile'
+import { MEANWHILE_MOD, meanwhileEvents, validateMeanwhile, type MeanwhileScene } from '../../shared/meanwhile'
 import { buildMeanwhilePrompt } from '../prompts/meanwhilePrompt'
 import { useGameStore } from './gameStore'
 import { modIsOn } from './modsStore'

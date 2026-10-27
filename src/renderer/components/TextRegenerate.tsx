@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type JSX } from 'react'
 import { motion } from 'motion/react'
 import { TEXT_REGENERATION_MOD } from '../../shared/textRegeneration'
-import { useModOn } from '../stores/modsStore'
+import { useModOn } from '@vx/modkit/renderer'
 import { useGameStore } from '../stores/gameStore'
 import { useBunnyboardStore } from '../stores/bunnyboardStore'
 import { regenerateTextReply, textRegenerationTarget } from '../stores/textingLoop'

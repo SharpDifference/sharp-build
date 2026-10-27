@@ -2,7 +2,7 @@ import { reconcileBreakthroughWithRefunds, type BreakthroughState } from './brea
 import { talentEffect, talentsEnabled, talentMemoryKey, type TalentState } from './campusTalents'
 import { abilityUsedThisWeek, recordAbilityUse } from './talentAbilityState'
 import { giftReactionOf, itemDefOf, type ItemDef } from './shop'
-import type { Character, CharInfo, SceneLine, TimeSlot } from './types'
+import type { Character, CharInfo, SceneLine, TimeSlot } from '@vx/modkit/shared'
 import type { ExamPeriod } from './academics'
 
 export const TALENT_ABILITIES = {

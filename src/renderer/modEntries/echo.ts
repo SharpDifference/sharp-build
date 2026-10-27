@@ -1,4 +1,4 @@
-import { assignEchoes, settleEchoMemories } from '@shared/echo'
+import { assignEchoes, settleEchoMemories } from '../../shared/echo'
 import { createElement, lazy, Suspense } from 'react'
 import { registerHooks, type ScreenSlotProps } from '../mods/hooks'
 import { useGameStore } from '../stores/gameStore'

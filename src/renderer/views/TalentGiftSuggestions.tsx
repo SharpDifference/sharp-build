@@ -1,11 +1,11 @@
 import { useState } from 'react'
 import { motion } from 'motion/react'
-import { abilityRank, TALENT_ABILITIES, valueSuggestions } from '@shared/talentAbilities'
+import { abilityRank, TALENT_ABILITIES, valueSuggestions } from '../../shared/talentAbilities'
 import { shopDefOf, type ItemDef } from '@shared/shop'
 import { fullNameOf } from '@shared/types'
 import { formatMoney } from '@shared/money'
 import { useGameStore } from '../stores/gameStore'
-import { useModOn } from '../stores/modsStore'
+import { useModOn } from '@vx/modkit/renderer'
 import { gestures, quietLift, quietPress } from './motion'
 
 /** Owned perk reveals the strongest affordable gift match for a known character. */

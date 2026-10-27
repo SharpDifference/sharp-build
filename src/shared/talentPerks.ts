@@ -1,7 +1,7 @@
 import { talentEffect, talentsEnabled, type TalentState } from './campusTalents'
 import type { TalentEffect } from './talentTypes'
-import type { CharMemory, ProjectSession, TimeSlot } from './types'
-import type { PlayerStats, StatContext, StatusText } from './playerStats'
+import type { CharMemory, ProjectSession, TimeSlot } from '@vx/modkit/shared'
+import type { PlayerStats, StatContext, StatusText } from '@vx/modkit/shared'
 import { eurekaReady } from './talentAbilities'
 import type { ExamPeriod } from './academics'
 

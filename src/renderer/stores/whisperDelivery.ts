@@ -1,6 +1,6 @@
-import { whisperTerm } from '@shared/venusWhisper'
+import { whisperTerm } from '../../shared/venusWhisper'
 import { create } from 'zustand'
-import { VENUS_WHISPER_MOD, whisperWednesday, whisperWeekOccupied } from '@shared/venusWhisper'
+import { VENUS_WHISPER_MOD, whisperWednesday, whisperWeekOccupied } from '../../shared/venusWhisper'
 import { useGameStore } from './gameStore'
 import { modIsOn } from './modsStore'
 import { publishWhisper, replyOnWhisper, waitForWhisperCheckpoint, whisperReady } from './venusWhisper'

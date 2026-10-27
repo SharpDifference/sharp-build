@@ -1,4 +1,4 @@
-import type { ModDef } from '../mods'
+import type { ModDef } from '@vx/modkit/shared'
 import { registerTermCarry } from '../modCarry'
 import { readStartingChallenge, STARTING_CHALLENGE_MOD, type StartingChallenge } from '../startingChallenge'
 

@@ -1,4 +1,4 @@
-import type { MeanwhileScene } from '@shared/meanwhile'
+import type { MeanwhileScene } from '../../shared/meanwhile'
 import type { ClassEntry } from '@shared/types'
 import { bgUrl } from './bgAssets'
 
