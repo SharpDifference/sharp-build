@@ -192,7 +192,7 @@ export interface GameSave {
 export function hasTrait(character: Pick<Character, 'traits'> | undefined, trait: CharacterTrait): boolean;
 
 // @public
-export type HookKind = 'add' | 'merge' | 'pipeline' | 'first' | 'any' | 'event' | 'owner' | 'slot';
+export type HookKind = 'add' | 'merge' | 'pipeline' | 'first' | 'any' | 'event' | 'owner' | 'slot' | 'registry';
 
 // @public (undocumented)
 export type HookName = (typeof HOOKS)[number]['name'];
@@ -560,6 +560,12 @@ export const HOOKS: readonly [{
     readonly kind: 'slot';
     readonly dispatch: readonly ['screenSlot'];
     readonly since: '0.2.0';
+}, {
+    readonly name: 'protocols';
+    readonly side: 'main';
+    readonly kind: 'registry';
+    readonly dispatch: readonly ["collectRoutes"];
+    readonly since: '0.3.0';
 }];
 
 // @public
@@ -587,7 +593,7 @@ export interface ImagePromptParts {
 export const KIT_APIS: readonly ['shared:carryModFiles', 'shared:DEPRECATED_HOOKS', 'shared:hasTrait', 'shared:HOOKS', 'shared:KIT_APIS', 'shared:KIT_VERSION', 'shared:memoryStatusLine', 'shared:modById', 'shared:modOn', 'shared:optionKey', 'shared:optionOn', 'shared:registerCharacterTrait', 'shared:registerImagePromptDraft', 'shared:registerPostCarry', 'shared:registerRomanceRequirement', 'shared:registerTermCarry', 'shared:registerTermFiles', 'shared:REMOVED_HOOKS', 'shared:sharedModOn', 'renderer:Card', 'renderer:EmojiTool', 'renderer:fileLatePost', 'renderer:finishSlotActivity', 'renderer:Locked', 'renderer:modIsOn', 'renderer:openPanel', 'renderer:ownsPostComments', 'renderer:PostCommentAction', 'renderer:PostCommentsView', 'renderer:PostPicture', 'renderer:postVisible', 'renderer:promptFields', 'renderer:promptLines', 'renderer:promptRequired', 'renderer:registerHooks', 'renderer:SentText', 'renderer:submitAction', 'renderer:takeTurnFromReply', 'renderer:useBareMessage', 'renderer:useEmojiTool', 'renderer:useModOn', 'renderer:useModOption', 'main:registerComfyLaunchEnvironment'];
 
 // @public
-export const KIT_VERSION = "0.2.0";
+export const KIT_VERSION = "0.3.0";
 
 // @public (undocumented)
 export type KitApiName = (typeof KIT_APIS)[number];
@@ -647,6 +653,7 @@ export interface ModDef {
     blurb: string;
     defaultOn: boolean;
     id: string;
+    library?: boolean;
     // (undocumented)
     name: string;
     offNote?: string;

@@ -20,8 +20,9 @@ export type HookSide = 'shared' | 'renderer' | 'main'
  * - `event`: every mod is told; nothing is returned
  * - `owner`: one mod at a time draws it, the first that is on and has one
  * - `slot`: every mod's component is drawn at the place, in list order
+ * - `registry`: what a mod's code exports is collected once, at load
  */
-export type HookKind = 'add' | 'merge' | 'pipeline' | 'first' | 'any' | 'event' | 'owner' | 'slot'
+export type HookKind = 'add' | 'merge' | 'pipeline' | 'first' | 'any' | 'event' | 'owner' | 'slot' | 'registry'
 
 export interface HookRow {
   /** The name a manifest uses: a key of `ModHooks`, or `prompts.<spot>` and `requests.<spot>`. */
@@ -111,7 +112,10 @@ export const HOOKS = [
   slot('contactPostExtra'),
   { ...slot('railButton'), since: '0.2.0' },
   { ...slot('landingTool'), since: '0.2.0' },
-  { ...slot('gameMenuEntry'), since: '0.2.0' }
+  { ...slot('gameMenuEntry'), since: '0.2.0' },
+
+  // The main process: what a mod's `main.js` exports, collected by the loader at start
+  { name: 'protocols', side: 'main', kind: 'registry', dispatch: ['collectRoutes'], since: '0.3.0' }
 ] as const satisfies readonly HookRow[]
 
 export type HookName = (typeof HOOKS)[number]['name']
