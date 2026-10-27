@@ -5,6 +5,7 @@ import type { ModSessionTable, ModStatus, SafeStart } from '@shared/modSession'
 import { BUILD } from '@shared/mods'
 import type { Settings } from '@shared/types'
 import { getModsDirPath, getSettingsPath } from '../paths'
+import { bindModSession } from '../services/modsService'
 import { patchStoredSettings } from '../services/settingsService'
 import { addDevFolder, devFolders, removeDevFolder, watchDevFolder, type DevChangeKind } from './devFolders'
 import { loadMods, type LoaderResult } from './loader'
@@ -55,6 +56,7 @@ export function startModSession(): void {
     log: (line) => console.log(line),
     warn: (line) => console.warn(line)
   })
+  bindModSession(modSession)
 }
 
 /** The table as it stands; empty until {@link startModSession} has run. */
