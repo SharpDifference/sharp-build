@@ -14,6 +14,14 @@ import {
   type CharacterBody
 } from '../src/shared/characterBody'
 import { cgSetDraft, spriteDraft } from '../src/shared/imagePrompt'
+import { setSharedModRules } from '../src/shared/modRules'
+import { setPhotoSwitches } from '../src/shared/photoSwitches'
+// Photo Feature registers her body in the drafts from its shared entry, which the mod list loads.
+import '../src/shared/mods'
+
+// Photo Feature on, with body details, as the drafts below are read.
+setSharedModRules(() => true)
+setPhotoSwitches({ on: true, body: true })
 import { buildPhotoPrompt } from '../src/shared/photoPrompt'
 import type { Character } from '../src/shared/types'
 import { character } from './fixtures'
@@ -201,12 +209,14 @@ describe('gateBody', () => {
 /** The dev's prompts, untouched while the switch is off. */
 describe('with no body', () => {
   it("writes the dev's sprite and CG prompts exactly as they were", () => {
+    setPhotoSwitches({ body: false })
     const plain = her()
     const sprite = spriteDraft(plain, ['standing'], 'nude')
     expect(sprite.appearance).toEqual(plain.baseAppearance)
     expect(sprite.negative).not.toContain('loli')
     expect(cgSetDraft(plain).appearance).toEqual(plain.baseAppearance)
     expect(bodyAppearance(plain, 'photo')).toEqual(plain.baseAppearance)
+    setPhotoSwitches({ body: true })
   })
 })
 

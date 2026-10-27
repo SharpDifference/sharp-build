@@ -48,9 +48,8 @@ import {
   cgSetDraft,
   expressionDraft,
   spriteDraft,
-  withRegenTags,
   type PromptEdit
-} from './bodyDrafts'
+} from '@shared/imagePrompt'
 import {
   CUSTOM_OUTFIT_INSTRUCTIONS_MAX,
   CUSTOM_OUTFIT_NAME_MAX,
@@ -72,7 +71,7 @@ import {
   STOCK_POSITIONS
 } from '@shared/positions'
 import { ROOM_PROMPT_LEAD, ROOM_VARIANTS } from '@shared/room'
-import type { PromptGroup } from '@shared/regenTags'
+import { withRegenTags, type PromptGroup } from '@shared/regenTags'
 import { pictureKeySet } from '@shared/settingsRules'
 import { sfwWithholds } from '@shared/sfw'
 import { isGiftCategory } from '@shared/shop'
