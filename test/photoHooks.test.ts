@@ -238,7 +238,8 @@ const HOOKS: readonly {
   },
   {
     file: 'src/renderer/App.tsx',
-    needs: ["import './mods'"],
+    // `import './mods'` until the loader; `import { loadInstalledMods } from './mods'` since.
+    needs: ["from './mods'"],
     why: 'no mod is registered at boot'
   },
   {

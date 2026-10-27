@@ -58,7 +58,10 @@ describe('MODS with the installed mods', () => {
   it('lists them with the in-repo ones, sorted by id, for every status', async () => {
     await import('../../src/renderer/installedMods')
     const { MODS, modOn, NO_SWITCHES } = await import('@shared/mods')
-    expect(MODS.map((mod) => mod.id)).toEqual(['apple', 'lib', 'user', 'zebra'])
+    // Beside whatever in-repo mods the build has (none on core), in one list sorted by id.
+    const ids = MODS.map((mod) => mod.id)
+    expect(ids).toEqual(expect.arrayContaining(['apple', 'lib', 'user', 'zebra']))
+    expect(ids).toEqual([...ids].sort())
     expect(modOn(NO_SWITCHES, 'apple')).toBe(true)
     expect(modOn(NO_SWITCHES, 'zebra')).toBe(true)
   })
