@@ -1,6 +1,6 @@
 import type { Character, Emotion, OutfitSet, Position } from './types'
 import { customCgTagsFor, withAfterTag } from './customCgs'
-import { bodyAppearance, bodyNegative } from './characterBody'
+import { draftedParts } from './imagePromptDrafts'
 import { negativeTagsFor, outfitTagsFor } from './outfits'
 import {
   CG_BASE_PROMPT,
@@ -92,20 +92,23 @@ export function spriteDraft(
   poseTags: readonly string[],
   set: OutfitSet | null
 ): Extract<PromptEdit, { kind: 'sprite' }> {
+  // Her appearance and the shared and set negatives, with whatever the mods that are on add.
+  const { appearance, negative } = draftedParts(
+    {
+      appearance: [...character.baseAppearance],
+      negative: [...NEGATIVE_TAGS, ...(set ? negativeTagsFor(set) : [])]
+    },
+    { character, kind: set === 'nude' ? 'nude' : 'sprite' }
+  )
   return {
     kind: 'sprite',
     set,
     base: [...QUALITY_TAGS, ...BASE_TAGS],
-    appearance: bodyAppearance(character, set === 'nude' ? 'nude' : 'sprite'),
+    appearance,
     outfit: set === null ? [...character.outfit] : [...outfitTagsFor(character, set)],
     pose: [...poseTags],
-    // Her own negatives come last, after the shared ones and the set's own.
-    negative: [
-      ...NEGATIVE_TAGS,
-      ...(set ? negativeTagsFor(set) : []),
-      ...bodyNegative(character),
-      ...(character.negativeTags ?? [])
-    ]
+    // Her own negatives come last, after the shared ones, the set's own and the mods'.
+    negative: [...negative, ...(character.negativeTags ?? [])]
   }
 }
 
@@ -125,11 +128,15 @@ export function expressionDraft(
 
 /** The groups every one of a character's CGs shares, whichever position it is in. */
 export function cgSetDraft(character: Character): Extract<PromptEdit, { kind: 'cgs' }> {
+  const { appearance, negative } = draftedParts(
+    { appearance: [...character.baseAppearance], negative: [...CG_NEGATIVE_TAGS] },
+    { character, kind: 'cg' }
+  )
   return {
     kind: 'cgs',
     base: [...QUALITY_TAGS, ...tagsOf(CG_BASE_PROMPT)],
-    appearance: bodyAppearance(character, 'cg'),
-    negative: [...CG_NEGATIVE_TAGS, ...bodyNegative(character), ...(character.negativeTags ?? [])]
+    appearance,
+    negative: [...negative, ...(character.negativeTags ?? [])]
   }
 }
 

@@ -100,16 +100,32 @@ optionGroups: [{ id: 'loader', label: 'Loading animation', hint: 'The animation 
 | `src/main/services/modsService.ts` | Reads and writes `data/mods.json`. |
 | `src/renderer/stores/modsStore.ts` | The switches in the renderer, and the hooks. |
 | `src/renderer/views/ModsModal.tsx` | The Mods screen. |
-| `src/renderer/mods/hooks.ts` | The hook points (below). |
+| `packages/modkit/` | The mod kit, `@vx/modkit`: the hook points (below), the shared rule and the carry registries, under the three entries a mod imports (`shared`, `renderer`, `main`) and core's own `host` side. Its README says how it is laid out and checked. |
+| `src/renderer/mods/hooks.ts`, `src/renderer/mods/ModSlot.tsx`, `src/shared/modRules.ts`, `src/shared/modCarry.ts` | The old paths of what moved into the kit, re-exporting it, so core's imports are unchanged. |
 | `src/renderer/modEntries/` | One file per mod with hooks, named for its id: its `registerHooks`. |
 | `src/renderer/mods/index.ts` | Loads every file in `modEntries/` at boot. |
 | `test/mods.test.ts` | The rules, tested against a list with every shape of mod. |
+| `test/kit/` | The kit's own checks: a mod file imports only the kit (`boundary.test.ts`), the hook table and the kit's surface agree with the code (`contract.test.ts`), and the per-hook compatibility check (`compat.test.ts`). |
 
 ## A rule in shared code
 
 Shared code holds no switches. Where a rule there has to follow one, give the rule a flag with
 a setter, and set it from `modsStore.ts` at boot and whenever a switch moves
 (`useModsStore.subscribe`). Echo does this for its bonus, and Photo Feature for its switches.
+
+## Sprite and CG prompt drafts
+
+`shared/imagePromptDrafts.ts` lets a shared mod entry add to a sprite's or a CG's prompt draft,
+in both processes: the editor's regenerate draft in the renderer and every render in main are
+built by the same `spriteDraft` and `cgSetDraft`. Register once at boot with
+`registerImagePromptDraft(modId, { draft, regen? })`, from `@vx/modkit/shared`.
+
+- `draft(parts, { character, kind })` is handed the draft's `appearance` and `negative` tags
+  and returns them with the mod's own in; `kind` is `sprite`, `nude` or `cg`. Each mod that is
+  on is asked in id order, like every hook, and her own negatives are added after every mod's.
+- `regen(kept, draft, on)` is what a regenerate reopens on: the edit its button last sent
+  (`kept`), refreshed with the mod's tags as they are in the fresh `draft`. It is asked whether
+  or not the mod is on, so one that is off can take its own tags back out of a remembered edit.
 
 ## Additive romance requirements
 
@@ -162,7 +178,8 @@ game there. At each place mods commonly add to, the game asks once, in one line 
 file; a mod answers from its own files. Two mods adding to the same place then never touch the
 same lines, and neither touches the game's code at that place.
 
-Everything is in `src/renderer/mods/hooks.ts`. The game's side, at each place:
+Everything is in `packages/modkit/src/renderer/hooks.ts` (`src/renderer/mods/hooks.ts` re-exports it).
+The game's side, at each place:
 
 ```ts
 ...promptLines('dm', { character, info, state })   // in textingPrompt.ts
@@ -207,6 +224,10 @@ else names it.
 | `afterDmReply` | `textingLoop.ts` | Act after her reply in a DM has landed |
 | `afterSceneReply` | `loop/turn.ts` | Read a landed scene reply as the model wrote it, fields a mod asked for included. A turn's reply only: a scene's closing reply is not handed over |
 | `scenePlay` | `SceneChrome.tsx`, `GameView.tsx` | Stand a seat on the scene's rail, and open a panel of its own over the scene |
+| `gameModals` | `GameView.tsx` | Register panels of its own by id, which `openPanel(id, arg?)` from the kit opens over the game view. Props: `theme`, `arg`, `covered`, `onClose`, `openGameMenu` |
+| `railButton` | `SceneChrome.tsx` | Draw a button on the scene's rail, after the Calendar and before the mods' scene seats; not on a created scene or a replay. Props: `Seat` (the rail's own seat), `visible`, `dead` |
+| `landingTool` | `LandingChrome.tsx` | Draw a tool in the landing's corner, after the log and before Settings; not on a created scene or a replay. Props: `Tool` (the landing's own tool), `visible` |
+| `gameMenuEntry` | `GameMenuModal.tsx` | Draw an entry in the game menu, after Mods and before Controls. Props: `Item` (the menu's own entry), `saveOffer` (`'open'` where a save can be written now) |
 | `afterReachOut` | `textingLoop.ts` | Act after the texts of a girl texting first have landed |
 | `playerActs` | `gameLoop.ts` (`submitAction`), `loop/hangouts.ts`, `loop/relax.ts` | Act when the reader commits to something: an action, a hangout begun, or Relax |
 | `gameEntered` | `gameLoop.ts` (`enterGame`) | Act when a game is entered, new or loaded |
@@ -249,7 +270,7 @@ screen to show. The first mod that answers is offered; the game's own choice alw
 While `prepare` runs, the screen that offered the choice keeps every button locked; an answer
 that comes back after that screen closed, or after its game was left, opens nothing.
 
-The places on screen (`settingsSection` to `contactPostExtra` above) each take a component. Every mod
+The places on screen (`settingsSection` to `contactPostExtra` above, `railButton`, `landingTool` and `gameMenuEntry`) each take a component. Every mod
 that is on and has one there is drawn, in list order, and drawn again when a switch moves or a
 game is entered or left (a `playthrough` mod is on as the game's record says); a mod that is
 off is not drawn. The props are the facts the game has at that place, and only the ones a
@@ -275,6 +296,26 @@ panels: the scene behind it takes no key, click or turn until it closes. A field
 the scene's reply (`requests.scene`) comes back whole in `afterSceneReply`, once the reply's
 lines are on the transcript.
 
+A mod's own panels (`gameModals`) are components under ids of its choosing. `openPanel(id, arg?)`
+from `@vx/modkit/renderer` opens one over the game view, in place of whatever panel is open there,
+as one of the view's own panels: the scene behind it takes no key, click or turn until it closes.
+The panel is handed `theme`, `arg` (whatever `openPanel` was handed beside the id, such as whose
+panel it is), `covered` (a crossing between screens is over the view), `onClose`, and
+`openGameMenu`, which closes it into the game menu, for a panel the menu opened. Any mod may open
+any id, its own or another mod's; one panel per id, the first mod's that is on, with a warning in
+the console naming both mods when two that are on have a panel under the same id. Where no game view
+is up, or no mod that is on has a panel under the id, `openPanel` opens nothing and returns
+`false`.
+
+A button on the rail (`railButton`) draws with the rail's own `Seat`, so it looks and moves as
+the game's seats do. It turns `visible` and `dead` into the seat's `state` as they do: `'gone'`
+where not visible, `'dim'` where dead, `'shown'` otherwise. A tool on the landing (`landingTool`) draws with the
+landing's own `Tool`, handed a `label`, `onClick` and its icon, and stands only while `visible`;
+the corner staggers it in with the game's. An entry in the game menu (`gameMenuEntry`) draws with
+the menu's own `Item`, handed its words and `onClick`, and `dead` and a `note` for a hover over
+it while dead. A press on any of the three opens the mod's panel with `openPanel`; a panel opened
+from the menu can go back to it with `openGameMenu`.
+
 A panel that sends a turn of its own takes the reader's turn first with `takeTurnFromReply()`
 from `stores/gameLoop.ts`, then sends with `submitAction`. It sends nothing itself: it brings the
 scene to a decision point a turn can go out from, the way an interjection does. Lines still
@@ -290,15 +331,16 @@ as a new hook beside the old one.
 A field in the character editor (`editorField`) is `read`, `Field` and `write`. `read` takes
 its value off her as the editor opens; `Field` is drawn under Generation settings, after the
 appearance tags, handed `value`, `onChange`, `charId` and her `baseAppearance` as the form holds
-it; `write` turns the value into what saving puts on her, merged over the game's own fields. Save
-and the unsaved-changes check see it as they see the game's fields. A mod that is off draws no
+it; `write` turns the value into what saving puts on her. Write only your own fields: the game's
+own are written over whatever a mod returns, so a mod cannot change her name or her traits by
+mistake. Save and the unsaved-changes check see it as they see the game's fields. A mod that is off draws no
 field and writes nothing, so what it saved on her stays.
 
 ### Not covered yet
 
-- Screens: a mod's menu entries, buttons on the rail and the landing, and editor fields, and its
-  own panels beyond one over a scene (`scenePlay`), a page beside the feed (`updatesTab`), a
-  preview on the Mods screen (`optionPreviews`) and the places on screen above.
+- Screens: a mod's own panels beyond those over the game view (`scenePlay`, `gameModals`), a
+  page beside the feed (`updatesTab`), a preview on the Mods screen (`optionPreviews`) and the
+  places on screen above.
 - Main process: IPC, protocols, services, settings and character rules.
 - Saves: a mod's own fields in a save. Carrying them into the next semester is covered below.
 
@@ -308,7 +350,8 @@ These are still direct edits, as before.
 
 `test/modHooks.test.ts`: only mods that are on are asked, in list order; likes fall back to the
 game's own; a post a mod holds is not passed on; scene places and landed scene replies go to
-the mods that are on. `test/modSlots.test.ts`: each place on screen draws the components of the
+the mods that are on; `openPanel` opens a panel only while a game view is up and a mod that is
+on has the id. `test/modSlots.test.ts`: each place on screen draws the components of the
 mods that are on and not those that are off, each in a boundary of its own that turns a throw
 into nothing drawn.
 
@@ -483,7 +526,9 @@ Windows aliases, errors/disposal, and the real service's launch boundary with mo
   stores, award currency, consume an ability or roll randomness. Commit effects at
   `slotSettled` instead. With no active handler, the native projection passes through.
 - `sharedModOn` in `shared/modRules.ts` uses the same live lookup as renderer hooks,
-  without importing renderer stores. It defaults off before binding. A mod's renderer entry
+  without importing renderer stores. It defaults off before binding. In main,
+  `modsService.ts` binds it to the switches main last read or wrote; main knows no
+  playthrough, so a `playthrough` mod answers there as its switch stands. A mod's renderer entry
   owns any mod-specific setup; framework stores should not import feature modules.
 - Mods may add optional fields to `GameSave`, `CharMemory` and `ProjectSession` by
   TypeScript declaration merging in their own modules. Enrollment additions go on

@@ -10,7 +10,11 @@ import { defineConfig } from 'vitest/config'
 export default defineConfig({
   resolve: {
     alias: {
-      '@shared': resolve(__dirname, 'src/shared')
+      '@shared': resolve(__dirname, 'src/shared'),
+      '@vx/modkit/host': resolve(__dirname, 'packages/modkit/src/host'),
+      '@vx/modkit/shared': resolve(__dirname, 'packages/modkit/src/shared'),
+      '@vx/modkit/renderer': resolve(__dirname, 'packages/modkit/src/renderer'),
+      '@vx/modkit/main': resolve(__dirname, 'packages/modkit/src/main')
     }
   },
   // Components a test reaches through a mod's entry are compiled as the app compiles them.

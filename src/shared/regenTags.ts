@@ -1,5 +1,6 @@
 import type { Character, RegenTarget } from './types'
 import type { PromptEdit } from './imagePrompt'
+import { regenDrafted } from './imagePromptDrafts'
 
 /**
  * What one regenerate button last sent, kept on a character's record so its modal reopens on
@@ -44,7 +45,8 @@ export function withRegenTags(draft: PromptEdit, stored: unknown): PromptEdit {
     const tags = held[group]
     if (isTagList(tags)) groups[group] = [...tags]
   }
-  return next
+  // The mods' own tags in it as they are now, not as the button last sent them.
+  return regenDrafted(next, draft)
 }
 
 /** The record with what one regenerate button sent kept under it, over whatever it kept before. */

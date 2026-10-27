@@ -1,0 +1,26 @@
+{
+  // Declarations of the kit and of everything in core its bridge reaches, for `scripts/report.mjs`:
+  // emitted under `temp/dts` with the repo's layout, so the bridge's relative paths still hold.
+  "extends": "@electron-toolkit/tsconfig/tsconfig.web.json",
+  "include": [
+    "src/shared/index.ts",
+    "src/renderer/index.ts",
+    "src/main/index.ts",
+    "../../src/renderer/env.d.ts",
+    "../../src/renderer/signalsmith-stretch.d.ts",
+    "../../src/preload/api.d.ts"
+  ],
+  "compilerOptions": {
+    "noImplicitAny": true,
+    "types": ["node", "vite/client"],
+    "declaration": true,
+    "emitDeclarationOnly": true,
+    "rootDir": "../..",
+    "outDir": "temp/dts",
+    "paths": {
+      "@shared/*": ["../../src/shared/*"],
+      "@vx/modkit/host/*": ["./src/host/*"],
+      "@vx/modkit/*": ["./src/*/index.ts"]
+    }
+  }
+}

@@ -4,14 +4,22 @@
     "src/renderer/**/*",
     "src/web/**/*",
     "src/preload/api.d.ts",
-    "src/shared/**/*"
+    "src/shared/**/*",
+    "packages/modkit/src/shared/**/*",
+    "packages/modkit/src/renderer/**/*",
+    "packages/modkit/src/host/shared.ts",
+    "packages/modkit/src/host/renderer.ts",
+    "packages/modkit/src/bridge/shared.ts",
+    "packages/modkit/src/bridge/renderer.ts"
   ],
   "compilerOptions": {
     "composite": true,
     // The @electron-toolkit base turns this off despite `strict`; on.
     "noImplicitAny": true,
     "paths": {
-      "@shared/*": ["./src/shared/*"]
+      "@shared/*": ["./src/shared/*"],
+      "@vx/modkit/host/*": ["./packages/modkit/src/host/*"],
+      "@vx/modkit/*": ["./packages/modkit/src/*/index.ts"]
     }
   }
 }
