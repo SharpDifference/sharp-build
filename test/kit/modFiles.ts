@@ -158,7 +158,7 @@ export const MOD_FILES: Record<string, ModSet> = {
     ]
   },
   'plot-twist': {
-    globs: ['src/shared/plotTwist*.ts', 'src/renderer/prompts/plotTwist.ts', 'src/renderer/views/PlotTwistModal.tsx']
+    globs: ['src/shared/plotTwist*.ts', 'src/renderer/prompts/plotTwist.ts', 'src/renderer/views/PlotTwistModal.tsx', 'src/renderer/views/PlotTwistEntry.tsx']
   },
   'prompt-studio': {
     globs: [
@@ -185,7 +185,8 @@ export const MOD_FILES: Record<string, ModSet> = {
       'src/shared/storyMemory*.ts',
       'src/main/services/storyMemory*',
       'src/renderer/stores/storyMemory.ts',
-      'src/renderer/views/StoryMemoryModal.tsx'
+      'src/renderer/views/StoryMemoryModal.tsx',
+      'src/renderer/views/StoryMemoryEntry.tsx'
     ]
   },
   'text-regeneration': {
