@@ -1,0 +1,18 @@
+{
+  "manifest": 1,
+  "id": "lib",
+  "name": "Lib",
+  "author": "morrowkiln",
+  "version": "1.0.0",
+  "blurb": "A library the tests' other fixture requires.",
+  "source": "https://github.com/venus-extracurriculars/lib",
+  "kit": "0.3.0",
+  "hooks": [],
+  "main": false,
+  "scope": "anytime",
+  "defaultOn": true,
+  "library": true,
+  "exports": [
+    "greet"
+  ]
+}

@@ -2313,6 +2313,24 @@ export interface Settings {
    * whatever `lessNsfwText` says. Absent is the shipped persona.
    */
   scenePersona?: string
+  /**
+   * Folders a mod author loads a mod from as it is built, each holding an unzipped release.
+   * **Written by main** from the Mods screen's "For mod authors" fold, not by a settings patch,
+   * and read before the window opens. Absent is none.
+   */
+  devModFolders?: string[]
+  /**
+   * Whether an installed mod from a source the org has not reviewed may run its main-process
+   * code. Hand-edited until the Mods screen offers it; absent is off, and such a mod is then
+   * not permitted to run.
+   */
+  allowUnreviewedMain?: boolean
+  /**
+   * Which installed mods the start notice has already named, by id, each with the version it was
+   * named at: the notice shows once per version of a mod that is not running, and the Mods
+   * screen's row carries the word after that. **Written by main**, like `devModFolders`.
+   */
+  modNoticesSeen?: Record<string, string>
 }
 
 /** How many memories per character a cast scene's prompt carries, by cast size; absent is the default. */

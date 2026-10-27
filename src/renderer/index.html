@@ -8,12 +8,25 @@
          picture, the reader's own picture, the photos, a picture picked for an upload.
          In script-src, `blob:` is the pitch-shift worklet the stretch library registers from
          an in-memory module, and 'wasm-unsafe-eval' is its WebAssembly, which Chromium
-         refuses under a policy that does not name it. -->
+         refuses under a policy that does not name it.
+         `vxmod:` is the installed mods: each one's `renderer.js` and the host shims under
+         script-src (a mod's workers too, worker-src falling back to it), its `style.css`
+         under style-src, its `assets/` under img-src, media-src and font-src, and its own
+         JSON, workflows and routes under connect-src. media-src, font-src and connect-src
+         are new directives, so each keeps the 'self' default-src gave them. The hash is the
+         import map below, an inline script: a test holds the two together, so editing the
+         map without the hash fails there and not in a player's game. -->
     <meta
       http-equiv="Content-Security-Policy"
-      content="default-src 'self'; script-src 'self' blob: 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' charimg: bgimg: data: blob:"
+      content="default-src 'self'; script-src 'self' blob: 'wasm-unsafe-eval' vxmod: 'sha256-U9sna81IyqWXaNMbvONqLhpQt7sJF/mMoPk7G6kzpv4='; style-src 'self' 'unsafe-inline' vxmod:; img-src 'self' charimg: bgimg: data: blob: vxmod:; media-src 'self' blob: vxmod:; font-src 'self' vxmod:; connect-src 'self' vxmod:"
     />
     <title>Venus University</title>
+    <!-- One React: a mod's `renderer.js` keeps these names external, and each resolves to a
+         small module main generates that hands over the page's own instance. The map is one
+         line so its hash does not depend on the file's line endings; it is static, because
+         nothing in it depends on which mods are installed, and the game's own code never
+         meets it (bundled with no bare imports left, and rewritten by Vite in dev). -->
+    <script type="importmap">{"imports":{"react":"vxmod://host/react.js","react/jsx-runtime":"vxmod://host/react-jsx-runtime.js","react-dom":"vxmod://host/react-dom.js","react-dom/client":"vxmod://host/react-dom-client.js","motion/react":"vxmod://host/motion-react.js","@vx/modkit/shared":"vxmod://host/kit-shared.js","@vx/modkit/renderer":"vxmod://host/kit-renderer.js","@vx/modkit/main":"vxmod://host/kit-main.js"}}</script>
   </head>
   <body>
     <div id="root"></div>

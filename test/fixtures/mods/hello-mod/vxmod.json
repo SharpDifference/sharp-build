@@ -1,0 +1,27 @@
+{
+  "manifest": 1,
+  "id": "hello-mod",
+  "name": "Hello mod",
+  "author": "morrowkiln",
+  "version": "1.0.0",
+  "blurb": "Says hello in App settings.",
+  "source": "https://github.com/venus-extracurriculars/hello-mod",
+  "kit": "0.3.0",
+  "hooks": [
+    "settingsSection",
+    "renderer:registerHooks",
+    "renderer:useModOn",
+    "protocols"
+  ],
+  "main": true,
+  "scope": "anytime",
+  "defaultOn": true,
+  "options": [
+    {
+      "id": "loud",
+      "label": "Loud",
+      "hint": "Says it louder.",
+      "default": false
+    }
+  ]
+}

@@ -1,0 +1,19 @@
+{
+  "manifest": 1,
+  "id": "missing-hook",
+  "name": "Missing hook",
+  "author": "morrowkiln",
+  "version": "1.0.0",
+  "blurb": "Missing hook, a fixture of the loader's tests.",
+  "source": "https://github.com/venus-extracurriculars/missing-hook",
+  "kit": "0.3.0",
+  "hooks": [
+    "settingsSection",
+    "renderer:registerHooks",
+    "renderer:useModOn",
+    "notARealHook"
+  ],
+  "main": false,
+  "scope": "anytime",
+  "defaultOn": true
+}

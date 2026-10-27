@@ -1,4 +1,4 @@
-import { net, protocol } from 'electron'
+import { net, protocol, type CustomScheme } from 'electron'
 import { pathToFileURL } from 'url'
 import { isCharFileRel } from '@shared/characterFiles'
 import { SAFE_CHAR_ID } from '@shared/characterRules'
@@ -19,17 +19,18 @@ const BG_SCHEME = 'bgimg'
 const BG_HOST = 'custom'
 
 /**
- * Must run **before** `app.whenReady()`, and only once, so both schemes are registered here;
- * `standard` makes host/path parse, while `supportFetchAPI`/`secure` keep renderer CSP from
- * blocking them.
+ * Must run **before** `app.whenReady()`, and only once, so both schemes are registered here,
+ * with any `extra` the caller has (the mods' `vxmod`); `standard` makes host/path parse, while
+ * `supportFetchAPI`/`secure` keep renderer CSP from blocking them.
  */
-export function registerImageSchemes(): void {
-  protocol.registerSchemesAsPrivileged(
-    [CHAR_SCHEME, BG_SCHEME].map((scheme) => ({
+export function registerImageSchemes(extra: readonly CustomScheme[] = []): void {
+  protocol.registerSchemesAsPrivileged([
+    ...[CHAR_SCHEME, BG_SCHEME].map((scheme) => ({
       scheme,
       privileges: { standard: true, secure: true, supportFetchAPI: true, stream: true }
-    }))
-  )
+    })),
+    ...extra
+  ])
 }
 
 /** The file a background URL names, or null where it names none of a background's pictures. */

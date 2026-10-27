@@ -11,19 +11,24 @@ import {
   type ModDef,
   type ModSwitches
 } from '@shared/mods'
+import { sessionRow, type ModSessionEntry } from '@shared/modSession'
 import { ConfirmModal } from '../components/ConfirmModal'
 import { useModalShell } from '../components/useModalShell'
 import { TitleTab } from '../components/TitleTab'
 import { modDetail, optionPreview } from '../mods/hooks'
+import { isWebBuild } from '../platform'
+import { ModsAuthorsFold } from './ModsAuthorsFold'
+import { notRunningLine, useModSessionStore } from '../stores/modSessionStore'
 import { useModsStore } from '../stores/modsStore'
 import { useUiStore } from '../stores/uiStore'
-import { gestures, lift, panelUnderTab, press, veilIn } from './motion'
+import { gestures, lift, press, panelUnderTab, veilIn } from './motion'
 import '../vu_styles/Mods.css'
 
 /** What a mod's row says of it, and the colour that goes with the word. */
 type Standing = 'on' | 'off' | 'needs'
 
-function standingOf(switches: ModSwitches, mod: ModDef): { kind: Standing; text: string } {
+function standingOf(switches: ModSwitches, mod: ModDef, running: boolean): { kind: Standing; text: string } {
+  if (!running) return { kind: 'needs', text: 'not running' }
   if (!switchedOn(switches, mod.id)) return { kind: 'off', text: 'off' }
   const missing = missingRequirement(switches, mod.id)
   // A mod that needs something this build lacks names itself; there is nothing else to name.
@@ -34,6 +39,17 @@ function standingOf(switches: ModSwitches, mod: ModDef): { kind: Standing; text:
 /** When a mod's switch takes effect, in the two words the legend explains. */
 function scopeWords(mod: ModDef): string {
   return mod.scope === 'playthrough' ? 'per playthrough' : 'any time'
+}
+
+/** Where a mod came from, in a word for its tag. */
+function originWords(session: ModSessionEntry | undefined): string {
+  if (!session) return 'built in'
+  return session.dev ? 'from folder' : 'installed'
+}
+
+/** The folder's own name, which is what a row has room for. */
+function folderName(folder: string): string {
+  return folder.replace(/[\\/]+$/, '').split(/[\\/]/).pop() ?? folder
 }
 
 interface SwitchProps {
@@ -116,14 +132,23 @@ export function ModsModal({ theme, onClose, inGame = false, warn }: ModsModalPro
   const switches = useModsStore((s) => s.switches)
   const setMod = useModsStore((s) => s.setMod)
   const setOption = useModsStore((s) => s.setOption)
-  const [selectedId, setSelectedId] = useState(MODS[0]?.id ?? null)
+  const table = useModSessionStore((s) => s.table)
+  const shiftStart = useModSessionStore((s) => s.shiftStart)
+  const running = useModSessionStore((s) => s.running)
+  // A library has no switch and no row; the mods that need it name it on theirs.
+  const listed = MODS.filter((mod) => !mod.library)
+  // A folder whose manifest could not be read has no entry in the list: it gets a row of its own, by folder.
+  const unreadable = table.mods.filter((mod) => mod.def === null)
+  const sessionOf = (id: string): ModSessionEntry | undefined => sessionRow(table, id)
+  const [selectedId, setSelectedId] = useState(listed[0]?.id ?? null)
 
   const { host, overlayProps } = useModalShell(close)
   if (!host) return null
 
-  const selected = MODS.find((mod) => mod.id === selectedId) ?? null
+  const selected = listed.find((mod) => mod.id === selectedId) ?? null
+  const selectedSession = selected ? sessionOf(selected.id) : undefined
   const missing = selected ? missingRequirement(switches, selected.id) : null
-  const count = modsOn(switches).length
+  const count = modsOn(switches, listed).length
   // A mod's own page, where one of the mods that are on has one for it.
   const Detail = selected ? modDetail(selected) : undefined
 
@@ -156,20 +181,22 @@ export function ModsModal({ theme, onClose, inGame = false, warn }: ModsModalPro
             </p>
           </div>
           <span id="mods-count" className="vu-mods-count">
-            {count} of {MODS.length} on
+            {count} of {listed.length} on
           </span>
         </header>
 
         <div className="vu-mods-panes">
-          {MODS.length === 0 && (
+          {listed.length === 0 && unreadable.length === 0 && (
             <p id="mods-none" className="vu-mods-blurb">
               This build carries no mods yet. It is the game as released, with this screen ready
               for them.
             </p>
           )}
           <ul className="vu-mods-list">
-            {MODS.map((mod) => {
-              const standing = standingOf(switches, mod)
+            {listed.map((mod) => {
+              const session = sessionOf(mod.id)
+              const isRunning = running(mod.id)
+              const standing = standingOf(switches, mod, isRunning)
               return (
                 <li key={mod.id} className="vu-mods-row" data-selected={mod.id === selectedId}>
                   <button
@@ -182,7 +209,16 @@ export function ModsModal({ theme, onClose, inGame = false, warn }: ModsModalPro
                     <span className="vu-mods-name">{mod.name}</span>
                     <span className="vu-mods-meta">
                       {mod.author} · {scopeWords(mod)}
+                      {session?.dev ? ` · from folder ${folderName(session.folder)}` : ''}
                     </span>
+                    {session && !isRunning && (
+                      <span className="vu-mods-row-line" data-kind="needs">
+                        Not running this session: {notRunningLine(session, table, shiftStart)}
+                      </span>
+                    )}
+                    {session && isRunning && session.warnings.length > 0 && (
+                      <span className="vu-mods-row-line">{session.warnings.join(' · ')}</span>
+                    )}
                   </button>
                   <span className="vu-mods-standing" data-kind={standing.kind}>
                     {standing.text}
@@ -191,6 +227,7 @@ export function ModsModal({ theme, onClose, inGame = false, warn }: ModsModalPro
                     id={`mods-switch-${mod.id}`}
                     label={`${mod.name}, ${standing.text}`}
                     on={switchedOn(switches, mod.id)}
+                    disabled={!isRunning}
                     onChange={(on) => {
                       setSelectedId(mod.id)
                       request({ modId: mod.id, optionId: null, on })
@@ -199,6 +236,17 @@ export function ModsModal({ theme, onClose, inGame = false, warn }: ModsModalPro
                 </li>
               )
             })}
+            {unreadable.map((mod) => (
+              <li key={`unreadable-${mod.folder}`} className="vu-mods-row" data-kind="unreadable">
+                <span className="vu-mods-pick">
+                  <span className="vu-mods-name">{folderName(mod.folder)}</span>
+                  <span className="vu-mods-meta">{mod.dev ? 'developer folder' : 'installed folder'}</span>
+                  <span className="vu-mods-row-line" data-kind="needs">
+                    Not running this session: {mod.message}
+                  </span>
+                </span>
+              </li>
+            ))}
           </ul>
 
           {selected && (
@@ -211,10 +259,27 @@ export function ModsModal({ theme, onClose, inGame = false, warn }: ModsModalPro
               </div>
               <p className="vu-mods-blurb">{selected.blurb}</p>
               <p className="vu-mods-tags">
-                <span className="vu-mods-tag">installed</span>
+                <span className="vu-mods-tag">{originWords(selectedSession)}</span>
                 <span className="vu-mods-tag">{scopeWords(selected)}</span>
+                {selectedSession?.manifest && <span className="vu-mods-tag">kit {selectedSession.manifest.kit}</span>}
               </p>
+              {selectedSession?.manifest && (
+                <p className="vu-mods-about" data-cursor="text">
+                  {selectedSession.dev ? selectedSession.folder : selectedSession.manifest.source}
+                </p>
+              )}
               {selected.offNote && <p className="vu-mods-note">{selected.offNote}</p>}
+              {selectedSession && !running(selected.id) && (
+                <p className="vu-mods-note" data-kind="needs">
+                  Not running this session: {notRunningLine(selectedSession, table, shiftStart)}. Its switch stays
+                  where you left it, and what it saved is kept.
+                </p>
+              )}
+              {selectedSession?.warnings.map((warning) => (
+                <p key={warning} className="vu-mods-note">
+                  {warning}
+                </p>
+              ))}
               {inGame && selected.scope === 'playthrough' && (
                 <p className="vu-mods-note" data-kind="needs">
                   Set when a playthrough starts. A change here leaves the game you are in as it is.
@@ -312,6 +377,9 @@ export function ModsModal({ theme, onClose, inGame = false, warn }: ModsModalPro
             playthroughs.
           </p>
         </div>
+
+        {/* The browser build installs nothing, so it has no folders to load from. */}
+        {!isWebBuild() && <ModsAuthorsFold />}
 
         <div className="vu-foot">
           <motion.button

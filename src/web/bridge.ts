@@ -68,6 +68,7 @@ import * as saves from './db/saves'
 import * as scenes from './db/scenes'
 import { readGrabBags, writeGrabBags } from './db/grabbags'
 import { readModSwitches, writeModSwitches } from './mods'
+import { EMPTY_SESSION } from '@shared/modSession'
 import { getPoseManifest, getQuickstart, readAudio } from './assets'
 import { offerDownload } from './download'
 import { emitter } from './emitter'
@@ -170,7 +171,17 @@ export function buildApi(): VenusUniversityApi {
     },
     mods: {
       get: () => result('read the mod switches', readModSwitches),
-      set: (switches) => result('save the mod switches', () => writeModSwitches(switches))
+      set: (switches) => result('save the mod switches', () => writeModSwitches(switches)),
+      // The browser build installs nothing: no table, no host, no developer folders.
+      session: EMPTY_SESSION,
+      exposeHost: () => Promise.resolve({ ok: true, data: undefined }),
+      failed: () => Promise.resolve({ ok: true, data: undefined }),
+      noticesSeen: () => Promise.resolve({ ok: true, data: undefined }),
+      addDevFolder: () => Promise.resolve({ ok: true, data: null }),
+      removeDevFolder: () => Promise.resolve({ ok: true, data: undefined }),
+      devFolders: () => Promise.resolve({ ok: true, data: [] }),
+      onDevChanged: () => () => {},
+      restart: () => Promise.resolve({ ok: true, data: undefined })
     },
     app: {
       // There is no window to close: the page is somebody else's tab.

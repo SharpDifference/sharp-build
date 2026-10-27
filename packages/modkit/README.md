@@ -36,6 +36,16 @@ cannot exist without a row there: the renderer's `hookTie.ts` fails the typechec
 and the table disagree. The kit's own version is semantic and informational: a minor adds, a
 major removes what `DEPRECATED_HOOKS` announced or changes a shape the API report shows.
 
+## The manifest and the loader
+
+A mod built outside the repo ships a `vxmod.json`: `parseManifest` in the host's shared entry
+reads it, refusing the whole file at the first field it cannot read, and `modDefOf` turns it into
+the entry `MODS` lists. Its `requires`, `optional` and `game` ranges are written in the small
+subset `src/shared/range.ts` reads. The game's loader (`src/main/mods/` in core) reads every
+installed manifest at start, checks its `hooks` with `checkCompat`, orders the mods by what they
+require and loads them; `registerHooks` then holds each registration to its manifest through
+`setDeclaredHooks`. `MODDING.md` says what the fields mean.
+
 ## Checks
 
 - `npm test` at the root runs `test/kit/*`: the boundary test, the compatibility check's tests

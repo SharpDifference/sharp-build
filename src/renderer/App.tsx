@@ -1,10 +1,11 @@
 import { useEffect, useState, type JSX } from 'react'
 import { AnimatePresence } from 'motion/react'
 import { writerReady } from '@shared/settingsRules'
-import './mods'
+import { loadInstalledMods } from './mods'
 import { Crossing } from './components/Crossing'
 import { Cursor } from './components/Cursor'
 import { ModalHost } from './components/ModalHost'
+import { ModToast } from './components/ModToast'
 import { ErrorModal } from './components/ErrorModal'
 import { FatalErrorScreen } from './components/FatalErrorScreen'
 import { ManageCharactersView } from './views/ManageCharactersView'
@@ -16,6 +17,7 @@ import { SetupView } from './views/SetupView'
 import { AppSettingsModal } from './views/AppSettingsModal'
 import { CreditsModal } from './views/CreditsModal'
 import { ModsModal } from './views/ModsModal'
+import { ModsNoticeModal } from './views/ModsNoticeModal'
 import { DownloadModal } from './views/DownloadModal'
 import { FeedbackModal } from './views/FeedbackModal'
 import { LoadGameModal } from './views/LoadGameModal'
@@ -31,7 +33,8 @@ import { useGameStore } from './stores/gameStore'
 import { useGrabBagStore } from './stores/grabBagStore'
 import { convertLegacyImages } from './stores/legacyImageStore'
 import { useSaveStore } from './stores/saveStore'
-import { useModsStore } from './stores/modsStore'
+import { modIsOn, useModsStore } from './stores/modsStore'
+import { useModSessionStore } from './stores/modSessionStore'
 import { useSettingsStore } from './stores/settingsStore'
 import { comfySourceOf } from '@shared/comfyModels'
 import { comfySettled, useSetupStore } from './stores/setupStore'
@@ -87,6 +90,10 @@ async function boot(): Promise<void> {
   // Non-fatal too: with no switches read, every community mod runs at its default.
   await useModsStore.getState().load()
 
+  // The installed mods' code, imported one at a time, every registration made before any screen
+  // draws. One that fails is off for the session, and the notice under the cover says so.
+  await loadInstalledMods((id) => modIsOn(id))
+
   // The graph opens as soon as the sliders it mixes against are in.
   useAudioStore.getState().start()
 
@@ -133,6 +140,7 @@ function App(): JSX.Element {
   const download = useUiStore((s) => s.download)
   const offer = useUpdateStore((s) => s.offer)
   const updateFailure = useUpdateStore((s) => s.failure)
+  const modNotice = useModSessionStore((s) => s.notice)
   // The Game View's own key: a save switched over a running game replaces
   // this store's state under the curtain, and its React state — crossfade pairs, `sending`,
   // `uiHidden` — is a fact about the save on screen and must not outlive it.
@@ -170,10 +178,12 @@ function App(): JSX.Element {
       {/* The gate itself is what a closing modal has to outlive, so it is the presence's
           child: the exits run inside it, and it unmounts once they finish. */}
       <AnimatePresence>
-        {(modals.length > 0 || error || download || offer || updateFailure) && (
+        {(modals.length > 0 || error || download || offer || updateFailure || modNotice) && (
           <AppModals key="app-modals" />
         )}
       </AnimatePresence>
+      {/* A mod author's developer folder changed under a game: the one toast, over everything. */}
+      <ModToast />
 
       {/* It draws nothing here — it publishes what the pointer is doing onto the document and
           the OS draws the mark. Outside the fatal branch above on purpose: a screen the
@@ -195,6 +205,7 @@ function AppModals(): JSX.Element {
   const dismissError = useUiStore((s) => s.dismissError)
   const offer = useUpdateStore((s) => s.offer)
   const updateFailure = useUpdateStore((s) => s.failure)
+  const modNotice = useModSessionStore((s) => s.notice)
 
   const [theme] = useState(heldScreenTheme)
 
@@ -206,6 +217,7 @@ function AppModals(): JSX.Element {
         {modals.includes('settings') && <AppSettingsModal key="settings" theme={theme} />}
         {modals.includes('credits') && <CreditsModal key="credits" theme={theme} />}
         {modals.includes('mods') && <ModsModal key="mods" theme={theme} />}
+        {modNotice && <ModsNoticeModal key="mods-notice" theme={theme} notice={modNotice} />}
         {modals.includes('feedback') && <FeedbackModal key="feedback" theme={theme} />}
         {modals.includes('support') && <SupportModal key="support" theme={theme} />}
         {modals.includes('loadGame') && <LoadGameModal key="load-game" theme={theme} />}

@@ -61,6 +61,11 @@ export interface ModDef {
   options?: readonly ModOption[]
   /** The groups its options name, by id. */
   optionGroups?: readonly ModOptionGroup[]
+  /**
+   * A library: no switch and no row on the Mods screen. It is on while a mod that is on requires
+   * it, and its exports are what the mods that require it import.
+   */
+  library?: boolean
 }
 
 /**
@@ -70,13 +75,29 @@ export interface ModDef {
  */
 const ENTRIES = import.meta.glob<ModDef>('./modEntries/*.ts', { eager: true, import: 'default' })
 
-/**
- * Every mod in this build, in the order the Mods screen lists them and the hooks are asked: by
- * id. None yet in `core`: this is the frame alone.
- */
-export const MODS: readonly ModDef[] = Object.keys(ENTRIES)
+/** The list itself, which {@link installMods} adds to in place so every holder of `MODS` sees the same list. */
+const list: ModDef[] = Object.keys(ENTRIES)
   .sort()
   .map((file) => ENTRIES[file])
+
+/**
+ * Every mod in this build, in the order the Mods screen lists them and the hooks are asked: by
+ * id. The in-repo mods from the start (none in `core`: that is the frame alone), and the
+ * installed ones once {@link installMods} has added them, which main does from its loader and the
+ * window from its first import, before any module reads the list.
+ */
+export const MODS: readonly ModDef[] = list
+
+/**
+ * Adds the installed mods' entries to {@link MODS}, for every status, so the Mods screen can show
+ * each; the list stays sorted by id. An id the build already carries is left as the build has it.
+ */
+export function installMods(defs: readonly ModDef[]): void {
+  for (const def of defs) {
+    if (!list.some((mod) => mod.id === def.id)) list.push(def)
+  }
+  list.sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0))
+}
 
 /**
  * What the player has set, as `data/mods.json` holds it. A mod or an option that is not in
