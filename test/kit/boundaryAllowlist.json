@@ -888,7 +888,6 @@
   "src/shared/talentAbilities.ts -> ./shop",
   "src/shared/talentAbilities.ts -> ./types",
   "src/shared/talentBondPoints.ts -> ./playerStats",
-  "src/shared/talentCatalog.ts -> ./talentPacks/*.ts",
   "src/shared/talentGrowth.ts -> ./playerStats",
   "src/shared/talentMemories.ts -> ./echo",
   "src/shared/talentMemories.ts -> ./types",

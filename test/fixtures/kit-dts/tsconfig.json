@@ -1,0 +1,5 @@
+{
+  // The kit's declaration build, plus one file that augments a core module the way a mod does.
+  "extends": "../../../packages/modkit/tsconfig.dts.json",
+  "files": ["augmentsBackup.ts"]
+}

@@ -123,15 +123,26 @@ export function scanMods(root: string, mods: Record<string, ModSet>): ScanResult
   for (const [id, mod] of Object.entries(mods)) {
     for (const file of files(root, mod.globs)) owner.set(file, id)
   }
-  const ownerOf = (target: string): string | undefined => {
+  /**
+   * The mods an import reaches, `undefined` standing for a file no mod owns: a file's owner, every
+   * owner among the files a glob matches, or for a folder (or a glob matching nothing) the owner of
+   * whatever is under it.
+   */
+  const ownersOf = (target: string): (string | undefined)[] => {
     for (const suffix of RESOLVED) {
       const found = owner.get(target + suffix)
-      if (found) return found
+      if (found) return [found]
     }
-    // A glob, or a folder: whatever is under it decides.
-    const dir = target.includes('*') ? posix.dirname(target.slice(0, target.indexOf('*'))) : target
-    for (const [file, id] of owner) if (file.startsWith(`${dir}/`)) return id
-    return undefined
+    const star = target.indexOf('*')
+    if (star !== -1) {
+      const matched = files(root, [target]).sort()
+      if (matched.length > 0) return [...new Set(matched.map((file) => owner.get(file)))]
+    }
+    // A glob's folder is its path up to the last `/` before its first `*`: `a/b/*.ts` and
+    // `a/b/c*.ts` are both under `a/b`.
+    const dir = star === -1 ? target : target.slice(0, target.lastIndexOf('/', star))
+    for (const [file, id] of owner) if (file.startsWith(`${dir}/`)) return [id]
+    return [undefined]
   }
 
   const scanned: string[] = []
@@ -150,11 +161,12 @@ export function scanMods(root: string, mods: Record<string, ModSet>): ScanResult
       }
       if (specifier.startsWith('.')) {
         const target = posix.normalize(posix.join(posix.dirname(file), specifier))
-        const other = ownerOf(target)
-        if (other === id) continue
-        if (other === undefined) fail(`reaches outside the mod: \`${target}\``)
-        else if (requires.includes(other)) required.push({ file, specifier, mod: other })
-        else fail(`imports mod \`${other}\`, which it does not require`)
+        for (const other of ownersOf(target)) {
+          if (other === id) continue
+          if (other === undefined) fail(`reaches outside the mod: \`${target}\``)
+          else if (requires.includes(other)) required.push({ file, specifier, mod: other })
+          else fail(`imports mod \`${other}\`, which it does not require`)
+        }
         continue
       }
       if (specifier.startsWith('/')) {

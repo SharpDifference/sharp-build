@@ -1135,6 +1135,7 @@ function ConversationView({
       </div>
 
       {!bot && <TextRegenerate charId={charId} />}
+      {!bot && <ModSlot slot="conversationFoot" props={{ charId }} />}
       <div className="vu-bb-foot">
         {boss ? (
           <BossActions
