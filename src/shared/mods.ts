@@ -61,6 +61,11 @@ export interface ModDef {
   options?: readonly ModOption[]
   /** The groups its options name, by id. */
   optionGroups?: readonly ModOptionGroup[]
+  /**
+   * A library: no switch and no row on the Mods screen. It is on while a mod that is on requires
+   * it, and its exports are what the mods that require it import.
+   */
+  library?: boolean
 }
 
 /**
