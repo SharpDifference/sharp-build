@@ -128,8 +128,10 @@ export function scanMods(root: string, mods: Record<string, ModSet>): ScanResult
       const found = owner.get(target + suffix)
       if (found) return found
     }
-    // A glob, or a folder: whatever is under it decides.
-    const dir = target.includes('*') ? posix.dirname(target.slice(0, target.indexOf('*'))) : target
+    // A glob, or a folder: whatever is under it decides. A glob's folder is its path up to the last
+    // `/` before its first `*`: `a/b/*.ts` and `a/b/c*.ts` are both under `a/b`.
+    const star = target.indexOf('*')
+    const dir = star === -1 ? target : target.slice(0, target.lastIndexOf('/', star))
     for (const [file, id] of owner) if (file.startsWith(`${dir}/`)) return id
     return undefined
   }
