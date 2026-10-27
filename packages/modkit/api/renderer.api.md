@@ -94,6 +94,36 @@ export function fileLatePost(post: NonNullable<SlotIntroResponse['posts']>[numbe
 export function finishSlotActivity(owner: string, id: string, completed: boolean, result: string): Promise<boolean>;
 
 // @public
+export interface GameMenuItemProps {
+    // (undocumented)
+    children: ReactNode;
+    dead?: boolean;
+    note?: string;
+    // (undocumented)
+    onClick: () => void;
+}
+
+// @public
+export interface GameModalProps {
+    arg: string | undefined;
+    covered: boolean;
+    // (undocumented)
+    onClose: () => void;
+    openGameMenu: () => void;
+    theme: ScreenTheme;
+}
+
+// @public
+export interface LandingToolProps {
+    // (undocumented)
+    children: ReactNode;
+    // (undocumented)
+    label: string;
+    // (undocumented)
+    onClick: () => void;
+}
+
+// @public
 export interface LikesAsk {
     author: string;
     // (undocumented)
@@ -109,6 +139,9 @@ export interface LikesAsk {
 export function Locked(input: {
     children: ReactNode;
 }): JSX.Element;
+
+// @public
+export type ManualSaveOffer = 'open' | 'waiting' | 'none';
 
 // @public
 export interface ModDetailProps {
@@ -158,6 +191,9 @@ export interface ModHooks {
         nudge: (charId: string) => void;
     }) => void | Promise<void>;
     gameEntered?: () => void;
+    gameMenuEntry?: ComponentType<ScreenSlotProps['gameMenuEntry']>;
+    gameModals?: Record<string, ComponentType<GameModalProps>>;
+    landingTool?: ComponentType<ScreenSlotProps['landingTool']>;
     mapOverlay?: ComponentType<ScreenSlotProps['mapOverlay']>;
     messageAttachment?: ComponentType<ScreenSlotProps['messageAttachment']>;
     modDetail?: (mod: ModDef) => ComponentType<ModDetailProps> | undefined;
@@ -177,6 +213,7 @@ export interface ModHooks {
     prompts?: {
         [S in PromptSpot]?: PromptAddition<PromptSpots[S]>;
     };
+    railButton?: ComponentType<ScreenSlotProps['railButton']>;
     requests?: {
         [S in keyof RequestSpots]?: (request: StructuredRequest, ctx: RequestSpots[S]) => StructuredRequest;
     };
@@ -204,6 +241,9 @@ export interface ModHooks {
 
 // @public
 export function modIsOn(id: string, record?: Pick<PlaythroughRecord, 'mods'> | null): boolean;
+
+// @public
+export function openPanel(id: string, arg?: string): boolean;
 
 // @public
 export interface OptionPreviewProps {
@@ -499,6 +539,16 @@ export interface ScreenSlotProps {
         height: number;
     };
     // (undocumented)
+    gameMenuEntry: {
+        Item: ComponentType<GameMenuItemProps>;
+        saveOffer: ManualSaveOffer;
+    };
+    // (undocumented)
+    landingTool: {
+        Tool: ComponentType<LandingToolProps>;
+        visible: boolean;
+    };
+    // (undocumented)
     mapOverlay: {
         canTravel: boolean;
         close: () => void;
@@ -525,6 +575,12 @@ export interface ScreenSlotProps {
     // (undocumented)
     portraitOverlay: {
         charId: string;
+    };
+    // (undocumented)
+    railButton: {
+        Seat: ComponentType<RailSeatProps>;
+        visible: boolean;
+        dead: boolean;
     };
     // (undocumented)
     settingsSection: {

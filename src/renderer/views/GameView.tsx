@@ -190,7 +190,17 @@ import { ClassScheduleModal } from './ClassScheduleModal'
 import { EditPromptModal } from './EditPromptModal'
 import { FeedbackModal } from './FeedbackModal'
 import { GameMenuModal } from './GameMenuModal'
-import { endingChoice, prepareWayOn, scenePlays, updatesTabs, type WayOn } from '../mods/hooks'
+import {
+  endingChoice,
+  gameModal,
+  prepareWayOn,
+  scenePlays,
+  setPanelOpener,
+  subscribeHookRules,
+  updatesTabs,
+  type WayOn
+} from '../mods/hooks'
+import { modPanelGone } from './modPanelOwner'
 import { ModSlot } from '../mods/ModSlot'
 import { currentRun, runStale } from '../stores/loop/state'
 import { ModsModal } from './ModsModal'
@@ -279,6 +289,8 @@ type OpenPanel =
   | { kind: 'mods' }
   /** A mod's own panel over the scene, opened from its seat on the rail. */
   | { kind: 'modPanel'; modId: string }
+  /** A mod's panel by its id, opened with the kit's `openPanel`, with what it was handed. */
+  | { kind: 'gameModal'; id: string; arg: string | undefined }
   | { kind: 'feedback' }
   | { kind: 'leaving' }
   | { kind: 'quitting' }
@@ -688,6 +700,18 @@ export function GameView(): JSX.Element {
   const [action, setAction] = useState('')
   const [panel, setPanel] = useState<OpenPanel | null>(null)
   const closePanel = (): void => setPanel(null)
+  // A mod opens its panels here, as arms of this view's own, for as long as the view is up.
+  useEffect(() => setPanelOpener((id, arg) => setPanel({ kind: 'gameModal', id, arg })), [])
+  /** The mod's panel `openPanel` put up, while its mod is on. */
+  const ModPanel = panel?.kind === 'gameModal' ? gameModal(panel.id) : undefined
+  // A mod switched off, here or by a game entered or left, takes its open panel with it: the
+  // panel would draw nothing, yet `blocked` would stay up behind it with no way to close it.
+  const panelGone = useSyncExternalStore(subscribeHookRules, () =>
+    (panel?.kind === 'gameModal' || panel?.kind === 'modPanel') && modPanelGone(panel)
+  )
+  useEffect(() => {
+    if (panelGone) closePanel()
+  }, [panelGone])
   /**
    * The glyphs a gift threw off her, until the last of them has faded. Armed `waiting` when the
    * present is handed over and raised on the line her reply opens with, so what they answer is
@@ -2173,6 +2197,7 @@ export function GameView(): JSX.Element {
           calendarBadge={calendarBadge}
           bunnyboardBadge={bunnyboardBadge}
           railDead={false}
+          modButtons={!created && !replaying}
           onCalendar={() => setPanel({ kind: 'calendar' })}
           onBunnyboard={() => useBunnyboardStore.getState().openApp()}
           onSettings={() => setPanel({ kind: 'settings' })}
@@ -2240,6 +2265,7 @@ export function GameView(): JSX.Element {
           onMap={() => setPanel({ kind: 'map' })}
           onChatLog={() => setPanel({ kind: 'chatLog' })}
           onSettings={() => setPanel({ kind: 'settings' })}
+          modButtons={!created && !replaying}
         />
       ) : (
         /* The three game overs: the ending's authored lines in the app's dialogue box over a
@@ -2827,6 +2853,19 @@ export function GameView(): JSX.Element {
             .map(({ modId, play }) => (
               <play.Panel key={`mod-${modId}`} theme={half} onClose={closePanel} />
             ))}
+
+        {/* A mod's panel by its id, opened with the kit's `openPanel`, as an arm of `OpenPanel`
+            for the reason Settings is. A mod switched off while it is open has none. */}
+        {panel?.kind === 'gameModal' && ModPanel && (
+          <ModPanel
+            key={`mod-modal-${panel.id}-${panel.arg ?? ''}`}
+            theme={half}
+            arg={panel.arg}
+            covered={covered}
+            onClose={closePanel}
+            openGameMenu={() => setPanel({ kind: 'settings' })}
+          />
+        )}
 
         {/* The key list the menu opens, an arm of `OpenPanel` for the reason Settings is. */}
         {panel?.kind === 'controls' && (

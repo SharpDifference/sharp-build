@@ -7,6 +7,9 @@ export type {
   EditorFieldProps,
   EmojiToolProps,
   EndingChoice,
+  GameMenuItemProps,
+  GameModalProps,
+  LandingToolProps,
   LikesAsk,
   ModDetailProps,
   ModHooks,
@@ -35,8 +38,9 @@ export type {
   UpdatesTab,
   WayOn
 } from './hooks'
-export { ownsPostComments, postVisible, promptFields, promptLines, promptRequired, registerHooks } from './hooks'
+export { openPanel, ownsPostComments, postVisible, promptFields, promptLines, promptRequired, registerHooks } from './hooks'
 export type {
+  ManualSaveOffer,
   PromptState,
   ResolvedSave,
   ScreenTheme,

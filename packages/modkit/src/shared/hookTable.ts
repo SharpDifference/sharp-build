@@ -96,19 +96,23 @@ export const HOOKS = [
   { name: 'bunnyboardPage', side: 'renderer', kind: 'add', dispatch: ['bunnyboardPages'], since: '0.1.0' },
   { name: 'updatesTab', side: 'renderer', kind: 'add', dispatch: ['updatesTabs'], since: '0.1.0' },
   { name: 'scenePlay', side: 'renderer', kind: 'add', dispatch: ['scenePlays'], since: '0.1.0' },
+  { name: 'gameModals', side: 'renderer', kind: 'add', dispatch: ['gameModal', 'setPanelOpener'], since: '0.2.0' },
   { name: 'contactTab', side: 'renderer', kind: 'add', dispatch: ['contactTabs'], since: '0.1.0' },
   { name: 'editorField', side: 'renderer', kind: 'add', dispatch: ['editorFields'], since: '0.1.0' },
   slot('settingsSection'),
   slot('portraitOverlay'),
   slot('phoneOverlay'),
-  { name: 'conversationFoot', side: 'renderer', kind: 'slot', dispatch: ['screenSlot'], since: '0.2.0' },
+  { name: 'conversationFoot', side: 'renderer', kind: 'slot', dispatch: ['screenSlot'], since: '0.3.0' },
   slot('mapOverlay'),
   slot('photosPageSection'),
   slot('editCharacterImages'),
   slot('stageLayer'),
   slot('panelLayer'),
   slot('messageAttachment'),
-  slot('contactPostExtra')
+  slot('contactPostExtra'),
+  { ...slot('railButton'), since: '0.2.0' },
+  { ...slot('landingTool'), since: '0.2.0' },
+  { ...slot('gameMenuEntry'), since: '0.2.0' }
 ] as const satisfies readonly HookRow[]
 
 export type HookName = (typeof HOOKS)[number]['name']
@@ -153,6 +157,7 @@ export const KIT_APIS = [
   'shared:optionKey',
   'shared:optionOn',
   'shared:registerCharacterTrait',
+  'shared:registerImagePromptDraft',
   'shared:registerPostCarry',
   'shared:registerRomanceRequirement',
   'shared:registerTermCarry',
@@ -165,6 +170,7 @@ export const KIT_APIS = [
   'renderer:finishSlotActivity',
   'renderer:Locked',
   'renderer:modIsOn',
+  'renderer:openPanel',
   'renderer:ownsPostComments',
   'renderer:PostCommentAction',
   'renderer:PostCommentsView',
