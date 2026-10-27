@@ -174,6 +174,7 @@ export const KIT_APIS = [
   'renderer:finishSlotActivity',
   'renderer:Locked',
   'renderer:modIsOn',
+  'renderer:modState',
   'renderer:openPanel',
   'renderer:ownsPostComments',
   'renderer:PostCommentAction',

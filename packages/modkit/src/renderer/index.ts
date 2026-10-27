@@ -40,6 +40,8 @@ export type {
 } from './hooks'
 export { openPanel, ownsPostComments, postVisible, promptFields, promptLines, promptRequired, registerHooks } from './hooks'
 export { recordField, safePoint, saveField, useSafePoint, writeModField, writeModFields } from './saveField'
+export { modState } from './modState'
+export type { ModStateHandle, ModStateSpec } from './modState'
 export type { ModDataRecord, RecordFieldHandle, RecordFieldSpec, SaveFieldHandle, SaveFieldSpec } from './saveField'
 export type {
   ManualSaveOffer,

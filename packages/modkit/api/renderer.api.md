@@ -248,6 +248,23 @@ export interface ModHooks {
 export function modIsOn(id: string, record?: Pick<PlaythroughRecord, 'mods'> | null): boolean;
 
 // @public
+export function modState<T>(modId: string, spec: ModStateSpec<T>): ModStateHandle<T>;
+
+// @public
+export interface ModStateHandle<T> {
+    get(): T;
+    set(next: T): void;
+    subscribe(onChange: (value: T) => void): () => void;
+    use(): T;
+}
+
+// @public
+export interface ModStateSpec<T> {
+    initial: T;
+    lifetime: 'game' | 'session';
+}
+
+// @public
 export function openPanel(id: string, arg?: string): boolean;
 
 // @public

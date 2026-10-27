@@ -1,7 +1,7 @@
 import { blocksNewRomance } from '@shared/romanceRequirements'
 import { savedModScene } from '@shared/modScene'
 import { statFloor } from '../mods/hooks'
-import { bindSaveFieldStore, readModSlices, writeModSlices } from '@vx/modkit/host/renderer'
+import { bindGameBoundary, bindSaveFieldStore, readModSlices, writeModSlices } from '@vx/modkit/host/renderer'
 import { useModSessionStore } from './modSessionStore'
 import { create } from 'zustand'
 import {
@@ -1867,6 +1867,7 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
     // The notes are of the game being left.
     useModSessionStore.getState().clearDataNotes()
     set({ ...initialState, loads: get().loads, ...freshStage() })
+    tellGameBoundary()
   },
 
   setAwaitingInput: (awaiting) => set({ awaitingInput: awaiting }),
@@ -3302,6 +3303,25 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
     }
   }
 }))
+
+/** Who is told each time a game is entered (a load) or left (a reset). */
+const boundaryWatchers = new Set<() => void>()
+
+function tellGameBoundary(): void {
+  for (const watcher of [...boundaryWatchers]) watcher()
+}
+
+useGameStore.subscribe((state, before) => {
+  if (state.loads !== before.loads) tellGameBoundary()
+})
+
+// The mods' unsaved `game` states go back to where they started here.
+bindGameBoundary((onBoundary) => {
+  boundaryWatchers.add(onBoundary)
+  return () => {
+    boundaryWatchers.delete(onBoundary)
+  }
+})
 
 // The mods' save fields read and write their values here.
 bindSaveFieldStore({
