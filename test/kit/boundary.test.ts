@@ -72,6 +72,18 @@ describe('the import boundary', () => {
     )
   })
 
+  it("finds a glob import's owner in the glob's own folder, not the one above it", () => {
+    const shared = 'test/fixtures/kit-boundary-glob/shared'
+    // The neighbour is listed first, so its file is the first one in the shared folder.
+    const { violations } = scanMods(ROOT, {
+      neighbour: { globs: [`${shared}/neighbour.ts`] },
+      packs: { globs: [`${shared}/catalog.ts`, `${shared}/packs/**`] }
+    })
+    expect(violations.map((one) => `${line(one)}: ${one.reason}`)).toEqual([
+      `${shared}/neighbour.ts -> ./packs/*.ts: imports mod \`packs\`, which it does not require`
+    ])
+  })
+
   it("holds today's in-repo mods to the kit, beyond the allowlist", () => {
     // The entries' own `requires` win over the map's, which is for a mod whose entry is elsewhere.
     const entries = entryMods(ROOT)
