@@ -9,6 +9,7 @@ export type {
   CharMemory,
   ChatMessage,
   GameSave,
+  NativeGameSave,
   LedgerResponse,
   ModEnrollmentFields,
   ModSceneFields,

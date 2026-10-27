@@ -118,6 +118,7 @@ import {
   type Conversation,
   type GameHistory,
   type GameSave,
+  type NativeGameSave,
   type IntimateAct,
   type PlaythroughRecord,
   type JobState,
@@ -244,6 +245,128 @@ export interface SceneKind {
   receivedGift?: ReceivedGift | null
 }
 
+/**
+ * Every key of a save file core owns. A field added to `NativeGameSave` is a compile error until it
+ * is listed here; a mod's own field may be listed too, to have core's copies own it. Anything a
+ * file carries beyond these is kept as read and written back untouched.
+ */
+const SAVE_KEYS: Record<keyof NativeGameSave, true> & Partial<Record<keyof GameSave, true>> = {
+  schemaVersion: true,
+  playthroughId: true,
+  semester: true,
+  saveId: true,
+  saveDate: true,
+  stats: true,
+  money: true,
+  bio: true,
+  tallies: true,
+  date: true,
+  time: true,
+  charInfo: true,
+  playerSchedule: true,
+  history: true,
+  replays: true,
+  bunnyboard: true,
+  events: true,
+  job: true,
+  jobsClosed: true,
+  formerJobs: true,
+  transcript: true,
+  inventory: true,
+  sceneEventsFired: true,
+  readerCold: true,
+  readerColdsHad: true,
+  classRecords: true,
+  gradesStanding: true,
+  expelled: true,
+  midtermStandingDone: true,
+  finalsScoresShown: true,
+  venusThrough: true,
+  bunnybotThrough: true,
+  bunnymapUnlocked: true,
+  bunnyshopUnlocked: true,
+  venusJobIntroSent: true,
+  bunnybotContactIntroSent: true,
+  bunnybotFirstPostNudgeSent: true,
+  bunnybotTwoTimingTipSent: true,
+  bunnybotSeenTipSent: true,
+  bunnybotDeferred: true,
+  droppedClasses: true,
+  addedClasses: true,
+  npcRelationships: true,
+  npcFriendships: true,
+  occasionsDeclined: true,
+  npcOverlay: true,
+  slotRumor: true,
+  lastSlotCast: true,
+  weekendOutings: true,
+  outingSlots: true,
+  springBreakAway: true,
+  homecomingVisitor: true,
+  feedExtras: true,
+  graduationSeen: true,
+  farewellsDone: true,
+  endingArtWanted: true,
+  scene: true,
+  thumbnail: true
+}
+
+/**
+ * Every key of a saved scene core owns, the loop's own included. A field added to `SceneState` is
+ * a compile error until it is listed here; anything a scene carries beyond these is kept as read
+ * and written back untouched.
+ */
+const SCENE_KEYS: Record<keyof SceneState, true> = {
+  activity: true,
+  mods: true,
+  cast: true,
+  transcript: true,
+  summary: true,
+  summaries: true,
+  bg: true,
+  slots: true,
+  emotions: true,
+  flipped: true,
+  departed: true,
+  offStage: true,
+  stageOverride: true,
+  bgOverride: true,
+  outfitLock: true,
+  cgLock: true,
+  sceneLog: true,
+  classCode: true,
+  projectClass: true,
+  jobId: true,
+  jobStats: true,
+  farewell: true,
+  textLedgerSkip: true,
+  textLedger: true,
+  ignoredInvites: true,
+  turnedDownInvites: true,
+  visitJobId: true,
+  mentions: true,
+  location: true,
+  inPublic: true,
+  gifts: true,
+  secret: true,
+  event: true,
+  receivedGift: true,
+  quiz: true,
+  currentLine: true,
+  pendingLines: true,
+  resumeOnLine: true,
+  endPending: true,
+  ledger: true,
+  opening: true
+}
+
+/** The own keys of `record` that `owned` does not list, with their values as read. */
+function restOf(record: object | null | undefined, owned: Record<string, true>) {
+  return Object.fromEntries(
+    Object.entries(record ?? {}).filter(([key]) => !Object.hasOwn(owned, key))
+  )
+}
+
 /** The scene-kind facts a `set` writes onto the store, unpacked from one verdict. */
 function sceneKindFields(scene: SceneKind | null | undefined) {
   return {
@@ -276,6 +399,16 @@ interface GameStoreState {
   sceneActivity: import('@shared/slotActivity').SlotActivity | null
   /** What mods keep with the scene being played, saved with it as `mods`. */
   sceneMods: import('@shared/types').ModSceneFields
+  /**
+   * What the restored scene carried that core does not own, written back with it untouched;
+   * another mod's data, or a field from a newer build. Empty for a scene cast here.
+   */
+  sceneRest: Record<string, unknown>
+  /**
+   * What the loaded save carried that core does not own, written back untouched; another mod's
+   * data, or a field from a newer build.
+   */
+  saveRest: Record<string, unknown>
   /** The playthrough being played; every save this session writes goes into it. */
   playthroughId: string | null
   /** The Scene Creator's scene being played, with no playthrough; null in a game. */
@@ -1418,6 +1551,7 @@ function nextLineFields(
 }
 
 const initialState = {
+  saveRest: {} as Record<string, unknown>,
   playthroughId: null,
   createdScene: null as CreatedScene | null,
   replaying: null as { over?: true } | null,
@@ -1484,6 +1618,7 @@ const initialState = {
   charKeyToId: {} as Record<string, string>,
   cast: [] as string[],
   sceneMods: {} as import('@shared/types').ModSceneFields,
+  sceneRest: {} as Record<string, unknown>,
   sceneClass: null as string | null,
   sceneActivity: null,
   sceneProject: null as string | null,
@@ -1628,6 +1763,7 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
       graduationSeen: save.graduationSeen,
       farewellsDone: save.farewellsDone,
       endingArtWanted: save.endingArtWanted,
+      saveRest: restOf(save, SAVE_KEYS),
       characters,
       charKeyToId: buildCharKeyToId(characters),
       ...freshStage()
@@ -1752,6 +1888,8 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
     }
     const mods = savedModScene(state.sceneMods)
     return {
+      // First, so a key core owns always wins.
+      ...state.sceneRest,
       ...(state.sceneActivity ? { activity: { ...state.sceneActivity } } : {}),
       ...(mods ? { mods } : {}),
       cast: [...state.cast],
@@ -1810,6 +1948,7 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
       pendingLines: scene ? [...scene.pendingLines] : [],
       cast: scene ? [...scene.cast] : [],
       ...sceneKindFields(scene),
+      sceneRest: restOf(scene, SCENE_KEYS),
       sceneTextLedger: scene?.textLedger ? { ...scene.textLedger } : null,
       sceneGifts: (scene?.gifts ?? []).map((g) => ({ ...g })),
       sceneQuiz: scene?.quiz
@@ -1885,8 +2024,10 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
     set({
       cast: charIds,
       ...sceneKindFields(scene),
-      // The bank belongs to one scene: every scene start and boundary reset comes through here.
-      sceneTextLedger: null
+      // The bank and the rest belong to one scene: every scene start and boundary reset comes
+      // through here.
+      sceneTextLedger: null,
+      sceneRest: {}
     }),
 
   appendSceneLines: (lines) =>
@@ -3058,6 +3199,8 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
   toGameSave: () => {
     const state = get()
     return {
+      // First, so a key core owns always wins; a save with nothing foreign adds nothing here.
+      ...state.saveRest,
       schemaVersion: SAVE_SCHEMA_VERSION,
       ...(state.semesterId !== null ? { semester: state.semesterId } : {}),
       stats: state.stats,

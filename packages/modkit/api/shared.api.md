@@ -115,77 +115,7 @@ export interface DeprecatedHook {
 export type GameOverReason = 'debt' | 'expulsion' | 'gameComplete' | 'endingDebt';
 
 // @public
-export interface GameSave {
-    addedClasses: Record<string, AddedClass>;
-    bio?: string;
-    bunnyboard: BunnyboardState;
-    // (undocumented)
-    bunnybotContactIntroSent: boolean;
-    bunnybotDeferred: BunnybotHandover[];
-    // (undocumented)
-    bunnybotFirstPostNudgeSent: boolean;
-    // (undocumented)
-    bunnybotSeenTipSent?: boolean;
-    bunnybotThrough: number;
-    // (undocumented)
-    bunnybotTwoTimingTipSent: boolean;
-    bunnymapUnlocked: boolean;
-    // (undocumented)
-    bunnyshopUnlocked: boolean;
-    charInfo: Record<string, CharState>;
-    classRecords: Record<string, ClassRecord>;
-    date: number;
-    droppedClasses: Record<string, DroppedClass>;
-    endingArtWanted: boolean;
-    events: CalendarEvent[];
-    expelled: boolean;
-    farewellsDone: string[];
-    feedExtras: FeedExtras | null;
-    // (undocumented)
-    finalsScoresShown: boolean;
-    formerJobs?: Record<string, FormerJob>;
-    gradesStanding: 'good' | 'bad' | null;
-    graduationSeen: boolean;
-    history: GameHistory;
-    homecomingVisitor?: string;
-    inventory: OwnedItem[];
-    job: JobState | null;
-    jobsClosed: string[];
-    lastSlotCast: {
-        date: number;
-        time: TimeSlot;
-        charIds: string[];
-    } | null;
-    midtermStandingDone: boolean;
-    money: number;
-    npcFriendships?: NpcFriendship[];
-    npcOverlay: NpcSlotOverlay | null;
-    npcRelationships: NpcRelationshipMap;
-    occasionsDeclined?: string[];
-    outingSlots: Record<string, number>;
-    playerSchedule: Record<number, string>;
-    playthroughId: string;
-    readerCold?: ColdCase;
-    readerColdsHad?: number[];
-    replays?: GameReplays;
-    saveDate: number;
-    saveId: string;
-    scene: SceneState | null;
-    sceneEventsFired?: SceneEventsFired;
-    // (undocumented)
-    schemaVersion: 13;
-    semester?: string;
-    slotRumor?: SlotRumor | null;
-    springBreakAway: string[] | null;
-    stats: PlayerStats;
-    tallies?: ReaderTallies;
-    thumbnail?: string;
-    // (undocumented)
-    time: TimeSlot;
-    transcript?: Transcript;
-    venusJobIntroSent: boolean;
-    venusThrough: number;
-    weekendOutings: Record<string, number>;
+export interface GameSave extends NativeGameSave {
 }
 
 // @public
@@ -713,6 +643,80 @@ export type ModScope = 'anytime' | 'playthrough';
 export interface ModSwitches {
     on: Record<string, boolean>;
     options: Record<string, boolean>;
+}
+
+// @public
+export interface NativeGameSave {
+    addedClasses: Record<string, AddedClass>;
+    bio?: string;
+    bunnyboard: BunnyboardState;
+    // (undocumented)
+    bunnybotContactIntroSent: boolean;
+    bunnybotDeferred: BunnybotHandover[];
+    // (undocumented)
+    bunnybotFirstPostNudgeSent: boolean;
+    // (undocumented)
+    bunnybotSeenTipSent?: boolean;
+    bunnybotThrough: number;
+    // (undocumented)
+    bunnybotTwoTimingTipSent: boolean;
+    bunnymapUnlocked: boolean;
+    // (undocumented)
+    bunnyshopUnlocked: boolean;
+    charInfo: Record<string, CharState>;
+    classRecords: Record<string, ClassRecord>;
+    date: number;
+    droppedClasses: Record<string, DroppedClass>;
+    endingArtWanted: boolean;
+    events: CalendarEvent[];
+    expelled: boolean;
+    farewellsDone: string[];
+    feedExtras: FeedExtras | null;
+    // (undocumented)
+    finalsScoresShown: boolean;
+    formerJobs?: Record<string, FormerJob>;
+    gradesStanding: 'good' | 'bad' | null;
+    graduationSeen: boolean;
+    history: GameHistory;
+    homecomingVisitor?: string;
+    inventory: OwnedItem[];
+    job: JobState | null;
+    jobsClosed: string[];
+    lastSlotCast: {
+        date: number;
+        time: TimeSlot;
+        charIds: string[];
+    } | null;
+    midtermStandingDone: boolean;
+    money: number;
+    npcFriendships?: NpcFriendship[];
+    npcOverlay: NpcSlotOverlay | null;
+    npcRelationships: NpcRelationshipMap;
+    occasionsDeclined?: string[];
+    outingSlots: Record<string, number>;
+    playerSchedule: Record<number, string>;
+    playthroughId: string;
+    readerCold?: ColdCase;
+    readerColdsHad?: number[];
+    replays?: GameReplays;
+    saveDate: number;
+    saveId: string;
+    scene: SceneState | null;
+    sceneEventsFired?: SceneEventsFired;
+    // (undocumented)
+    schemaVersion: 13;
+    semester?: string;
+    slotRumor?: SlotRumor | null;
+    springBreakAway: string[] | null;
+    stats: PlayerStats;
+    tallies?: ReaderTallies;
+    thumbnail?: string;
+    // (undocumented)
+    time: TimeSlot;
+    transcript?: Transcript;
+    venusJobIntroSent: boolean;
+    venusThrough: number;
+    weekendOutings: Record<string, number>;
 }
 
 // @public

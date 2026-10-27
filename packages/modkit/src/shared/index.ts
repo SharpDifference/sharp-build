@@ -8,6 +8,7 @@ export type {
   ChatMessage,
   GameOverReason,
   GameSave,
+  NativeGameSave,
   ImagePromptDraft,
   ImagePromptKind,
   ImagePromptParts,

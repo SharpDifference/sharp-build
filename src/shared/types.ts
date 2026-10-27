@@ -1457,7 +1457,7 @@ export interface BankedTextLedger {
 export type BunnybotHandover = 'contact' | 'haunt'
 
 /** On-disk save file — `/data/saves/{playthroughId}/{saveId}.json`. */
-export interface GameSave {
+export interface NativeGameSave {
   schemaVersion: 13
   /**
    * The playthrough this save belongs to. Derived from the containing folder
@@ -1656,6 +1656,9 @@ export interface GameSave {
    */
   thumbnail?: string
 }
+
+/** The on-disk save: core's fields, plus the optional ones mods declare on it from their own modules. */
+export interface GameSave extends NativeGameSave {}
 
 /** One employer the reader has left: the raises he had taken, and how it ended. */
 export interface FormerJob {
