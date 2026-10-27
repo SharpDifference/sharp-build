@@ -4,7 +4,7 @@ import { STORY_ASSISTANT } from '../storyAssistant'
 const mod: ModDef = {
   id: STORY_ASSISTANT,
   name: 'Story Assistant',
-  author: 'mtabbada',
+  author: 'Sharp',
   version: '1.0.0',
   scope: 'anytime',
   defaultOn: false,
