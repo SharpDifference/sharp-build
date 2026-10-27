@@ -50,7 +50,7 @@ export async function getModSwitches(): Promise<ModSwitches> {
   if (switches !== stored) await setModSwitches(switches)
   // Main's own copy of Photo Feature's switches, for the renders it draws (body details).
   setPhotoSwitches(photoSwitchesOf(switches))
-  known = switches
+  known = cleanSwitches(switches)
   return known
 }
 
@@ -62,8 +62,8 @@ export async function setModSwitches(switches: ModSwitches): Promise<void> {
     { schemaVersion: SCHEMA_VERSION, ...cleanSwitches(switches) },
     { code: 'MODS_UNWRITABLE', message: 'Could not save mods.json.' }
   )
-  known = cleanSwitches(switches)
   setPhotoSwitches(photoSwitchesOf(switches))
+  known = cleanSwitches(switches)
 }
 
 /**
