@@ -10,11 +10,14 @@ import {
   MANIFEST_NAME,
   MANIFEST_READ,
   MANIFEST_UNREADABLE,
+  manifestModJson,
   portableOf,
   readManifestRecord,
   stripWrapper,
+  unknownManifestKeys,
   type CharacterManifest
 } from '@shared/characterTransfer'
+import { MOD_PARTS_DIR } from '@shared/modParts'
 import { appError, messageOf } from '@shared/errors'
 import { imageTypeOf } from '@shared/imageBytes'
 import type { ExportKind } from '@shared/sillyTavern'
@@ -35,6 +38,68 @@ import { getCharacter, readCharacterFile } from './characterService'
 import { sniffImageFile } from './imageFiles'
 import { readJsonFile, writeAtomicJson } from './jsonFile'
 import { convertFolderImages } from './legacyImageService'
+import { modNameOf, modVersionOf } from './modDataService'
+import { characterTransferParts } from './modParts'
+
+/**
+ * Each registered mod's share of the export: its json for the manifest, and whatever it wrote
+ * into its own folder under `mods/`. A part that throws is left out with a warning, as a picture
+ * that is not one is, and the export goes ahead.
+ */
+async function exportModParts(
+  charId: string,
+  stagingDir: string
+): Promise<Record<string, { version: string; json?: unknown }>> {
+  const mods: Record<string, { version: string; json?: unknown }> = {}
+  for (const [modId, part] of characterTransferParts()) {
+    const dir = join(stagingDir, MOD_PARTS_DIR, modId)
+    try {
+      await mkdir(dir, { recursive: true })
+      const json: unknown = await part.export(charId, dir)
+      // Copied through JSON, so what goes in the manifest is what an import reads back.
+      mods[modId] = {
+        version: modVersionOf(modId),
+        ...(json !== undefined ? { json: JSON.parse(JSON.stringify(json)) as unknown } : {})
+      }
+    } catch (err) {
+      console.warn(`[transfer] left out ${modId}'s data:`, messageOf(err))
+      await discard(dir)
+    }
+  }
+  return mods
+}
+
+/** Runs every rollback in `rollbacks`, the last first; one that throws is logged. */
+async function rollBack(rollbacks: readonly { modId: string; undo: () => Promise<void> }[]): Promise<void> {
+  for (const { modId, undo } of [...rollbacks].reverse()) {
+    await undo().catch((err: unknown) => {
+      console.error(`[transfer] ${modId} could not take its data back out:`, err)
+    })
+  }
+}
+
+/**
+ * Hands the adopted character to every registered part in turn. One that throws takes the
+ * earlier parts' data back out, last first, and removes her folder: she arrives whole or not at
+ * all.
+ */
+async function adoptModParts(
+  charId: string,
+  run: (modId: string) => Promise<() => Promise<void>>,
+  code: string,
+  verb: string
+): Promise<void> {
+  const rollbacks: { modId: string; undo: () => Promise<void> }[] = []
+  for (const modId of characterTransferParts().keys()) {
+    try {
+      rollbacks.push({ modId, undo: await run(modId) })
+    } catch (err) {
+      await rollBack(rollbacks)
+      await rm(getCharacterPath(charId), { recursive: true, force: true }).catch(() => {})
+      throw appError(code, `Could not add the ${verb} character: ${modNameOf(modId)} could not take her data.`, messageOf(err))
+    }
+  }
+}
 
 /** Moving one character between installs, as a zip in the shared package format. */
 
@@ -53,7 +118,11 @@ export async function exportCharacter(charId: string, targetPath: string): Promi
       message: 'Could not write the character into the export.'
     })
 
-    const manifest = buildManifest(character, new Date().toISOString())
+    const mods = await exportModParts(charId, stagingDir)
+    const manifest: CharacterManifest = {
+      ...buildManifest(character, new Date().toISOString()),
+      ...(Object.keys(mods).length > 0 ? { mods } : {})
+    }
     await writeAtomicJson(join(stagingDir, MANIFEST_NAME), manifest, {
       code: 'EXPORT_FAILED',
       message: 'Could not write the export manifest.'
@@ -144,7 +213,10 @@ export async function duplicateCharacter(charId: string): Promise<Character> {
 
     // The id is minted here, never read off the copied file.
     const copy: Character = { ...character, charId: randomId() }
-    return await adoptFolder(tempDir, copy, 'DUPLICATE_FAILED', 'duplicated')
+    const adopted = await adoptFolder(tempDir, copy, 'DUPLICATE_FAILED', 'duplicated')
+    const parts = characterTransferParts()
+    await adoptModParts(adopted.charId, (modId) => parts.get(modId)!.duplicate(charId, adopted.charId), 'DUPLICATE_FAILED', 'duplicated')
+    return adopted
   } catch (err) {
     await discard(tempDir)
     throw err
@@ -194,6 +266,8 @@ async function readManifest(dir: string): Promise<CharacterManifest> {
  */
 export async function importCharacter(archivePath: string): Promise<Character> {
   const tempDir = scratchDir('import')
+  // The mods' own files, moved out of her folder before it becomes hers.
+  const modsDir = scratchDir('import-mods')
 
   try {
     const entries = await extractZip(archivePath, tempDir)
@@ -204,7 +278,8 @@ export async function importCharacter(archivePath: string): Promise<Character> {
 
     await checkExtractedContent(tempDir, classifyImportEntry, 'export')
 
-    await readManifest(tempDir)
+    const manifest = await readManifest(tempDir)
+    const legacy = unknownManifestKeys(manifest)
 
     const charId = randomId()
     const { character } = await readCharacterFile(
@@ -225,9 +300,36 @@ export async function importCharacter(archivePath: string): Promise<Character> {
     // An older package's pictures arrive as PNG and are kept as WebP, before she is the player's.
     await convertFolderImages(tempDir)
 
-    return await adoptFolder(tempDir, character, 'IMPORT_FAILED', 'imported')
+    // The mods' files are the mods' to take in, never part of her folder.
+    await mkdir(modsDir, { recursive: true })
+    await rename(join(tempDir, MOD_PARTS_DIR), join(modsDir, MOD_PARTS_DIR)).catch((err: unknown) => {
+      if ((err as NodeJS.ErrnoException).code !== 'ENOENT') throw err
+    })
+    const parts = characterTransferParts()
+    const dirOf = (modId: string): string => join(modsDir, MOD_PARTS_DIR, modId)
+    for (const modId of Object.keys(manifest.mods ?? {})) {
+      if (!parts.has(modId)) console.log(`[transfer] ${modId} is not installed; its data in the export is left out`)
+    }
+    for (const [modId, part] of parts) {
+      try {
+        await part.validate(manifestModJson(manifest, modId), dirOf(modId), legacy)
+      } catch (err) {
+        throw appError('IMPORT_FAILED', `That export cannot come in: ${modNameOf(modId)} could not read her data.`, messageOf(err))
+      }
+    }
+
+    const adopted = await adoptFolder(tempDir, character, 'IMPORT_FAILED', 'imported')
+    await adoptModParts(
+      adopted.charId,
+      (modId) => parts.get(modId)!.adopt(adopted.charId, manifestModJson(manifest, modId), dirOf(modId), legacy),
+      'IMPORT_FAILED',
+      'imported'
+    )
+    return adopted
   } catch (err) {
     await discard(tempDir)
     throw err
+  } finally {
+    await discard(modsDir)
   }
 }

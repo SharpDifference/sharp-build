@@ -9,6 +9,8 @@ import {
   type CustomBackground
 } from './customBackgrounds'
 import { appError } from './errors'
+import { isSafeEntryName, modPartEntryOf, MOD_PARTS_DIR } from './modParts'
+import { MOD_ID_RULE } from '@vx/modkit/host/shared'
 import { validateRecord, type ValidateRecordOptions } from './jsonValidate'
 import { readLorebookRecord, type LorebookRecord } from './lorebookRecord'
 import { PHOTO_META_READ, type PhotoMeta } from './photos'
@@ -42,6 +44,24 @@ const PROFILE_PICTURES_DIR = 'profilePictures'
 const PHOTOS_DIR = 'photos'
 const BACKGROUNDS_DIR = 'backgrounds'
 
+/** The top-level folders this build writes into a backup; any other is a mod's or a newer build's. */
+const CORE_DIRS = [
+  CHARACTERS_DIR,
+  ENDING_ART_DIR,
+  SEMESTER_ENDING_ART_DIR,
+  PROFILE_PICTURES_DIR,
+  PHOTOS_DIR,
+  BACKGROUNDS_DIR,
+  MOD_PARTS_DIR
+]
+
+/** The top-level folder `name` sits in when it is none this build writes, or null. */
+export function legacyDirOf(name: string): string | null {
+  const parts = name.split('/')
+  if (parts.length < 2 || CORE_DIRS.includes(parts[0])) return null
+  return parts.every(isSafeEntryName) ? parts[0] : null
+}
+
 /** One save, with where it belongs written beside it. */
 export interface BackupSave {
   playthroughId: string
@@ -70,6 +90,16 @@ export interface BackupPlaythrough {
   createdAt: number
 }
 
+/** One mod's own share of a backup: its files sit under `mods/<id>/` in the zip. */
+export interface BackupModPart {
+  /** The version of the mod that wrote it. */
+  version: string
+  /** What the mod's part answered beside its files; absent where it answered none. */
+  json?: unknown
+  /** Its files, as paths under its folder. */
+  files: string[]
+}
+
 /** Everything a backup carries beside the images. */
 export interface BackupFile {
   schemaVersion: number
@@ -94,7 +124,59 @@ export interface BackupFile {
   replays?: BackupReplay[]
   /** Each playthrough's own lorebook, by playthrough id; absent in backups from before them. */
   lorebooks?: Record<string, LorebookRecord>
+  /** Each mod's own share, by mod id, in the order the parts wrote them; absent where none did. */
+  mods?: Record<string, BackupModPart>
   characters: Character[]
+}
+
+/** Every key of the record this build reads; any other key is a mod's or a newer build's, kept for the mods' parts. */
+const BACKUP_KEYS: Record<keyof BackupFile, true> = {
+  schemaVersion: true,
+  settings: true,
+  grabbags: true,
+  playthroughs: true,
+  saves: true,
+  endingArt: true,
+  semesterEndingArt: true,
+  profilePictures: true,
+  photos: true,
+  backgrounds: true,
+  scenes: true,
+  replays: true,
+  lorebooks: true,
+  mods: true,
+  characters: true
+}
+
+/** The record's own keys this build does not read, with their values as read. */
+export function unknownBackupKeys(record: BackupFile): Record<string, unknown> {
+  return Object.fromEntries(Object.entries(record).filter(([key]) => !Object.hasOwn(BACKUP_KEYS, key)))
+}
+
+/**
+ * The mods' shares a backup carries, each under a mod id with a version and a list of its files;
+ * refuses the backup before anything is written.
+ */
+export function modPartsFromBackup(record: BackupFile): Record<string, BackupModPart> {
+  const carried: unknown = record.mods ?? {}
+  const bad = (where: string): never => {
+    throw appError(BACKUP_READ.malformed.code, BACKUP_READ.malformed.message, where)
+  }
+  if (typeof carried !== 'object' || carried === null || Array.isArray(carried)) bad('mods')
+  const parts: Record<string, BackupModPart> = {}
+  for (const [modId, value] of Object.entries(carried as Record<string, unknown>)) {
+    const where = `mods.${modId}`
+    if (!MOD_ID_RULE.test(modId)) bad(where)
+    if (typeof value !== 'object' || value === null || Array.isArray(value)) bad(where)
+    const { version, json, files } = value as Partial<BackupModPart>
+    if (typeof version !== 'string') bad(where)
+    const list: unknown = files ?? []
+    if (!Array.isArray(list) || !list.every((rel) => typeof rel === 'string' && rel.split('/').every(isSafeEntryName))) {
+      bad(where)
+    }
+    parts[modId] = { version: version as string, ...(json !== undefined ? { json } : {}), files: [...(list as string[])] }
+  }
+  return parts
 }
 
 /** How a backup is checked once it has been read. */
@@ -294,10 +376,12 @@ function isBackgroundPicture(name: string): boolean {
 
 /**
  * What one entry of an arriving backup is: the record, one of a character's pictures, a
- * graduation picture, a profile picture, a photo or a background's picture, something the
- * archive carries that no unpack keeps, or something this build never wrote.
+ * graduation picture, a profile picture, a photo or a background's picture, a mod's own file
+ * (`file`, never read as a picture), a file in a top-level folder this build does not write
+ * (`legacy`, kept for the mods' parts), something the archive carries that no unpack keeps, or
+ * something this build never wrote.
  */
-export function classifyBackupEntry(name: string): 'record' | 'image' | 'skip' | 'reject' {
+export function classifyBackupEntry(name: string): 'record' | 'image' | 'file' | 'legacy' | 'skip' | 'reject' {
   if (name === BACKUP_NAME) return 'record'
   if (isArchiveCruft(name)) return 'skip'
   if (charFileOf(name)) return 'image'
@@ -306,6 +390,8 @@ export function classifyBackupEntry(name: string): 'record' | 'image' | 'skip' |
   if (isPlaythroughPicture(name, PROFILE_PICTURES_DIR)) return 'image'
   if (isPicturePair(name, PHOTOS_DIR)) return 'image'
   if (isBackgroundPicture(name)) return 'image'
+  if (modPartEntryOf(name)) return 'file'
+  if (legacyDirOf(name)) return 'legacy'
   return 'reject'
 }
 

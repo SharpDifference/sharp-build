@@ -38,6 +38,11 @@ export interface Manifest {
   readonly optionGroups?: readonly ModOptionGroup[]
   readonly library?: boolean
   readonly exports?: readonly string[]
+  /**
+   * Where the mod's data outside the save already lives, from before `modDataPath`: `data`
+   * under `data/`, `playthrough` under each playthrough's folder. Each is one or two folder names.
+   */
+  readonly dataPath?: { readonly data?: string; readonly playthrough?: string }
 }
 
 export type ParsedManifest = { readonly ok: true; readonly manifest: Manifest } | { readonly ok: false; readonly error: string }
@@ -63,8 +68,54 @@ const FIELDS: readonly (keyof Manifest)[] = [
   'options',
   'optionGroups',
   'library',
-  'exports'
+  'exports',
+  'dataPath'
 ]
+
+/** The names core keeps directly under `data/`, which no mod's `dataPath.data` may start with. */
+export const CORE_DATA_NAMES: readonly string[] = [
+  'app.log',
+  'backgrounds',
+  'cast-checked',
+  'characters',
+  'grabbags.json',
+  'mod-data',
+  'mods',
+  'mods.json',
+  'saves',
+  'scenes',
+  'services',
+  'settings.json',
+  'tmp',
+  'update'
+]
+
+/**
+ * The names core keeps directly under a playthrough's folder, which no mod's
+ * `dataPath.playthrough` may start with; a later semester's graduation picture and every save
+ * file are refused by their shape besides.
+ */
+export const CORE_PLAYTHROUGH_NAMES: readonly string[] = [
+  'ending.png',
+  'ending.webp',
+  'enrollment.json',
+  'lorebook.json',
+  'mod-data',
+  'photos',
+  'playthrough.json',
+  'profile.png',
+  'profile.webp',
+  'replays'
+]
+
+/** One folder name of a `dataPath`. */
+const DATA_SEGMENT = /^[a-z0-9][a-z0-9._-]*$/
+
+/** Names Windows keeps for devices, whatever follows the dot. */
+const DEVICE_NAME = /^(con|prn|aux|nul|com[0-9]|lpt[0-9])(\..*)?$/
+
+/** What core itself names at a playthrough's top beyond its fixed list: graduation pictures and saves. */
+const PLAYTHROUGH_SHAPES = /^(ending-[0-9]+\.(png|webp)|.*\.json)$/
 
 /** The fields that must be non-empty text, in the order they are checked. */
 const TEXT_FIELDS = ['id', 'name', 'author', 'version', 'blurb', 'source', 'kit'] as const
@@ -212,16 +263,39 @@ function read(json: unknown, folder: { id: string; version: string } | null): Ma
   }
   if (library === true && !exports) refuse('a library must list its "exports"')
   if (library !== true && exports && exports.length > 0) refuse('only a library has "exports"')
+  const dataPath = dataPaths(get('dataPath'))
 
   // Built field by field in the written order, with fresh copies of the lists and maps, so the
   // result shares nothing with the parsed JSON and holds nothing the file did not.
-  const copies: Record<string, unknown> = { hooks, requires, optional, options, optionGroups, exports }
+  const copies: Record<string, unknown> = { hooks, requires, optional, options, optionGroups, exports, dataPath }
   const manifest: Record<string, unknown> = {}
   for (const key of FIELDS) {
     const value = key in copies ? copies[key] : get(key)
     if (value !== undefined && value !== null) manifest[key] = value
   }
   return manifest as unknown as Manifest
+}
+
+/** `dataPath`: an object of `data` and `playthrough`, each a folder of one or two names core does not use. */
+function dataPaths(value: unknown): { data?: string; playthrough?: string } | undefined {
+  if (value === undefined) return undefined
+  if (!isPlainObject(value)) refuse('"dataPath" is not an object of "data" and "playthrough"')
+  const out: { data?: string; playthrough?: string } = {}
+  for (const [key, path] of Object.entries(value)) {
+    if (key !== 'data' && key !== 'playthrough') refuse(`"dataPath" has an unknown field ${quote(key)}`)
+    if (typeof path !== 'string') refuse(`"dataPath.${key}" is not a string`)
+    const segments = path.split('/')
+    const bad =
+      path.includes('..') ||
+      segments.length > 2 ||
+      segments.some((segment) => !DATA_SEGMENT.test(segment) || segment.endsWith('.') || DEVICE_NAME.test(segment))
+    if (bad) refuse(`"dataPath.${key}" is not one or two lower-case folder names: ${quote(path)}`)
+    const first = segments[0]
+    const core = key === 'data' ? CORE_DATA_NAMES.includes(first) : CORE_PLAYTHROUGH_NAMES.includes(first) || PLAYTHROUGH_SHAPES.test(first)
+    if (core) refuse(`"dataPath.${key}" names ${quote(first)}, which the game keeps for itself`)
+    out[key] = path
+  }
+  return out
 }
 
 function text(key: string, value: unknown): void {

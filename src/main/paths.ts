@@ -27,6 +27,9 @@ import { REPLAYS_DIR } from '@shared/replays'
 import type { RoomVariant } from '@shared/room'
 import type { OutfitSet } from '@shared/types'
 
+/** The folder each mod's own files outside the save sit in, under `data/` and under a playthrough. */
+const MOD_DATA_DIR = 'mod-data'
+
 /**
  * Returns the runtime data root for settings, saves, characters and managed
  * services; all data paths derive from here.
@@ -253,6 +256,21 @@ export function getModsPath(): string {
 /** `/data/mods` — the installed mods, one folder per id (`main/mods/layout.ts`). */
 export function getModsDirPath(): string {
   return join(getDataPath(), 'mods')
+}
+
+/** `/data/mod-data` — each mod's own files outside the save, one folder per id. */
+export function getModDataRootPath(): string {
+  return join(getDataPath(), MOD_DATA_DIR)
+}
+
+/** `/data/mod-data/{modId}` — a mod's own files that belong to no playthrough. */
+export function getModDataPath(modId: string): string {
+  return join(getModDataRootPath(), modId)
+}
+
+/** `/data/saves/{playthroughId}/mod-data/{modId}` — a mod's own files for one playthrough. */
+export function getPlaythroughModDataPath(playthroughId: string, modId: string): string {
+  return join(getPlaythroughPath(playthroughId), MOD_DATA_DIR, modId)
 }
 
 /** `/data/saves` — one folder per playthrough. */

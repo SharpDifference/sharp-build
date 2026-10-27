@@ -198,6 +198,9 @@ export const KIT_APIS = [
   'renderer:useSafePoint',
   'renderer:writeModField',
   'renderer:writeModFields',
+  'main:backupPart',
+  'main:characterTransferPart',
+  'main:modDataPath',
   'main:registerComfyLaunchEnvironment'
 ] as const
 
