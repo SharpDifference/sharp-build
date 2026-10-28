@@ -7,6 +7,11 @@ Expose the native stat-rank readers `MAX_TIER` and `pointsForTier`, with the
 requirement using the game's own threshold rather than copying its point value.
 No stat thresholds, gains, floors, decay or romance rules change.
 
+Expose `useModalShell`, `useDismissLayer` and the `ModalShell` type from the renderer entry.
+Installed mod panels can share core's modal host and dismissal stack: Escape and right-click
+close only the topmost layer, and a field retains its context menu. These are the game's own
+functions, not a second stack. Existing APIs and native modal behavior are unchanged.
+
 ## 0.3.0
 
 The loader. Installed mods are read from `data/mods/<id>/<version>/` and from the developer
