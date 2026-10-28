@@ -19,7 +19,12 @@ export const MOD_FILES: Record<string, ModSet> = {
     ]
   },
   bunnyfeeds: {
-    globs: ['src/shared/bunnyfeeds*.ts', 'src/renderer/components/Bunnyfeeds*', 'src/renderer/stores/bunnyfeeds*']
+    globs: [
+      'src/shared/bunnyfeeds*.ts',
+      'src/renderer/components/Bunnyfeeds*',
+      'src/renderer/stores/bunnyfeeds*',
+      'src/renderer/vu_styles/Bunnyfeeds.css'
+    ]
   },
   'campus-talents': {
     globs: [

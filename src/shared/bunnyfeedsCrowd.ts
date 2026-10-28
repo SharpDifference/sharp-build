@@ -1,5 +1,4 @@
-import { hasTrait } from './traits'
-import type { Character } from './types'
+import { hasTrait, type Character } from '@vx/modkit/shared'
 
 /**
  * How many people answer one of her posts when Bunnyfeeds files its replies: read off how many

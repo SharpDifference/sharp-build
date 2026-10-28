@@ -1,25 +1,19 @@
-import type { CharInfo } from '@shared/types'
+import type { CharInfo, PostComment, SocialPost, StructuredRequest } from '@vx/modkit/shared'
 import { messageOf } from '@shared/errors'
 import {
   threadWork,
   type FeedThreadsResponse,
   type HeldFeedMemory,
   type ThreadWork
-} from '@shared/bunnyfeeds'
+} from '../../shared/bunnyfeeds'
 import {
   ADDRESSED_FOLLOWER_CHANCE,
   ADDRESSED_GIRL_CHANCE,
   followerChance,
   followingOf
-} from '@shared/bunnyfeedsCrowd'
+} from '../../shared/bunnyfeedsCrowd'
 import { globalSlotOf } from '@shared/jobs'
-import type { PostComment } from '@shared/postComments'
-import {
-  charKeyOf,
-  type MemoryType,
-  type SocialPost,
-  type StructuredRequest
-} from '@shared/types'
+import { charKeyOf, type MemoryType } from '@shared/types'
 import {
   buildFeedThreadsPrompt,
   type FeedThread,

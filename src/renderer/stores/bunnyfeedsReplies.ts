@@ -13,9 +13,9 @@ import {
   pickOpeningFriend,
   planCrowd,
   rollCrowd
-} from '@shared/bunnyfeedsCrowd'
-import type { PostComment } from '@shared/postComments'
-import { charKeyOf, type Character, type CharInfo } from '@shared/types'
+} from '../../shared/bunnyfeedsCrowd'
+import type { Character, CharInfo, PostComment } from '@vx/modkit/shared'
+import { charKeyOf } from '@shared/types'
 import {
   FEED_EMOJI,
   FEED_EMOJI_BAG,

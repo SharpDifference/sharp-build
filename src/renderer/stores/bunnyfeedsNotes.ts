@@ -1,7 +1,7 @@
-import { feedNotes, unreadFeedNotes, type FeedNote } from '@shared/bunnyfeeds'
+import { feedNotes, unreadFeedNotes, type FeedNote } from '../../shared/bunnyfeeds'
 import { globalSlotOf } from '@shared/jobs'
-import type { CharInfo } from '@shared/types'
-import { postVisible } from '../mods/hooks'
+import type { CharInfo } from '@vx/modkit/shared'
+import { postVisible } from '@vx/modkit/renderer'
 import { useGameStore } from './gameStore'
 
 type GameState = ReturnType<typeof useGameStore.getState>
