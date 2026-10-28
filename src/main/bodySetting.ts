@@ -1,5 +1,5 @@
-import { gateBody } from '@shared/characterBody'
-import { photoFeatureOn, photoSwitches } from '@shared/photoSwitches'
+import { gateBody } from '../shared/characterBody'
+import { photoFeatureOn, photoSwitches } from '../shared/photoSwitches'
 import type { Character } from '@shared/types'
 
 /**

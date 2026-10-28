@@ -5,7 +5,7 @@ import { bodyTagsFor, describesNothingOn } from './photoBody'
 import { framingInTags, framingOf } from './photoFraming'
 import { photoPose, withoutCameraHold, withoutHeldObject, withoutSelfieWord } from './photoPose'
 import { LOCATIONS, NARRATIVE_LOCATIONS } from './locations'
-import type { Character } from './types'
+import type { Character } from '@vx/modkit/shared'
 // Carries the `Character.body` augmentation into whatever program imports this module. The
 // project's `include` would reach it for the app, but `tsconfig.test.json` lists only the tests
 // and pulls in what they import — so the feature brings its own types rather than relying on a

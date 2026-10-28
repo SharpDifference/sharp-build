@@ -154,7 +154,12 @@ export const MOD_FILES: Record<string, ModSet> = {
       'src/renderer/stores/photo{Comments,Group,Post,Recovery,SwitchHooks,TipDelivery,Turn,Webp}.ts',
       'src/renderer/views/ContactGallery.tsx',
       'src/renderer/views/bodyFields.tsx',
-      'src/renderer/views/bodyDrafts.ts'
+      'src/renderer/views/bodyDrafts.ts',
+      'src/renderer/prompts/photoBrief.ts',
+      'src/renderer/prompts/bodyBrief.ts',
+      'src/renderer/vu_styles/PhotoBubble.css',
+      'src/renderer/vu_styles/ContactGallery.css',
+      'src/renderer/vu_styles/BodyFields.css'
     ]
   },
   'plot-twist': {

@@ -1,5 +1,6 @@
 import type { CharacterBody } from './characterBody'
-import type { Character, Result } from './types'
+import type { Result } from './types'
+import type { Character } from '@vx/modkit/shared'
 
 /**
  * What the photo feature adds to the save's shapes, added from outside them.

@@ -1,6 +1,7 @@
 import { customOutfitSlotsIn, outfitTagsFor } from './outfits'
 import { saysAny } from './photoWords'
-import type { Character, CustomOutfitSlot } from './types'
+import type { CustomOutfitSlot } from './types'
+import type { Character } from '@vx/modkit/shared'
 
 /**
  * Which of her own wardrobes a photograph shows.

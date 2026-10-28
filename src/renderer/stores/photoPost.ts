@@ -1,6 +1,6 @@
-import { allowedPostTier, settlePhoto, type PhotoTier } from '@shared/photoGate'
-import type { ChatPhoto } from '@shared/photoTypes'
-import type { SocialPost } from '@shared/types'
+import { allowedPostTier, settlePhoto, type PhotoTier } from '../../shared/photoGate'
+import type { ChatPhoto } from '../../shared/photoTypes'
+import type { SocialPost } from '@vx/modkit/shared'
 import { useGameStore } from './gameStore'
 import {
   canSendPhotos,

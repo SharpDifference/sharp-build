@@ -1,4 +1,4 @@
-import type { ModDef } from '../mods'
+import type { ModDef } from '@vx/modkit/shared'
 import { bodyAppearance, bodyNegative, gateBody, withBodyTags } from '../characterBody'
 import { registerImagePromptDraft } from '../imagePromptDrafts'
 import { PHOTO_FEATURE_MOD, photoSwitches } from '../photoSwitches'

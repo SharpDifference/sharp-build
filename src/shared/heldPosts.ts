@@ -1,5 +1,5 @@
 import { photoFeatureOn } from './photoSwitches'
-import type { SocialPost } from './types'
+import type { SocialPost } from '@vx/modkit/shared'
 
 /**
  * Whether a post is out: on her feed for anybody to read, rather than filed and still waiting

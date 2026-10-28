@@ -1,6 +1,6 @@
 import { PHOTO_FEATURE } from '@shared/mods'
-import { reachOf, rollAudienceLikes } from '@shared/postAudience'
-import { postIsOut } from '@shared/heldPosts'
+import { reachOf, rollAudienceLikes } from '../../shared/postAudience'
+import { postIsOut } from '../../shared/heldPosts'
 import {
   photoLines,
   photoStub,
@@ -31,8 +31,8 @@ import {
   withGroupPhotoRequest
 } from '../stores/photoGroup'
 import { useGameStore } from '../stores/gameStore'
-import { registerTermFiles } from '@shared/modCarry'
-import { ownsPostComments, registerHooks } from '../mods/hooks'
+import { registerTermFiles } from '@vx/modkit/shared'
+import { ownsPostComments, registerHooks } from '@vx/modkit/renderer'
 import { BODY_EDITOR_FIELD } from '../views/bodyFields'
 import { PhotoComments, PhotoPostPicture } from '../components/PhotoPostSpots'
 import { MessagePhotoAttachment, PhotoLightboxHost } from '../components/PhotoBubble'

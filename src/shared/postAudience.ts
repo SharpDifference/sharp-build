@@ -1,6 +1,5 @@
 import type { PhotoTier } from './photoGate'
-import { hasTrait } from './traits'
-import type { Character } from './types'
+import { hasTrait, type Character } from '@vx/modkit/shared'
 
 /**
  * Who sees a post on the feed, and what they do about it.

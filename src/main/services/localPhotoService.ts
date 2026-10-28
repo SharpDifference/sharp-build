@@ -13,10 +13,10 @@ import {
   photoSlug,
   pngPhotoOf,
   type PhotoKind
-} from '@shared/photoFiles'
-import { photoSwitches } from '@shared/photoSwitches'
-import { isPhotoTier, type PhotoTier } from '@shared/photoGate'
-import { buildDuoPhotoPrompt, buildPhotoPrompt } from '@shared/photoPrompt'
+} from '../../shared/photoFiles'
+import { photoSwitches } from '../../shared/photoSwitches'
+import { isPhotoTier, type PhotoTier } from '../../shared/photoGate'
+import { buildDuoPhotoPrompt, buildPhotoPrompt } from '../../shared/photoPrompt'
 import type { Character } from '@shared/types'
 import { getPhotoPath, getPhotosPath, getPhotosRoot } from '../photoProtocol'
 import { withBodySetting } from '../bodySetting'
