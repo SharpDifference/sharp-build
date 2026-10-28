@@ -770,7 +770,7 @@ export async function importBackup(archivePath: string): Promise<void> {
     const mods = modPartsFromBackup(record)
 
     // Every mod's share is read before anything is written, and made only once the game's is.
-    const legacy = { record: unknownBackupKeys(record), dirs: await legacyDirsIn(scratch) }
+    const legacy = { record: unknownBackupKeys(record), dirs: await legacyDirsIn(scratch), archive: archivePath }
     const restores = await prepareModParts(scratch, mods, legacy)
     try {
       await replaceSettings(settings)

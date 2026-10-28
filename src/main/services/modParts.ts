@@ -36,6 +36,8 @@ export interface BackupPartLegacy {
   record: Readonly<Record<string, unknown>>
   /** The zip's top-level folders the game does not claim, as unpacked: absolute paths. */
   dirs: readonly string[]
+  /** The backup file being read, by the path it was given: for a share an older build kept beside it. */
+  archive: string
 }
 
 /** A mod's own share of a backup. */

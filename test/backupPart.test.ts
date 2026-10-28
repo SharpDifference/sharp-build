@@ -78,7 +78,7 @@ interface Seen {
   json?: unknown
   list?: readonly string[]
   bytes?: Buffer
-  legacy?: { record: Readonly<Record<string, unknown>>; dirs: readonly string[] }
+  legacy?: { record: Readonly<Record<string, unknown>>; dirs: readonly string[]; archive: string }
   legacyFile?: string
   committed: boolean
   discarded: boolean
@@ -203,6 +203,7 @@ describe('a backup part', () => {
     await importBackup(legacyArchive)
     expect(seen.legacy?.record).toEqual({ exMusic: { volume: 7 } })
     expect(seen.legacy?.dirs).toHaveLength(1)
+    expect(seen.legacy?.archive).toBe(legacyArchive)
     expect(seen.legacyFile).toBe('la la')
   })
 
@@ -254,7 +255,7 @@ describe('a backup part', () => {
       expect(json).toBeUndefined()
       expect(await readdir(files.dir)).toEqual([])
       expect(files.list).toEqual([])
-      expect(legacy).toEqual({ record: {}, dirs: [] })
+      expect(legacy).toEqual({ record: {}, dirs: [], archive })
       if (fail) throw new Error('Synthetic legacy parser failure')
       return { commit, discard: async () => {} }
     })
