@@ -22,6 +22,8 @@ const rendererKit = await import('@vx/modkit/renderer')
 const hostRenderer = await import('@vx/modkit/host/renderer')
 const hooksShim = await import('../../src/renderer/mods/hooks')
 const slotShim = await import('../../src/renderer/mods/ModSlot')
+const saveFieldKit = await import('../../packages/modkit/src/renderer/saveField')
+const modStateKit = await import('../../packages/modkit/src/renderer/modState')
 
 const ROOT = resolve(__dirname, '../..')
 
@@ -47,8 +49,8 @@ describe('the entry points', () => {
     expect(rendererKit.useDismissLayer).toBe(native.useDismissLayer)
   })
 
-  it('split every runtime export of hooks.ts and ModSlot between the host and the mod', () => {
-    const moved = [...runtime(hooksShim), ...runtime(slotShim)].sort()
+  it('split every runtime export of hooks.ts, ModSlot, saveField.ts and modState.ts between the host and the mod', () => {
+    const moved = [...runtime(hooksShim), ...runtime(slotShim), ...runtime(saveFieldKit), ...runtime(modStateKit)].sort()
     const host = runtime(hostRenderer)
     const mod = runtime(rendererKit).filter((name) => moved.includes(name))
     expect([...host, ...mod].sort()).toEqual(moved)

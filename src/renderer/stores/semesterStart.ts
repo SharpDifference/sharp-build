@@ -355,7 +355,9 @@ export function continuedStartOf(
     graduationSeen: false,
     farewellsDone: [],
     endingArtWanted: false,
-    scene: null
+    scene: null,
+    // Each mod's slice as its field carried it; each one's own `normalize` reads it on the load.
+    ...(carry.ex ? { ex: carry.ex } : {})
   }
 
   return { id: continued.id, semester, save }

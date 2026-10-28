@@ -12,6 +12,7 @@ import {
   optionOn,
   PHOTO_FEATURE,
   photoSwitchesOf,
+  playthroughModVersions,
   playthroughMods,
   switchedOn,
   withMod,
@@ -179,6 +180,17 @@ describe('a new playthrough', () => {
     expect(playthroughMods(NO_SWITCHES, LIST)).toEqual(['places', 'work'])
     expect(playthroughMods(withMod(NO_SWITCHES, 'places', false), LIST)).toEqual([])
     expect(playthroughMods(NO_SWITCHES, [])).toEqual([])
+  })
+
+  it('keeps the version of every mod that is on, of either scope', () => {
+    const list = LIST.map((mod) => (mod.id === 'work' ? { ...mod, version: '2.3.0' } : mod))
+    expect(playthroughModVersions(NO_SWITCHES, list)).toEqual({ free: '1.0.0', places: '1.0.0', work: '2.3.0' })
+    // Off for itself, and `work` with it, since it cannot act without `places`.
+    expect(playthroughModVersions(withMod(withMod(NO_SWITCHES, 'places', false), 'quiet', true), list)).toEqual({
+      free: '1.0.0',
+      quiet: '1.0.0'
+    })
+    expect(playthroughModVersions(NO_SWITCHES, [])).toEqual({})
   })
 })
 
