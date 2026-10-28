@@ -9,7 +9,8 @@ import { availableEchoBreakthrough, activateBreakthrough, breakthroughCast, canB
 import { interject } from '../stores/gameLoop'
 import { useGameStore } from '../stores/gameStore'
 import { useModOn, useModsStore } from '../stores/modsStore'
-import { BREAKTHROUGH_SECONDS, breakthroughBannerMotion, breakthroughHaloMotion, gestures, lift, press, quietLift, quietPress } from './motion'
+import { BREAKTHROUGH_SECONDS, breakthroughBannerMotion, breakthroughHaloMotion } from './BreakthroughMotion'
+import { gestures, lift, press, quietLift, quietPress } from './motion'
 import '../vu_styles/Breakthrough.css'
 import { ReckoningEntry } from './ReckoningModal'
 
