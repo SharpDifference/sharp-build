@@ -2,7 +2,7 @@ import { useMemo, useState, type JSX } from 'react'
 import { motion } from 'motion/react'
 import { slotFromId } from '@shared/jobs'
 import { fullNameOf, type Season } from '@shared/types'
-import { feedNoteUnread, type FeedNote } from '@shared/bunnyfeeds'
+import { feedNoteUnread, type FeedNote } from '../../shared/bunnyfeeds'
 import { FEED_PAGE } from '../stores/feedView'
 import { useGameStore } from '../stores/gameStore'
 import {
@@ -14,7 +14,7 @@ import {
 import { formatNumericGameDate, slotHalf } from '../prompts/gameDate'
 import { dealt, gestures, quietLift, quietPress, rowLift, rowPress, slideInQuick } from '../views/motion'
 import { CommentFace, PostViewHost, usePostView } from './BunnyfeedsThread'
-import { SentText } from './TextSpots'
+import { SentText } from '@vx/modkit/renderer'
 import '../vu_styles/Bunnyfeeds.css'
 
 /** The rows dealing themselves out, as every list on the phone does. */

@@ -1,10 +1,9 @@
-import { BUNNYFEEDS, type HeldFeedMemory } from '@shared/bunnyfeeds'
-import { memoryStatusLine } from '@shared/relationship'
-import type { CharMemory, SceneLine } from '@shared/types'
+import { BUNNYFEEDS, type HeldFeedMemory } from '../../shared/bunnyfeeds'
+import { memoryStatusLine, optionOn, type CharMemory, type SceneLine } from '@vx/modkit/shared'
+import { modIsOn } from '@vx/modkit/renderer'
 import { TEXT_LEDGER_FEED_LINES } from '../prompts/bunnyfeedsPrompt'
 import { UNKNOWN_NAME, useGameStore } from './gameStore'
-import { optionOn } from '@shared/mods'
-import { modIsOn, useModsStore } from './modsStore'
+import { useModsStore } from './modsStore'
 
 /** Where a held memory without a poster says it happened, as earlier test builds wrote it. */
 const FEED_MEMORY_TAG = ', on the feed'

@@ -1,8 +1,7 @@
 import { useId, useMemo, type CSSProperties, type JSX, type ReactNode } from 'react'
 import { hashString, seededRand } from '@shared/hash'
-import { BUNNYFEEDS } from '@shared/bunnyfeeds'
-import type { OptionPreviewProps } from '../mods/hooks'
-import { useModOption } from '../stores/modsStore'
+import { BUNNYFEEDS } from '../../shared/bunnyfeeds'
+import { useModOption, type OptionPreviewProps } from '@vx/modkit/renderer'
 import '../vu_styles/Bunnyfeeds.css'
 
 /** How a follower's face is drawn, as the Mods screen's "Faces of other students" picks it. */

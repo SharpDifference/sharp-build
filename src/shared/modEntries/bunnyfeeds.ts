@@ -1,4 +1,4 @@
-import type { ModDef } from '../mods'
+import type { ModDef } from '@vx/modkit/shared'
 import { BUNNYFEEDS } from '../bunnyfeeds'
 
 const mod: ModDef = {
