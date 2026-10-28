@@ -63,6 +63,7 @@ export const MOD_FILES: Record<string, ModSet> = {
       'src/main/services/soundtrackService.ts',
       'src/renderer/stores/soundtrack*',
       'src/renderer/views/SoundtracksModal.tsx',
+      'src/renderer/views/SoundtrackSettings.tsx',
       'src/renderer/vu_styles/Soundtracks.css'
     ]
   },
