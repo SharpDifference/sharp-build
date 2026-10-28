@@ -188,7 +188,9 @@ export const KIT_APIS = [
   'renderer:submitAction',
   'renderer:takeTurnFromReply',
   'renderer:useBareMessage',
+  'renderer:useDismissLayer',
   'renderer:useEmojiTool',
+  'renderer:useModalShell',
   'renderer:useModOn',
   'renderer:useModOption',
   'main:registerComfyLaunchEnvironment'

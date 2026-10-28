@@ -176,6 +176,30 @@ else the highest, with a line in the log. The loader deletes nothing and writes 
   standing in for an installed copy of the same id). While the game runs, a change to the folder
   reloads the window, at once off a game and on offer in one; a changed `main.js` offers a restart.
 
+### Modal controls
+
+An installed mod imports `useModalShell` and `useDismissLayer` from `@vx/modkit/renderer`,
+and declares `renderer:useModalShell` or `renderer:useDismissLayer` for whichever it uses.
+They share the game's dismissal stack; do not copy the implementation or add another global
+Escape listener. Mod panels and native panels then dismiss from the top down.
+
+Call `useModalShell(onClose, sound?, primary?)` unconditionally inside a React component.
+`sound` is `'panel'` (the default), `'phone'`, or `'none'`. The returned `host` is null until
+mount; once it exists, portal the panel into it and spread `overlayProps` on the outside
+overlay. The hook handles Escape, right-click outside a text field, and a click that starts
+and ends on the overlay. It releases its place in the stack on unmount. The mod supplies its
+own content, layout and styles; the hook is not a focus trap.
+
+For a primary action, pass the callback as the third argument and spread `primaryProps` on
+the motion element containing the primary action and the modal's controls. Its
+`onAnimationComplete('shown')` enables Enter/Space once
+the entrance animation lands, with the native guards for text fields and repeated keys.
+Without a primary action, omit that argument and those props.
+
+`useDismissLayer(onClose, active)` puts a nested popup on the same stack while `active` is
+true. The first Escape/right-click closes that layer; the underlying modal remains open.
+Changing `active` to false or unmounting removes the layer. Neither hook depends on any mod.
+
 ## Options that are one choice
 
 Options that are one choice among several share a `group`, and the mod names the group in

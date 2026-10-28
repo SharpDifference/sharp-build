@@ -41,6 +41,7 @@ export type {
 export { openPanel, ownsPostComments, postVisible, promptFields, promptLines, promptRequired, registerHooks } from './hooks'
 export type {
   ManualSaveOffer,
+  ModalShell,
   PromptState,
   ResolvedSave,
   ScreenTheme,
@@ -62,7 +63,9 @@ export {
   submitAction,
   takeTurnFromReply,
   useBareMessage,
+  useDismissLayer,
   useEmojiTool,
+  useModalShell,
   useModOn,
   useModOption
 } from '../bridge/renderer'
