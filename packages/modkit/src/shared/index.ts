@@ -31,6 +31,7 @@ export type {
   SocialPost,
   StatContext,
   StatKey,
+  StatTier,
   StatusText,
   StructuredRequest,
   TextingResponse,
@@ -38,11 +39,13 @@ export type {
 } from '../bridge/shared'
 export {
   hasTrait,
+  MAX_TIER,
   memoryStatusLine,
   modById,
   modOn,
   optionKey,
   optionOn,
+  pointsForTier,
   registerCharacterTrait,
   registerImagePromptDraft,
   registerRomanceRequirement
