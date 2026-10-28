@@ -2,23 +2,19 @@ import { mkdtemp, rm } from 'fs/promises'
 import { tmpdir } from 'os'
 import { join } from 'path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-import { installMods, type ModDef } from '@shared/mods'
 import { loadMods } from '../../src/main/mods/loader'
 import { FIXTURES, installFixture } from './fixtureMods'
 
 /**
  * An installed copy of a mod the build already carries: refused, listed by its folder with no
- * definition, so the build's own copy keeps running and no hook is answered twice. Its own file,
- * because `installMods` adds to the list for the whole run.
+ * definition, so the build's own copy keeps running and no hook is answered twice. The loader is
+ * handed the build's own ids, never the list the installed mods join.
  */
 
 let root = ''
 
-const BUILT_IN: ModDef = { id: 'hello-mod', name: 'Hello mod', author: 'a', version: '2.0.0', scope: 'anytime', defaultOn: true, blurb: '' }
-
 beforeEach(async () => {
   root = await mkdtemp(join(tmpdir(), 'vu-builtin-'))
-  installMods([BUILT_IN])
 })
 
 afterEach(async () => {
@@ -32,6 +28,7 @@ describe('an installed mod whose id the build carries', () => {
       modsDir: join(root, 'mods'),
       devFolders: [join(FIXTURES, 'hello-mod')],
       allowUnreviewedMain: true,
+      builtIn: ['hello-mod'],
       coreVersion: '0.1.0',
       gameVersion: '0.6.0',
       safeStart: null,

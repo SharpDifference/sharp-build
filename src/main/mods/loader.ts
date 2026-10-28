@@ -2,7 +2,6 @@ import { existsSync, readFileSync, statSync } from 'fs'
 import { basename, join, resolve } from 'path'
 import { checkCompat, hookNameKind, modDefOf, parseManifest } from '@vx/modkit/host/shared'
 import { satisfies } from '../../../packages/modkit/src/shared/range'
-import { MODS } from '@shared/mods'
 import { modFileUrl, type ModSessionEntry, type ModSessionTable, type ModStatus, type SafeStart } from '@shared/modSession'
 import { findInstalledMods, readInstalled } from './layout'
 import { orderMods, type OrderInput } from './order'
@@ -27,6 +26,11 @@ export interface LoaderInput {
   readonly devFolders: readonly string[]
   /** Whether main-process code from a source the build has not reviewed may run. */
   readonly allowUnreviewedMain: boolean
+  /**
+   * The ids of the mods built into this copy of the game: the list as it was before any installed
+   * mod joined it. A folder with one of these ids is refused; the build's own copy runs.
+   */
+  readonly builtIn: readonly string[]
   /** The build's version (`BUILD.version`), which the table and the messages name as core's. */
   readonly coreVersion: string
   /** The game's version (`app.getVersion()`), which a manifest's `game` range is held against. */
@@ -86,7 +90,7 @@ function unreadable(id: string, folder: string, dev: boolean, message: string): 
  * the folder. `approved` is the installer's word on the install, read from its record beside the
  * folders; nothing inside the folder counts.
  */
-function readCandidate(folder: string, expect: { id: string; version: string } | null, dev: boolean, approved: boolean): Candidate {
+function readCandidate(folder: string, expect: { id: string; version: string } | null, dev: boolean, approved: boolean, builtIn: readonly string[]): Candidate {
   const name = expect?.id ?? basename(folder)
   const manifestPath = join(folder, 'vxmod.json')
   let json: unknown
@@ -100,7 +104,7 @@ function readCandidate(folder: string, expect: { id: string; version: string } |
   if (!parsed.ok) return unreadable(name, folder, dev, parsed.error)
   const manifest = parsed.manifest
   // The build's own copy is in the bundle already; a second one would answer every hook twice.
-  if (MODS.some((mod) => mod.id === manifest.id)) return unreadable(name, folder, dev, 'already part of this build')
+  if (builtIn.includes(manifest.id)) return unreadable(name, folder, dev, 'already part of this build')
   const hasMain = isFile(join(folder, 'main.js'))
   const candidate: Candidate = {
     entry: {
@@ -143,10 +147,10 @@ function findCandidates(input: LoaderInput): Candidate[] {
       candidates.push(unreadable(mod.id, mod.folder, false, mod.problem ?? 'no version folder'))
       continue
     }
-    candidates.push(readCandidate(mod.folder, { id: mod.id, version: mod.version }, false, installed.approved(mod.id, mod.version)))
+    candidates.push(readCandidate(mod.folder, { id: mod.id, version: mod.version }, false, installed.approved(mod.id, mod.version), input.builtIn))
   }
 
-  const devCandidates = input.devFolders.map((folder) => readCandidate(resolve(folder), null, true, false))
+  const devCandidates = input.devFolders.map((folder) => readCandidate(resolve(folder), null, true, false, input.builtIn))
   for (const dev of devCandidates) {
     if (dev.entry.manifest === null) {
       candidates.push(dev)
