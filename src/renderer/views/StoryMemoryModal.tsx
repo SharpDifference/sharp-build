@@ -13,7 +13,7 @@ import {
   type StoryRecord
 } from '../../shared/storyMemory'
 import { TitleTab } from '../components/TitleTab'
-import { useModalShell } from '../components/useModalShell'
+import { useModalShell } from '@vx/modkit/renderer'
 import { useGameStore } from '../stores/gameStore'
 import { useModOn } from '@vx/modkit/renderer'
 import { manualSaveOffer, writeStoryMemory } from '../stores/loop/saves'
