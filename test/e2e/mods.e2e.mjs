@@ -127,6 +127,8 @@ await scenario('hello-mod loads', ['hello-mod'], async ({ page, cspViolations })
   check('useModOn answers on', (await page.textContent('#hello-mod-on')) === 'on')
   const ping = await page.evaluate(() => fetch('vxmod://hello-mod/@/ping').then((r) => r.text()))
   check("fetch('vxmod://hello-mod/@/ping') answers ok (its main.js ran)", ping === 'ok', ping)
+  const mainOn = await page.evaluate(() => fetch('vxmod://hello-mod/@/on').then((r) => r.text()))
+  check("its main.js sees itself on through sharedModOn", mainOn === 'true', mainOn)
   check('the console has no CSP violation', cspViolations.length === 0, cspViolations.join(' | '))
 })
 
@@ -178,7 +180,8 @@ await scenario('a library and its dependent', ['lib', 'uses-lib'], async ({ page
   check('uses-lib has one', (await page.$('#mods-pick-uses-lib')) !== null)
 })
 
-// 5. Dev folder: hello-mod's folder as a developer folder; a change to its renderer.js reloads the window.
+// 5. Dev folder: hello-mod's folder as a developer folder; a change to its renderer.js reloads the window,
+//    and a change to its manifest reaches main's rule.
 {
   const devFolder = mkdtempSync(join(tmpdir(), 'vu-e2e-dev-'))
   cpSync(join(fixtures, 'hello-mod'), devFolder, { recursive: true })
@@ -203,6 +206,14 @@ await scenario('a library and its dependent', ['lib', 'uses-lib'], async ({ page
     await page.waitForSelector('#hello-mod-section', { timeout: 10000 })
     const heading = await page.textContent('#hello-mod-section h4')
     check('the window reloaded with the new text', heading === 'Hello again', heading ?? '')
+    await closeTopModal(page)
+    const manifestFile = join(devFolder, 'vxmod.json')
+    const reloadedAgain = page.waitForEvent('load', { timeout: 15000 })
+    writeFileSync(manifestFile, readFileSync(manifestFile, 'utf8').replace('"defaultOn": true', '"defaultOn": false'))
+    await reloadedAgain
+    await settle(page)
+    const mainOn = await page.evaluate(() => fetch('vxmod://hello-mod/@/on').then((r) => r.text()))
+    check("main's rule reads the manifest's new defaultOn after the reload", mainOn === 'false', mainOn)
   }, { ...SETTINGS, devModFolders: [devFolder] })
   rmSync(devFolder, { recursive: true, force: true })
 }
