@@ -1,6 +1,7 @@
 import { CHARACTER_FILE_NAME, isCharFileRel, STAGING_DIR } from './characterFiles'
 import { CHARACTER_SCHEMA_VERSION } from './characterRules'
 import { appError } from './errors'
+import { modPartEntryOf } from './modParts'
 import { validateRecord, type ValidateRecordOptions } from './jsonValidate'
 import type { Character } from './types'
 
@@ -24,6 +25,31 @@ export interface CharacterManifest {
   firstName: string
   /** Informational, as above. */
   lastName: string
+  /** Each mod's own share of the export, by mod id; its files sit under `mods/<id>/`. */
+  mods?: Record<string, { version: string; json?: unknown }>
+}
+
+/** Every key of a manifest this build reads; any other is a mod's or a newer build's. */
+const MANIFEST_KEYS: Record<keyof CharacterManifest, true> = {
+  format: true,
+  schemaVersion: true,
+  exportedAt: true,
+  firstName: true,
+  lastName: true,
+  mods: true
+}
+
+/** The manifest's own keys this build does not read, with their values as read. */
+export function unknownManifestKeys(manifest: object): Record<string, unknown> {
+  return Object.fromEntries(Object.entries(manifest).filter(([key]) => !Object.hasOwn(MANIFEST_KEYS, key)))
+}
+
+/** The json the manifest carries for `modId`, or undefined where it carries none or not in the shape written. */
+export function manifestModJson(manifest: CharacterManifest, modId: string): unknown {
+  const mods: unknown = manifest.mods
+  if (typeof mods !== 'object' || mods === null || Array.isArray(mods) || !Object.hasOwn(mods, modId)) return undefined
+  const entry: unknown = (mods as Record<string, unknown>)[modId]
+  return typeof entry === 'object' && entry !== null ? (entry as { json?: unknown }).json : undefined
 }
 
 /** How a manifest is checked once it has been read. */
@@ -136,16 +162,17 @@ export function stripWrapper(names: readonly string[]): string | null {
 
 /**
  * What one entry of an arriving package is: the record, the marker, a staged run's image, one
- * of her pictures, something the archive carries that no unpack keeps, or something this build
- * never wrote.
+ * of her pictures, a mod's own file (`mod`, never read as a picture), something the archive
+ * carries that no unpack keeps, or something this build never wrote.
  */
 export function classifyImportEntry(
   rel: string
-): 'record' | 'manifest' | 'staging' | 'image' | 'skip' | 'reject' {
+): 'record' | 'manifest' | 'staging' | 'image' | 'mod' | 'skip' | 'reject' {
   if (rel === CHARACTER_FILE_NAME) return 'record'
   if (rel === MANIFEST_NAME) return 'manifest'
   if (rel === STAGING_DIR || rel.startsWith(`${STAGING_DIR}/`)) return 'staging'
   if (isArchiveCruft(rel)) return 'skip'
   if (isCharFileRel(rel)) return 'image'
+  if (modPartEntryOf(rel)) return 'mod'
   return 'reject'
 }

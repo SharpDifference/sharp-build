@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom'
 import { motion } from 'motion/react'
 import { DialogFrame } from '../components/DialogFrame'
 import { useModalShell } from '../components/useModalShell'
-import { notRunningLine, useModSessionStore, type ModNotice } from '../stores/modSessionStore'
+import { notRunningLine, UNVERSIONED_LINE, useModSessionStore, type ModNotice } from '../stores/modSessionStore'
 import { useUiStore } from '../stores/uiStore'
 import { gestures, lift, press, quietLift, quietPress } from './motion'
 import '../vu_styles/Dialog.css'
@@ -12,7 +12,8 @@ import '../vu_styles/Dialog.css'
  * The two notices about installed mods that are not running. At start, once per version of each
  * such mod: which did not start and why, with the Mods screen a button away; the game then starts
  * without them. On entering a game whose record names a `playthrough` mod that is not running:
- * that the game goes on without it.
+ * that the game goes on without it, and which version of it the game was played with where that is
+ * not the one installed. The quiet `unversioned` notice is the toast's, never this modal's.
  */
 export function ModsNoticeModal({ theme, notice }: { theme: 'day' | 'night'; notice: ModNotice }): JSX.Element | null {
   const dismiss = useModSessionStore((s) => s.dismissNotice)
@@ -67,6 +68,9 @@ export function ModsNoticeModal({ theme, notice }: { theme: 'day' | 'night'; not
           <li key={mod.id} className="vu-note-text">
             <b>{mod.manifest?.name ?? mod.id}</b>
             {notice.kind === 'game' ? " isn't running this session" : ''}: {notRunningLine(mod, table, shiftStart)}
+            {notice.playedWith?.[mod.id] !== undefined
+              ? ` (this game was played with ${mod.manifest?.name ?? mod.id} ${notice.playedWith[mod.id]})`
+              : ''}
           </li>
         ))}
       </ul>
@@ -75,6 +79,7 @@ export function ModsNoticeModal({ theme, notice }: { theme: 'day' | 'night'; not
           ? 'The game starts without them. What they saved is kept, and they come back once the cause is fixed.'
           : 'This game goes on without it.'}
       </p>
+      {notice.unversioned && <p className="vu-note-text">{UNVERSIONED_LINE}</p>}
     </DialogFrame>,
     host
   )

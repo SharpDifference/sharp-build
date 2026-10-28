@@ -1,5 +1,6 @@
 import type { ComponentType, ReactNode } from 'react'
 import { checkCompat, hookNamesOf } from '../shared/compat'
+import { declaredHooksNow, refusedAsForeign } from './attribution'
 import type { StructuredRequest, LedgerResponse } from '../bridge/shared'
 import type { PromptState } from '../bridge/renderer'
 import type { SlotIntroInput } from '../bridge/renderer'
@@ -616,30 +617,8 @@ export function subscribeHookRules(onChange: () => void): () => void {
   return rules.subscribe?.(onChange) ?? (() => {})
 }
 
-/**
- * What the loader knows about the installed mods' manifests, for {@link registerHooks} to hold a
- * registration to: `declared` is a mod's `hooks` list, or undefined for a mod with no manifest (an
- * in-repo mod), and `onRefused` is told of a registration that was not pushed, with the reason.
- */
-export interface DeclaredHooks {
-  declared: (modId: string) => readonly string[] | undefined
-  onRefused: (modId: string, message: string) => void
-}
-
-let declaredHooks: DeclaredHooks | null = null
-
-/** The mod whose `renderer.js` the loader is importing right now, or null between imports. */
-let loadingModId: string | null = null
-
-/** Hands {@link registerHooks} the declared lists; null takes them away again. */
-export function setDeclaredHooks(lookup: DeclaredHooks | null): void {
-  declaredHooks = lookup
-}
-
-/** Names the mod being imported, so a registration made during the import is attributed to it. */
-export function setLoadingMod(modId: string | null): void {
-  loadingModId = modId
-}
+export { setDeclaredHooks, setLoadingMod } from './attribution'
+export type { DeclaredHooks } from './attribution'
 
 /**
  * A mod's hooks, registered once from its own files. An installed mod's registration is held to
@@ -647,11 +626,9 @@ export function setLoadingMod(modId: string | null): void {
  * while this one is being imported, is refused and nothing of it is kept.
  */
 export function registerHooks(modId: string, hooks: ModHooks): void {
+  const declaredHooks = declaredHooksNow()
   if (declaredHooks) {
-    if (loadingModId !== null && modId !== loadingModId) {
-      declaredHooks.onRefused(loadingModId, `registered hooks for \`${modId}\`, which is another mod`)
-      return
-    }
+    if (refusedAsForeign(modId, 'hooks')) return
     const declared = declaredHooks.declared(modId)
     if (declared) {
       const compat = checkCompat(declared, hookNamesOf(hooks))
@@ -1040,7 +1017,8 @@ export interface EditorFieldProps {
 /**
  * A field of a mod's own in the character editor, under Generation settings. `read` takes its
  * value off her as the editor opens, `Field` edits it with the rest of the form, and `write` is what
- * saving puts back on her: its own fields only, since the game's own are written over it. Save
+ * saving puts back on her: its own fields only, since the game's own are written over it; an `ex`
+ * it returns adds its slices beside hers and the other mods'. Save
  * and the unsaved-changes check see it as they see the game's fields. A mod that is off draws no
  * field and writes nothing.
  */
@@ -1053,6 +1031,19 @@ export interface EditorField {
 /** The fields of the mods that are on in the character editor, in list order, under each mod's id. */
 export function editorFields(): { modId: string; field: EditorField }[] {
   return activeEntries().flatMap(({ modId, hooks }) => (hooks.editorField ? [{ modId, field: hooks.editorField }] : []))
+}
+
+/**
+ * What the mods' fields put on her as the editor saves: each active field's `write` of its own
+ * value, a later one over an earlier, except `ex`, where every write's slices go in beside hers
+ * and the other mods', since no field may replace the bag.
+ */
+export function editorWrites(character: Character, valueOf: (modId: string) => unknown): Partial<Character> {
+  const writes = editorFields().map(({ modId, field }) => field.write(valueOf(modId)))
+  const merged: Partial<Character> = Object.assign({}, ...writes)
+  const carried = writes.filter((write) => write.ex)
+  if (carried.length > 0) merged.ex = Object.assign({}, character.ex, ...carried.map((write) => write.ex))
+  return merged
 }
 
 /** The lines Save Game shows about the scene being saved, one from each mod that has one. */

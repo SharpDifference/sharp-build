@@ -96,7 +96,10 @@ function sameMemory(a: CharMemory, b: CharMemory): boolean {
   return a.date === b.date && a.type === b.type && a.desc === b.desc
 }
 
-/** `list` with every copy of `match` swapped for `next`, or dropped for null; undefined if none. */
+/**
+ * `list` with every copy of `match` rewritten to `next`, or dropped for null; undefined if none.
+ * A rewritten copy keeps every key of its own that `next` does not set.
+ */
 function replacedIn(
   list: readonly CharMemory[] | undefined,
   match: CharMemory,
@@ -106,7 +109,7 @@ function replacedIn(
   const replaced: CharMemory[] = []
   for (const entry of list) {
     if (!sameMemory(entry, match)) replaced.push(entry)
-    else if (next) replaced.push(next)
+    else if (next) replaced.push({ ...entry, ...next })
   }
   return replaced
 }
@@ -139,7 +142,7 @@ export function withMemoryReplaced<T extends MemoryHolders>(
     changed = true
   }
   if (info.textMemory && sameMemory(info.textMemory, match)) {
-    if (next) out.textMemory = next
+    if (next) out.textMemory = { ...info.textMemory, ...next }
     else delete out.textMemory
     changed = true
   }

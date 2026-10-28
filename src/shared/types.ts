@@ -331,6 +331,11 @@ export interface CharacterBrief {
 /** On-disk character definition — `/data/characters/{charId}/character.json`. */
 export interface Character {
   schemaVersion: 3
+  /**
+   * What mods keep with this character, keyed by the mod's id. Core never reads inside a slice and
+   * writes each one back as read; every value is plain JSON.
+   */
+  ex?: Record<string, ModSlice>
   /** crypto.randomUUID(); also the folder name under /data/characters. */
   charId: string
   firstName: string
@@ -485,6 +490,11 @@ export const READER_SPEAKER = 'reader'
 
 /** A single remembered event, rendered as `"<Name> <type> that <desc>"`. */
 export interface CharMemory {
+  /**
+   * What mods keep with this memory, keyed by the mod's id. Core never reads inside a slice and
+   * writes each one back as read; every value is plain JSON.
+   */
+  ex?: Record<string, ModSlice>
   /** Game date (days elapsed) it happened. */
   date: number
   type: MemoryType
@@ -595,6 +605,11 @@ export interface ExamRecord {
 
 /** One slot spent building a project — and what the reader did with it. */
 export interface ProjectSession {
+  /**
+   * What mods keep with this session, keyed by the mod's id. Core never reads inside a slice and
+   * writes each one back as read; every value is plain JSON.
+   */
+  ex?: Record<string, ModSlice>
   date: number
   time: TimeSlot
   /** The scene's own summary; absent when the closing call never produced one. */
@@ -886,6 +901,11 @@ export type CharInfo = CharState & CharProfile
 
 /** One status update on the social feed; its likes are rolled once and stored. */
 export interface SocialPost {
+  /**
+   * What mods keep with this post, keyed by the mod's id. Core never reads inside a slice and
+   * writes each one back as read; every value is plain JSON.
+   */
+  ex?: Record<string, ModSlice>
   /** crypto.randomUUID(); the stable list key and what a like is addressed to. */
   id: string
   text: string
@@ -953,6 +973,11 @@ export type InviteKind = (typeof INVITE_KINDS)[number]
 
 /** One Bunnyboard text message. */
 export interface ChatMessage {
+  /**
+   * What mods keep with this message, keyed by the mod's id. Core never reads inside a slice and
+   * writes each one back as read; every value is plain JSON.
+   */
+  ex?: Record<string, ModSlice>
   /** crypto.randomUUID(); the stable list key. */
   id: string
   sender: ChatSender
@@ -978,6 +1003,11 @@ export interface ChatMessage {
 /** One Bunnyboard conversation with a contact, keyed by her charId. */
 export interface Conversation {
   charId: string
+  /**
+   * What mods keep with this conversation, keyed by the mod's id. Core never reads inside a slice and
+   * writes each one back as read; every value is plain JSON.
+   */
+  ex?: Record<string, ModSlice>
   messages: ChatMessage[]
   /** Messages the player has not opened the conversation to see. */
   unread: number
@@ -1456,8 +1486,19 @@ export interface BankedTextLedger {
  */
 export type BunnybotHandover = 'contact' | 'haunt'
 
+/**
+ * One mod's data on a record, under the mod's id in the record's `ex`: what the mod wrote, and
+ * the version of the mod that wrote it, so a later version can read an older shape.
+ */
+export interface ModSlice {
+  /** The version of the mod that wrote `data`. */
+  v: string
+  /** What the mod wrote, plain JSON; core never reads inside it. */
+  data: unknown
+}
+
 /** On-disk save file — `/data/saves/{playthroughId}/{saveId}.json`. */
-export interface GameSave {
+export interface NativeGameSave {
   schemaVersion: 13
   /**
    * The playthrough this save belongs to. Derived from the containing folder
@@ -1655,7 +1696,15 @@ export interface GameSave {
    * boundary and epilogue saves.
    */
   thumbnail?: string
+  /**
+   * What mods keep with this save, keyed by the mod's id. Core never reads inside a slice and
+   * writes each one back as read; every value is plain JSON.
+   */
+  ex?: Record<string, ModSlice>
 }
+
+/** The on-disk save: core's fields, plus the optional ones mods declare on it from their own modules. */
+export interface GameSave extends NativeGameSave {}
 
 /** One employer the reader has left: the raises he had taken, and how it ended. */
 export interface FormerJob {
@@ -1964,6 +2013,12 @@ export type SemesterCarry = Pick<
    * (`semesterModCarry.ts`); the next semester's opening save takes them back in.
    */
   mods?: Partial<ModCarryFields>
+  /**
+   * What mods carry into the next semester, keyed by the mod's id: each registered mod's slice as
+   * its `carry` left it, and every other mod's as read. The next semester's first save takes it
+   * as its `ex`. Core never reads inside a slice; every value is plain JSON.
+   */
+  ex?: Record<string, ModSlice>
 }
 
 /** The record as New Game hands it over; `saveService` stamps the version. */
@@ -2064,6 +2119,11 @@ export type EnrollmentDraft = QuickstartBundle & ModEnrollmentFields & {
   tokensGenerated?: number
   /** The semester Continue is starting, where this is not the playthrough's first. */
   continued?: ContinuedSemester
+  /**
+   * What mods keep with this enrollment, keyed by the mod's id; the semester's first save starts
+   * with it as its `ex`. Core never reads inside a slice; every value is plain JSON.
+   */
+  ex?: Record<string, ModSlice>
 }
 
 /**

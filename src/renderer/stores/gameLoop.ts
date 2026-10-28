@@ -137,7 +137,7 @@ import {
 import { retrySilently as silentRetry } from './silentRetry'
 import { sanitizeSlotIntro } from './slotIntroReply'
 import { postsWithModFields } from './slotPostsForMods'
-import { modFieldsLeaving } from './semesterModCarry'
+import { modFieldsLeaving, modSlicesLeaving } from './semesterModCarry'
 import { boxFits } from '../views/boxRows'
 import { answerCrossing, cancelCrossing, endCrossing, markCrossingWait } from './crossingStore'
 import {
@@ -3027,7 +3027,7 @@ export function enterGame(
   // Held for a replay's return, which enters the same game again.
   loopState.record = record
   // A `playthrough` mod this game started with that is not running this session is named once.
-  useModSessionStore.getState().gameEntered(record)
+  useModSessionStore.getState().gameEntered(record, save.playthroughId)
   const game = useGameStore.getState()
   game.loadSave(save, record, characters)
   // A read nothing on screen is waiting on: the profile is not open yet.
@@ -3148,13 +3148,16 @@ export async function leaveForNextSemester(): Promise<boolean> {
     // Read off the store before the teardown resets it: purchases since the goodbyes included.
     const handoff = carryOf(game, view)
     // What the mods carry, read off the same ending, rides beside the game's own carry.
-    const mods = modFieldsLeaving(game.toGameSave(), {
+    const leaving = {
       playthroughId,
       index: game.semesterIndex,
       season: view.season,
       characters: useCharacterStore.getState().characters
-    })
+    }
+    const mods = modFieldsLeaving(game.toGameSave(), leaving)
     if (Object.keys(mods).length > 0) handoff.carry.mods = mods
+    const ex = modSlicesLeaving(game.modData, game.modValues, leaving)
+    if (ex) handoff.carry.ex = ex
     stageContinuation({ playthroughId, record, from: view.id, handoff })
   }
   await leaveToMenu({ keepCrossing: true })

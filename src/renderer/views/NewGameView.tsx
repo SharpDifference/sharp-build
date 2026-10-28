@@ -69,7 +69,7 @@ import {
 } from '../stores/crossingStore'
 import { slotStampOf } from '../stores/slotCrossing'
 import { spriteUrl, useCharacterStore, visibleOrderOf } from '../stores/characterStore'
-import { playthroughMods } from '@shared/mods'
+import { playthroughModVersions, playthroughMods } from '@shared/mods'
 import { useModsStore } from '../stores/modsStore'
 import { useSaveStore } from '../stores/saveStore'
 import { useUiStore } from '../stores/uiStore'
@@ -818,11 +818,16 @@ export function NewGameView(): JSX.Element {
       })
     )
 
-    const startingMods = playthroughMods(useModsStore.getState().switches)
+    const switches = useModsStore.getState().switches
+    const startingMods = playthroughMods(switches)
+    const startingVersions = playthroughModVersions(switches)
     const written = await useSaveStore.getState().createPlaythrough(
       {
         // The per-playthrough mods this one starts with; none in a build that has none.
         ...(startingMods.length > 0 ? { mods: startingMods } : {}),
+        // And the version of every mod on, of either scope, so a later build can say which it was.
+        // Written even when empty: only a record from before the map lacks it.
+        modVersions: startingVersions,
         chars: roster.map((c) => c.charId),
         playerFirstName: playerName.first,
         playerLastName: playerName.last,
@@ -911,7 +916,9 @@ export function NewGameView(): JSX.Element {
         farewellsDone: [],
         endingArtWanted: false,
         // No scene in progress, so the game opens at the slot boundary.
-        scene: null
+        scene: null,
+        // What the mods kept with the registration, as they left it.
+        ...(resumed?.enrollment.ex ? { ex: resumed.enrollment.ex } : {})
       },
       playthroughId ?? undefined
     )

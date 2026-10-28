@@ -1,4 +1,4 @@
-import { mkdir, readFile, rename, rm, utimes, writeFile } from 'fs/promises'
+import { mkdir, readdir, readFile, rename, rm, utimes, writeFile } from 'fs/promises'
 import { basename, dirname, join } from 'path'
 import {
   BACKUP_NAME,
@@ -12,7 +12,9 @@ import {
   charFileEntry,
   classifyBackupEntry,
   endingArtEntry,
+  isLegacyDir,
   lorebooksFromBackup,
+  modPartsFromBackup,
   namedReplays,
   photoEntry,
   profilePictureEntry,
@@ -20,6 +22,8 @@ import {
   scenesFromBackup,
   semesterEndingArtEntry,
   semesterPicturesFromBackup,
+  unknownBackupKeys,
+  type BackupModPart,
   type SemesterPicture,
   type BackupFile,
   type BackupPhoto,
@@ -33,6 +37,7 @@ import { BG_VARIANTS, type BgVariant, type CustomBackground } from '@shared/cust
 import { appError, messageOf } from '@shared/errors'
 import { imageTypeOf } from '@shared/imageBytes'
 import type { LorebookRecord } from '@shared/lorebookRecord'
+import { isSafeEntryName, MOD_PARTS_DIR } from '@shared/modParts'
 import { REPLAY_NOT_FOUND } from '@shared/replays'
 import { SCENE_NOT_FOUND, type SavedScene } from '@shared/sceneCreator'
 import {
@@ -56,6 +61,7 @@ import {
   getEndingArtPath,
   getEnrollmentPath,
   getLorebookPath,
+  getModDataPath,
   getPhotoMetaPath,
   getPhotoPath,
   getPhotosPath,
@@ -86,6 +92,8 @@ import { getGrabBags, setGrabBags } from './grabBagService'
 import { dropImageTwins, sniffImageFile } from './imageFiles'
 import { readValidatedJson, writeAtomicJson } from './jsonFile'
 import { readLorebook } from './lorebookService'
+import { modNameOf, modVersionOf } from './modDataService'
+import { backupParts, type BackupPartLegacy, type BackupPartRestore } from './modParts'
 import { listPhotos, readPhoto } from './photoService'
 import { readProfilePicture } from './profilePictureService'
 import { readReplay } from './replayService'
@@ -237,6 +245,41 @@ async function backupReplays(
   return replays
 }
 
+/**
+ * Every registered mod's share, written by its part into its own folder under `mods/` in
+ * `scratch`. A part that throws, or answers what cannot be carried, is left out with a warning,
+ * as an unreadable picture is, and the backup goes ahead.
+ */
+async function backupModParts(
+  scratch: string,
+  playthroughIds: readonly string[]
+): Promise<Record<string, BackupModPart>> {
+  const mods: Record<string, BackupModPart> = {}
+  for (const [modId, part] of backupParts()) {
+    const folder = join(scratch, MOD_PARTS_DIR, modId)
+    try {
+      await mkdir(folder, { recursive: true })
+      const out = await part.export({ scratch: folder, playthroughIds: [...playthroughIds] })
+      const written = await relPathsUnder(folder)
+      // A path a part names with Windows separators is read as the same path.
+      const files = out?.files ? [...out.files].map((rel) => (typeof rel === 'string' ? rel.split('\\').join('/') : rel)) : written
+      const stray = files.find(
+        (rel) => typeof rel !== 'string' || !rel.split('/').every(isSafeEntryName) || !written.includes(rel)
+      )
+      if (stray !== undefined) throw new Error(`it names ${String(stray)}, which it did not write`)
+      // What it wrote and did not name is not carried.
+      for (const rel of written) if (!files.includes(rel)) await rm(join(folder, rel), { force: true })
+      // Copied through JSON, so what goes in the record is what a restore reads back.
+      const json: unknown = out?.json === undefined ? undefined : JSON.parse(JSON.stringify(out.json))
+      mods[modId] = { version: modVersionOf(modId), ...(json !== undefined ? { json } : {}), files }
+    } catch (err) {
+      console.warn(`[backup] leaving out ${modId}'s data:`, messageOf(err))
+      await discard(folder)
+    }
+  }
+  return mods
+}
+
 /** Writes everything this install keeps into `targetPath` as one zip. */
 export async function exportBackup(targetPath: string): Promise<void> {
   const scratch = scratchDir('backup')
@@ -342,6 +385,7 @@ export async function exportBackup(targetPath: string): Promise<void> {
     const backgrounds = await backupBackgrounds(scratch)
     const scenes = await backupScenes()
     const replays = await backupReplays(saves, playthroughs)
+    const mods = await backupModParts(scratch, Object.keys(playthroughs))
 
     const record: BackupFile = {
       schemaVersion: BACKUP_SCHEMA_VERSION,
@@ -357,6 +401,7 @@ export async function exportBackup(targetPath: string): Promise<void> {
       scenes,
       replays,
       ...(Object.keys(lorebooks).length > 0 ? { lorebooks } : {}),
+      ...(Object.keys(mods).length > 0 ? { mods } : {}),
       characters
     }
     await writeAtomicJson(join(scratch, BACKUP_NAME), record, {
@@ -595,6 +640,110 @@ async function restoreScenes(scenes: readonly SavedScene[]): Promise<void> {
   for (const scene of scenes) await writeScene(scene)
 }
 
+/** A mod's restore, prepared and not yet made. */
+interface PreparedRestore {
+  modId: string
+  restore: BackupPartRestore
+}
+
+/** Drops every restore in `restores`, the last first; one that will not drop is logged. */
+async function discardRestores(restores: readonly PreparedRestore[]): Promise<void> {
+  for (const { modId, restore } of [...restores].reverse()) {
+    await restore.discard().catch((err: unknown) => {
+      console.warn(`[backup] ${modId}'s prepared restore would not drop:`, messageOf(err))
+    })
+  }
+}
+
+/**
+ * Each registered mod's share of the backup, read and prepared before anything is written, in
+ * the record's order, followed by installed parts absent from that record so they can migrate
+ * legacy backups. A part that throws drops every restore prepared before it and stops the
+ * restore with nothing of the player's written.
+ */
+async function prepareModParts(
+  scratch: string,
+  carried: Readonly<Record<string, BackupModPart>>,
+  legacy: BackupPartLegacy
+): Promise<PreparedRestore[]> {
+  const restores: PreparedRestore[] = []
+  const ids = new Set([...Object.keys(carried), ...backupParts().keys()])
+  for (const modId of ids) {
+    const part = backupParts().get(modId)
+    if (!part) continue
+    const entry = carried[modId]
+    const dir = join(scratch, MOD_PARTS_DIR, modId)
+    try {
+      await mkdir(dir, { recursive: true })
+      const list = await relPathsUnder(dir)
+      restores.push({ modId, restore: await part.prepare(entry?.json, { dir, list }, legacy) })
+    } catch (err) {
+      await discardRestores(restores)
+      throw appError(
+        'BACKUP_PART_FAILED',
+        `Could not put the backup back: ${modNameOf(modId)} could not read its data in it.`,
+        messageOf(err)
+      )
+    }
+  }
+  return restores
+}
+
+/**
+ * Keeps the share of each mod the backup carries that has no part here, as it came, under
+ * `data/mod-data/<id>/.backup/<when>/` with its record entry beside it, for the mod to claim
+ * once it is installed.
+ */
+async function keepUnclaimedModParts(
+  scratch: string,
+  carried: Readonly<Record<string, BackupModPart>>
+): Promise<void> {
+  const at = String(Date.now())
+  for (const [modId, entry] of Object.entries(carried)) {
+    if (backupParts().has(modId)) continue
+    const target = join(getModDataPath(modId), '.backup', at)
+    try {
+      await mkdir(dirname(target), { recursive: true })
+      try {
+        await rename(join(scratch, MOD_PARTS_DIR, modId), target)
+      } catch (err) {
+        if ((err as NodeJS.ErrnoException).code !== 'ENOENT') throw err
+        await mkdir(target, { recursive: true })
+      }
+      await writeAtomicJson(join(target, BACKUP_NAME), entry, RESTORE_FAILED)
+      console.log(`[backup] ${modId} is not installed; its data is kept in ${target}`)
+    } catch (err) {
+      console.error(`[backup] could not keep ${modId}'s data:`, messageOf(err))
+    }
+  }
+}
+
+/**
+ * Makes every prepared restore, in order, once the game's own share is written. One that throws
+ * is logged, the ones after it are dropped, and the restore ends naming the mod.
+ */
+async function commitRestores(restores: readonly PreparedRestore[]): Promise<void> {
+  for (const [index, { modId, restore }] of restores.entries()) {
+    try {
+      await restore.commit()
+    } catch (err) {
+      console.error(`[backup] ${modId}'s data was not restored:`, err)
+      await discardRestores(restores.slice(index + 1))
+      throw appError(
+        'BACKUP_PART_FAILED',
+        `The backup is back, but ${modNameOf(modId)}'s data was not restored.`,
+        messageOf(err)
+      )
+    }
+  }
+}
+
+/** The top-level folders of the unpacked backup this build does not write, as absolute paths. */
+async function legacyDirsIn(scratch: string): Promise<string[]> {
+  const entries = await readdir(scratch, { withFileTypes: true })
+  return entries.filter((entry) => entry.isDirectory() && isLegacyDir(entry.name)).map((entry) => join(scratch, entry.name))
+}
+
 /**
  * Reads one backup back over everything this install holds: settings, grab bags and saves are
  * replaced by the backup's — the settings keeping this install's keys and switches — the
@@ -618,13 +767,24 @@ export async function importBackup(archivePath: string): Promise<void> {
     const replays = replaysFromBackup(record)
     const semesterPictures = semesterPicturesFromBackup(record)
     const lorebooks = lorebooksFromBackup(record)
+    const mods = modPartsFromBackup(record)
 
-    await replaceSettings(settings)
-    await setGrabBags(record.grabbags)
-    await restoreSaves(scratch, record, replays, semesterPictures, lorebooks)
-    await restoreCharacters(scratch, record)
-    await restoreBackgrounds(scratch, backgrounds)
-    await restoreScenes(scenes)
+    // Every mod's share is read before anything is written, and made only once the game's is.
+    const legacy = { record: unknownBackupKeys(record), dirs: await legacyDirsIn(scratch), archive: archivePath }
+    const restores = await prepareModParts(scratch, mods, legacy)
+    try {
+      await replaceSettings(settings)
+      await setGrabBags(record.grabbags)
+      await restoreSaves(scratch, record, replays, semesterPictures, lorebooks)
+      await restoreCharacters(scratch, record)
+      await restoreBackgrounds(scratch, backgrounds)
+      await restoreScenes(scenes)
+    } catch (err) {
+      await discardRestores(restores)
+      throw err
+    }
+    await keepUnclaimedModParts(scratch, mods)
+    await commitRestores(restores)
   } finally {
     await discard(scratch)
   }

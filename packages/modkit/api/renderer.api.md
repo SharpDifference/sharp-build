@@ -162,6 +162,11 @@ export interface ModalShell {
 }
 
 // @public
+export interface ModDataRecord {
+    ex?: Record<string, ModSlice>;
+}
+
+// @public
 export interface ModDetailProps {
     mod: ModDef;
     optionOn: (optionId: string) => boolean;
@@ -259,6 +264,23 @@ export interface ModHooks {
 
 // @public
 export function modIsOn(id: string, record?: Pick<PlaythroughRecord, 'mods'> | null): boolean;
+
+// @public
+export function modState<T>(modId: string, spec: ModStateSpec<T>): ModStateHandle<T>;
+
+// @public
+export interface ModStateHandle<T> {
+    get(): T;
+    set(next: T): void;
+    subscribe(onChange: (value: T) => void): () => void;
+    use(): T;
+}
+
+// @public
+export interface ModStateSpec<T> {
+    initial: T;
+    lifetime: 'game' | 'session';
+}
 
 // @public
 export function openPanel(id: string, arg?: string): boolean;
@@ -449,6 +471,22 @@ export interface RailSeatProps {
 }
 
 // @public
+export function recordField<T>(modId: string, spec: RecordFieldSpec<T>): RecordFieldHandle<T>;
+
+// @public
+export interface RecordFieldHandle<T> {
+    read(record: ModDataRecord): T;
+    with<R extends ModDataRecord>(record: R, next: T): R;
+}
+
+// @public
+export interface RecordFieldSpec<T> {
+    empty: T;
+    legacy?: readonly string[];
+    normalize?: (stored: unknown, legacy: Readonly<Record<string, unknown>>, from: string | null) => T;
+}
+
+// @public
 export function registerHooks(modId: string, hooks: ModHooks): void;
 
 // @public (undocumented)
@@ -482,11 +520,35 @@ export interface ResolvedSave {
 }
 
 // @public
+export function safePoint(): ManualSaveOffer;
+
+// @public
 export interface SaveChoice extends WayOn {
     label: string;
     message: string;
     // (undocumented)
     title: string;
+}
+
+// @public
+export function saveField<T>(modId: string, spec: SaveFieldSpec<T>): SaveFieldHandle<T>;
+
+// @public
+export interface SaveFieldHandle<T> {
+    read(): T;
+    set(next: T): void;
+    use(): T;
+    write(next: T, options?: {
+        expect?: T;
+    }): Promise<Result<null>>;
+}
+
+// @public
+export interface SaveFieldSpec<T> {
+    carry?: (value: T, context: TermCarryContext) => T | undefined;
+    empty: T;
+    legacy?: readonly string[];
+    normalize?: (stored: unknown, legacy: Readonly<Record<string, unknown>>, from: string | null) => T;
 }
 
 // @public
@@ -748,6 +810,9 @@ export function useModOn(id: string, record?: Pick<PlaythroughRecord, 'mods'> | 
 export function useModOption(modId: string, optionId: string): boolean;
 
 // @public
+export function useSafePoint(): ManualSaveOffer;
+
+// @public
 export type ViewName = 'boot' | 'setup'
 /** The key stage alone, from the menu's top slot when no key is set. */
 | 'apiKey'
@@ -767,6 +832,16 @@ export interface WayOn {
     // (undocumented)
     prepare: () => Promise<(() => ViewName) | null>;
 }
+
+// @public
+export function writeModField<T>(modId: string, next: T, options?: {
+    expect?: T;
+}): Promise<Result<null>>;
+
+// @public
+export function writeModFields(modId: string, next: Readonly<Record<string, unknown>>, options?: {
+    expect?: Readonly<Record<string, unknown>>;
+}): Promise<Result<null>>;
 
 // (No @packageDocumentation comment for this package)
 

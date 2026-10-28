@@ -4,3 +4,13 @@
  */
 export { registerComfyLaunchEnvironment } from '../../../../src/main/services/comfyLaunchEnvironment'
 export type { ComfyLaunchContext } from '../../../../src/main/services/comfyLaunchEnvironment'
+export { modDataPath } from '../../../../src/main/services/modDataService'
+export { backupPart, characterTransferPart } from '../../../../src/main/services/modParts'
+export type {
+  BackupPart,
+  BackupPartContext,
+  BackupPartExport,
+  BackupPartLegacy,
+  BackupPartRestore,
+  CharacterTransferPart
+} from '../../../../src/main/services/modParts'

@@ -1,5 +1,6 @@
 /** `@vx/modkit/shared`: what a mod may import on either side of the process boundary. */
 export type {
+  AppError,
   Character,
   CharacterTrait,
   CharacterTraitDefinition,
@@ -8,6 +9,7 @@ export type {
   ChatMessage,
   GameOverReason,
   GameSave,
+  NativeGameSave,
   ImagePromptDraft,
   ImagePromptKind,
   ImagePromptParts,
@@ -18,6 +20,7 @@ export type {
   ModOption,
   ModOptionGroup,
   ModSceneFields,
+  ModSlice,
   ModScope,
   ModSwitches,
   PlayerStats,
@@ -25,6 +28,7 @@ export type {
   PostComment,
   ProjectSession,
   PromptEdit,
+  Result,
   SceneLine,
   SlotActivity,
   SlotActivityOffer,
