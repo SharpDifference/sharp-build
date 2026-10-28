@@ -63,6 +63,15 @@ describe('MODS with the installed mods', () => {
     expect(modOn(NO_SWITCHES, 'zebra')).toBe(true)
   })
 
+  it('makes the installed part what a table read again carries, leaving the build\'s own entries', async () => {
+    const { MODS, installMods, modById, setInstalledMods } = await import('@shared/mods')
+    installMods([def('apple'), def('zebra'), def('user')])
+    setInstalledMods([def('zebra', { defaultOn: false }), def('mango'), def('apple', { defaultOn: false })], ['apple'])
+    expect(MODS.map((mod) => mod.id)).toEqual(['apple', 'mango', 'zebra'])
+    expect(modById('zebra')?.defaultOn).toBe(false)
+    expect(modById('apple')?.defaultOn).toBe(true)
+  })
+
   it('keeps a mod that is not running off, whatever its switch says', async () => {
     const { modIsOn, useModsStore } = await import('../../src/renderer/stores/modsStore')
     const { withMod, NO_SWITCHES } = await import('@shared/mods')

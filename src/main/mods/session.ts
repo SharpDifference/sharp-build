@@ -2,7 +2,7 @@ import { app, BrowserWindow, ipcMain, type IpcMainInvokeEvent } from 'electron'
 import { readFileSync } from 'fs'
 import { basename, resolve } from 'path'
 import type { ModSessionTable, ModStatus, SafeStart } from '@shared/modSession'
-import { BUILD, installMods, MODS } from '@shared/mods'
+import { BUILD, MODS, setInstalledMods } from '@shared/mods'
 import type { Settings } from '@shared/types'
 import { getModsDirPath, getSettingsPath } from '../paths'
 import { bindModSession } from '../services/modsService'
@@ -27,13 +27,15 @@ let result: LoaderResult | null = null
 const BUILT_IN_IDS: readonly string[] = MODS.map((mod) => mod.id)
 
 /**
- * Holds a loader run as the session's, and adds every mod it found to `MODS`, for every status, as the
- * window does from its copy of the table: main's shared rules ask the one list, and an installed mod
- * the list did not hold would answer off whatever its switch.
+ * Holds a loader run as the session's, and makes the installed part of `MODS` what its table carries,
+ * for every status with a definition, as the window gets from its copy of the table: main's shared
+ * rules ask the one list, and an installed mod the list did not hold would answer off whatever its
+ * switch. A rerun replaces a definition that changed and drops one whose row lost its definition or
+ * is gone, so a mod a developer folder no longer holds cannot answer on from a stale entry.
  */
 function hold(next: LoaderResult): void {
   result = next
-  installMods(next.table.mods.flatMap((mod) => (mod.def ? [mod.def] : [])))
+  setInstalledMods(next.table.mods.flatMap((mod) => (mod.def ? [mod.def] : [])), BUILT_IN_IDS)
 }
 
 /** The export names of the host modules, as the renderer reported them once it had parked them. */
@@ -86,9 +88,9 @@ export function modSession(): ModSessionTable {
 /**
  * Re-reads the manifests and reruns every check without requiring any `main.js` again: each one
  * already required hands back what it exported the first time. What the window reads on its next
- * load is then this run's table.
+ * load is then this run's table, and `MODS` holds its definitions.
  */
-function rerunChecks(): void {
+export function rerunModChecks(): void {
   const before = result
   const { devFolders, allowUnreviewedMain } = loaderSettings()
   const next = loadMods({
@@ -143,7 +145,7 @@ function markFailed(id: string, status: ModStatus, message: string): void {
  */
 function devFolderChanged(folder: string, kind: DevChangeKind, files: readonly string[]): void {
   const id = result?.table.mods.find((mod) => mod.dev && mod.folder === resolve(folder))?.id ?? basename(folder)
-  if (kind === 'renderer') rerunChecks()
+  if (kind === 'renderer') rerunModChecks()
   console.log(`[mods] ${id}: ${kind === 'main' ? 'main.js' : files.join(', ')} changed in ${folder}`)
   for (const window of BrowserWindow.getAllWindows()) {
     if (!window.webContents.isDestroyed()) window.webContents.send('mods:devChanged', { id, kind })
