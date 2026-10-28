@@ -73,6 +73,7 @@ describe('Incoming Texts in the combined package', () => {
     expect(latestTextReply(thread(), 7, 0)?.sent.text).toBe('Thanks')
   })
 
+  // Imports Photo Feature's entry, which loads the kit's renderer side: slow under a full run.
   it('passes incoming replies through the real photo registration and preserves its schema', async () => {
     useModsStore.setState({ switches: withMod(NO_SWITCHES, 'photo-feature', true) })
     const complete = api()
@@ -83,5 +84,5 @@ describe('Incoming Texts in the combined package', () => {
     expect(sendPhoto).toHaveBeenCalledWith('a', useGameStore.getState().characters.a,
       expect.objectContaining({ sendPhoto: true, photoPrompt: 'A selfie at the campus cafe' }))
     expect(thread().messages.every(m => m.sender === 'contact')).toBe(true)
-  })
+  }, 20_000)
 })
