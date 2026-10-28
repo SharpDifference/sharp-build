@@ -1,4 +1,4 @@
-import { mkdir, readFile, rename, rm, utimes, writeFile } from 'fs/promises'
+import { mkdir, readdir, readFile, rename, rm, utimes, writeFile } from 'fs/promises'
 import { basename, dirname, join } from 'path'
 import {
   BACKUP_NAME,
@@ -12,7 +12,7 @@ import {
   charFileEntry,
   classifyBackupEntry,
   endingArtEntry,
-  legacyDirOf,
+  isLegacyDir,
   lorebooksFromBackup,
   modPartsFromBackup,
   namedReplays,
@@ -261,7 +261,8 @@ async function backupModParts(
       await mkdir(folder, { recursive: true })
       const out = await part.export({ scratch: folder, playthroughIds: [...playthroughIds] })
       const written = await relPathsUnder(folder)
-      const files = out?.files ? [...out.files] : written
+      // A path a part names with Windows separators is read as the same path.
+      const files = out?.files ? [...out.files].map((rel) => (typeof rel === 'string' ? rel.split('\\').join('/') : rel)) : written
       const stray = files.find(
         (rel) => typeof rel !== 'string' || !rel.split('/').every(isSafeEntryName) || !written.includes(rel)
       )
@@ -736,12 +737,8 @@ async function commitRestores(restores: readonly PreparedRestore[]): Promise<voi
 
 /** The top-level folders of the unpacked backup this build does not write, as absolute paths. */
 async function legacyDirsIn(scratch: string): Promise<string[]> {
-  const dirs = new Set<string>()
-  for (const rel of await relPathsUnder(scratch)) {
-    const dir = legacyDirOf(rel)
-    if (dir) dirs.add(dir)
-  }
-  return [...dirs].map((dir) => join(scratch, dir))
+  const entries = await readdir(scratch, { withFileTypes: true })
+  return entries.filter((entry) => entry.isDirectory() && isLegacyDir(entry.name)).map((entry) => join(scratch, entry.name))
 }
 
 /**

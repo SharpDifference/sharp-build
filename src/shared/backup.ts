@@ -55,10 +55,15 @@ const CORE_DIRS = [
   MOD_PARTS_DIR
 ]
 
+/** Whether a top-level folder of a backup is none this build writes: a mod's, or a newer build's. */
+export function isLegacyDir(name: string): boolean {
+  return !CORE_DIRS.includes(name) && isSafeEntryName(name)
+}
+
 /** The top-level folder `name` sits in when it is none this build writes, or null. */
 export function legacyDirOf(name: string): string | null {
   const parts = name.split('/')
-  if (parts.length < 2 || CORE_DIRS.includes(parts[0])) return null
+  if (parts.length < 2 || !isLegacyDir(parts[0])) return null
   return parts.every(isSafeEntryName) ? parts[0] : null
 }
 

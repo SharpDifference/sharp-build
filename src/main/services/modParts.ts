@@ -18,7 +18,7 @@ export interface BackupPartContext {
 export interface BackupPartExport {
   /** Carried in the backup's record beside the files. Plain JSON. */
   json?: unknown
-  /** The files it wrote, as paths under `scratch`; without it, every file it wrote is carried. */
+  /** The files it wrote, as paths under `scratch`, with `/` or the platform's separator; without it, every file it wrote is carried. */
   files?: readonly string[]
 }
 
