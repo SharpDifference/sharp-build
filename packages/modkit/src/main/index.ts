@@ -1,3 +1,11 @@
 /** `@vx/modkit/main`: what a mod's main-process code may import. */
-export { registerComfyLaunchEnvironment } from '../bridge/main'
-export type { ComfyLaunchContext } from '../bridge/main'
+export { backupPart, characterTransferPart, modDataPath, registerComfyLaunchEnvironment } from '../bridge/main'
+export type {
+  BackupPart,
+  BackupPartContext,
+  BackupPartExport,
+  BackupPartLegacy,
+  BackupPartRestore,
+  CharacterTransferPart,
+  ComfyLaunchContext
+} from '../bridge/main'

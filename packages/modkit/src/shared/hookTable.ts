@@ -176,6 +176,7 @@ export const KIT_APIS = [
   'renderer:finishSlotActivity',
   'renderer:Locked',
   'renderer:modIsOn',
+  'renderer:modState',
   'renderer:openPanel',
   'renderer:ownsPostComments',
   'renderer:PostCommentAction',
@@ -185,7 +186,10 @@ export const KIT_APIS = [
   'renderer:promptFields',
   'renderer:promptLines',
   'renderer:promptRequired',
+  'renderer:recordField',
   'renderer:registerHooks',
+  'renderer:safePoint',
+  'renderer:saveField',
   'renderer:SentText',
   'renderer:submitAction',
   'renderer:takeTurnFromReply',
@@ -195,6 +199,12 @@ export const KIT_APIS = [
   'renderer:useModalShell',
   'renderer:useModOn',
   'renderer:useModOption',
+  'renderer:useSafePoint',
+  'renderer:writeModField',
+  'renderer:writeModFields',
+  'main:backupPart',
+  'main:characterTransferPart',
+  'main:modDataPath',
   'main:registerComfyLaunchEnvironment'
 ] as const
 

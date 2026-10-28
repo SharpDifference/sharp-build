@@ -145,7 +145,8 @@ function App(): JSX.Element {
   const download = useUiStore((s) => s.download)
   const offer = useUpdateStore((s) => s.offer)
   const updateFailure = useUpdateStore((s) => s.failure)
-  const modNotice = useModSessionStore((s) => s.notice)
+  // The quiet notice is the toast's, not a modal.
+  const modNotice = useModSessionStore((s) => (s.notice?.kind === 'unversioned' ? null : s.notice))
   // The Game View's own key: a save switched over a running game replaces
   // this store's state under the curtain, and its React state — crossfade pairs, `sending`,
   // `uiHidden` — is a fact about the save on screen and must not outlive it.
@@ -210,7 +211,7 @@ function AppModals(): JSX.Element {
   const dismissError = useUiStore((s) => s.dismissError)
   const offer = useUpdateStore((s) => s.offer)
   const updateFailure = useUpdateStore((s) => s.failure)
-  const modNotice = useModSessionStore((s) => s.notice)
+  const modNotice = useModSessionStore((s) => (s.notice?.kind === 'unversioned' ? null : s.notice))
 
   const [theme] = useState(heldScreenTheme)
 

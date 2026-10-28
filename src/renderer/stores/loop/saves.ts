@@ -13,6 +13,7 @@ import { normalizeWhisper, VENUS_WHISPER_MOD, type VenusWhisper } from '@shared/
 import { reconcileTalentBreakthrough } from '@shared/talentAbilities'
 import { withMeanwhile, type MeanwhileScene } from '@shared/meanwhile'
 import type { Conversation } from '@shared/types'
+import { modById } from '@shared/mods'
 import { savedModScene } from '@shared/modScene'
 import { gameOverReasonOf, type GameOverReason } from '@shared/gameOver'
 import { isGameOver, spentOf } from '@shared/money'
@@ -25,6 +26,7 @@ import {
   type SceneLine,
   type SceneState
 } from '@shared/types'
+import { bindModWrites, saveFields, writeModSlices as slicesWith } from '@vx/modkit/host/renderer'
 import { isGraduationSlot } from '../../prompts/graduation'
 import { useBunnyboardStore } from '../bunnyboardStore'
 import { PORTRAIT_SLOTS, useGameStore } from '../gameStore'
@@ -51,8 +53,18 @@ let writeChain: Promise<void> = Promise.resolve()
 /** How many writes are queued or running behind {@link writeChain}. */
 let pending = 0
 
-/** A manual save is being written; a second one waits for it. */
+/** A manual save, or a mod's write to its save data, is being written; a second one waits for it. */
 let manualWriting = false
+
+/** Who is told when {@link manualWriting} moves, which nothing else in the stores shows. */
+const lockWatchers = new Set<() => void>()
+
+/** Takes or releases the manual-save lock, telling whoever watches the save offer. */
+function setManualWriting(next: boolean): void {
+  if (manualWriting === next) return
+  manualWriting = next
+  for (const watcher of [...lockWatchers]) watcher()
+}
 
 /**
  * Runs `write` once every write queued before it has settled — and not at all when the stay it
@@ -362,8 +374,11 @@ export function manualSaveOffer(): ManualSaveOffer {
   return saveOffer(manualWriting)
 }
 
-/** Rechecked by an editor at its write turn, excluding only its own write lock. */
-function saveOffer(manualInProgress: boolean): ManualSaveOffer {
+/**
+ * The save offer, with `manualInProgress` standing for the manual-save lock: a write holding the
+ * lock itself asks with false, so its own hold does not make it wait.
+ */
+export function saveOffer(manualInProgress: boolean): ManualSaveOffer {
   const game = useGameStore.getState()
   if (!game.playthroughId || game.activeGameOver !== null) return 'none'
   // The goodbye menu past the floor: the next press meets the collectors, and the goodbyes
@@ -442,7 +457,7 @@ export async function writeManualSave(slot: number): Promise<boolean> {
   const draft = manualSaveDraft()
   if (!playthroughId || !draft) return false
 
-  manualWriting = true
+  setManualWriting(true)
   let saved = false
   try {
     await queueWrite(async () => {
@@ -458,7 +473,7 @@ export async function writeManualSave(slot: number): Promise<boolean> {
   } catch (err) {
     reportWriteFailure(toAppError(err, 'SAVE_WRITE_FAILED'))
   } finally {
-    manualWriting = false
+    setManualWriting(false)
   }
   return saved
 }
@@ -487,7 +502,7 @@ export async function writePlotTwist(value: string): Promise<Result<null>> {
     ok: false,
     error: appError('PLOT_TWIST_STALE', 'The loaded game changed. Reopen Plot Twist before trying again.')
   }
-  manualWriting = true
+  setManualWriting(true)
   try {
     await queueWrite(async () => {
       if (!sameGame()) return
@@ -523,7 +538,7 @@ export async function writePlotTwist(value: string): Promise<Result<null>> {
   } catch (error) {
     if (sameGame()) outcome = { ok: false, error: toAppError(error, 'SAVE_WRITE_FAILED') }
   } finally {
-    manualWriting = false
+    setManualWriting(false)
   }
   return outcome
 }
@@ -538,7 +553,7 @@ export async function writeWhisper(next: VenusWhisper, previous: VenusWhisper, a
   }
   if (!current() || manualSaveOffer() !== 'open') throw Error('Wait for a safe save point.')
   let written = false
-  manualWriting = true
+  setManualWriting(true)
   try {
     await queueWrite(async () => {
       if (!current() || saveOffer(false) !== 'open') return
@@ -554,7 +569,7 @@ export async function writeWhisper(next: VenusWhisper, previous: VenusWhisper, a
       written = true
     })
     if (!written) throw Error('The game changed. Reopen the newsletter.')
-  } finally { manualWriting = false }
+  } finally { setManualWriting(false) }
 }
 
 /** The edit joins the game's write lane; disk succeeds before visible state is changed. */
@@ -568,7 +583,7 @@ export async function writeStoryMemory(next: StoryMemory, expected: { playthroug
   const draft = manualSaveDraft() ?? { ...game.toGameSave(), scene: null }
   const memory = normalizeStoryMemory(next)
   let written = false
-  manualWriting = true
+  setManualWriting(true)
   try {
     await queueWrite(async () => {
       if (!fresh()) return
@@ -578,7 +593,7 @@ export async function writeStoryMemory(next: StoryMemory, expected: { playthroug
       if (fresh()) useGameStore.setState({ exStoryMemory: memory })
     })
     if (!written) throw Error('The playthrough changed. Reopen Story Memory to edit this save.')
-  } finally { manualWriting = false }
+  } finally { setManualWriting(false) }
 }
 
 /** Cache a spectator scene without ever inserting it into canonical history or memories. */
@@ -612,7 +627,7 @@ export async function writeEcho(next: EchoState, previous: EchoState, active: ()
   const saved = normalizeEcho(next)
   assertEchoEdit(previous, saved)
   let written = false
-  manualWriting = true
+  setManualWriting(true)
   try {
     await queueWrite(async () => {
       if (!current() || saveOffer(false) !== 'open') return
@@ -630,7 +645,7 @@ export async function writeEcho(next: EchoState, previous: EchoState, active: ()
     })
     if (!written) throw Error('The game changed. Reopen the Echo.')
   } finally {
-    manualWriting = false
+    setManualWriting(false)
   }
 }
 
@@ -644,7 +659,7 @@ export async function writeTalentChange(action: TalentChange): Promise<void> {
   const available=():boolean=>owns() && modIsOn('campus-talents') && !start.replaying && !start.createdScene && !start.sceneEnding && !start.statusShown
   if (!available() || manualSaveOffer()!=='open') throw Error('Wait until the scene or messages have finished before spending points.')
   let written=false
-  manualWriting=true
+  setManualWriting(true)
   try {
     await queueWrite(async()=>{
       if (!available() || saveOffer(false)!=='open') return
@@ -672,7 +687,7 @@ export async function writeTalentChange(action: TalentChange): Promise<void> {
       written=true
     })
     if (!written) throw Error('The game changed. Reopen Skill trees and try again.')
-  } finally { manualWriting=false }
+  } finally { setManualWriting(false) }
 }
 
 /** One atomic save holds the spirit charge, round progress and earned Character Dynamics tag. */
@@ -708,7 +723,7 @@ export async function writeReckoningChange(
     ...(dynamics ? { exCharacterDynamics: dynamics } : {})
   }
   let written = false
-  manualWriting = true
+  setManualWriting(true)
   try {
     await queueWrite(async () => {
       if (!current() || saveOffer(false) !== 'open') return
@@ -749,6 +764,120 @@ export async function writeReckoningChange(
     })
     if (!written) throw Error('The game changed; reopen the encounter.')
   } finally {
-    manualWriting = false
+    setManualWriting(false)
   }
 }
+
+/** What a mod writing its save data said it edited from, by id. */
+export interface ModWriteOptions {
+  /** Per id, the value the caller edited from; the write is refused as stale once it is not the live one (`===`). */
+  expect?: Readonly<Record<string, unknown>>
+}
+
+const WAIT_MESSAGE = 'Wait for the scene to settle.'
+const STALE_MESSAGE = 'The game changed. Reopen this and try again.'
+
+/** A refused mod write. */
+function refused(code: string, message: string): Result<null> {
+  return { ok: false, error: appError(code, message) }
+}
+
+/** The live value of `modId`'s save field, as its handle reads it: the stored value, or the field's `empty`. */
+function liveValueOf(modId: string): unknown {
+  const values = useGameStore.getState().modValues
+  return Object.hasOwn(values, modId) ? values[modId] : saveFields().get(modId)?.empty
+}
+
+/** The first id whose live value is no longer the one `expect` names, or undefined. */
+function staleIn(expect: Readonly<Record<string, unknown>> | undefined): string | undefined {
+  return Object.keys(expect ?? {}).find((id) => liveValueOf(id) !== expect?.[id])
+}
+
+/** `draft` with `next` written into its mods' data as the store writes it, every other slice kept. */
+function withModValues(draft: SaveDraft, next: Readonly<Record<string, unknown>>): SaveDraft {
+  return { ...draft, ex: slicesWith(draft.ex ?? {}, next) }
+}
+
+/**
+ * A mod's edit to its own save data, and to that of the mods it requires: written over the
+ * autosave at a safe point, behind every write already queued, and taken into the live game only
+ * once it is on disk. Refused, writing nothing, when an id is another mod's, the mod is off, no
+ * game is loaded, a value it edited from has moved, or the loop is not at a point a save can be
+ * taken at. Never throws.
+ */
+export async function writeModSlices(
+  modId: string,
+  next: Readonly<Record<string, unknown>>,
+  options: ModWriteOptions = {}
+): Promise<Result<null>> {
+  try {
+    const allowed = new Set([modId, ...(modById(modId)?.requires ?? [])])
+    const foreign = Object.keys(next).find((id) => !allowed.has(id))
+    if (foreign !== undefined) {
+      return refused('MOD_WRITE_FOREIGN', `${modId} cannot write the save data of ${foreign}.`)
+    }
+    if (!modIsOn(modId, loopState.record)) return refused('MOD_WRITE_OFF', 'That mod is off.')
+    const start = useGameStore.getState()
+    const playthroughId = start.playthroughId
+    if (!playthroughId) return refused('MOD_WRITE_NO_GAME', 'There is no game to save into.')
+    if (staleIn(options.expect) !== undefined) return refused('MOD_WRITE_STALE', STALE_MESSAGE)
+    if (manualSaveOffer() !== 'open') return refused('MOD_WRITE_WAIT', WAIT_MESSAGE)
+    const loads = start.loads
+    const run = currentRun()
+    const sameGame = (): boolean => {
+      const game = useGameStore.getState()
+      return !runStale(run) && game.playthroughId === playthroughId && game.loads === loads
+    }
+
+    setManualWriting(true)
+    try {
+      // A stay left before the write's turn skips it, which leaves this as the answer.
+      let outcome: Result<null> = refused('MOD_WRITE_STALE', STALE_MESSAGE)
+      await queueWrite(async () => {
+        if (!sameGame() || staleIn(options.expect) !== undefined) return
+        if (!modIsOn(modId, loopState.record)) {
+          outcome = refused('MOD_WRITE_OFF', 'That mod is off.')
+          return
+        }
+        if (saveOffer(false) !== 'open') {
+          outcome = refused('MOD_WRITE_WAIT', WAIT_MESSAGE)
+          return
+        }
+        const game = useGameStore.getState()
+        const base = manualSaveDraft() ?? (sceneActiveOf(game) ? null : { ...game.toGameSave(), scene: null })
+        if (!base) {
+          outcome = refused('MOD_WRITE_WAIT', WAIT_MESSAGE)
+          return
+        }
+        const result = await window.api.saves.autosave(playthroughId, withModValues(base, next))
+        if (!result.ok) {
+          outcome = { ok: false, error: result.error }
+          return
+        }
+        outcome = { ok: true, data: null }
+        if (!sameGame()) return
+        useGameStore.setState((state) => ({ modValues: { ...state.modValues, ...next } }))
+        if (loopState.statusBase) loopState.statusBase = withModValues(loopState.statusBase, next)
+      })
+      return outcome
+    } finally {
+      setManualWriting(false)
+    }
+  } catch (err) {
+    return { ok: false, error: toAppError(err, 'SAVE_WRITE_FAILED') }
+  }
+}
+
+// What a mod's `writeModField` and `safePoint` reach.
+bindModWrites({
+  write: (modId, next, options) => writeModSlices(modId, next, options),
+  safePoint: manualSaveOffer,
+  subscribe: (onChange) => {
+    const stores = [useGameStore.subscribe(onChange), useBunnyboardStore.subscribe(onChange)]
+    lockWatchers.add(onChange)
+    return () => {
+      for (const unsubscribe of stores) unsubscribe()
+      lockWatchers.delete(onChange)
+    }
+  }
+})

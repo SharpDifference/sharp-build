@@ -1,7 +1,7 @@
 import { ReflectionPortraitControl } from '../components/ReflectionPortrait'
 import { useEffect, useRef, useState, type CSSProperties, type JSX } from 'react'
 import { createPortal } from 'react-dom'
-import { editorFields } from '../mods/hooks'
+import { editorFields, editorWrites } from '../mods/hooks'
 import { ModSlot, SlotBoundary } from '../mods/ModSlot'
 import { useModsStore } from '../stores/modsStore'
 import { AnimatePresence, motion } from 'motion/react'
@@ -529,7 +529,7 @@ export function EditCharacterModal({
     const next: Character = {
       ...character,
       // The mods' own fields first, so the game's below win over any a mod writes by mistake.
-      ...Object.assign({}, ...editorFields().map(({ modId, field }) => field.write(modValue(modId)))),
+      ...editorWrites(character, modValue),
       firstName: form.firstName,
       lastName: form.lastName,
       personality: form.personality,

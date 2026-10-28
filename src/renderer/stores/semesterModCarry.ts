@@ -1,6 +1,7 @@
-import { carryModFields, type ModCarryFields } from '@shared/modCarry'
+import { carryModSlices } from '@vx/modkit/host/renderer'
+import { carryModFields, type ModCarryFields, type TermCarryContext } from '@shared/modCarry'
 import { semesterShiftOf } from '@shared/semesters'
-import type { Character, GameSave, SaveDraft, Season } from '@shared/types'
+import type { Character, GameSave, ModSlice, SaveDraft, Season } from '@shared/types'
 
 /** The semester being left, as the ending's carry knows it. */
 export interface LeavingSemester {
@@ -29,9 +30,27 @@ export function modFieldsLeaving(
     saveId: 'ending',
     saveDate: 0
   }
-  return carryModFields(full, {
+  return carryModFields(full, contextOf(leaving))
+}
+
+/**
+ * What the mods' save fields carry out of a finished semester: the `ex` the next semester's
+ * first save starts with, from the ending's slices as read and each registered mod's value, or
+ * undefined where nothing is carried.
+ */
+export function modSlicesLeaving(
+  read: Readonly<Record<string, ModSlice>>,
+  values: Readonly<Record<string, unknown>>,
+  leaving: LeavingSemester
+): Record<string, ModSlice> | undefined {
+  const ex = carryModSlices(read, values, contextOf(leaving))
+  return Object.keys(ex).length > 0 ? ex : undefined
+}
+
+function contextOf(leaving: LeavingSemester): TermCarryContext {
+  return {
     term: leaving.index,
     back: semesterShiftOf(leaving.season),
     characters: leaving.characters
-  })
+  }
 }

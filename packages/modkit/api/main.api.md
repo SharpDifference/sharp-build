@@ -5,11 +5,62 @@
 ```ts
 
 // @public
+export interface BackupPart {
+    export(context: BackupPartContext): Promise<BackupPartExport>;
+    prepare(json: unknown, files: {
+        dir: string;
+        list: readonly string[];
+    }, legacy: BackupPartLegacy): Promise<BackupPartRestore>;
+}
+
+// @public
+export function backupPart(modId: string, part: BackupPart): void;
+
+// @public
+export interface BackupPartContext {
+    playthroughIds: readonly string[];
+    scratch: string;
+}
+
+// @public
+export interface BackupPartExport {
+    files?: readonly string[];
+    json?: unknown;
+}
+
+// @public
+export interface BackupPartLegacy {
+    archive: string;
+    dirs: readonly string[];
+    record: Readonly<Record<string, unknown>>;
+}
+
+// @public
+export interface BackupPartRestore {
+    commit(): Promise<void>;
+    discard(): Promise<void>;
+}
+
+// @public
+export interface CharacterTransferPart {
+    adopt(charId: string, json: unknown, dir: string, legacy: Readonly<Record<string, unknown>>): Promise<() => Promise<void>>;
+    duplicate(fromId: string, toId: string): Promise<() => Promise<void>>;
+    export(charId: string, dir: string): Promise<unknown>;
+    validate(json: unknown, dir: string, legacy: Readonly<Record<string, unknown>>): Promise<void>;
+}
+
+// @public
+export function characterTransferPart(modId: string, part: CharacterTransferPart): void;
+
+// @public
 export interface ComfyLaunchContext {
     // (undocumented)
     readonly platform: NodeJS.Platform;
     readonly root: string;
 }
+
+// @public
+export function modDataPath(modId: string, playthroughId?: string): string;
 
 // @public
 export function registerComfyLaunchEnvironment(modId: string, provider: EnvironmentProvider): () => void;

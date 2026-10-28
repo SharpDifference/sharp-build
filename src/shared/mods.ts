@@ -257,6 +257,18 @@ export function playthroughMods(
     .map((mod) => mod.id)
 }
 
+/**
+ * The version of every mod on as a playthrough starts now, `playthrough` and `anytime` alike, by
+ * id: what its record keeps so a save played with another version of a mod can say which. Empty
+ * in a build with none on, and the record keeps the empty map: its absence means an older record.
+ */
+export function playthroughModVersions(
+  switches: ModSwitches,
+  mods: readonly ModDef[] = MODS
+): Record<string, string> {
+  return Object.fromEntries(modsOn(switches, mods).map((mod) => [mod.id, mod.version]))
+}
+
 /** The mods that are on for the game as a whole, in list order. */
 export function modsOn(switches: ModSwitches, mods: readonly ModDef[] = MODS): ModDef[] {
   return mods.filter((mod) => globallyOn(switches, mod.id, mods))
@@ -305,6 +317,12 @@ declare module './types' {
      * and on every record written before the list existed.
      */
     mods?: string[]
+    /**
+     * The version of every mod on when this playthrough started, `playthrough` and `anytime`
+     * alike, by id; empty where none were on. Absent only on a record written before mods
+     * recorded their versions.
+     */
+    modVersions?: Record<string, string>
   }
 }
 

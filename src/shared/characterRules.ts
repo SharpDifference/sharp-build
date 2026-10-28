@@ -38,6 +38,7 @@ const CHARACTER_REQUIRED: Record<
     | 'charId'
     | 'customCgs'
     | 'customOutfits'
+    | 'ex'
     | 'lora'
     | 'negativeTags'
     | 'profileCrop'

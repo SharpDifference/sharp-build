@@ -5,6 +5,16 @@
 ```ts
 
 // @public
+export interface AppError {
+    // (undocumented)
+    code: string;
+    // (undocumented)
+    detail?: string;
+    // (undocumented)
+    message: string;
+}
+
+// @public
 export function carryModFiles(context: TermFilesContext): Promise<void>;
 
 // @public
@@ -22,6 +32,7 @@ export interface Character {
     datingPreference: string;
     // (undocumented)
     dislikes: string[];
+    ex?: Record<string, ModSlice>;
     expressionTags: Record<Emotion, string[]>;
     // (undocumented)
     firstName: string;
@@ -81,6 +92,7 @@ export interface CharMemory {
     desc: string;
     echoAffinity?: 'matching' | 'competing';
     echoBoosted?: boolean;
+    ex?: Record<string, ModSlice>;
     // (undocumented)
     type: MemoryType;
 }
@@ -90,6 +102,7 @@ export interface ChatMessage {
     date: number;
     error?: boolean;
     everydayAsk?: EverydayAsk;
+    ex?: Record<string, ModSlice>;
     exReplyTo?: string;
     id: string;
     invite?: true;
@@ -118,86 +131,16 @@ export interface DeprecatedHook {
 export type GameOverReason = 'debt' | 'expulsion' | 'gameComplete' | 'endingDebt';
 
 // @public
-export interface GameSave {
-    addedClasses: Record<string, AddedClass>;
-    bio?: string;
-    bunnyboard: BunnyboardState;
-    // (undocumented)
-    bunnybotContactIntroSent: boolean;
-    bunnybotDeferred: BunnybotHandover[];
-    // (undocumented)
-    bunnybotFirstPostNudgeSent: boolean;
-    // (undocumented)
-    bunnybotSeenTipSent?: boolean;
-    bunnybotThrough: number;
-    // (undocumented)
-    bunnybotTwoTimingTipSent: boolean;
-    bunnymapUnlocked: boolean;
-    // (undocumented)
-    bunnyshopUnlocked: boolean;
-    charInfo: Record<string, CharState>;
-    classRecords: Record<string, ClassRecord>;
-    date: number;
-    droppedClasses: Record<string, DroppedClass>;
-    endingArtWanted: boolean;
-    events: CalendarEvent[];
+export interface GameSave extends NativeGameSave {
     // (undocumented)
     exBreakthrough?: BreakthroughState;
     exCharacterDynamics?: CharacterDynamics;
     // (undocumented)
     exEcho?: EchoState;
     exNpcWatch?: MeanwhileStore;
-    expelled: boolean;
     exReckoning?: ReckoningState;
     exStoryMemory?: StoryMemory;
-    farewellsDone: string[];
-    feedExtras: FeedExtras | null;
-    // (undocumented)
-    finalsScoresShown: boolean;
-    formerJobs?: Record<string, FormerJob>;
-    gradesStanding: 'good' | 'bad' | null;
-    graduationSeen: boolean;
-    history: GameHistory;
-    homecomingVisitor?: string;
-    inventory: OwnedItem[];
-    job: JobState | null;
-    jobsClosed: string[];
-    lastSlotCast: {
-        date: number;
-        time: TimeSlot;
-        charIds: string[];
-    } | null;
-    midtermStandingDone: boolean;
-    money: number;
-    npcFriendships?: NpcFriendship[];
-    npcOverlay: NpcSlotOverlay | null;
-    npcRelationships: NpcRelationshipMap;
-    occasionsDeclined?: string[];
-    outingSlots: Record<string, number>;
-    playerSchedule: Record<number, string>;
-    playthroughId: string;
     presetVars?: Record<string, string>;
-    readerCold?: ColdCase;
-    readerColdsHad?: number[];
-    replays?: GameReplays;
-    saveDate: number;
-    saveId: string;
-    scene: SceneState | null;
-    sceneEventsFired?: SceneEventsFired;
-    // (undocumented)
-    schemaVersion: 13;
-    semester?: string;
-    slotRumor?: SlotRumor | null;
-    springBreakAway: string[] | null;
-    stats: PlayerStats;
-    tallies?: ReaderTallies;
-    thumbnail?: string;
-    // (undocumented)
-    time: TimeSlot;
-    transcript?: Transcript;
-    venusJobIntroSent: boolean;
-    venusThrough: number;
-    weekendOutings: Record<string, number>;
 }
 
 // @public
@@ -608,10 +551,10 @@ export interface ImagePromptParts {
 }
 
 // @public
-export const KIT_APIS: readonly ['shared:carryModFiles', 'shared:DEPRECATED_HOOKS', 'shared:hasTrait', 'shared:HOOKS', 'shared:KIT_APIS', 'shared:KIT_VERSION', 'shared:MAX_TIER', 'shared:memoryStatusLine', 'shared:modById', 'shared:modOn', 'shared:optionKey', 'shared:optionOn', 'shared:pointsForTier', 'shared:registerCharacterTrait', 'shared:registerImagePromptDraft', 'shared:registerPostCarry', 'shared:registerRomanceRequirement', 'shared:registerTermCarry', 'shared:registerTermFiles', 'shared:REMOVED_HOOKS', 'shared:sharedModOn', 'renderer:Card', 'renderer:EmojiTool', 'renderer:fileLatePost', 'renderer:finishSlotActivity', 'renderer:Locked', 'renderer:modIsOn', 'renderer:openPanel', 'renderer:ownsPostComments', 'renderer:PostCommentAction', 'renderer:PostCommentsView', 'renderer:PostPicture', 'renderer:postVisible', 'renderer:promptFields', 'renderer:promptLines', 'renderer:promptRequired', 'renderer:registerHooks', 'renderer:SentText', 'renderer:submitAction', 'renderer:takeTurnFromReply', 'renderer:useBareMessage', 'renderer:useDismissLayer', 'renderer:useEmojiTool', 'renderer:useModalShell', 'renderer:useModOn', 'renderer:useModOption', 'main:registerComfyLaunchEnvironment'];
+export const KIT_APIS: readonly ['shared:carryModFiles', 'shared:DEPRECATED_HOOKS', 'shared:hasTrait', 'shared:HOOKS', 'shared:KIT_APIS', 'shared:KIT_VERSION', 'shared:MAX_TIER', 'shared:memoryStatusLine', 'shared:modById', 'shared:modOn', 'shared:optionKey', 'shared:optionOn', 'shared:pointsForTier', 'shared:registerCharacterTrait', 'shared:registerImagePromptDraft', 'shared:registerPostCarry', 'shared:registerRomanceRequirement', 'shared:registerTermCarry', 'shared:registerTermFiles', 'shared:REMOVED_HOOKS', 'shared:sharedModOn', 'renderer:Card', 'renderer:EmojiTool', 'renderer:fileLatePost', 'renderer:finishSlotActivity', 'renderer:Locked', 'renderer:modIsOn', 'renderer:modState', 'renderer:openPanel', 'renderer:ownsPostComments', 'renderer:PostCommentAction', 'renderer:PostCommentsView', 'renderer:PostPicture', 'renderer:postVisible', 'renderer:promptFields', 'renderer:promptLines', 'renderer:promptRequired', 'renderer:recordField', 'renderer:registerHooks', 'renderer:safePoint', 'renderer:saveField', 'renderer:SentText', 'renderer:submitAction', 'renderer:takeTurnFromReply', 'renderer:useBareMessage', 'renderer:useDismissLayer', 'renderer:useEmojiTool', 'renderer:useModalShell', 'renderer:useModOn', 'renderer:useModOption', 'renderer:useSafePoint', 'renderer:writeModField', 'renderer:writeModFields', 'main:backupPart', 'main:characterTransferPart', 'main:modDataPath', 'main:registerComfyLaunchEnvironment'];
 
 // @public
-export const KIT_VERSION = "0.4.0";
+export const KIT_VERSION = "0.5.0";
 
 // @public (undocumented)
 export type KitApiName = (typeof KIT_APIS)[number];
@@ -726,9 +669,90 @@ export interface ModSceneFields {
 export type ModScope = 'anytime' | 'playthrough';
 
 // @public
+export interface ModSlice {
+    data: unknown;
+    v: string;
+}
+
+// @public
 export interface ModSwitches {
     on: Record<string, boolean>;
     options: Record<string, boolean>;
+}
+
+// @public
+export interface NativeGameSave {
+    addedClasses: Record<string, AddedClass>;
+    bio?: string;
+    bunnyboard: BunnyboardState;
+    // (undocumented)
+    bunnybotContactIntroSent: boolean;
+    bunnybotDeferred: BunnybotHandover[];
+    // (undocumented)
+    bunnybotFirstPostNudgeSent: boolean;
+    // (undocumented)
+    bunnybotSeenTipSent?: boolean;
+    bunnybotThrough: number;
+    // (undocumented)
+    bunnybotTwoTimingTipSent: boolean;
+    bunnymapUnlocked: boolean;
+    // (undocumented)
+    bunnyshopUnlocked: boolean;
+    charInfo: Record<string, CharState>;
+    classRecords: Record<string, ClassRecord>;
+    date: number;
+    droppedClasses: Record<string, DroppedClass>;
+    endingArtWanted: boolean;
+    events: CalendarEvent[];
+    ex?: Record<string, ModSlice>;
+    expelled: boolean;
+    farewellsDone: string[];
+    feedExtras: FeedExtras | null;
+    // (undocumented)
+    finalsScoresShown: boolean;
+    formerJobs?: Record<string, FormerJob>;
+    gradesStanding: 'good' | 'bad' | null;
+    graduationSeen: boolean;
+    history: GameHistory;
+    homecomingVisitor?: string;
+    inventory: OwnedItem[];
+    job: JobState | null;
+    jobsClosed: string[];
+    lastSlotCast: {
+        date: number;
+        time: TimeSlot;
+        charIds: string[];
+    } | null;
+    midtermStandingDone: boolean;
+    money: number;
+    npcFriendships?: NpcFriendship[];
+    npcOverlay: NpcSlotOverlay | null;
+    npcRelationships: NpcRelationshipMap;
+    occasionsDeclined?: string[];
+    outingSlots: Record<string, number>;
+    playerSchedule: Record<number, string>;
+    playthroughId: string;
+    readerCold?: ColdCase;
+    readerColdsHad?: number[];
+    replays?: GameReplays;
+    saveDate: number;
+    saveId: string;
+    scene: SceneState | null;
+    sceneEventsFired?: SceneEventsFired;
+    // (undocumented)
+    schemaVersion: 13;
+    semester?: string;
+    slotRumor?: SlotRumor | null;
+    springBreakAway: string[] | null;
+    stats: PlayerStats;
+    tallies?: ReaderTallies;
+    thumbnail?: string;
+    // (undocumented)
+    time: TimeSlot;
+    transcript?: Transcript;
+    venusJobIntroSent: boolean;
+    venusThrough: number;
+    weekendOutings: Record<string, number>;
 }
 
 // @public
@@ -783,6 +807,7 @@ export interface PostComment {
 export interface ProjectSession {
     // (undocumented)
     date: number;
+    ex?: Record<string, ModSlice>;
     summary?: string;
     // (undocumented)
     time: TimeSlot;
@@ -845,6 +870,15 @@ export interface RemovedHook {
 }
 
 // @public
+export type Result<T> = {
+    ok: true;
+    data: T;
+} | {
+    ok: false;
+    error: AppError;
+};
+
+// @public
 export interface SceneLine {
     actions?: string[];
     bg?: string;
@@ -884,6 +918,7 @@ export interface SlotActivityOffer {
 export interface SocialPost {
     comments?: PostComment[];
     date: number;
+    ex?: Record<string, ModSlice>;
     id: string;
     liked?: boolean;
     likedOn?: number;

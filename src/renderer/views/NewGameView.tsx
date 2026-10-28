@@ -78,6 +78,7 @@ import { continuedDynamics, returningSetupIds, withContinuedModSetup } from '@sh
 import { EchoPanel } from './EchoPanel'
 import { type EchoState } from '@shared/echo'
 import { echoSetupLocks, finalizeEchoSetup, prepareEchoSetup } from '@shared/echoSetup'
+import { modById, playthroughModVersions } from '@shared/mods'
 import { useSaveStore } from '../stores/saveStore'
 import { useUiStore } from '../stores/uiStore'
 import { CharacterHeightModal } from './CharacterHeightModal'
@@ -916,10 +917,19 @@ export function NewGameView(): JSX.Element {
       })
     )
 
+    // Every mod on by the switches, and each playthrough mod the enrollment keeps whatever the
+    // switches say now, so the record's two lists name the same mods.
+    const startingVersions = {
+      ...playthroughModVersions(useModsStore.getState().switches),
+      ...Object.fromEntries(startingMods.flatMap((id) => { const mod = modById(id); return mod ? [[id, mod.version]] : [] }))
+    }
     const written = await useSaveStore.getState().createPlaythrough(
       {
         // The per-playthrough mods this one starts with; none in a build that has none.
         ...(startingMods.length > 0 ? { mods: startingMods } : {}),
+        // And the version of every mod on, of either scope, so a later build can say which it was.
+        // Written even when empty: only a record from before the map lacks it.
+        modVersions: startingVersions,
         chars: roster.map((c) => c.charId),
         playerFirstName: playerName.first,
         playerLastName: playerName.last,
@@ -1011,7 +1021,9 @@ export function NewGameView(): JSX.Element {
         farewellsDone: [],
         endingArtWanted: false,
         // No scene in progress, so the game opens at the slot boundary.
-        scene: null
+        scene: null,
+        // What the mods kept with the registration, as they left it.
+        ...(resumed?.enrollment.ex ? { ex: resumed.enrollment.ex } : {})
       },
       playthroughId ?? undefined
     )
