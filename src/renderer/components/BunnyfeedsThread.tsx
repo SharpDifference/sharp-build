@@ -19,7 +19,6 @@ import { FollowerFace } from './BunnyfeedsFaces'
 import { armFeedThreads } from '../stores/bunnyfeedsThreads'
 import { takeCommented } from '../stores/bunnyfeedsVisit'
 import { useBunnyboardStore } from '../stores/bunnyboardStore'
-import '../vu_styles/PopList.css'
 import '../vu_styles/Bunnyfeeds.css'
 
 /** A post's full view, and the comment in it to scroll to, if any. */

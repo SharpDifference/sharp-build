@@ -92,7 +92,6 @@
   "src/renderer/components/BunnyfeedsThread.tsx -> ../stores/textingLoop",
   "src/renderer/components/BunnyfeedsThread.tsx -> ../views/motion",
   "src/renderer/components/BunnyfeedsThread.tsx -> ../views/screenIcons",
-  "src/renderer/components/BunnyfeedsThread.tsx -> ../vu_styles/PopList.css",
   "src/renderer/components/BunnyfeedsThread.tsx -> @shared/postComments",
   "src/renderer/components/BunnyfeedsThread.tsx -> @shared/types",
   "src/renderer/components/EmojiPicker.tsx -> ../views/motion",
