@@ -9,6 +9,8 @@ import { character, charactersById, charInfo, restoreApi, stubApi } from './fixt
 
 vi.mock('../src/renderer/stores/photoTurn', () => ({ sendPhoto: vi.fn() }))
 const game = () => useGameStore.getState()
+// Every case imports Photo Feature's entry, which loads the kit's renderer side: slow under a full run.
+vi.setConfig({ testTimeout: 20_000 })
 
 beforeEach(() => {
   vi.useFakeTimers(); resetTextingLoop(); game().reset(); useBunnyboardStore.getState().reset()
