@@ -15,7 +15,8 @@ export const MOD_FILES: Record<string, ModSet> = {
       'src/shared/breakthrough*.ts',
       'src/renderer/stores/breakthrough*',
       'src/renderer/prompts/breakthrough*',
-      'src/renderer/views/Breakthrough*'
+      'src/renderer/views/Breakthrough*',
+      'src/renderer/vu_styles/Breakthrough.css'
     ]
   },
   bunnyfeeds: {
@@ -27,14 +28,17 @@ export const MOD_FILES: Record<string, ModSet> = {
       'src/shared/campusTalents.ts',
       'src/shared/talentPacks/**',
       'src/renderer/views/Talent*',
-      'src/renderer/assets/talents/**'
+      'src/renderer/assets/talents/**',
+      'src/renderer/vu_styles/Talents.css'
     ]
   },
   'character-dynamics': {
     globs: [
       'src/shared/characterDynamics*.ts',
       'src/shared/continuedModSetup.ts',
-      'src/renderer/views/CharacterDynamics*'
+      'src/renderer/views/CharacterDynamics*',
+      'src/renderer/vu_styles/CharacterDynamics.css',
+      'src/renderer/vu_styles/CharacterDynamicsBackstory.css'
     ]
   },
   // Its entry names the mod it requires through a constant, which the scan does not read.
@@ -53,7 +57,8 @@ export const MOD_FILES: Record<string, ModSet> = {
       'src/shared/soundtrack*.ts',
       'src/main/services/soundtrackService.ts',
       'src/renderer/stores/soundtrack*',
-      'src/renderer/views/SoundtracksModal.tsx'
+      'src/renderer/views/SoundtracksModal.tsx',
+      'src/renderer/vu_styles/Soundtracks.css'
     ]
   },
   echo: {
@@ -65,6 +70,7 @@ export const MOD_FILES: Record<string, ModSet> = {
       'src/renderer/echoCutout.html',
       'src/renderer/stores/echoAssignments.ts',
       'src/renderer/views/EchoPanel.tsx',
+      'src/renderer/vu_styles/Echo.css',
       'assets/echo-public/**',
       'assets/workflows/echoCutout.py',
       'assets/workflows/echoMegaten.json',
@@ -85,7 +91,8 @@ export const MOD_FILES: Record<string, ModSet> = {
       'src/renderer/stores/meanwhile*',
       'src/renderer/prompts/meanwhile*',
       'src/renderer/views/Meanwhile*',
-      'src/renderer/views/meanwhileImages.ts'
+      'src/renderer/views/meanwhileImages.ts',
+      'src/renderer/vu_styles/Meanwhile.css'
     ]
   },
   'mini-games': {
@@ -158,7 +165,7 @@ export const MOD_FILES: Record<string, ModSet> = {
     ]
   },
   'plot-twist': {
-    globs: ['src/shared/plotTwist*.ts', 'src/renderer/prompts/plotTwist.ts', 'src/renderer/views/PlotTwistModal.tsx', 'src/renderer/views/PlotTwistEntry.tsx']
+    globs: ['src/shared/plotTwist*.ts', 'src/renderer/prompts/plotTwist.ts', 'src/renderer/views/PlotTwistModal.tsx', 'src/renderer/views/PlotTwistEntry.tsx', 'src/renderer/vu_styles/PlotTwist.css']
   },
   'prompt-studio': {
     globs: [
@@ -176,6 +183,8 @@ export const MOD_FILES: Record<string, ModSet> = {
       'src/shared/reckoning*.ts',
       'src/renderer/stores/reckoning*',
       'src/renderer/views/Reckoning*',
+      'src/renderer/vu_styles/Reckoning.css',
+      'src/renderer/vu_styles/ReckoningDungeon.css',
       'assets/sound/community/reckoning/**'
     ]
   },
@@ -186,11 +195,12 @@ export const MOD_FILES: Record<string, ModSet> = {
       'src/main/services/storyMemory*',
       'src/renderer/stores/storyMemory.ts',
       'src/renderer/views/StoryMemoryModal.tsx',
-      'src/renderer/views/StoryMemoryEntry.tsx'
+      'src/renderer/views/StoryMemoryEntry.tsx',
+      'src/renderer/vu_styles/StoryMemory.css'
     ]
   },
   'text-regeneration': {
-    globs: ['src/shared/textRegeneration.ts', 'src/renderer/components/TextRegenerate.tsx']
+    globs: ['src/shared/textRegeneration.ts', 'src/renderer/components/TextRegenerate.tsx', 'src/renderer/vu_styles/TextRegenerate.css']
   },
   'venus-whisper': {
     globs: [
@@ -199,7 +209,8 @@ export const MOD_FILES: Record<string, ModSet> = {
       'src/renderer/stores/venusWhisper*',
       'src/renderer/stores/whisper*',
       'src/renderer/views/VenusWhisperModal.tsx',
-      'src/renderer/mods/venusWhisper.tsx'
+      'src/renderer/mods/venusWhisper.tsx',
+      'src/renderer/vu_styles/VenusWhisper.css'
     ]
   }
 }
