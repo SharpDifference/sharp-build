@@ -376,8 +376,10 @@ Moving to the default is the author's choice, and core moves nothing.
   `scratch`, and without it everything it wrote is carried. A part that throws, or names a file it
   did not write, is left out with a warning, and the backup goes ahead.
 - At import, every part's `prepare(json, { dir, list }, legacy)` runs before anything is written,
-  reads its share and returns `{ commit, discard }`. Then core writes its own share, then every
-  `commit()`, in order. A `prepare` that throws stops the import with nothing written, and the
+  reads its share and returns `{ commit, discard }`. `json` is undefined, and `dir` empty, where
+  the backup carries no share for the mod, as an older backup does; a part with nothing to restore
+  returns a pair that does nothing. Then core writes its own share, then every `commit()`, in
+  order. A `prepare` that throws stops the import with nothing written, and the
   restores already prepared are discarded; so are they all if core's own share fails. A `commit`
   that throws ends the import naming the mod, with the game's share already back.
 
