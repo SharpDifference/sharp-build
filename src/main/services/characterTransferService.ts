@@ -307,6 +307,8 @@ export async function importCharacter(archivePath: string): Promise<Character> {
     })
     const parts = characterTransferParts()
     const dirOf = (modId: string): string => join(modsDir, MOD_PARTS_DIR, modId)
+    // Each part finds its folder whether or not the export carries one, as a backup's part does.
+    for (const modId of parts.keys()) await mkdir(dirOf(modId), { recursive: true })
     for (const modId of Object.keys(manifest.mods ?? {})) {
       if (!parts.has(modId)) console.log(`[transfer] ${modId} is not installed; its data in the export is left out`)
     }
