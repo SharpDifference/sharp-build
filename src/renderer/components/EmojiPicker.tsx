@@ -10,10 +10,9 @@ import {
 } from 'react'
 import { createPortal } from 'react-dom'
 import { motion } from 'motion/react'
-import { useDismissLayer } from './useModalShell'
+import { useDismissLayer } from '@vx/modkit/renderer'
 import { tonedEmoji, useEmojiPrefs } from '../stores/emojiPrefs'
 import { gestures, quietLift, quietPress } from '../views/motion'
-import '../vu_styles/PopList.css'
 import '../vu_styles/EmojiPicker.css'
 
 /** One emoji as the catalogue lists it: the glyph, its name, and a 1 where it takes a tone. */
