@@ -1,15 +1,15 @@
-import { photoFeatureOn } from '@shared/photoSwitches'
+import { photoFeatureOn } from '../../shared/photoSwitches'
 import {
   allowedPhotoTier,
   PHOTO_TIERS,
   photoReasonOf,
   type PhotoReason,
   type PhotoTier
-} from '@shared/photoGate'
+} from '../../shared/photoGate'
 import { affectionFor } from '@shared/relationship'
-import { wardrobeLine } from '@shared/photoWardrobe'
-import type { Character, CharInfo, ChatMessage } from '@shared/types'
-import type { TextingPromptState } from './textingPrompt'
+import { wardrobeLine } from '../../shared/photoWardrobe'
+import type { Character, CharInfo, ChatMessage } from '@vx/modkit/shared'
+import type { TextingPromptState } from '@vx/modkit/renderer'
 
 /**
  * What she is told she may photograph, what the thread remembers of the pictures she has already

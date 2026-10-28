@@ -157,7 +157,7 @@ export const MOD_FILES: Record<string, ModSet> = {
   },
   'photo-feature': {
     globs: [
-      'src/shared/photo*.ts',
+      'src/shared/photo{Body,Duo,Files,Framing,Gate,Loader,Pose,Prompt,Switches,Types,Wardrobe,Words}.ts',
       'src/shared/characterBody.ts',
       'src/shared/heldPosts.ts',
       'src/shared/postAudience.ts',
@@ -166,10 +166,15 @@ export const MOD_FILES: Record<string, ModSet> = {
       'src/main/localPhotoBackup.ts',
       'src/main/services/localPhotoService.ts',
       'src/preload/photoApi.ts',
-      'src/renderer/stores/photo*',
+      'src/renderer/stores/photo{Comments,Group,Post,Recovery,SwitchHooks,TipDelivery,Turn,Webp}.ts',
       'src/renderer/views/ContactGallery.tsx',
       'src/renderer/views/bodyFields.tsx',
-      'src/renderer/views/bodyDrafts.ts'
+      'src/renderer/views/bodyDrafts.ts',
+      'src/renderer/prompts/photoBrief.ts',
+      'src/renderer/prompts/bodyBrief.ts',
+      'src/renderer/vu_styles/PhotoBubble.css',
+      'src/renderer/vu_styles/ContactGallery.css',
+      'src/renderer/vu_styles/BodyFields.css'
     ]
   },
   'plot-twist': {

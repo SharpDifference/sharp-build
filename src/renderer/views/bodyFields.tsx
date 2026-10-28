@@ -10,7 +10,7 @@ import {
   drawBody,
   type BodyField,
   type CharacterBody
-} from '@shared/characterBody'
+} from '../../shared/characterBody'
 import { usePhotoSwitches } from '../stores/photoSwitchHooks'
 import type { EditorField } from '@vx/modkit/renderer'
 import { gestures, quietLift, quietPress } from './motion'

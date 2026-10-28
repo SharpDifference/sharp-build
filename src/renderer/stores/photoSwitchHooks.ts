@@ -6,7 +6,7 @@ import {
   setPhotoSwitches,
   subscribePhotoSwitches,
   type PhotoSwitches
-} from '@shared/photoSwitches'
+} from '../../shared/photoSwitches'
 import { noNsfwImagesOf, useSettingsStore } from './settingsStore'
 
 /** Photo Feature's switches in a component, which redraws when one moves. */

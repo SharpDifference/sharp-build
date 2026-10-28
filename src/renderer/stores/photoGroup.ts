@@ -1,19 +1,19 @@
 import { PHOTO_FEATURE } from '@shared/mods'
 import { npcFriendsOf } from '@shared/npcRelationships'
-import { groupPhotoPair, type GroupPhotoPair } from '@shared/photoDuo'
-import { duoPhotosOn } from '@shared/photoSwitches'
-import type { Character, StructuredRequest, TimeSlot } from '@shared/types'
+import { groupPhotoPair, type GroupPhotoPair } from '../../shared/photoDuo'
+import { duoPhotosOn } from '../../shared/photoSwitches'
+import type { Character, StructuredRequest, TimeSlot } from '@vx/modkit/shared'
 import {
   ownsPostComments,
   promptFields,
   promptLines,
   promptRequired,
+  fileLatePost,
   type SceneReplied
-} from '../mods/hooks'
+} from '@vx/modkit/renderer'
 import { postCommentLines, postPhotoLines } from '../prompts/photoBrief'
 import { useGameStore } from './gameStore'
 import { canSendPhotos } from './localPhotoStore'
-import { fileLatePost } from './loop/feed'
 import { startHeldPostPhoto } from './photoPost'
 
 /**

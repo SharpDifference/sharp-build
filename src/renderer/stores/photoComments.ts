@@ -1,10 +1,10 @@
 import { rollPostLikes } from '@shared/feed'
-import { photoFeatureOn } from '@shared/photoSwitches'
+import { photoFeatureOn } from '../../shared/photoSwitches'
 import { npcFriendsOf } from '@shared/npcRelationships'
 import { globalSlotOf } from '@shared/jobs'
-import type { PhotoTier } from '@shared/photoGate'
-import { reachOf, rollAudienceLikes, rollCrowdCount } from '@shared/postAudience'
-import type { PostComment } from '@shared/postComments'
+import type { PhotoTier } from '../../shared/photoGate'
+import { reachOf, rollAudienceLikes, rollCrowdCount } from '../../shared/postAudience'
+import type { PostComment } from '@vx/modkit/shared'
 import {
   FEED_EMOJI,
   FEED_EMOJI_BAG,

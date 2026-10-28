@@ -1,5 +1,4 @@
-import type { PromptEdit } from './imagePrompt'
-import type { Character } from './types'
+import type { PromptEdit, Character } from '@vx/modkit/shared'
 
 /**
  * Her body, as five picks from fixed pools.

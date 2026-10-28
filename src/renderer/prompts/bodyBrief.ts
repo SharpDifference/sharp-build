@@ -1,5 +1,5 @@
-import { photoFeatureOn, photoSwitches } from '@shared/photoSwitches'
-import { BODY_POOLS, drawBody, type CharacterBody } from '@shared/characterBody'
+import { photoFeatureOn, photoSwitches } from '../../shared/photoSwitches'
+import { BODY_POOLS, drawBody, type CharacterBody } from '../../shared/characterBody'
 
 /**
  * What the character call is asked about her body, and what is made of the answer.
