@@ -4,8 +4,10 @@
 
 ```ts
 
+import { AnimationDefinition } from 'motion/react';
 import type { ComponentType } from 'react';
 import { JSX } from 'react';
+import { MouseEventHandler } from 'react';
 import { ReactNode } from 'react';
 import { StoreApi } from 'zustand';
 import { UseBoundStore } from 'zustand';
@@ -142,6 +144,22 @@ export function Locked(input: {
 
 // @public
 export type ManualSaveOffer = 'open' | 'waiting' | 'none';
+
+// @public
+export interface ModalShell {
+    host: HTMLElement | null;
+    // (undocumented)
+    overlayProps: {
+        onMouseDown: MouseEventHandler<HTMLElement>;
+        onClick: MouseEventHandler<HTMLElement>;
+        inert: boolean;
+    };
+    primaryProps: {
+        ref: (node: HTMLElement | null) => void;
+        onAnimationComplete: (definition: AnimationDefinition) => void;
+    };
+    topmost: () => boolean;
+}
 
 // @public
 export interface ModDataRecord {
@@ -777,7 +795,13 @@ export interface UpdatesTab {
 export function useBareMessage(text: string): boolean;
 
 // @public
+export function useDismissLayer(onDismiss: () => void, active: boolean): void;
+
+// @public
 export function useEmojiTool(): boolean;
+
+// @public
+export function useModalShell(onClose: () => void, sound?: 'panel' | 'phone' | 'none', primary?: () => void): ModalShell;
 
 // @public
 export function useModOn(id: string, record?: Pick<PlaythroughRecord, 'mods'> | null): boolean;

@@ -539,10 +539,10 @@ export interface ImagePromptParts {
 }
 
 // @public
-export const KIT_APIS: readonly ['shared:carryModFiles', 'shared:DEPRECATED_HOOKS', 'shared:hasTrait', 'shared:HOOKS', 'shared:KIT_APIS', 'shared:KIT_VERSION', 'shared:memoryStatusLine', 'shared:modById', 'shared:modOn', 'shared:optionKey', 'shared:optionOn', 'shared:registerCharacterTrait', 'shared:registerImagePromptDraft', 'shared:registerPostCarry', 'shared:registerRomanceRequirement', 'shared:registerTermCarry', 'shared:registerTermFiles', 'shared:REMOVED_HOOKS', 'shared:sharedModOn', 'renderer:Card', 'renderer:EmojiTool', 'renderer:fileLatePost', 'renderer:finishSlotActivity', 'renderer:Locked', 'renderer:modIsOn', 'renderer:modState', 'renderer:openPanel', 'renderer:ownsPostComments', 'renderer:PostCommentAction', 'renderer:PostCommentsView', 'renderer:PostPicture', 'renderer:postVisible', 'renderer:promptFields', 'renderer:promptLines', 'renderer:promptRequired', 'renderer:recordField', 'renderer:registerHooks', 'renderer:safePoint', 'renderer:saveField', 'renderer:SentText', 'renderer:submitAction', 'renderer:takeTurnFromReply', 'renderer:useBareMessage', 'renderer:useEmojiTool', 'renderer:useModOn', 'renderer:useModOption', 'renderer:useSafePoint', 'renderer:writeModField', 'renderer:writeModFields', 'main:backupPart', 'main:characterTransferPart', 'main:modDataPath', 'main:registerComfyLaunchEnvironment'];
+export const KIT_APIS: readonly ['shared:carryModFiles', 'shared:DEPRECATED_HOOKS', 'shared:hasTrait', 'shared:HOOKS', 'shared:KIT_APIS', 'shared:KIT_VERSION', 'shared:MAX_TIER', 'shared:memoryStatusLine', 'shared:modById', 'shared:modOn', 'shared:optionKey', 'shared:optionOn', 'shared:pointsForTier', 'shared:registerCharacterTrait', 'shared:registerImagePromptDraft', 'shared:registerPostCarry', 'shared:registerRomanceRequirement', 'shared:registerTermCarry', 'shared:registerTermFiles', 'shared:REMOVED_HOOKS', 'shared:sharedModOn', 'renderer:Card', 'renderer:EmojiTool', 'renderer:fileLatePost', 'renderer:finishSlotActivity', 'renderer:Locked', 'renderer:modIsOn', 'renderer:modState', 'renderer:openPanel', 'renderer:ownsPostComments', 'renderer:PostCommentAction', 'renderer:PostCommentsView', 'renderer:PostPicture', 'renderer:postVisible', 'renderer:promptFields', 'renderer:promptLines', 'renderer:promptRequired', 'renderer:recordField', 'renderer:registerHooks', 'renderer:safePoint', 'renderer:saveField', 'renderer:SentText', 'renderer:submitAction', 'renderer:takeTurnFromReply', 'renderer:useBareMessage', 'renderer:useDismissLayer', 'renderer:useEmojiTool', 'renderer:useModalShell', 'renderer:useModOn', 'renderer:useModOption', 'renderer:useSafePoint', 'renderer:writeModField', 'renderer:writeModFields', 'main:backupPart', 'main:characterTransferPart', 'main:modDataPath', 'main:registerComfyLaunchEnvironment'];
 
 // @public
-export const KIT_VERSION = "0.4.0";
+export const KIT_VERSION = "0.5.0";
 
 // @public (undocumented)
 export type KitApiName = (typeof KIT_APIS)[number];
@@ -584,6 +584,9 @@ export interface LedgerResponse {
 
 // @public
 export type LedgerStats = Partial<Record<StatKey, boolean>>;
+
+// @public
+export const MAX_TIER: StatTier;
 
 // @public
 export function memoryStatusLine(name: string, entry: Pick<CharMemory, 'type' | 'desc'>): SceneLine;
@@ -773,6 +776,9 @@ export interface PlaythroughRecord {
 }
 
 // @public
+export function pointsForTier(tier: StatTier): number;
+
+// @public
 export interface PostComment {
     at: number;
     // (undocumented)
@@ -931,6 +937,9 @@ export interface StatContext {
 
 // @public
 export type StatKey = 'brain' | 'body' | 'heart';
+
+// @public
+export type StatTier = 0 | 1 | 2 | 3 | 4 | 5;
 
 // @public
 export interface StatusText {

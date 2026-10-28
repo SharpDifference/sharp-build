@@ -75,7 +75,7 @@ export interface ModDef {
  */
 const ENTRIES = import.meta.glob<ModDef>('./modEntries/*.ts', { eager: true, import: 'default' })
 
-/** The list itself, which {@link installMods} adds to in place so every holder of `MODS` sees the same list. */
+/** The list itself, which {@link installMods} and {@link setInstalledMods} change in place so every holder of `MODS` sees the same list. */
 const list: ModDef[] = Object.keys(ENTRIES)
   .sort()
   .map((file) => ENTRIES[file])
@@ -96,7 +96,27 @@ export function installMods(defs: readonly ModDef[]): void {
   for (const def of defs) {
     if (!list.some((mod) => mod.id === def.id)) list.push(def)
   }
-  list.sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0))
+  sortById(list)
+}
+
+/**
+ * Makes the installed part of {@link MODS} these definitions, for a process that reads the installed
+ * mods again while it runs: one the list did not hold is added, one it held is replaced, and an
+ * installed one no longer given is dropped. The ids in `builtIn` are the build's own and stay as
+ * they are, whatever `defs` says of them; the list stays sorted by id. Switches saved for a mod the
+ * list no longer holds are not touched: `cleanSwitches` keeps them for its return.
+ */
+export function setInstalledMods(defs: readonly ModDef[], builtIn: readonly string[]): void {
+  const next = list.filter((mod) => builtIn.includes(mod.id))
+  for (const def of defs) {
+    if (!builtIn.includes(def.id) && !next.some((mod) => mod.id === def.id)) next.push(def)
+  }
+  list.splice(0, list.length, ...next)
+  sortById(list)
+}
+
+function sortById(mods: ModDef[]): void {
+  mods.sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0))
 }
 
 /**

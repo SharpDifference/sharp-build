@@ -45,6 +45,7 @@ export type { ModStateHandle, ModStateSpec } from './modState'
 export type { ModDataRecord, RecordFieldHandle, RecordFieldSpec, SaveFieldHandle, SaveFieldSpec } from './saveField'
 export type {
   ManualSaveOffer,
+  ModalShell,
   PromptState,
   ResolvedSave,
   ScreenTheme,
@@ -66,7 +67,9 @@ export {
   submitAction,
   takeTurnFromReply,
   useBareMessage,
+  useDismissLayer,
   useEmojiTool,
+  useModalShell,
   useModOn,
   useModOption
 } from '../bridge/renderer'

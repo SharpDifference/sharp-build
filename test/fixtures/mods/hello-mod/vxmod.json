@@ -11,6 +11,7 @@
     "settingsSection",
     "renderer:registerHooks",
     "renderer:useModOn",
+    "shared:sharedModOn",
     "protocols"
   ],
   "main": true,

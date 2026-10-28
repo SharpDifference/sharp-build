@@ -1,6 +1,6 @@
 # @vx/modkit
 
-## 0.4.0
+## 0.5.0
 
 Mod data. A mod keeps its data in the save, on the records inside it, in memory for a game or a
 session, and in folders of its own outside the save; core keeps every save key it does not own
@@ -25,6 +25,18 @@ through a load and a save.
 
 Existing hooks and APIs keep their shapes; declaration merging into `GameSave` and
 `registerTermCarry` work as before.
+
+## 0.4.0
+
+Expose the native stat-rank readers `MAX_TIER` and `pointsForTier`, with the
+`StatTier` type, through `@vx/modkit/shared`. Mods can express a maximum-rank
+requirement using the game's own threshold rather than copying its point value.
+No stat thresholds, gains, floors, decay or romance rules change.
+
+Expose `useModalShell`, `useDismissLayer` and the `ModalShell` type from the renderer entry.
+Installed mod panels can share core's modal host and dismissal stack: Escape and right-click
+close only the topmost layer, and a field retains its context menu. These are the game's own
+functions, not a second stack. Existing APIs and native modal behavior are unchanged.
 
 ## 0.3.0
 

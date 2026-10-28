@@ -43,6 +43,12 @@ describe('the entry points', () => {
     expect(runtime(hostRenderer).filter((name) => name in rendererKit)).toEqual([])
   })
 
+  it('shares the native modal dismissal stack instead of creating a second one for mods', async () => {
+    const native = await import('../../src/renderer/components/useModalShell')
+    expect(rendererKit.useModalShell).toBe(native.useModalShell)
+    expect(rendererKit.useDismissLayer).toBe(native.useDismissLayer)
+  })
+
   it('split every runtime export of hooks.ts, ModSlot, saveField.ts and modState.ts between the host and the mod', () => {
     const moved = [...runtime(hooksShim), ...runtime(slotShim), ...runtime(saveFieldKit), ...runtime(modStateKit)].sort()
     const host = runtime(hostRenderer)

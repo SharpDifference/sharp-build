@@ -1,78 +1,80 @@
-import { mkdtemp, mkdir, rm, writeFile } from 'fs/promises'
+import { readFileSync } from 'fs'
+import { mkdir, mkdtemp, rm, writeFile } from 'fs/promises'
 import { tmpdir } from 'os'
 import { join } from 'path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { FIXTURES, installFixture, recordInstall } from './mods/fixtureMods'
 
 /**
- * Shared rules in the main process: `modsService` binds them to the switches it last read or
- * wrote, so a shared registry asked during a render sees the player's switches, not "off".
+ * Shared rules in the main process, with the real rule and the real loader: the mod session adds
+ * the installed mods to `MODS`, so a shared registry asked in main sees an installed mod as the
+ * window does. On by default, off once its switch is written off, on again once a switch read
+ * from disk says so; off whatever its switch while its `main.js` failed. Only Electron is a stub.
  */
 let root = ''
 vi.mock('electron', () => ({
-  app: { isPackaged: false, getAppPath: () => root, getPath: () => root }
-}))
-// This build lists no mods, so the lookup reads the switch alone.
-vi.mock('@shared/mods', async (original) => ({
-  ...(await original<typeof import('@shared/mods')>()),
-  modOn: (switches: { on: Record<string, boolean> }, id: string) => switches.on[id] === true
+  app: {
+    isPackaged: false,
+    getAppPath: () => root,
+    getPath: () => root,
+    getVersion: () => '0.6.0',
+    commandLine: { hasSwitch: () => false }
+  },
+  BrowserWindow: { getAllWindows: () => [] },
+  ipcMain: { on: () => {}, handle: () => {} },
+  dialog: {},
+  net: {},
+  protocol: {},
+  safeStorage: {}
 }))
 
-const { bindModSession, getModSwitches, setModSwitches } = await import('../src/main/services/modsService')
+const { getModSwitches, setModSwitches } = await import('../src/main/services/modsService')
+const { modSession, startModSession } = await import('../src/main/mods/session')
+const { MODS, switchedOn } = await import('../src/shared/mods')
 const { sharedModOn } = await import('../src/shared/modRules')
-const { EMPTY_SESSION } = await import('../src/shared/modSession')
 
-/** A session table holding `photos` at the given status. */
-function sessionWith(status: 'loaded' | 'failed'): import('../src/shared/modSession').ModSessionTable {
-  return {
-    ...EMPTY_SESSION,
-    mods: [
-      {
-        id: 'photos',
-        manifest: null,
-        def: { id: 'photos', name: 'Photos', author: 'a', version: '1.0.0', scope: 'anytime', defaultOn: true, blurb: '' },
-        status,
-        message: status === 'failed' ? 'main.js threw: boom' : null,
-        warnings: [],
-        folder: 'C:\\mods\\photos\\1.0.0',
-        dev: false,
-        renderer: null,
-        style: null
-      }
-    ],
-    order: status === 'loaded' ? ['photos'] : []
-  }
+/** The hello-mod fixture's manifest, under another id and with a `main.js` that throws. */
+async function installBroken(data: string): Promise<void> {
+  const manifest = JSON.parse(readFileSync(join(FIXTURES, 'hello-mod', 'vxmod.json'), 'utf8')) as Record<string, unknown>
+  const folder = join(data, 'mods', 'broken', '1.0.0')
+  await mkdir(folder, { recursive: true })
+  await writeFile(join(folder, 'vxmod.json'), JSON.stringify({ ...manifest, id: 'broken', name: 'Broken', hooks: ['protocols'], options: undefined }))
+  await writeFile(join(folder, 'main.js'), "throw new Error('boom')")
+  recordInstall(data, 'broken', '1.0.0', new Uint8Array())
 }
 
 describe('shared rules in main', () => {
   beforeEach(async () => {
     root = await mkdtemp(join(tmpdir(), 'vu-mods-'))
+    const data = join(root, 'data')
+    installFixture(data, 'hello-mod')
+    await installBroken(data)
+    await setModSwitches({ on: {}, options: {} })
+    startModSession()
   })
   afterEach(async () => {
     await rm(root, { recursive: true, force: true })
   })
 
-  it('answer from the switches main last read, and then from the ones it last wrote', async () => {
-    expect(sharedModOn('photos')).toBe(false)
+  it('list the installed mods, and answer for a loaded one from the switches main last read or wrote', async () => {
+    expect(modSession().mods.map((mod) => [mod.id, mod.status])).toEqual([
+      ['broken', 'failed'],
+      ['hello-mod', 'loaded']
+    ])
+    expect(MODS.map((mod) => mod.id)).toEqual(expect.arrayContaining(['broken', 'hello-mod']))
 
-    await mkdir(join(root, 'data'), { recursive: true })
-    await writeFile(
-      join(root, 'data', 'mods.json'),
-      JSON.stringify({ schemaVersion: 1, on: { photos: true }, options: {} })
-    )
+    expect(sharedModOn('hello-mod')).toBe(true)
+    await setModSwitches({ on: { 'hello-mod': false }, options: {} })
+    expect(sharedModOn('hello-mod')).toBe(false)
+
+    await writeFile(join(root, 'data', 'mods.json'), JSON.stringify({ schemaVersion: 1, on: { 'hello-mod': true }, options: {} }))
     await getModSwitches()
-    expect(sharedModOn('photos')).toBe(true)
-
-    await setModSwitches({ on: { photos: false }, options: {} })
-    expect(sharedModOn('photos')).toBe(false)
+    expect(sharedModOn('hello-mod')).toBe(true)
   })
 
-  it('answer off for an installed mod the session table does not show as loaded, whatever its switch', async () => {
-    await setModSwitches({ on: { photos: true }, options: {} })
-    bindModSession(() => sessionWith('failed'))
-    expect(sharedModOn('photos')).toBe(false)
-    bindModSession(() => sessionWith('loaded'))
-    expect(sharedModOn('photos')).toBe(true)
-    bindModSession(() => EMPTY_SESSION)
-    expect(sharedModOn('photos')).toBe(true)
+  it('answer off for an installed mod whose main.js failed, whatever its switch', async () => {
+    const switches = await setModSwitches({ on: { broken: true }, options: {} }).then(getModSwitches)
+    expect(switchedOn(switches, 'broken')).toBe(true)
+    expect(sharedModOn('broken')).toBe(false)
   })
 })

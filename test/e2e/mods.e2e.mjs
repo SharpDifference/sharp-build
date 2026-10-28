@@ -127,6 +127,8 @@ await scenario('hello-mod loads', ['hello-mod'], async ({ page, cspViolations })
   check('useModOn answers on', (await page.textContent('#hello-mod-on')) === 'on')
   const ping = await page.evaluate(() => fetch('vxmod://hello-mod/@/ping').then((r) => r.text()))
   check("fetch('vxmod://hello-mod/@/ping') answers ok (its main.js ran)", ping === 'ok', ping)
+  const mainOn = await page.evaluate(() => fetch('vxmod://hello-mod/@/on').then((r) => r.text()))
+  check("its main.js sees itself on through sharedModOn", mainOn === 'true', mainOn)
   check('the console has no CSP violation', cspViolations.length === 0, cspViolations.join(' | '))
 })
 
@@ -178,7 +180,8 @@ await scenario('a library and its dependent', ['lib', 'uses-lib'], async ({ page
   check('uses-lib has one', (await page.$('#mods-pick-uses-lib')) !== null)
 })
 
-// 5. Dev folder: hello-mod's folder as a developer folder; a change to its renderer.js reloads the window.
+// 5. Dev folder: hello-mod's folder as a developer folder; a change to its renderer.js reloads the window,
+//    and a change to its manifest reaches main's rule.
 {
   const devFolder = mkdtempSync(join(tmpdir(), 'vu-e2e-dev-'))
   cpSync(join(fixtures, 'hello-mod'), devFolder, { recursive: true })
@@ -203,9 +206,53 @@ await scenario('a library and its dependent', ['lib', 'uses-lib'], async ({ page
     await page.waitForSelector('#hello-mod-section', { timeout: 10000 })
     const heading = await page.textContent('#hello-mod-section h4')
     check('the window reloaded with the new text', heading === 'Hello again', heading ?? '')
+    await closeTopModal(page)
+    const manifestFile = join(devFolder, 'vxmod.json')
+    const reloadedAgain = page.waitForEvent('load', { timeout: 15000 })
+    writeFileSync(manifestFile, readFileSync(manifestFile, 'utf8').replace('"defaultOn": true', '"defaultOn": false'))
+    await reloadedAgain
+    await settle(page)
+    const mainOn = await page.evaluate(() => fetch('vxmod://hello-mod/@/on').then((r) => r.text()))
+    check("main's rule reads the manifest's new defaultOn after the reload", mainOn === 'false', mainOn)
   }, { ...SETTINGS, devModFolders: [devFolder] })
   rmSync(devFolder, { recursive: true, force: true })
 }
+
+await scenario('installed modal and native settings share one dismissal stack', ['modal-shell'], async ({ page }) => {
+  await openSettingsGameTab(page)
+  await page.click('#fixture-modal-open')
+  await page.waitForSelector('#fixture-modal')
+  await page.click('#fixture-modal-open-layer')
+  await page.waitForSelector('#fixture-modal-layer')
+  await page.keyboard.press('Escape')
+  await page.waitForSelector('#fixture-modal-layer', { state: 'detached' })
+  check('Escape closes the inner layer alone', (await page.$('#fixture-modal')) !== null && (await page.$('#settings-modal')) !== null)
+  await page.keyboard.press('Escape')
+  await page.waitForSelector('#fixture-modal', { state: 'detached' })
+  check('the next Escape closes the mod modal alone', (await page.$('#settings-modal')) !== null)
+
+  await page.click('#fixture-modal-open')
+  await page.waitForSelector('#fixture-modal')
+  await page.click('#fixture-modal-open-layer')
+  await page.click('#fixture-modal-input', { button: 'right' })
+  check('a field keeps its right-click menu without dismissing its layer', (await page.$('#fixture-modal-layer')) !== null)
+  await page.locator('#fixture-modal-layer span').click({ button: 'right' })
+  await page.waitForSelector('#fixture-modal-layer', { state: 'detached' })
+  check('right-click outside a field dismisses the inner layer alone', (await page.$('#fixture-modal')) !== null && (await page.$('#settings-modal')) !== null)
+  await page.locator('#fixture-modal p').click({ button: 'right' })
+  await page.waitForSelector('#fixture-modal', { state: 'detached' })
+  check('right-click dismisses the mod modal without closing settings', (await page.$('#settings-modal')) !== null)
+
+  await page.click('#fixture-modal-open')
+  await page.waitForSelector('#fixture-modal')
+  const overlay = page.locator('#fixture-modal-overlay')
+  await overlay.click({ position: { x: 5, y: 5 } })
+  await page.waitForSelector('#fixture-modal', { state: 'detached' })
+  check('outside click dismisses the mod modal alone', (await page.$('#settings-modal')) !== null)
+  await closeTopModal(page)
+  await page.waitForSelector('#settings-modal', { state: 'detached' })
+  check('native settings regains Escape after every mod layer is gone', (await page.$('#menu-settings')) !== null)
+})
 
 console.log(failures === 0 ? '\nEvery check passed.' : `\n${failures} check(s) failed.`)
 process.exit(failures === 0 ? 0 : 1)

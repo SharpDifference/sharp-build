@@ -1,0 +1,14 @@
+{
+  "manifest": 1,
+  "id": "modal-shell",
+  "name": "Modal shell fixture",
+  "author": "Maestro Leeds",
+  "version": "1.0.0",
+  "blurb": "Tests an installed mod sharing native modal dismissal.",
+  "source": "https://github.com/venus-extracurriculars/modal-shell",
+  "kit": "0.4.0",
+  "hooks": ["settingsSection", "renderer:registerHooks", "renderer:useModalShell", "renderer:useDismissLayer"],
+  "main": false,
+  "scope": "anytime",
+  "defaultOn": true
+}
