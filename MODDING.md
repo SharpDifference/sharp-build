@@ -305,6 +305,12 @@ other mod's. `expect` is, per id, the value the edit was made from, as `read()` 
 is no longer the live value, the write is refused. The handle's `write` is `writeModField` for its
 own id.
 
+`expect` is compared with `===`: an object is stale once `read()` hands out another object, a
+string or a number once its value differs. So a game loaded since the edit is not caught by
+`expect` alone where the value happens to be the same. An editor that must not outlive its game
+keeps a token in a `modState` with `lifetime: 'game'`, which every load, of the same save included,
+puts back to `initial`.
+
 Both return a `Result`: `{ ok: true, data: null }`, or `{ ok: false, error }` with an `AppError`'s
 `code` and `message`. A refusal writes nothing and changes nothing, and comes back as the error,
 never as a throw:
