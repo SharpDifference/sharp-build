@@ -1,4 +1,4 @@
-import type { Point, Dart, Ellipse, Flight, Impact, PanelBand } from '@shared/minigameRules/darts';
+import type { Point, Dart, Ellipse, Flight, Impact, PanelBand } from '../../../shared/minigameRules/darts';
 
 interface Sprite {
   x: number;
@@ -25,7 +25,7 @@ export interface BoardFrame {
   impact?: Impact | null;
   reduced?: boolean;
 }
-import { NUMBERS, RINGS, scoreHit, PANEL_BANDS, panelLights } from '@shared/minigameRules/darts';
+import { NUMBERS, RINGS, scoreHit, PANEL_BANDS, panelLights } from '../../../shared/minigameRules/darts';
 
 const C = 350,
   R = 245,

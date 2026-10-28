@@ -1,5 +1,5 @@
 import { createElement, lazy, Suspense } from 'react'
-import { registerHooks, type EmojiToolProps } from '../mods/hooks'
+import { registerHooks, type EmojiToolProps } from '@vx/modkit/renderer'
 import { EmojiText, emojiOnly } from '../components/EmojiText'
 
 /** The panel, loaded the first time a composer with its smiley is drawn. */

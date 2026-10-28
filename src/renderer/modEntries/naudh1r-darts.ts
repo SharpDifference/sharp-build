@@ -1,4 +1,4 @@
-import DARTS from '@shared/minigameEntries/darts'
+import DARTS from '../../shared/minigameEntries/darts'
 import { DartsPack } from '../minigames/games/DartsPack'
 import { registerGame } from '../minigames/kit'
 
