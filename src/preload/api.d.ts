@@ -16,6 +16,7 @@ import type { StudioBackupFile } from '@shared/presets/studioBackup'
 import type { StudioPrompts } from '@shared/presets/studioPrompts'
 import type { Preset, PresetImport, PresetListing } from '@shared/presets/types'
 import type { SoundtracksApi } from '@shared/soundtracks'
+import type { ModSessionTable, ModStatus } from '@shared/modSession'
 import type { LorebookRecord, WorldInfoFile, WorldInfoImport } from '@shared/lorebookRecord'
 import type {
   PhotoEntry,
@@ -157,6 +158,30 @@ export interface VenusUniversityApi {
     get: () => Promise<Result<ModSwitches>>
     /** Replaces every switch and option. */
     set: (switches: ModSwitches) => Promise<Result<void>>
+    /**
+     * The installed mods' session table (`shared/modSession.ts`), read once and synchronously
+     * when the preload runs, so it is whole before any module of the window reads `MODS`. A
+     * value, not a call; the browser build's is empty.
+     */
+    session: ModSessionTable
+    /**
+     * The export names of each host module the window has parked for the `vxmod://host/` shims,
+     * by specifier. Sent once, before the first installed mod is imported.
+     */
+    exposeHost: (names: Record<string, string[]>) => Promise<Result<void>>
+    /** Marks a mod the window could not load as off for the session, so its files stop being served. */
+    failed: (id: string, status: ModStatus, message: string) => Promise<Result<void>>
+    /** Records which mods the start notice has named, by id, each with the version it was named at. */
+    noticesSeen: (seen: Record<string, string>) => Promise<Result<void>>
+    /** Picks a folder holding an unzipped release and adds it to the developer folders; null when dismissed. */
+    addDevFolder: () => Promise<Result<string | null>>
+    removeDevFolder: (folder: string) => Promise<Result<void>>
+    /** The developer folders as stored. */
+    devFolders: () => Promise<Result<string[]>>
+    /** A developer folder changed on disk: its `renderer.js` or assets (a reload shows it), or its `main.js` (a restart does). */
+    onDevChanged: (listener: (change: { id: string; kind: 'renderer' | 'main' }) => void) => () => void
+    /** Starts the app again, for a `main.js` that changed. */
+    restart: () => Promise<Result<void>>
   }
   app: {
     /** Ends the app; main writes nothing, the caller has already saved. */

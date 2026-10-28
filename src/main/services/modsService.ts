@@ -7,6 +7,7 @@ import {
   withPhotoSettingsCarried,
   type ModSwitches
 } from '@shared/mods'
+import { EMPTY_SESSION, isRunning, type ModSessionTable } from '@shared/modSession'
 import { setSharedModRules } from '@shared/modRules'
 import { setPhotoSwitches } from '@shared/photoSwitches'
 import { getDataPath, getModsPath, getSettingsPath } from '../paths'
@@ -17,10 +18,20 @@ const SCHEMA_VERSION = 1
 
 /**
  * The switches main last read or wrote. Shared rules ask them here, as the renderer's ask its own
- * store: main knows no playthrough, so a `playthrough` mod answers as its switch stands.
+ * store: main knows no playthrough, so a `playthrough` mod answers as its switch stands. The rule
+ * reads `MODS`, which holds the installed mods once the mod session has added them, and an
+ * installed mod that is not running this session (its `main.js` threw after registering, say)
+ * answers off whatever its switch, as the window's rule has it.
  */
 let known: ModSwitches = NO_SWITCHES
-setSharedModRules((modId) => modOn(known, modId))
+/** The session table as main holds it; until the loader binds it, nothing is installed. */
+let session: () => ModSessionTable = () => EMPTY_SESSION
+setSharedModRules((modId) => isRunning(session(), modId) && modOn(known, modId))
+
+/** Binds the shared rules to the mod session's table, read live so a rerun of the checks counts. */
+export function bindModSession(lookup: () => ModSessionTable): void {
+  session = lookup
+}
 
 /** `data/mods.json` as it is on disk. */
 interface ModsFile extends ModSwitches {

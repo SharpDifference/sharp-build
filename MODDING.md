@@ -75,6 +75,107 @@ switch is left as the player set it.
 - `playthrough.json`: `mods`, the `playthrough` mods that playthrough started with.
 
 
+## Installed mods
+
+A mod built outside the repo is installed under `data/mods/` and found at start; the game does not
+know it when it is built. The kit (`packages/modkit`) is the one part of the game it imports.
+
+```
+data/mods/<id>/current              one line: the version in use (optional)
+data/mods/<id>/<version>/vxmod.json  the release, unpacked as it came
+                         renderer.js  optional: runs in the window, an ES module
+                         main.js      optional: runs in the main process, CommonJS
+                         style.css    optional
+                         assets/      optional
+data/mods/installed.json             the installer's record of each install, by id and version:
+                                     where the zip came from, its hash, whether the source is approved
+```
+
+`<id>` follows the id rule above and `<version>` is strict `major.minor.patch`; both must match the
+manifest. One version of an id is in use at a time: the one `current` names, else the only one,
+else the highest, with a line in the log. The loader deletes nothing and writes nothing.
+
+### The manifest, `vxmod.json`
+
+```json
+{
+  "manifest": 1,
+  "id": "hello-mod",
+  "name": "Hello mod",
+  "author": "morrowkiln",
+  "version": "1.0.0",
+  "blurb": "Says hello in App settings.",
+  "source": "https://github.com/venus-extracurriculars/hello-mod",
+  "kit": "0.3.0",
+  "hooks": ["settingsSection", "renderer:registerHooks", "renderer:useModOn"],
+  "game": ">=0.6.0 <0.8.0",
+  "requires": { "mini-games": "^1.2.0" },
+  "optional": { "photo-feature": "^2.0.0" },
+  "main": false,
+  "scope": "anytime",
+  "defaultOn": true,
+  "offNote": "Switching it off keeps what it saved.",
+  "options": [],
+  "optionGroups": [],
+  "library": false,
+  "exports": []
+}
+```
+
+- `manifest` is the schema's version, `1`. A higher one is refused as made for a newer game; an
+  unknown field is refused rather than ignored, so a manifest for a newer schema is never half-read.
+- `hooks` names every hook and kit API the mod uses: hooks plainly (`prompts.dm`), kit APIs as
+  `side:name` (`renderer:useModOn`), and a required library's exports as `<lib>:<export>`. It is
+  checked against the hook table at start, and `registerHooks` refuses a hook it does not name.
+- `game` is advisory: a version outside the range is a warning on the row, never a refusal.
+- `requires` and `optional` are `{ id: range }` maps in a small range syntax (`1.2.3`, `^`, `~`,
+  `>=`, `<`, `1.x`, `*`, a space for and). A required mod must be installed, in range and running;
+  an optional one in range is loaded first and its exports are there, otherwise nothing.
+- `main` must agree with whether `main.js` exists. `defaultOn`, `offNote`, `options` and
+  `optionGroups` are the mod's entry, as an in-repo mod writes them in `src/mod.ts`.
+- A library (`library: true`) has no switch and no row; it is on while a mod that is on requires
+  it, and `exports` names what its `renderer.js` exports for them to import as
+  `vxmod://<lib>/renderer.js`.
+
+### What runs, and where
+
+- **Main**, before the window opens: every manifest is read and checked, the mods are ordered by
+  what they require (dependencies first, ties by id), and each installed, compatible, permitted
+  mod's `main.js` is required in that order, switch or not; main-side code asks the switch where
+  it acts. `main.js` is one CommonJS file with its dependencies bundled, and its `require` reaches
+  only the kit (`@vx/modkit/shared`, `@vx/modkit/main`, answering the APIs the manifest declares
+  and throwing on any other), `vxmod:<id>` for a required library, `electron`, Node's own modules
+  and a file inside the mod's folder. `main.js` is expected to be that one bundled file; a file of
+  the mod's own that it requires runs under the same `require`, so nothing in it reaches past the
+  kit or the folder either, and a `.node` addon is the one thing handed to Node's own loader. In
+  this step it exports `protocols`: routes under `vxmod://<id>/@/<route>/…`, each
+  `{ route, handle(request) }`. A mod never has a scheme of its own.
+- **The window**, in `boot()` before the first screen: each loaded mod's `renderer.js` is imported
+  from `vxmod://<id>/renderer.js`, one at a time in load order, and its `style.css` added, kept
+  only while the mod is on. `react`, `react/jsx-runtime`, `react-dom`, `react-dom/client`,
+  `motion/react`, `@vx/modkit/shared` and `@vx/modkit/renderer` stay external in a mod's build:
+  the page's import map sends them to `vxmod://host/`, where small generated modules hand over the
+  page's own instances, so a mod's components run on the game's one React. `@vx/modkit/main`
+  there is a module that throws.
+- **`vxmod://`** serves a running mod's files from its one folder (nothing outside it, and nothing
+  of a mod that is not running), its routes, and the host shims, with the policy in `index.html`
+  naming `vxmod:` for scripts, styles, images, media, fonts and connections.
+- **A mod that cannot run** is off for the session, with its data kept: nothing is written, not
+  `data/mods.json`, not a save. The Mods screen's row keeps its switch where the player left it,
+  disabled, and says why under the name (`needs an update: `x` is not in this core`; `needs
+  Mini-games, which did not load`; `main.js threw: …`); a notice at start names each such mod once
+  per version; entering a game whose record names a `playthrough` mod that is not running says so.
+  A mod whose main-process code comes from a source the build has not reviewed (`installed.json`,
+  written by the installer alone, does not record its version as approved; a file inside the mod's
+  folder says nothing) is not permitted to run unless `allowUnreviewedMain` is on in
+  `settings.json`; a developer folder's always is.
+- **Starting without mods**: `--no-mods` on the command line reads the manifests and runs
+  nothing; Shift held while the window comes up skips every installed mod's window code.
+- **For mod authors**: the fold at the foot of the Mods screen loads a mod from a folder holding
+  an unzipped release (`settings.json`'s `devModFolders`, taking effect at the next start, and
+  standing in for an installed copy of the same id). While the game runs, a change to the folder
+  reloads the window, at once off a game and on offer in one; a changed `main.js` offers a restart.
+
 ## Options that are one choice
 
 Options that are one choice among several share a `group`, and the mod names the group in
@@ -103,8 +204,13 @@ optionGroups: [{ id: 'loader', label: 'Loading animation', hint: 'The animation 
 | `packages/modkit/` | The mod kit, `@vx/modkit`: the hook points (below), the shared rule and the carry registries, under the three entries a mod imports (`shared`, `renderer`, `main`) and core's own `host` side. Its README says how it is laid out and checked. |
 | `src/renderer/mods/hooks.ts`, `src/renderer/mods/ModSlot.tsx`, `src/shared/modRules.ts`, `src/shared/modCarry.ts` | The old paths of what moved into the kit, re-exporting it, so core's imports are unchanged. |
 | `src/renderer/modEntries/` | One file per mod with hooks, named for its id: its `registerHooks`. |
-| `src/renderer/mods/index.ts` | Loads every file in `modEntries/` at boot. |
+| `src/renderer/mods/index.ts` | Loads every file in `modEntries/` at boot, then imports each installed mod's `renderer.js`. |
+| `src/shared/modSession.ts` | The session table: what the loader found and what became of each installed mod. |
+| `src/main/mods/` | The loader (`loader.ts`), the on-disk layout (`layout.ts`), the load order (`order.ts`), requiring `main.js` (`require.ts`), the `vxmod://` protocol (`protocol.ts`, `resolve.ts`, `shims.ts`), the session and its channels (`session.ts`), the developer folders (`devFolders.ts`). |
+| `src/renderer/installedMods.ts`, `src/renderer/mods/host.ts`, `src/renderer/stores/modSessionStore.ts` | The installed mods in the window: their entries into `MODS` first of all, the host modules the import map points at, and the session the hooks and the Mods screen read. |
+| `packages/modkit/src/shared/manifest.ts`, `range.ts` | Reading `vxmod.json`, and the version-range subset. |
 | `test/mods.test.ts` | The rules, tested against a list with every shape of mod. |
+| `test/mods/` | The loader's tests, on the fixture mods under `test/fixtures/mods/`. `npm run test:electron`, after a build, runs them in the real app. |
 | `test/kit/` | The kit's own checks: a mod file imports only the kit (`boundary.test.ts`), the hook table and the kit's surface agree with the code (`contract.test.ts`), and the per-hook compatibility check (`compat.test.ts`). |
 
 ## A rule in shared code
@@ -342,7 +448,8 @@ field and writes nothing, so what it saved on her stays.
 - Screens: a mod's own panels beyond those over the game view (`scenePlay`, `gameModals`), a
   page beside the feed (`updatesTab`), a preview on the Mods screen (`optionPreviews`) and the
   places on screen above.
-- Main process: IPC, protocols, services, settings and character rules.
+- Main process: IPC, services, settings and character rules. Protocols are covered: a mod's
+  `main.js` exports routes under `vxmod://<id>/@/…`.
 - Saves: a mod's own fields in a save. Carrying them into the next semester is covered below.
 
 These are still direct edits, as before.

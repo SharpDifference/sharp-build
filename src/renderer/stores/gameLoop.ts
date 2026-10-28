@@ -120,6 +120,7 @@ import {
   shortenSceneSoFar
 } from '../prompts/scenePrompt'
 import { useGrabBagStore } from './grabBagStore'
+import { useModSessionStore } from './modSessionStore'
 import {
   namesCharacter,
   PORTRAIT_SLOTS,
@@ -3062,6 +3063,8 @@ export function enterGame(
   resetLoop()
   // Held for a replay's return, which enters the same game again.
   loopState.record = record
+  // A `playthrough` mod this game started with that is not running this session is named once.
+  useModSessionStore.getState().gameEntered(record)
   const game = useGameStore.getState()
   game.loadSave(save, record, characters)
   // A read nothing on screen is waiting on: the profile is not open yet.

@@ -35,6 +35,10 @@ export function getDataPath(): string {
   if (app.isPackaged) {
     return join(resolve(app.getPath('exe'), '..'), 'data')
   }
+  // An unpackaged run may be pointed at another data folder: the Electron tests run the built app
+  // against a temp folder holding their fixtures, never against this checkout's own `data/`.
+  const override = process.env['VU_DATA_PATH']
+  if (override) return resolve(override)
   return resolve(app.getAppPath(), 'data')
 }
 
@@ -244,6 +248,11 @@ export function getGrabBagsPath(): string {
 /** `/data/mods.json` — the community mods' switches and options. */
 export function getModsPath(): string {
   return join(getDataPath(), 'mods.json')
+}
+
+/** `/data/mods` — the installed mods, one folder per id (`main/mods/layout.ts`). */
+export function getModsDirPath(): string {
+  return join(getDataPath(), 'mods')
 }
 
 /** `/data/saves` — one folder per playthrough. */

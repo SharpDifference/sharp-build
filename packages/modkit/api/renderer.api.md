@@ -327,7 +327,7 @@ export interface PromptSpots {
         character: Character;
         info: CharInfo;
         date: number;
-        time: TimeSlot;
+        time: TimeSlot_2;
     };
     'slot-posts': Record<string, never>;
     'slot-reach-outs': {
@@ -359,6 +359,8 @@ export interface PromptState {
     backFromBreak?: readonly string[];
     backgrounds: BackgroundSets;
     bg: string | null;
+    // (undocumented)
+    breakthrough?: BreakthroughState;
     calendar: SemesterCalendar;
     cgReady: Record<string, boolean>;
     charInfo: Record<string, CharInfo>;
@@ -372,6 +374,12 @@ export interface PromptState {
     date: number;
     droppedNotices?: readonly DroppedNotice[];
     emotions: Record<string, SpriteRef>;
+    // (undocumented)
+    exCharacterDynamics?: CharacterDynamics;
+    // (undocumented)
+    exPlotTwist?: string;
+    // (undocumented)
+    exReckoning?: ReckoningState;
     farewell?: {
         firstName: string;
         forAWhile: boolean;
@@ -408,10 +416,16 @@ export interface PromptState {
     slotRumor?: LoreRumor;
     springBreakAway?: readonly string[] | null;
     stats?: PlayerStats;
+    // (undocumented)
+    storyMemory?: StorySnapshot;
+    textEdits?: {
+        scene?: TextEdits<SceneTextId>;
+        global?: TextEdits<GlobalTextId>;
+    };
     textedWith?: readonly string[];
     textingSummaries?: Record<string, string[]>;
     // (undocumented)
-    time: TimeSlot;
+    time: TimeSlot_2;
     upcomingPlans?: Record<string, string[]>;
     visitJobId: string | null;
     weather?: readonly Weather[];
@@ -626,6 +640,9 @@ export interface SlotIntroInput {
     backOnCampus?: number;
     breakups: readonly IntroBreakup[];
     date: number;
+    // (undocumented)
+    exCharacterDynamics?: CharacterDynamics;
+    globalTextEdits?: TextEdits<GlobalTextId>;
     homecomingVisitor?: string;
     leavers: readonly IntroLeaver[];
     lessNsfwText: boolean;
@@ -641,7 +658,9 @@ export interface SlotIntroInput {
     secretBudget?: number;
     springBreakAway?: readonly string[] | null;
     stats?: PlayerStats;
-    time: TimeSlot;
+    // (undocumented)
+    storyMemory?: StorySnapshot;
+    time: TimeSlot_2;
     visitors: readonly IntroVisitor[];
     weather?: readonly Weather[];
 }
@@ -670,6 +689,7 @@ export function takeTurnFromReply(): boolean;
 
 // @public
 export interface TextingPromptState {
+    breakthrough?: BreakthroughState;
     calendar: SemesterCalendar;
     charCompanions?: NpcCompanions;
     charHaunt?: Haunt | null;
@@ -679,6 +699,9 @@ export interface TextingPromptState {
     classRosters: Readonly<Record<string, ClassRoster>>;
     // (undocumented)
     date: number;
+    // (undocumented)
+    exCharacterDynamics?: CharacterDynamics;
+    globalTextEdits?: TextEdits<GlobalTextId>;
     history: GameHistory;
     historyLimit?: number;
     homecomingVisitor?: string;
@@ -692,7 +715,9 @@ export interface TextingPromptState {
     springBreakAway?: readonly string[] | null;
     stats?: PlayerStats;
     // (undocumented)
-    time: TimeSlot;
+    storyMemory?: StorySnapshot;
+    // (undocumented)
+    time: TimeSlot_2;
     upcomingPlans?: Record<string, string[]>;
     weather?: readonly Weather[];
 }

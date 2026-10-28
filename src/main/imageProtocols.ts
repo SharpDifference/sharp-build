@@ -1,4 +1,4 @@
-import { net, protocol } from 'electron'
+import { net, protocol, type CustomScheme } from 'electron'
 import { pathToFileURL } from 'url'
 import { isCharFileRel } from '@shared/characterFiles'
 import { SAFE_CHAR_ID } from '@shared/characterRules'
@@ -20,11 +20,11 @@ const BG_SCHEME = 'bgimg'
 const BG_HOST = 'custom'
 
 /**
- * Must run **before** `app.whenReady()`, and only once, so both schemes are registered here;
- * `standard` makes host/path parse, while `supportFetchAPI`/`secure` keep renderer CSP from
- * blocking them.
+ * Must run **before** `app.whenReady()`, and only once, so both schemes are registered here,
+ * with any `extra` the caller has (the mods' `vxmod`); `standard` makes host/path parse, while
+ * `supportFetchAPI`/`secure` keep renderer CSP from blocking them.
  */
-export function registerImageSchemes(): void {
+export function registerImageSchemes(extra: readonly CustomScheme[] = []): void {
   protocol.registerSchemesAsPrivileged([
     ...[CHAR_SCHEME, BG_SCHEME].map((scheme) => ({
       scheme,
@@ -32,7 +32,8 @@ export function registerImageSchemes(): void {
     })),
     // A second `registerSchemesAsPrivileged` replaces the first, so `playimg://` is
     // privileged from here rather than registering itself.
-    PHOTO_SCHEME
+    PHOTO_SCHEME,
+    ...extra
   ])
 }
 

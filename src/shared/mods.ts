@@ -63,6 +63,11 @@ export interface ModDef {
   options?: readonly ModOption[]
   /** The groups its options name, by id. */
   optionGroups?: readonly ModOptionGroup[]
+  /**
+   * A library: no switch and no row on the Mods screen. It is on while a mod that is on requires
+   * it, and its exports are what the mods that require it import.
+   */
+  library?: boolean
 }
 
 export const PHOTO_FEATURE = 'photo-feature'
@@ -74,13 +79,49 @@ export const PHOTO_FEATURE = 'photo-feature'
  */
 const ENTRIES = import.meta.glob<ModDef>('./modEntries/*.ts', { eager: true, import: 'default' })
 
-/**
- * Every mod in this build, in the order the Mods screen lists them and the hooks are asked: by
- * id. None yet in `core`: this is the frame alone.
- */
-export const MODS: readonly ModDef[] = Object.keys(ENTRIES)
+/** The list itself, which {@link installMods} and {@link setInstalledMods} change in place so every holder of `MODS` sees the same list. */
+const list: ModDef[] = Object.keys(ENTRIES)
   .sort()
   .map((file) => ENTRIES[file])
+
+/**
+ * Every mod in this build, in the order the Mods screen lists them and the hooks are asked: by
+ * id. The in-repo mods from the start (none in `core`: that is the frame alone), and the
+ * installed ones once {@link installMods} has added them, which main does from its loader and the
+ * window from its first import, before any module reads the list.
+ */
+export const MODS: readonly ModDef[] = list
+
+/**
+ * Adds the installed mods' entries to {@link MODS}, for every status, so the Mods screen can show
+ * each; the list stays sorted by id. An id the build already carries is left as the build has it.
+ */
+export function installMods(defs: readonly ModDef[]): void {
+  for (const def of defs) {
+    if (!list.some((mod) => mod.id === def.id)) list.push(def)
+  }
+  sortById(list)
+}
+
+/**
+ * Makes the installed part of {@link MODS} these definitions, for a process that reads the installed
+ * mods again while it runs: one the list did not hold is added, one it held is replaced, and an
+ * installed one no longer given is dropped. The ids in `builtIn` are the build's own and stay as
+ * they are, whatever `defs` says of them; the list stays sorted by id. Switches saved for a mod the
+ * list no longer holds are not touched: `cleanSwitches` keeps them for its return.
+ */
+export function setInstalledMods(defs: readonly ModDef[], builtIn: readonly string[]): void {
+  const next = list.filter((mod) => builtIn.includes(mod.id))
+  for (const def of defs) {
+    if (!builtIn.includes(def.id) && !next.some((mod) => mod.id === def.id)) next.push(def)
+  }
+  list.splice(0, list.length, ...next)
+  sortById(list)
+}
+
+function sortById(mods: ModDef[]): void {
+  mods.sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0))
+}
 
 /**
  * What the player has set, as `data/mods.json` holds it. A mod or an option that is not in
