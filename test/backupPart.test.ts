@@ -4,6 +4,7 @@ import { join } from 'path'
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { installMods } from '@shared/mods'
 import type { SaveDraft } from '@shared/types'
+import type { BackupPart } from '../src/main/services/modParts'
 import { useGameStore } from '../src/renderer/stores/gameStore'
 import { record } from './fixtures'
 
@@ -26,7 +27,7 @@ const { createPlaythrough, listPlaythroughs } = await import('../src/main/servic
 const { createZip, extractZip } = await import('../src/main/services/archiveService')
 const { BACKUP_NAME } = await import('../src/shared/backup')
 const { defaultSettings } = await import('../src/shared/settingsRules')
-const { clearPregenCache, getDataPath, getModDataPath, getSavesPath, getSettingsPath } = await import(
+const { clearPregenCache, getDataPath, getModDataPath, getSavesPath, getSettingsPath, getSaveFilePath } = await import(
   '../src/main/paths'
 )
 
@@ -203,5 +204,71 @@ describe('a backup part', () => {
     expect(seen.legacy?.record).toEqual({ exMusic: { volume: 7 } })
     expect(seen.legacy?.dirs).toHaveLength(1)
     expect(seen.legacyFile).toBe('la la')
+  })
+
+  it('offers a legacy-only backup to an installed part even when there is no mods entry', async () => {
+    // This is the shape of an existing VE backup, before backupPart existed.
+    await createPlaythrough(record(), draft())
+    const archive = join(await tempDir('venus-university-legacy-only-zip-'), 'out.zip')
+    await exportBackup(archive)
+    const unpacked = await tempDir('venus-university-legacy-only-')
+    await extractZip(archive, unpacked)
+    const backup = JSON.parse(await readFile(join(unpacked, BACKUP_NAME), 'utf8'))
+    expect(backup.mods).toBeUndefined()
+    await writeFile(join(unpacked, BACKUP_NAME), JSON.stringify({ ...backup, exMusic: { volume: 7 } }))
+    await mkdir(join(unpacked, 'exMusic'), { recursive: true })
+    await writeFile(join(unpacked, 'exMusic', 'song.txt'), 'legacy song')
+    const legacyArchive = join(await tempDir('venus-university-legacy-only-final-'), 'legacy.zip')
+    await createZip(unpacked, legacyArchive)
+
+    await freshRoot()
+    const prepare = vi.fn<BackupPart['prepare']>(async (json, files, legacy) => {
+      expect(json).toBeUndefined()
+      expect(files.list).toEqual([])
+      expect(await readdir(files.dir)).toEqual([])
+      expect(legacy.record.exMusic).toEqual({ volume: 7 })
+      const folder = legacy.dirs.find((dir) => dir.endsWith('exMusic'))
+      if (!folder) throw new Error('Legacy music folder not provided')
+      const bytes = await readFile(join(folder, 'song.txt'))
+      return {
+        commit: async () => { await writeFile(join(modDataPath('tape-mod'), 'legacy-song.txt'), bytes) },
+        discard: async () => {}
+      }
+    })
+    backupPart('tape-mod', { export: async () => ({}), prepare })
+    await importBackup(legacyArchive)
+    expect(prepare).toHaveBeenCalledOnce()
+    expect(await readFile(join(getModDataPath('tape-mod'), 'legacy-song.txt'), 'utf8')).toBe('legacy song')
+  })
+
+  it.each([false, true])('prepares a newly installed part before restoring a backup with no mod data (fail: %s)', async fail => {
+    const original = await createPlaythrough(record(), draft())
+    const archive = join(await tempDir('venus-university-no-mod-data-'), 'out.zip')
+    await exportBackup(archive)
+    await freshRoot()
+    const current = await createPlaythrough(record(), draft())
+    const currentFile = getSaveFilePath(current.save.playthroughId, current.save.saveId)
+    const before = await readFile(currentFile, 'utf8')
+    const commit = vi.fn(async () => {})
+    const prepare = vi.fn<BackupPart['prepare']>(async (json, files, legacy) => {
+      expect(json).toBeUndefined()
+      expect(await readdir(files.dir)).toEqual([])
+      expect(files.list).toEqual([])
+      expect(legacy).toEqual({ record: {}, dirs: [] })
+      if (fail) throw new Error('Synthetic legacy parser failure')
+      return { commit, discard: async () => {} }
+    })
+    backupPart('tape-mod', { export: async () => ({}), prepare })
+    if (fail) {
+      await expect(importBackup(archive)).rejects.toMatchObject({ code: 'BACKUP_PART_FAILED' })
+      expect(await readFile(currentFile, 'utf8')).toBe(before)
+      expect((await listPlaythroughs()).map(entry => entry.playthroughId)).toEqual([current.save.playthroughId])
+      expect(commit).not.toHaveBeenCalled()
+    } else {
+      await importBackup(archive)
+      expect((await listPlaythroughs()).map(entry => entry.playthroughId)).toEqual([original.save.playthroughId])
+      expect(commit).toHaveBeenCalledOnce()
+    }
+    expect(prepare).toHaveBeenCalledOnce()
   })
 })

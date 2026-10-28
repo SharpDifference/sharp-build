@@ -657,7 +657,8 @@ async function discardRestores(restores: readonly PreparedRestore[]): Promise<vo
 
 /**
  * Each registered mod's share of the backup, read and prepared before anything is written, in
- * the record's order. A part that throws drops every restore prepared before it and stops the
+ * the record's order, followed by installed parts absent from that record so they can migrate
+ * legacy backups. A part that throws drops every restore prepared before it and stops the
  * restore with nothing of the player's written.
  */
 async function prepareModParts(
@@ -666,14 +667,16 @@ async function prepareModParts(
   legacy: BackupPartLegacy
 ): Promise<PreparedRestore[]> {
   const restores: PreparedRestore[] = []
-  for (const [modId, entry] of Object.entries(carried)) {
+  const ids = new Set([...Object.keys(carried), ...backupParts().keys()])
+  for (const modId of ids) {
     const part = backupParts().get(modId)
     if (!part) continue
+    const entry = carried[modId]
     const dir = join(scratch, MOD_PARTS_DIR, modId)
     try {
       await mkdir(dir, { recursive: true })
       const list = await relPathsUnder(dir)
-      restores.push({ modId, restore: await part.prepare(entry.json, { dir, list }, legacy) })
+      restores.push({ modId, restore: await part.prepare(entry?.json, { dir, list }, legacy) })
     } catch (err) {
       await discardRestores(restores)
       throw appError(
