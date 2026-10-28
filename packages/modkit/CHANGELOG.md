@@ -1,5 +1,12 @@
 # @vx/modkit
 
+## 0.4.0
+
+Expose the native stat-rank readers `MAX_TIER` and `pointsForTier`, with the
+`StatTier` type, through `@vx/modkit/shared`. Mods can express a maximum-rank
+requirement using the game's own threshold rather than copying its point value.
+No stat thresholds, gains, floors, decay or romance rules change.
+
 ## 0.3.0
 
 The loader. Installed mods are read from `data/mods/<id>/<version>/` and from the developer
