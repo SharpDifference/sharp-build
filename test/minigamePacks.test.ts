@@ -22,8 +22,8 @@ function filesIn(folder: string, ending: string): string[] {
     .map((name) => join(ROOT, folder, name))
 }
 
-/** A pack's own rules, and its own stylesheet. */
-const OWN = /^(@shared\/minigameRules\/|\.\/[A-Za-z]+$|\.\.\/\.\.\/vu_styles\/[A-Za-z]+\.css$)/
+/** A pack's own rules, by alias or by path, and its own stylesheet. */
+const OWN = /^(@shared\/minigameRules\/|\.\.\/\.\.\/\.\.\/shared\/minigameRules\/|\.\/[A-Za-z]+$|\.\.\/\.\.\/vu_styles\/[A-Za-z]+\.css$)/
 
 describe('a game pack reaches for nothing outside the kits', () => {
   it('in what it draws', () => {

@@ -2,7 +2,7 @@ import { useState, type JSX } from 'react'
 import { Darts } from './Darts'
 import { DartsExtra } from './DartsExtra'
 import { type GamePlay } from '../kit'
-import { extraModeUnavailable, type ExtraDartsMode } from '@shared/minigameRules/darts'
+import { extraModeUnavailable, type ExtraDartsMode } from '../../../shared/minigameRules/darts'
 import '../../vu_styles/Darts.css'
 
 const EXTRAS: Record<number, ExtraDartsMode> = { 3: 'girls-team', 4: 'leader', 5: 'precision', 6: 'exact' }

@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type JSX } from 'react'
 import { AnimatePresence, motion } from 'motion/react'
 import { gestures, lift, press, useAway, useReducedMotion, useEffectsGain, type GamePlay, type Opponent, type TableExpression } from '../kit'
-import { aimEllipse, movingDot, scoreHit, traitsFor, newExtraMatch, extraSummary, extraThrow, planExtraVisit, applyExtraPlan, extraSituation, extraTargetLabel, extraDescription, EXTRA_MODE_TITLES, type Ellipse, type Flight, type Impact, type Point, type ExtraDartsMode, type ExtraDartsMatch, type ExtraPlanItem } from '@shared/minigameRules/darts'
+import { aimEllipse, movingDot, scoreHit, traitsFor, newExtraMatch, extraSummary, extraThrow, planExtraVisit, applyExtraPlan, extraSituation, extraTargetLabel, extraDescription, EXTRA_MODE_TITLES, type Ellipse, type Flight, type Impact, type Point, type ExtraDartsMode, type ExtraDartsMatch, type ExtraPlanItem } from '../../../shared/minigameRules/darts'
 import { Board } from './dartsBoard'
 import { DartsAudio } from './dartsAudio'
 import { DartsControlGuide, DartsSectorLabel, dartsTurnLabel } from './DartsHelp'

@@ -75,7 +75,9 @@ export const MOD_FILES: Record<string, ModSet> = {
     globs: [
       'src/renderer/components/Emoji*',
       'src/renderer/components/emojiData.json',
-      'src/renderer/stores/emojiPrefs.ts'
+      'src/renderer/stores/emojiPrefs.ts',
+      'src/renderer/vu_styles/EmojiPicker.css',
+      'src/renderer/vu_styles/EmojiText.css'
     ]
   },
   'godlike-standards': { globs: ['src/shared/romanceRequirements.ts'] },
@@ -136,6 +138,7 @@ export const MOD_FILES: Record<string, ModSet> = {
       'src/renderer/minigames/games/darts*',
       'src/shared/minigameEntries/darts.ts',
       'src/shared/minigameRules/darts.ts',
+      'src/renderer/vu_styles/Darts.css',
       'src/assets/darts/**'
     ],
     requires: ['mini-games']
