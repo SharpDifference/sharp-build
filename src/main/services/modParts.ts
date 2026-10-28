@@ -45,6 +45,9 @@ export interface BackupPart {
   /**
    * Reads the mod's share out of an arriving backup before anything is written, and answers how
    * to restore it. A throw stops the whole restore with nothing written.
+   * Called even when the backup has no entry for this mod, so legacy keys/folders can be read.
+   * In that case json is undefined and files.dir still exists. With no data to restore, return
+   * a no-op commit/discard pair.
    */
   prepare(
     json: unknown,
