@@ -270,6 +270,33 @@ The tests in `test/romanceRequirements.test.ts` use a synthetic registration, no
 mod. They check order-independent composition, disabled/invalid responses, prompts, direct
 awards, roll eligibility, group acts, projections, saved milestones and the lover exception.
 
+### Native stat-rank readers
+
+`MAX_TIER`, `pointsForTier` and the `StatTier` type are available from
+`@vx/modkit/shared`. They are the game's own rank ceiling and threshold lookup, on either
+side of the process boundary. For a requirement tied to the highest native rank, call
+`pointsForTier(MAX_TIER)` inside the registered rule. Do not copy the current point value
+into the mod. Pass a valid `StatTier`; this typed lookup does not sanitize arbitrary saved
+numbers or define a mod's extra negative starting ranks.
+
+A manifest using these runtime exports declares `shared:MAX_TIER` and
+`shared:pointsForTier` alongside `shared:registerRomanceRequirement`. The type has no
+runtime declaration. An older core without either reader marks that mod as needing an
+update through the existing compatibility check.
+
+```ts
+import { MAX_TIER, pointsForTier, registerRomanceRequirement } from '@vx/modkit/shared'
+
+registerRomanceRequirement(MY_MOD, character => {
+  if (!appliesTo(character)) return null
+  const minimum = pointsForTier(MAX_TIER)
+  return { brain: minimum, body: minimum, heart: minimum }
+})
+```
+
+These readers do not award points or change stat progression, floors, semester decay, or
+the romance requirement registry's existing rules.
+
 ## Screens and the files in the root
 
 A mod's screens follow `UI_STYLE_GUIDE.md`, but nobody edits it, nor any other file in the root

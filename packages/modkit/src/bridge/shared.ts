@@ -21,7 +21,8 @@ export type {
   TimeSlot
 } from '@shared/types'
 export type { GameOverReason } from '@shared/gameOver'
-export type { LedgerStats, PlayerStats, StatContext, StatKey, StatusText } from '@shared/playerStats'
+export type { LedgerStats, PlayerStats, StatContext, StatKey, StatTier, StatusText } from '@shared/playerStats'
+export { MAX_TIER, pointsForTier } from '@shared/playerStats'
 export type { PostComment } from '@shared/postComments'
 export type { SlotActivity, SlotActivityOffer } from '@shared/slotActivity'
 export type { ModDef, ModOption, ModOptionGroup, ModScope, ModSwitches } from '@shared/mods'
