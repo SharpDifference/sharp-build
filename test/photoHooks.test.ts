@@ -261,7 +261,7 @@ const HOOKS: readonly {
     file: 'src/renderer/views/EditCharacterModal.tsx',
     needs: [
       'editorFields()',
-      'field.write('
+      'editorWrites('
     ],
     why: 'her body cannot be read or written by hand'
   }
