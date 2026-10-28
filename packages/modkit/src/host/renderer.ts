@@ -14,6 +14,7 @@ export {
   contactTabs,
   dmHistoryNotes,
   editorFields,
+  editorWrites,
   emojiTool,
   endingChoice,
   exercisedStats,

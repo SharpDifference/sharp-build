@@ -388,8 +388,9 @@ A restore replaces all of `data/saves`, so a mod's per-playthrough folders under
 backup holding a share for a mod that has no part here keeps it as it came, under
 `data/mod-data/<id>/.backup/<ms>/` with its `backup.json` entry beside it, for the mod to claim
 once it is installed. `legacy` is what an older backup holds that the game does not read:
-`record`, the record's keys core does not own, and `dirs`, its top-level folders core does not
-write, as absolute paths in the unpacked backup.
+`record`, the record's keys core does not own, `dirs`, its top-level folders core does not
+write, as absolute paths in the unpacked backup, and `archive`, the path of the backup file as it
+was given, for a share an older build kept beside it.
 
 **Characters.** `characterTransferPart(id, { export, validate, adopt, duplicate })` carries the
 mod's data with a character exported, imported or duplicated.
@@ -702,7 +703,8 @@ its value off her as the editor opens; `Field` is drawn under Generation setting
 appearance tags, handed `value`, `onChange`, `charId` and her `baseAppearance` as the form holds
 it; `write` turns the value into what saving puts on her. Write only your own fields: the game's
 own are written over whatever a mod returns, so a mod cannot change her name or her traits by
-mistake. Save and the unsaved-changes check see it as they see the game's fields. A mod that is off draws no
+mistake. A `write` may return `ex`: its slices go in beside hers and the other mods', never in
+place of them. Save and the unsaved-changes check see it as they see the game's fields. A mod that is off draws no
 field and writes nothing, so what it saved on her stays.
 
 ### Not covered yet

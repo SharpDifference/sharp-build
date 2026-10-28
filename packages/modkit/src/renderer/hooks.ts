@@ -1017,7 +1017,8 @@ export interface EditorFieldProps {
 /**
  * A field of a mod's own in the character editor, under Generation settings. `read` takes its
  * value off her as the editor opens, `Field` edits it with the rest of the form, and `write` is what
- * saving puts back on her: its own fields only, since the game's own are written over it. Save
+ * saving puts back on her: its own fields only, since the game's own are written over it; an `ex`
+ * it returns adds its slices beside hers and the other mods'. Save
  * and the unsaved-changes check see it as they see the game's fields. A mod that is off draws no
  * field and writes nothing.
  */
@@ -1030,6 +1031,19 @@ export interface EditorField {
 /** The fields of the mods that are on in the character editor, in list order, under each mod's id. */
 export function editorFields(): { modId: string; field: EditorField }[] {
   return activeEntries().flatMap(({ modId, hooks }) => (hooks.editorField ? [{ modId, field: hooks.editorField }] : []))
+}
+
+/**
+ * What the mods' fields put on her as the editor saves: each active field's `write` of its own
+ * value, a later one over an earlier, except `ex`, where every write's slices go in beside hers
+ * and the other mods', since no field may replace the bag.
+ */
+export function editorWrites(character: Character, valueOf: (modId: string) => unknown): Partial<Character> {
+  const writes = editorFields().map(({ modId, field }) => field.write(valueOf(modId)))
+  const merged: Partial<Character> = Object.assign({}, ...writes)
+  const carried = writes.filter((write) => write.ex)
+  if (carried.length > 0) merged.ex = Object.assign({}, character.ex, ...carried.map((write) => write.ex))
+  return merged
 }
 
 /** The lines Save Game shows about the scene being saved, one from each mod that has one. */

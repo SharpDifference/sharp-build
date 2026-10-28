@@ -135,6 +135,24 @@ describe('fields in the character editor', () => {
 
     expect(hooks.editorFields().map(({ modId }: { modId: string }) => modId)).toEqual(['body', 'notes'])
   })
+
+  it("put each field's write on her, and every mod's slice in her ex beside the others'", async () => {
+    const hooks = await fresh({}, ['body', 'notes'])
+    const slice = (data: unknown) => ({ v: '1.0.0', data })
+    hooks.registerHooks('body', { editorField: { ...field('body'), write: (value: unknown) => ({ ex: { body: slice(value) } }) } })
+    hooks.registerHooks('notes', {
+      editorField: { ...field('notes'), write: (value: unknown) => ({ backstory: String(value), ex: { notes: slice(value) } }) }
+    })
+    const her = { ex: { body: slice('old'), other: slice('kept') } } as unknown as Parameters<typeof hooks.editorWrites>[0]
+    expect(hooks.editorWrites(her, (modId: string) => `${modId}!`)).toEqual({
+      backstory: 'notes!',
+      ex: { body: slice('body!'), other: slice('kept'), notes: slice('notes!') }
+    })
+    // Where no field carries `ex`, hers is left alone, not copied.
+    const plain = await fresh({}, ['plain'])
+    plain.registerHooks('plain', { editorField: field('plain') })
+    expect(plain.editorWrites(her, () => null)).not.toHaveProperty('ex')
+  })
 })
 
 describe('updates tabs and option previews', () => {
