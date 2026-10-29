@@ -12,8 +12,9 @@ remain separate base-game features.
 Its renderer entry contributes a `gameMenuEntry` and the `plot-twist` panel in `gameModals`.
 The menu adapter calls the kit's `openPanel`, preserves the native safe-save gate, and lazily
 loads the existing editor. Closing returns to the game. GameView and GameMenuModal no longer
-import or name the Plot Twist panel. The saved text, write transaction and prompt behavior are
-unchanged; this UI migration alone does not make the mod a standalone package.
+import or name the Plot Twist panel. The editor now uses the public kit save field,
+game-lifetime editor state and safe-point APIs.
+This is still an in-repo mod: the prompt snapshot connection and shared UI helpers remain.
 
 ## Player behavior
 
@@ -36,10 +37,9 @@ facts; this is narrative guidance, not guaranteed obedience or a direct mechanic
 | --- | --- |
 | `src/shared/plotTwists.ts` | Registry definition, limit, validation, legacy reading, bounded active text, optional save type |
 | `src/shared/mods.ts` | Registers the independent switch; no `requires` |
-| `src/shared/saveRules.ts` | Keeps `exPlotTwist` optional for older saves |
-| `src/renderer/stores/gameStore.ts` | Initializes, loads, resets, and serializes `exPlotTwist` |
-| `src/renderer/stores/loop/saves.ts` | `writePlotTwist`, native save gating, serialization, failure handling and run/load fencing |
-| `src/renderer/stores/loop/promptState.ts` | Reads the switch when building request state |
+| `src/renderer/stores/plotTwist.ts` | Registers `saveField`, legacy normalization, semester carry and a game-lifetime editor token; validates edits and delegates writes to the kit |
+| `src/shared/plotTwistCarry.ts` | Accepts old, already-prepared semester continuations containing `mods.exPlotTwist` |
+| `src/renderer/stores/loop/promptState.ts` | Remaining direct connection: captures the switch and the generic live slice when building request state |
 | `src/renderer/prompts/plotTwist.ts` | Pure story-direction prompt block |
 | `src/renderer/prompts/scenePrompt.ts` | Cast opening, continuation and closing; solo-scene hook |
 | `src/renderer/modEntries/plot-twist.ts` | Registers the prompt, lazy menu entry and panel provider |
@@ -49,33 +49,46 @@ facts; this is narrative guidance, not guaranteed obedience or a direct mechanic
 | `src/renderer/views/PlotTwistModal.tsx` | Draft editing, counter, apply/clear, pending/error feedback |
 | `src/renderer/vu_styles/PlotTwist.css` | Native day/night colors, text-well scrolling and fixed actions |
 | `test/plotTwist.test.ts` | Legacy data, save checkpoints, write ordering, failures, and stale completions |
+| `test/plotTwistCarry.test.ts`, `test/maestroNativeSemesters.test.ts` | Legacy continuations, disabled retention, all eight native semesters and independent sibling branches |
 | `test/plotTwistPrompt.test.ts` | On/off routing into actual scene builders and immutable captured requests |
 | `test/maestroMenuHooks.test.ts` | Menu/panel registration, switches, safe-save gating, theme and return destination |
 
 ## Save compatibility and transaction
 
-The old compiled mod already used `exPlotTwist`. The current implementation retains that field.
-Base-game save schema 13 and its schema-12 upgrade are handled by the native save service;
-Plot Twist adds no separate schema migration.
-Missing/non-string legacy values become an empty string; valid strings load verbatim. An
-oversized legacy string survives round trips, but only the first 10,000 characters of its
-trimmed copy go to scene prompts. New edits over the limit are rejected, never silently cut.
-Native save services stamp and serialize the optional field with the rest of the save, on
-desktop and in the browser. No separate database, sidecar, IPC channel or migration is added.
+Version 1.1.0 stores its text in `save.ex['plot-twist'] = { v, data }`. Its renderer entry
+registers the field at boot even while the mod is off. On load, the field's normalizer reads
+`exPlotTwist` from old saves when no current slice value exists. The next save writes the
+versioned slice and omits the consumed legacy key. A current empty string wins over old text,
+so clearing a twist cannot revive it on a later load. Other mods' slices stay untouched.
 
-The write action validates first, takes the existing manual-save lock, and joins the loop's
-write queue. At its turn it rechecks the mod switch, safe-save gate, playthrough ID, load
-counter, and run token. It derives a native `manualSaveDraft`; only a true scene-less landing
-may fall back to `toGameSave()` with `scene: null`. The new twist overlays that draft, then the
-native autosave bridge writes it. Only a successful response in the same loaded run commits
-the live value. A queued stale operation performs no write. A write already sent may finish
-in the old playthrough, but its result never changes the newly loaded game.
+Missing/non-string values become empty. Legacy strings load verbatim, including oversized
+ones; only the trimmed prompt copy is capped at 10,000 characters. Newly submitted oversized
+edits are rejected. Loading migrates in memory; it does not rewrite the source file until an
+ordinary save occurs. No sidecar, database, custom IPC or save-schema change is needed.
 
-During status playback, the native checkpoint can be `loopState.statusBase`, captured before
-status rewards were applied. Updating both its twist and the live twist after success avoids
-losing the edit at the next save; its money, ledger and playback position remain untouched.
-Disk/IndexedDB failure keeps the previous live value and the UI draft for retry. The modal
-cannot be dismissed during its own write, so the player cannot advance underneath it.
+The mod's write wrapper validates text, verifies the editor's game-lifetime token, and calls
+`saveField.write(next, { expect: previous })`. The kit owns safe-point checks, the save queue,
+the native resumable checkpoint, the manual-write lock, switch checks and run/load fencing.
+It commits the live slice only after a successful disk/IndexedDB write, and updates a frozen
+status checkpoint without copying already-awarded money into it. Failure leaves the live
+value and draft available for retry. The editor cannot close during its own pending write.
+
+The editor token is created on mount and invalidated on unmount or any game load/reset.
+This separately prevents an old editor writing into a newly loaded save with *identical*
+text; value equality alone cannot detect that. Expected-value checks also reject a superseded
+edit in the same load. An already-dispatched write can finish for its old playthrough, but
+cannot update the newly loaded game or report success to its old editor.
+
+The field's `carry` returns the text unchanged for a new semester, independently of its switch.
+The legacy carry adapter remains only to admit `carry.mods.exPlotTwist` from a continuation
+prepared by an older build; its opening save then goes through the same normalizer. New
+continuations carry the versioned slice under `carry.ex`. Fresh games start empty. Removing
+the mod keeps its stored slice; reinstalling lets the field read it again.
+
+This is forward migration, not a promise that an old build can read the new slice. Preserve
+an original save when testing a downgrade. The snapshot capture in `loop/promptState.ts`
+remains until core offers a generic prompt-snapshot hook; reading the live field from inside
+a prompt formatter instead would change the meaning of an already-captured request.
 
 ## Prompt scope and cost
 

@@ -83,9 +83,13 @@ is not permission to erase saved optional fields.
 ### Plot Twist
 
 [Guide](mods/plot-twist.md), [rules](../src/shared/plotTwists.ts),
-[prompt](../src/renderer/prompts/plotTwist.ts), [carry](../src/shared/plotTwistCarry.ts).
+[prompt](../src/renderer/prompts/plotTwist.ts), [save field/editor state](../src/renderer/stores/plotTwist.ts),
+[legacy carry adapter](../src/shared/plotTwistCarry.ts).
 
-`exPlotTwist` is one direction per save, editable up to 10,000 JavaScript string characters.
+`save.ex['plot-twist'].data` is one direction per save, editable up to 10,000 JavaScript string characters.
+The registered field reads old `exPlotTwist` saves; an explicit empty slice wins over legacy text.
+Its `carry` preserves the direction when switched off. The editor uses public `useSafePoint`,
+`saveField.write` and a game-lifetime `modState` token, including when two saves have identical text.
 Applying/clearing is a queued autosave transaction. Scene builders append a bounded copy to
 future cast/solo requests. It is guidance, not a mechanical event, and is not directly added
 to text messages, classifiers or ledgers. Disabling it preserves the text; already captured

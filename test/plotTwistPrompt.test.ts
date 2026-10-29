@@ -1,4 +1,3 @@
-import '../src/renderer/modEntries/plot-twist'
 import { afterEach, beforeEach, expect, it } from 'vitest'
 import { PLOT_TWIST_MOD } from '@shared/plotTwists'
 import { useGameStore } from '../src/renderer/stores/gameStore'
@@ -7,12 +6,14 @@ import { buildScenePrompt, buildContinuationPrompt, buildClosingPrompt, buildSol
 import { character, restoreApi, stubApi } from './fixtures'
 
 stubApi({ jobs: { onProgress: () => () => {} } })
+await import('../src/renderer/modEntries/plot-twist')
+const { plotTwist } = await import('../src/renderer/stores/plotTwist')
 const { promptState } = await import('../src/renderer/stores/loop/promptState')
 
 const direction = 'A comet will pass the campus tonight.'
 beforeEach(() => {
   useGameStore.getState().reset()
-  useGameStore.setState({ exPlotTwist: direction })
+  plotTwist.set(direction)
   useModsStore.setState({ switches: { on: {}, options: {} } })
 })
 afterEach(restoreApi)
@@ -38,14 +39,22 @@ it('routes the saved direction once to each scene request, leaving schema and sy
     expect(enabled[i].system).toBe(disabled[i].system)
     expect(enabled[i].schema).toEqual(disabled[i].schema)
   }
-  expect(useGameStore.getState().toGameSave().exPlotTwist).toBe(direction)
+  expect(useGameStore.getState().toGameSave().ex?.[PLOT_TWIST_MOD]?.data).toBe(direction)
   useModsStore.setState({ switches: { on: {}, options: {} } })
   expect(promptState().exPlotTwist).toBe(direction)
 })
 
 it('does not mutate a captured request when the player later edits the twist', () => {
   const before = requests()[0]
-  useGameStore.setState({ exPlotTwist: 'The library is closing.' })
+  plotTwist.set('The library is closing.')
   expect(before.user).toContain(direction)
   expect(requests()[0].user).not.toContain(direction)
+})
+
+it('formats a captured state from its own twist, rather than the subsequently edited live field', () => {
+  const state = promptState()
+  plotTwist.set('The library is closing.')
+  const request = buildScenePrompt([character()], 'Talk.', state, '', '')
+  expect(request.user).toContain(direction)
+  expect(request.user).not.toContain('The library is closing.')
 })

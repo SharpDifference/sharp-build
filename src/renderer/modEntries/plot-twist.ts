@@ -1,10 +1,11 @@
 import { PLOT_TWIST_MOD } from '../../shared/plotTwists'
 import { plotTwistBlock } from '../prompts/plotTwist'
-import { registerHooks } from '../mods/hooks'
+import { registerHooks } from '@vx/modkit/renderer'
+import '../stores/plotTwist'
 import { createElement, lazy, Suspense } from 'react'
 import type { GameModalProps, ScreenSlotProps } from '@vx/modkit/renderer'
 
-// Keep the prompt-only registration independent of screen stores and bridge listeners.
+// The save field registers at boot; the editor UI still loads only when opened.
 const screens = () => import('../views/PlotTwistEntry')
 const Menu = lazy(() => screens().then(module => ({ default: module.PlotTwistMenuEntry })))
 const Panel = lazy(() => screens().then(module => ({ default: module.PlotTwistPanel })))

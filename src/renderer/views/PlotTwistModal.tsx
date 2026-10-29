@@ -1,15 +1,11 @@
-import { useRef, useState, type JSX } from 'react'
+import { useEffect, useRef, useState, type JSX } from 'react'
 import { createPortal } from 'react-dom'
 import { motion } from 'motion/react'
 import { PLOT_TWIST_LIMIT, PLOT_TWIST_MOD } from '../../shared/plotTwists'
 import { TextField } from '../components/TextField'
 import { TitleTab } from '../components/TitleTab'
-import { useModalShell } from '@vx/modkit/renderer'
-import { useGameStore } from '../stores/gameStore'
-import { useBunnyboardStore } from '../stores/bunnyboardStore'
-import { useModOn } from '@vx/modkit/renderer'
-import { manualSaveOffer, writePlotTwist } from '../stores/loop/saves'
-import type { ScreenTheme } from '@vx/modkit/renderer'
+import { useModalShell, useModOn, useSafePoint, type ScreenTheme } from '@vx/modkit/renderer'
+import { beginPlotTwistEdit, plotTwist, plotTwistEditor, writePlotTwist } from '../stores/plotTwist'
 import { gestures, lift, panelUnderTab, press, quietLift, quietPress, veilIn } from './motion'
 import '../vu_styles/PlotTwist.css'
 
@@ -18,36 +14,46 @@ export function PlotTwistModal({ theme, onClose }: {
   theme: ScreenTheme
   onClose: () => void
 }): JSX.Element | null {
-  const game = useGameStore()
-  useBunnyboardStore((s) => s.armedHangout)
+  const saved = plotTwist.use()
+  const currentOwner = plotTwistEditor.use()
+  const saveOffer = useSafePoint()
   const enabled = useModOn(PLOT_TWIST_MOD)
-  const owner = useRef({ playthroughId: game.playthroughId, loads: game.loads })
-  const [text, setText] = useState(game.exPlotTwist)
+  const owner = useRef<object | null>(null)
+  const previous = useRef(saved)
+  const [text, setText] = useState(saved)
+  useEffect(() => {
+    const token = beginPlotTwistEdit()
+    owner.current = token
+    previous.current = plotTwist.read()
+    setText(previous.current)
+    return () => { if (plotTwistEditor.get() === token) plotTwistEditor.set(null) }
+  }, [])
   const [pending, setPending] = useState(false)
   const writing = useRef(false)
   const [status, setStatus] = useState('')
   const [error, setError] = useState('')
-  const sameGame = owner.current.playthroughId === game.playthroughId && owner.current.loads === game.loads
-  const available = enabled && sameGame && manualSaveOffer() === 'open' && !pending
+  const sameGame = owner.current !== null && owner.current === currentOwner
+  const available = enabled && sameGame && saveOffer === 'open' && !pending
   const invalid = text.length > PLOT_TWIST_LIMIT
-  const changed = text.trim() !== game.exPlotTwist
+  const changed = text.trim() !== saved
   const applyDead = !available || invalid || !changed
-  const clearDead = !available || !game.exPlotTwist
+  const clearDead = !available || !saved
   const close = (): void => { if (!writing.current) onClose() }
   const { host, overlayProps } = useModalShell(close)
 
   async function apply(value: string): Promise<void> {
-    if (writing.current || !available) return
+    if (writing.current || !available || !owner.current) return
     writing.current = true
     setPending(true)
     setError('')
     setStatus('')
     try {
-      const result = await writePlotTwist(value)
+      const result = await writePlotTwist(value, owner.current, previous.current)
       if (!result.ok) {
         setError(result.error.message)
         return
       }
+      previous.current = value.trim()
       setText(value.trim())
       setStatus(value.trim() ? 'Saved. Your next scene request will include this direction.' : 'Cleared. Future scene requests will no longer include a twist.')
     } finally {

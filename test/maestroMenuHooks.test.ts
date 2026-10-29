@@ -9,10 +9,10 @@ import { gameModal, openPanel, setPanelOpener } from '../src/renderer/mods/hooks
 import { ModSlot } from '../src/renderer/mods/ModSlot'
 import { useModsStore } from '../src/renderer/stores/modsStore'
 import { restoreApi, stubApi } from './fixtures'
-import '../src/renderer/modEntries/plot-twist'
 import '../src/renderer/modEntries/story-memory'
 
 stubApi({ jobs: { onProgress: () => () => {} } })
+await import('../src/renderer/modEntries/plot-twist')
 const { PlotTwistMenuEntry, PlotTwistPanel } = await import('../src/renderer/views/PlotTwistEntry')
 const { StoryMemoryMenuEntry, StoryMemoryPanel } = await import('../src/renderer/views/StoryMemoryEntry')
 const Item = ({ dead, note, onClick, children }: GameMenuItemProps) =>

@@ -7,7 +7,6 @@ import type { CharacterDynamics } from '@shared/characterDynamics'
 import { assertEchoEdit, normalizeEcho, type EchoState } from '@shared/echo'
 import { normalizeStoryMemory, type StoryMemory } from '@shared/storyMemory'
 import { appError, toAppError } from '@shared/errors'
-import { PLOT_TWIST_MOD, validatePlotTwist } from '@shared/plotTwists'
 import { modIsOn } from '../modsStore'
 import { normalizeWhisper, VENUS_WHISPER_MOD, type VenusWhisper } from '@shared/venusWhisper'
 import { reconcileTalentBreakthrough } from '@shared/talentAbilities'
@@ -476,71 +475,6 @@ export async function writeManualSave(slot: number): Promise<boolean> {
     setManualWriting(false)
   }
   return saved
-}
-
-/**
- * Save a twist and a native, resumable checkpoint in the same write lane as the loop.
- * The live value changes only after a successful disk/IndexedDB write. In particular, a
- * failed write must not leak an unsaved twist into a later scene request or autosave.
- */
-export async function writePlotTwist(value: string): Promise<Result<null>> {
-  const validated = validatePlotTwist(value)
-  if (!validated.ok) return validated
-  const unavailable = (): Result<null> => ({
-    ok: false,
-    error: appError('PLOT_TWIST_WAIT', 'Wait for the scene to settle and enable Plot Twist before applying it.')
-  })
-  if (!modIsOn(PLOT_TWIST_MOD) || manualSaveOffer() !== 'open') return unavailable()
-  const game = useGameStore.getState()
-  const playthroughId = game.playthroughId
-  const run = currentRun()
-  const sameGame = (): boolean => {
-    const now = useGameStore.getState()
-    return !runStale(run) && now.playthroughId === playthroughId && now.loads === game.loads
-  }
-  let outcome: Result<null> = {
-    ok: false,
-    error: appError('PLOT_TWIST_STALE', 'The loaded game changed. Reopen Plot Twist before trying again.')
-  }
-  setManualWriting(true)
-  try {
-    await queueWrite(async () => {
-      if (!sameGame()) return
-      if (!modIsOn(PLOT_TWIST_MOD) || saveOffer(false) !== 'open') {
-        outcome = unavailable()
-        return
-      }
-      const now = useGameStore.getState()
-      // Use the ending/status checkpoint when there is one. Only a true landing may
-      // fall back to a scene-less save; never manufacture a mid-scene checkpoint.
-      const base = manualSaveDraft() ?? (!sceneActiveOf(now) ? { ...now.toGameSave(), scene: null } : null)
-      if (!playthroughId || !base) {
-        outcome = unavailable()
-        return
-      }
-      const result = await window.api.saves.autosave(playthroughId, {
-        ...base,
-        exPlotTwist: validated.data
-      })
-      if (!sameGame()) return
-      if (!result.ok) {
-        outcome = result
-        return
-      }
-      // Status playback can save from a frozen pre-status draft. Carry this edit there
-      // too, without advancing or replaying any of its stats, ledger, or pending lines.
-      if (loopState.statusBase) {
-        loopState.statusBase = { ...loopState.statusBase, exPlotTwist: validated.data }
-      }
-      useGameStore.setState({ exPlotTwist: validated.data })
-      outcome = { ok: true, data: null }
-    })
-  } catch (error) {
-    if (sameGame()) outcome = { ok: false, error: toAppError(error, 'SAVE_WRITE_FAILED') }
-  } finally {
-    setManualWriting(false)
-  }
-  return outcome
 }
 
 /** Newsletter edits join the native save lane, preserving the current scene checkpoint. */
