@@ -21,6 +21,15 @@ export interface CharacterBody {
   pubicHair?: string
 }
 
+/** Her stored body, with the old top-level field as a fallback. */
+export function bodyOf(character: Character): CharacterBody | undefined {
+  // Shared and main read the slice directly; recordField belongs to the window's kit.
+  const stored = character.ex?.['photo-feature']?.data
+  return stored === undefined
+    ? (character as Character & { body?: CharacterBody }).body
+    : (stored as CharacterBody)
+}
+
 /** Every field, in the order they are settled: each is checked against the ones before it. */
 export const BODY_FIELDS = ['build', 'breasts', 'hipsThighs', 'buttocks', 'pubicHair'] as const
 
@@ -253,9 +262,16 @@ export function bodyTagLabel(tag: string): string {
  * appearance under its real tag.
  */
 export function gateBody(character: Character, on: boolean): Character {
-  const { body, ...rest } = character
-  if (!on) return rest
-  return { ...rest, body: cleanBody(body) ?? {} }
+  const { body: _legacy, ...rest } = character as Character & { body?: CharacterBody }
+  const ex = { ...character.ex }
+  // This is only the character a prompt sees; the stored record is never changed.
+  if (on) {
+    ex['photo-feature'] = {
+      v: character.ex?.['photo-feature']?.v ?? '0.0.0',
+      data: cleanBody(bodyOf(character)) ?? {}
+    }
+  } else delete ex['photo-feature']
+  return { ...rest, ex }
 }
 
 /** Which picture a body is being written into, and so which of her fields it can show. */
@@ -271,7 +287,7 @@ export type BodyScope = 'sprite' | 'nude' | 'cg' | 'photo'
  * A photo adds its regions itself, by what is in shot (`photoBody`).
  */
 export function bodyAppearance(character: Character, scope: BodyScope): string[] {
-  const body = character.body
+  const body = bodyOf(character)
   if (!body) return [...character.baseAppearance]
   const kept = character.baseAppearance.filter((tag) => !ANY_BREAST_TAG.test(tag))
   const breasts = body.breasts ?? appearanceBreasts(character.baseAppearance)
@@ -291,7 +307,7 @@ const PETITE_NEGATIVE_TAGS = ['loli', 'child', 'aged_down']
 
 /** Her own extra negatives: none, unless her frame is `petite`. */
 export function bodyNegative(character: Character): string[] {
-  return character.body?.build === 'petite' ? [...PETITE_NEGATIVE_TAGS] : []
+  return bodyOf(character)?.build === 'petite' ? [...PETITE_NEGATIVE_TAGS] : []
 }
 
 /** Every tag that is hers only while the switch is on: every pool but her chest's. */

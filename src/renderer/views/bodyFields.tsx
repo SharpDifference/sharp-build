@@ -4,6 +4,7 @@ import {
   allowedBeside,
   appearanceBreasts,
   bodyTagLabel,
+  bodyOf,
   BODY_FIELDS,
   BODY_POOLS,
   cleanBody,
@@ -12,7 +13,7 @@ import {
   type CharacterBody
 } from '../../shared/characterBody'
 import { usePhotoSwitches } from '../stores/photoSwitchHooks'
-import type { EditorField } from '@vx/modkit/renderer'
+import { recordField, type EditorField } from '@vx/modkit/renderer'
 import { gestures, quietLift, quietPress } from './motion'
 import '../vu_styles/BodyFields.css'
 
@@ -39,6 +40,21 @@ function noneLabel(field: BodyField, baseAppearance: readonly string[]): string 
     return `As her appearance says (${bodyTagLabel(appearanceBreasts(baseAppearance))})`
   if (field === 'pubicHair') return 'Clean'
   return 'Average'
+}
+
+/** Her body on a character, moved from the old key when the character is written. */
+export const PHOTO_BODY_FIELD = recordField<CharacterBody>('photo-feature', {
+  empty: {},
+  legacy: ['body'],
+  normalize: (stored, legacy) => cleanBody(stored === undefined ? legacy.body : stored) ?? {}
+})
+
+/** A character write that keeps her body in Photo's slice and retires the old key. */
+export function writeBody(value: unknown) {
+  return {
+    ex: PHOTO_BODY_FIELD.with({ ex: {} }, cleanBody(value) ?? {}).ex,
+    body: undefined
+  }
 }
 
 /** Her body as the form holds it: whatever the pools allow of what her file has. */
@@ -159,8 +175,8 @@ const DRAWN_FIELDS: readonly BodyField[] = ['hipsThighs', 'buttocks', 'pubicHair
 
 /** Her body as a field in the character editor: read off her, edited, and written back clean. */
 export const BODY_EDITOR_FIELD: EditorField = {
-  read: (character) => bodyForm(character.body),
-  write: (value) => ({ body: cleanBody(value) }),
+  read: (character) => bodyForm(bodyOf(character)),
+  write: writeBody,
   Field: ({ value, onChange, baseAppearance }) => (
     <BodyFieldsSection body={value as CharacterBody} baseAppearance={baseAppearance} onChange={onChange} />
   )

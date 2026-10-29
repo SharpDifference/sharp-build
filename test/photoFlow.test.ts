@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { Character, Result } from '@shared/types'
-import { restoreApi, stubApi } from './fixtures'
+import { character, restoreApi, stubApi } from './fixtures'
 
 /**
  * That the photo feature's *order of events* is what it has to be.
@@ -618,5 +618,61 @@ describe('what the crowd said', () => {
       expect(one.handle).toBeTruthy()
       expect(one.emoji).toBeTruthy()
     }
+  })
+})
+
+
+/** The registered Photo field and creation hook, using the same kit host as the editor. */
+async function bodyHooks() {
+  stubApi({ jobs: { onProgress: () => () => {} } })
+  await import('../src/renderer/modEntries/photo-feature')
+  const hooks = await import('@vx/modkit/host/renderer')
+  hooks.setHookRules({ isOn: (id) => id === 'photo-feature', order: () => 0 })
+  return hooks
+}
+
+describe('a character body in Photo’s record slice', () => {
+  it('moves an editor save out of legacy body and keeps another mod’s slice', async () => {
+    const hooks = await bodyHooks()
+    const { bodyOf } = await import('../src/shared/characterBody')
+    const { PHOTO_BODY_FIELD } = await import('../src/renderer/views/bodyFields')
+    const old = { ...character(), body: { build: 'petite', buttocks: 'huge_ass' },
+      ex: { other: { v: '2.0.0', data: { kept: true } } } }
+    const before = structuredClone(old)
+    expect(PHOTO_BODY_FIELD.read(old)).toEqual({ build: 'petite' })
+    expect(PHOTO_BODY_FIELD.read({ ...old, ex: { ...old.ex,
+      'photo-feature': { v: '1.5.0', data: { build: 'curvy' } }
+    } })).toEqual({ build: 'curvy' })
+    const field = hooks.editorFields().find((entry) => entry.modId === 'photo-feature')!.field
+    const value = field.read(old)
+    const saved = JSON.parse(JSON.stringify({ ...old, ...hooks.editorWrites(old, () => value) }))
+    expect(saved).not.toHaveProperty('body')
+    expect(saved.ex['photo-feature']).toEqual({ v: '1.5.0', data: { build: 'petite' } })
+    expect(saved.ex.other).toEqual(old.ex.other)
+    expect(bodyOf(saved)).toEqual({ build: 'petite' })
+    expect(old).toEqual(before)
+  })
+
+  it('writes a cleared body without allowing the stale legacy key to return', async () => {
+    const hooks = await bodyHooks()
+    const { bodyOf } = await import('../src/shared/characterBody')
+    const old = { ...character(), body: { build: 'curvy' } }
+    const writes = hooks.editorWrites(old, () => ({}))
+    const saved = JSON.parse(JSON.stringify({ ...old, ...writes }))
+    expect(saved).not.toHaveProperty('body')
+    expect(saved.ex['photo-feature'].data).toEqual({})
+    expect(bodyOf({ ...old, ...writes })).toEqual({})
+  })
+
+  it('puts a generated character body in the slot instead of at the top level', async () => {
+    const hooks = await bodyHooks()
+    vi.spyOn(Math, 'random').mockReturnValue(0.5)
+    const written = JSON.parse(JSON.stringify(hooks.characterFromDraft(
+      { body: { build: ['toned'] } }, { baseAppearance: ['big_breasts'] }
+    )))
+    expect(written).not.toHaveProperty('body')
+    expect(written.ex['photo-feature']).toMatchObject({
+      v: '1.5.0', data: { build: 'toned', breasts: 'large_breasts' }
+    })
   })
 })

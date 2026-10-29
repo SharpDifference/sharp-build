@@ -3,6 +3,7 @@ import {
   allowedBeside,
   appearanceBreasts,
   bodyAppearance,
+  bodyOf,
   bodyNegative,
   bodyTagLabel,
   BODY_FIELDS,
@@ -22,9 +23,10 @@ import '../src/shared/mods'
 // Photo Feature on, with body details, as the drafts below are read.
 setSharedModRules(() => true)
 setPhotoSwitches({ on: true, body: true })
-import { buildPhotoPrompt } from '../src/shared/photoPrompt'
+import { buildPhotoPrompt, buildDuoPhotoPrompt } from '../src/shared/photoPrompt'
 import type { Character } from '../src/shared/types'
 import { character } from './fixtures'
+import { readCharacterRecord } from '../src/shared/characterRules'
 
 /** Her, with the appearance the dev's call writes: `big_breasts` for a big chest. */
 function her(body?: CharacterBody): Character {
@@ -197,12 +199,12 @@ describe('drawBody', () => {
 
 describe('gateBody', () => {
   it('takes her body away while the switch is off', () => {
-    expect(gateBody(her({ build: 'curvy' }), false).body).toBeUndefined()
+    expect(bodyOf(gateBody(her({ build: 'curvy' }), false))).toBeUndefined()
   })
 
   it('keeps it, filtered, while the switch is on, and gives her an empty one where she has none', () => {
-    expect(gateBody(her({ build: 'curvy' }), true).body).toEqual({ build: 'curvy' })
-    expect(gateBody(her(), true).body).toEqual({})
+    expect(bodyOf(gateBody(her({ build: 'curvy' }), true))).toEqual({ build: 'curvy' })
+    expect(bodyOf(gateBody(her(), true))).toEqual({})
   })
 })
 
@@ -341,5 +343,57 @@ describe('withBodyTags', () => {
 
   it('leaves a regenerate with nothing remembered as its draft', () => {
     expect(withBodyTags(draft, draft, true)).toBe(draft)
+  })
+})
+
+
+describe('body storage', () => {
+  const body: CharacterBody = {
+    build: 'petite', breasts: 'large_breasts', hipsThighs: 'wide_hips'
+  }
+
+  it('reads a legacy character file without making body a core field', () => {
+    const legacy = her(body)
+    const loaded = readCharacterRecord(JSON.parse(JSON.stringify(legacy)), 'legacy-character.json')
+    expect(bodyOf(legacy)).toEqual(body)
+    expect(bodyOf(loaded.character)).toEqual(body)
+  })
+
+  it('prefers the slice to a stale legacy body, including an explicitly cleared body', () => {
+    const legacy = her({ build: 'curvy' })
+    expect(bodyOf({ ...legacy, ex: { 'photo-feature': { v: '1.5.0', data: body } } })).toEqual(body)
+    expect(bodyOf({ ...legacy, ex: { 'photo-feature': { v: '1.5.0', data: {} } } })).toEqual({})
+  })
+
+  it('gates a sliced body without changing her record or another mod’s data', () => {
+    const record = { ...her(body), ex: {
+      'photo-feature': { v: '1.5.0', data: body },
+      other: { v: '2.0.0', data: { kept: true } }
+    } }
+    const before = structuredClone(record)
+    const off = gateBody(record, false)
+    expect(bodyOf(off)).toBeUndefined()
+    expect(off.ex?.other).toEqual(record.ex.other)
+    expect(bodyOf(gateBody(record, true))).toEqual(cleanBody(body))
+    expect(record).toEqual(before)
+  })
+
+  it('keeps sprite, CG and single and duo photo prompts identical for both storage formats', () => {
+    const legacy = her(body)
+    const slotted = { ...her(), ex: { 'photo-feature': { v: '1.5.0', data: body } } }
+    for (const on of [false, true]) {
+      setPhotoSwitches({ body: on })
+      expect(spriteDraft(slotted, ['standing'], 'nude')).toEqual(spriteDraft(legacy, ['standing'], 'nude'))
+      expect(cgSetDraft(slotted)).toEqual(cgSetDraft(legacy))
+      const old = gateBody(legacy, on)
+      const next = gateBody(slotted, on)
+      expect(buildPhotoPrompt(next, 'explicit', 'naked, standing at her mirror')).toEqual(
+        buildPhotoPrompt(old, 'explicit', 'naked, standing at her mirror')
+      )
+      expect(buildDuoPhotoPrompt(next, next, 'explicit', 'naked, sitting together on her bed')).toEqual(
+        buildDuoPhotoPrompt(old, old, 'explicit', 'naked, sitting together on her bed')
+      )
+    }
+    setPhotoSwitches({ body: true })
   })
 })

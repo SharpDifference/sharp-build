@@ -1,12 +1,12 @@
 import type { PhotoTier } from './photoGate'
 import { DORM_IDS, dormLabel } from './dorms'
-import { bodyAppearance, bodyNegative } from './characterBody'
+import { bodyAppearance, bodyNegative, bodyOf } from './characterBody'
 import { bodyTagsFor, describesNothingOn } from './photoBody'
 import { framingInTags, framingOf } from './photoFraming'
 import { photoPose, withoutCameraHold, withoutHeldObject, withoutSelfieWord } from './photoPose'
 import { LOCATIONS, NARRATIVE_LOCATIONS } from './locations'
 import type { Character } from '@vx/modkit/shared'
-// Carries the `Character.body` augmentation into whatever program imports this module. The
+// Carries Photo's message and post augmentations into whatever imports this module. The
 // project's `include` would reach it for the app, but `tsconfig.test.json` lists only the tests
 // and pulls in what they import — so the feature brings its own types rather than relying on a
 // tsconfig line, which would be one more thing to re-add on a sync.
@@ -436,7 +436,7 @@ export function buildPhotoPrompt(
   // wears it, not her undressing, and the tags pulled the picture towards it.
   if (tier === 'everyday') pose.tags = pose.tags.filter((tag) => !EVERYDAY_DROPS.has(tag))
   // Her body as far as the shot reaches: a selfie from the waist up names no hips.
-  const body = bodyTagsFor(character.body, scene, bare, framingInTags(pose.tags))
+  const body = bodyTagsFor(bodyOf(character), scene, bare, framingInTags(pose.tags))
 
   const wardrobe = bare
     ? // Undressed by what she moved aside, where the caption still dresses her; nude otherwise.
@@ -621,7 +621,7 @@ function duoHalf(
   const bare = tier === 'explicit'
   const dressed = bare && describesClothing(scene)
   const appearance = bodyAppearance(girl, 'photo').filter((tag) => tag !== '1girl')
-  const body = bodyTagsFor(girl.body, scene, bare, 'waist').filter(
+  const body = bodyTagsFor(bodyOf(girl), scene, bare, 'waist').filter(
     (tag) => bare || !BELOW_WAIST.test(tag)
   )
   const wardrobe = bare
