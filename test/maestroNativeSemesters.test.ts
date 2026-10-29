@@ -11,10 +11,14 @@ import { validateRecord } from '@shared/jsonValidate'
 import { useGameStore } from '../src/renderer/stores/gameStore'
 import { useModsStore } from '../src/renderer/stores/modsStore'
 import { carryOf } from '../src/renderer/stores/semesterCarry'
-import { modFieldsLeaving } from '../src/renderer/stores/semesterModCarry'
+import { modFieldsLeaving, modSlicesLeaving } from '../src/renderer/stores/semesterModCarry'
 import { continuedStartOf } from '../src/renderer/stores/semesterStart'
-import { character, charInfo, enrollment, playthroughRecord } from './fixtures'
+import { character, charInfo, enrollment, playthroughRecord, stubApi, restoreApi } from './fixtures'
 
+stubApi({ jobs: { onProgress: () => () => {} } })
+const { plotTwist } = await import('../src/renderer/stores/plotTwist')
+
+afterEach(() => { restoreApi() })
 afterEach(() => { useGameStore.getState().reset(); useModsStore.setState({ switches: { on: {}, options: {} } }) })
 
 it('keeps Maestro save data through all eight native semesters and older branch reloads with mods disabled', () => {
@@ -39,7 +43,7 @@ it('keeps Maestro save data through all eight native semesters and older branch 
   useGameStore.setState({ playthroughId: '123', playthroughMods: mods, chars: ['a', 'b'], characters: cast,
     charInfo: { a: charInfo({ ...record.profiles.a, nameKnown: true }), b: charInfo({ ...record.profiles.b, nameKnown: true }) },
     date: 123, time: 0, calendar: calendarOf('spring', []),
-    exEcho: echo, exCharacterDynamics: dynamics, exPlotTwist: 'An ongoing story direction.',
+    exEcho: echo, exCharacterDynamics: dynamics,
     exBreakthrough: normalizeBreakthrough({ meters: { a: 65, b: 80 }, moments: { a: [{ id: 'moment', date: 9, time: 0, outcome: 'They reached an understanding.' }] } }),
     exStoryMemory: normalizeStoryMemory({ facts: [{ id: 'manual:promise', text: 'A remembered promise.', subject: 'a',
       category: 'promise', timeline: 'current', certainty: 'event', claimant: null, knownBy: ['reader', 'a'], public: false,
@@ -48,6 +52,7 @@ it('keeps Maestro save data through all eight native semesters and older branch 
     exNpcWatch: normalizeMeanwhile({ scenes: [{ id: 'encounter:old', date: 9, participants: ['a', 'b'],
       title: 'An encounter', where: 'Library', positive: true, ref: 'library', kind: 'hangout', lines }] }),
     exVenusWhisper: whisper })
+  plotTwist.set('An ongoing story direction.')
   useModsStore.setState({ switches: { on: Object.fromEntries(MODS.map(mod => [mod.id, false])), options: {} } })
   const endings: ReturnType<typeof stampSave>[] = []
   let shifted = 9
@@ -56,6 +61,7 @@ it('keeps Maestro save data through all eight native semesters and older branch 
     const view = semesterOf(record, game().semesterId ?? undefined)
     const handoff = carryOf(game(), view)
     handoff.carry.mods = modFieldsLeaving(game().toGameSave(), { playthroughId: '123', index: view.index, season: view.season, characters: cast })
+    handoff.carry.ex = modSlicesLeaving(game().modData, game().modValues, { playthroughId: '123', index: view.index, season: view.season, characters: cast })
     shifted -= view.season === 'spring' ? 210 : 155
     const roster = handoff.continuing.map(id => cast[id as keyof typeof cast])
     const draft = enrollment({ chars: roster.map(c => c.charId), mods, perChar: Object.fromEntries(roster.map(c =>
@@ -70,7 +76,7 @@ it('keeps Maestro save data through all eight native semesters and older branch 
     expect(whisperTerm(game())).toBe(index)
     expect(game().alumni).toContain('b')
     expect(game().playthroughMods).toEqual(mods)
-    expect(game().exPlotTwist).toBe('An ongoing story direction.')
+    expect(plotTwist.read()).toBe('An ongoing story direction.')
     expect(game().exEcho).toEqual(echo)
     expect(game().exCharacterDynamics).toEqual(dynamics)
     expect(game().exBreakthrough.meters).toEqual({ a: 65, b: 80 })
@@ -94,12 +100,15 @@ it('keeps Maestro save data through all eight native semesters and older branch 
     const first = modFieldsLeaving(ending, { playthroughId: '123', index: view.index, season: view.season, characters: cast })
     const sibling = modFieldsLeaving(ending, { playthroughId: '123', index: view.index, season: view.season, characters: cast })
     expect(first).toEqual(sibling)
-    first.exPlotTwist = 'A different direction in the sibling semester.'
+    const sliceContext = { playthroughId: '123', index: view.index, season: view.season, characters: cast }
+    const firstSlices = modSlicesLeaving(game().modData, game().modValues, sliceContext)!
+    const siblingSlices = modSlicesLeaving(game().modData, game().modValues, sliceContext)!
+    firstSlices['plot-twist'].data = 'A different direction in the sibling semester.'
     first.exEcho!.girls.a.name = 'Sibling-only name'
-    expect(sibling.exPlotTwist).toBe('An ongoing story direction.')
+    expect(siblingSlices['plot-twist'].data).toBe('An ongoing story direction.')
     expect(sibling.exEcho!.girls.a.name).toBe(echo.girls.a.name)
     expect(JSON.stringify(ending)).toBe(original)
-    expect(game().exPlotTwist).toBe('An ongoing story direction.')
+    expect(plotTwist.read()).toBe('An ongoing story direction.')
     expect(game().semesterIndex).toBe(view.index)
     expect(storySnapshot(game())!.records.filter(f => f.kind === 'encounter')).toHaveLength(1)
   }

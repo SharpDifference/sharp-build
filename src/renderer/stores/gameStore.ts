@@ -17,7 +17,6 @@ import { bindGameBoundary, bindSaveFieldStore, readModSlices, writeModSlices } f
 import { useModSessionStore } from './modSessionStore'
 import { create } from 'zustand'
 import { blocksNewRomance } from '@shared/romanceRequirements'
-import { savedPlotTwist } from '@shared/plotTwists'
 import {
   affectionFor,
   emptyFlags,
@@ -496,8 +495,6 @@ interface GameStoreState {
    * Persisted; blank where he wrote nothing.
    */
   bio: string
-  /** Save-owned story direction; serialized even when its mod is switched off. */
-  exPlotTwist: string
   exCharacterDynamics?: CharacterDynamics
   /** Prompt Studio's tracked variables, by name. Persisted, and empty where there are none. */
   presetVars: Record<string, string>
@@ -1647,7 +1644,6 @@ const initialState = {
   stats: DEFAULT_PLAYER_STATS,
   money: STARTING_MONEY,
   bio: '',
-  exPlotTwist: '',
   exCharacterDynamics: undefined as CharacterDynamics | undefined,
   presetVars: {} as Record<string, string>,
   scenePresetVars: [] as PresetVarsMark[],
@@ -1802,7 +1798,6 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
       // Both are younger than the save format, so a playthrough started before them loads blank,
       // and a save written before a tally loads that tally at zero.
       bio: save.bio ?? '',
-      exPlotTwist: savedPlotTwist(save.exPlotTwist),
       exCharacterDynamics: readCharacterDynamics(save),
       presetVars: readPresetVars(save.presetVars),
       tallies: { ...emptyTallies(), ...save.tallies },
@@ -3359,7 +3354,6 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
       stats: state.stats,
       money: state.money,
       bio: state.bio,
-      exPlotTwist: state.exPlotTwist,
       ...(state.exCharacterDynamics ? { exCharacterDynamics: structuredClone(state.exCharacterDynamics) } : {}),
       ...(Object.keys(state.presetVars).length > 0 ? { presetVars: { ...state.presetVars } } : {}),
       tallies: state.tallies,

@@ -1,4 +1,4 @@
-// Plot Twist keeps its twist across semesters through the shared carry registry.
+// Accept old semester continuations; current saves use the renderer's saveField.carry.
 import '../plotTwistCarry'
 import { PLOT_TWIST_DEF } from '../plotTwists'
 

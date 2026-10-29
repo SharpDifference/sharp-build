@@ -1,11 +1,9 @@
-import { appError } from './errors'
-import type { ModDef } from '@vx/modkit/shared'
-import type { Result } from './types'
+import type { ModDef, Result } from '@vx/modkit/shared'
 
 /** Stable across the compiled mod and this source port. */
 declare module './types' {
   interface GameSave {
-    /** Optional in older saves; retained even while Plot Twist is switched off. */
+    /** Legacy saves only; the current value lives in ex['plot-twist']. */
     exPlotTwist?: string
   }
 }
@@ -17,7 +15,7 @@ export const PLOT_TWIST_DEF: ModDef = {
   id: PLOT_TWIST_MOD,
   name: 'Plot Twist',
   author: 'Maestro Leeds',
-  version: '1.0.0',
+  version: '1.1.0',
   scope: 'anytime',
   defaultOn: true,
   blurb: 'Give future scenes a new story direction. Edit one ongoing twist per save from the game menu.',
@@ -34,7 +32,7 @@ export function validatePlotTwist(value: unknown): Result<string> {
   if (typeof value !== 'string' || value.length > PLOT_TWIST_LIMIT) {
     return {
       ok: false,
-      error: appError('PLOT_TWIST_INVALID', 'Keep the plot twist within 10,000 characters.')
+      error: { code: 'PLOT_TWIST_INVALID', message: 'Keep the plot twist within 10,000 characters.' }
     }
   }
   return { ok: true, data: value.trim() }

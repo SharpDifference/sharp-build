@@ -1,45 +1,59 @@
 import { afterEach, expect, it } from 'vitest'
 import { NO_SWITCHES } from '@shared/mods'
 import { activePlotTwist, PLOT_TWIST_MOD } from '@shared/plotTwists'
+import { modSlicesLeaving } from '../src/renderer/stores/semesterModCarry'
+import { stampSave } from '@shared/saveRules'
 import { carriedModFields } from '@shared/modCarry'
-import { modFieldsLeaving } from '../src/renderer/stores/semesterModCarry'
-import type { GameSave } from '@shared/types'
 import { useGameStore } from '../src/renderer/stores/gameStore'
 import { modIsOn, useModsStore } from '../src/renderer/stores/modsStore'
+import { playthroughRecord, restoreApi, stubApi } from './fixtures'
 
-// @shared/mods loads the actual entry files, including the retention adapter.
+stubApi({ jobs: { onProgress: () => () => {} } })
+const { plotTwist } = await import('../src/renderer/stores/plotTwist')
+
+it('accepts a semester continuation prepared by the previous build', () => {
+  const game = () => useGameStore.getState()
+  game().reset()
+  const oldCarry = JSON.parse('{"exPlotTwist":"A direction carried by the previous build."}')
+  const opening = stampSave({ ...game().toGameSave(), ...carriedModFields(oldCarry) }, '123', 'next', 1)
+  game().loadSave(opening, playthroughRecord({ chars: [] }), {})
+  expect(plotTwist.read()).toBe(oldCarry.exPlotTwist)
+  expect(game().toGameSave()).not.toHaveProperty('exPlotTwist')
+})
+
 afterEach(() => {
   useGameStore.getState().reset()
   useModsStore.setState({ switches: NO_SWITCHES })
+  restoreApi()
 })
 
-it.each([true, false])('retains the twist through New Game+ with its switch %s', (enabled) => {
-  useGameStore.getState().reset()
+it.each([true, false])('retains a legacy twist through New Game+ with its switch %s', enabled => {
+  const game = () => useGameStore.getState()
+  game().reset()
   useModsStore.setState({ switches: { on: { [PLOT_TWIST_MOD]: enabled }, options: {} } })
-  const draft = useGameStore.getState().toGameSave()
   const twist = 'A character knows why the observatory closed.'
-  const save: GameSave = {
-    ...draft, playthroughId: '123', saveId: 'end', saveDate: 0, exPlotTwist: twist
-  }
-  const mods = modFieldsLeaving(save, { playthroughId: '123', index: 0, season: 'spring', characters: {} })
-  const opening = { ...draft, ...carriedModFields(JSON.parse(JSON.stringify(mods))) }
-  expect(opening.exPlotTwist).toBe(twist)
-  expect(activePlotTwist(opening.exPlotTwist, modIsOn(PLOT_TWIST_MOD))).toBe(enabled ? twist : '')
+  const save = stampSave({ ...game().toGameSave(), exPlotTwist: twist }, '123', 'end', 0)
+  game().loadSave(save, playthroughRecord({ chars: [] }), {})
+  const ex = modSlicesLeaving(game().modData, game().modValues, {
+    playthroughId: '123', index: 0, season: 'spring', characters: {}
+  })
+  const opening = stampSave({ ...game().toGameSave(), ex }, '123', 'next-semester', 1)
+  game().loadSave(JSON.parse(JSON.stringify(opening)), playthroughRecord({ chars: [] }), {})
+  expect(plotTwist.read()).toBe(twist)
+  expect(activePlotTwist(plotTwist.read(), modIsOn(PLOT_TWIST_MOD))).toBe(enabled ? twist : '')
   expect(save.exPlotTwist).toBe(twist)
-  expect(draft.exPlotTwist ?? '').toBe('')
-
-  // Another fresh start has no connection to the archived continuation.
-  useGameStore.getState().reset()
-  expect(useGameStore.getState().toGameSave().exPlotTwist ?? '').toBe('')
+  expect(opening).not.toHaveProperty('exPlotTwist')
+  game().reset()
+  expect(plotTwist.read()).toBe('')
 })
 
-it.each([undefined, ''])('keeps a missing or explicitly cleared twist blank (%s)', (twist) => {
-  useGameStore.getState().reset()
-  const draft = useGameStore.getState().toGameSave()
-  const save: GameSave = {
-    ...draft, playthroughId: '123', saveId: 'end', saveDate: 0, exPlotTwist: twist
-  }
-  const mods = modFieldsLeaving(save, { playthroughId: '123', index: 0, season: 'spring', characters: {} })
-  const opening = { ...draft, ...carriedModFields(mods) }
-  expect(opening.exPlotTwist ?? '').toBe('')
+it.each([undefined, ''])('keeps a missing or explicitly cleared twist blank (%s)', twist => {
+  const game = () => useGameStore.getState()
+  game().reset()
+  const save = stampSave({ ...game().toGameSave(), exPlotTwist: twist }, '123', 'end', 0)
+  game().loadSave(save, playthroughRecord({ chars: [] }), {})
+  const ex = modSlicesLeaving(game().modData, game().modValues, {
+    playthroughId: '123', index: 0, season: 'spring', characters: {}
+  })
+  expect(ex?.[PLOT_TWIST_MOD]?.data ?? '').toBe('')
 })

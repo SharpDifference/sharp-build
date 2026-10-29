@@ -179,7 +179,7 @@ export const MOD_FILES: Record<string, ModSet> = {
     ]
   },
   'plot-twist': {
-    globs: ['src/shared/plotTwist*.ts', 'src/renderer/prompts/plotTwist.ts', 'src/renderer/views/PlotTwistModal.tsx', 'src/renderer/views/PlotTwistEntry.tsx', 'src/renderer/vu_styles/PlotTwist.css']
+    globs: ['src/shared/plotTwist*.ts', 'src/renderer/prompts/plotTwist.ts', 'src/renderer/stores/plotTwist.ts', 'src/renderer/views/PlotTwistModal.tsx', 'src/renderer/views/PlotTwistEntry.tsx', 'src/renderer/vu_styles/PlotTwist.css']
   },
   'prompt-studio': {
     globs: [

@@ -1580,7 +1580,6 @@ describe('toGameSave', () => {
       'exBreakthrough',
       'exEcho',
       'exNpcWatch',
-      'exPlotTwist',
       'exReckoning',
       'exStoryMemory',
       'exTalents',
