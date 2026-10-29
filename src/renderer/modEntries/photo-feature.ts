@@ -33,7 +33,7 @@ import {
 import { useGameStore } from '../stores/gameStore'
 import { registerTermFiles } from '@vx/modkit/shared'
 import { ownsPostComments, registerHooks } from '@vx/modkit/renderer'
-import { BODY_EDITOR_FIELD } from '../views/bodyFields'
+import { BODY_EDITOR_FIELD, writeBody } from '../views/bodyFields'
 import { PhotoComments, PhotoPostPicture } from '../components/PhotoPostSpots'
 import { MessagePhotoAttachment, PhotoLightboxHost } from '../components/PhotoBubble'
 import { GalleryPanel, galleryShown, PostPhotoExtra } from '../views/ContactGallery'
@@ -114,9 +114,9 @@ registerHooks(PHOTO_FEATURE, {
       (charId) => useGameStore.getState().characters[charId]?.firstName
     ),
 
-  characterFromDraft: (draft, { baseAppearance }) => ({
-    body: bodyOfDraft(draft.body as DraftBody | undefined, baseAppearance)
-  }),
+  // Only Photo writes draft ex; the character builder combines the mods' writes by plain spread.
+  characterFromDraft: (draft, { baseAppearance }) =>
+    writeBody(bodyOfDraft(draft.body as DraftBody | undefined, baseAppearance)),
 
   // Her picture, if she offered one and the save will have it. Left to finish on its own: a
   // render is half a minute, and her words have already landed.

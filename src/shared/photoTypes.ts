@@ -1,4 +1,3 @@
-import type { CharacterBody } from './characterBody'
 import type { Result } from './types'
 import type { Character } from '@vx/modkit/shared'
 
@@ -46,15 +45,6 @@ export interface ChatPhoto {
 }
 
 declare module './types' {
-  interface Character {
-    /**
-     * Her body, one pooled tag per field, drawn into her pictures while the body switch is on.
-     * Optional throughout: a character written before it existed has none, and is drawn as she
-     * always was.
-     */
-    body?: CharacterBody
-  }
-
   interface ChatMessage {
     /** The picture this message carries, if it carries one. */
     photo?: ChatPhoto

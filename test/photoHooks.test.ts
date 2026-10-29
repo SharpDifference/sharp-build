@@ -101,11 +101,6 @@ const HOOKS: readonly {
     why: 'the browser build answers the same three calls, with refusals'
   },
   {
-    file: 'src/shared/characterRules.ts',
-    needs: ["| 'body'"],
-    why: 'her body is optional on the record, so the guard must not require it'
-  },
-  {
     file: 'src/shared/imagePrompt.ts',
     within: 'export function spriteDraft(',
     needs: ['draftedParts('],
