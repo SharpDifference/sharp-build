@@ -58,6 +58,8 @@ The request is built by `buildStoryAssistantPrompt` from what the player has bee
 nothing else:
 
 - the playthrough's setting and the `READER` block;
+- the reader's Brain, Body and Heart as points with their ranks, and that 100 is a soft limit:
+  a stat climbs past it, but its rank and wording stay at Godly;
 - the date and half of the day;
 - the four newest finished slots' summaries, and up to four older ones that name a girl in the
   scene by the name the reader knows her by;

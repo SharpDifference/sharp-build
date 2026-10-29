@@ -1,4 +1,14 @@
 import {
+  MAX_TIER,
+  pointsForTier,
+  STAT_KEYS,
+  STAT_LABELS,
+  tierName,
+  tierNameOf,
+  type PlayerStats,
+  type StatTier
+} from '@shared/playerStats'
+import {
   ASSISTANT_ACTION_LIMIT,
   ASSISTANT_SUGGESTIONS_MAX,
   type ChoiceCount
@@ -36,6 +46,8 @@ export interface AssistantGirl {
 export interface AssistantContext {
   setting: string
   reader: string
+  /** The reader's points in each stat. */
+  stats: PlayerStats
   /** The date and half of the day the scene is in. */
   when: string
   /** Earlier slots' summaries, dated, oldest first. */
@@ -106,6 +118,16 @@ function milestoneSentences(who: string, flags: AssistantGirl['flags']): string[
   if (flags.blocked) lines.push(`${who} has blocked the reader on Bunnyboard.`)
   else if (flags.gaveContactInfo) lines.push(`${who} has given the reader her number.`)
   return lines
+}
+
+/** The `STATS` block: each stat's points and rank, then how the scale reads. */
+function statLines(stats: PlayerStats): string[] {
+  const ceiling = pointsForTier(MAX_TIER)
+  const ranks = Array.from({ length: MAX_TIER + 1 }, (_, tier) => tierNameOf(tier as StatTier))
+  return [
+    ...STAT_KEYS.map((key) => `${STAT_LABELS[key]}: ${Math.floor(stats[key])} (${tierName(stats[key])})`),
+    `Ranks, lowest to highest: ${ranks.join(', ')}. The scale has a soft limit of ${ceiling}: a stat can climb past ${ceiling}, but from ${ceiling} on its rank and its wording under READER stay at ${tierNameOf(MAX_TIER)}.`
+  ]
 }
 
 /** One girl's entry under CAST. */
@@ -189,7 +211,7 @@ function assistantSchema(choices: ChoiceCount): StructuredRequest['schema'] {
 }
 
 /**
- * One read of the scene: the rules in `system`; then the world, the reader, the slot, the days
+ * One read of the scene: the rules in `system`; then the world, the reader, his stats, the slot, the days
  * before, the cast, the story so far and the scene's tail, with the player's question last.
  */
 export function buildStoryAssistantPrompt(context: AssistantContext): StructuredRequest {
@@ -200,6 +222,9 @@ export function buildStoryAssistantPrompt(context: AssistantContext): Structured
     '',
     'READER',
     context.reader.trim(),
+    '',
+    'STATS',
+    ...statLines(context.stats),
     '',
     'NOW',
     context.when,

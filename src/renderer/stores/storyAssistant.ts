@@ -267,6 +267,7 @@ function contextNow(question: string): AssistantContext {
   return {
     setting: settingNow(),
     reader: reader(),
+    stats: game.stats,
     when: formatDateBanner(game.date, game.time, season),
     earlier: earlierSlots(game, known),
     girls,
