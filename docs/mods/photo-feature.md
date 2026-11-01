@@ -112,9 +112,10 @@ from-behind shots hold less well than plain ones. Pictures from below are drawn 
 ## If a photo looks wrong
 
 Hover the photo and open the **info icon** in its bottom-right corner. It shows the prompt,
-negative, seed and LoRA used to draw it. Send those with the picture: most problems so far were
-one word in her sentence the model drew too literally, and each is a small fix. A photo taken
-before 1.7.0 shows a rebuilt prompt and no seed.
+negative, seed and LoRA used to draw it. Most problems are one word in her sentence the model
+drew too literally: change or remove it, then redraw. **Redraw with same seed** keeps the rest of
+the picture close to what it was, so you can see what your change did. A photo taken before 1.7.0
+shows a rebuilt prompt and no seed, so it can only be redrawn with a new one.
 
 If a photo stays PNG while WebP is on, look in `data/app.log` for a `[photo] kept ... as PNG:` line.
 
