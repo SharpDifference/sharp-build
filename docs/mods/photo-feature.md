@@ -121,6 +121,9 @@ If a photo stays PNG while WebP is on, look in `data/app.log` for a `[photo] kep
 
 ## 1.7.0
 
+- **Keep the place**: photos keep the place she described, and no longer put the name of her
+  outfit into the picture's prompt once her own tags dress her.
+
 - **See what drew a photo**: hover it and open the info icon for its prompt, negative, seed and
   LoRA. Photos taken before 1.7.0 show a rebuilt prompt and no seed.
 - **Redraw a photo**: edit its prompts, or **Rebuild** them from her current tags first, and draw

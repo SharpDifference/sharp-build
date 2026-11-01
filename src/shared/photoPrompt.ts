@@ -3,7 +3,13 @@ import { DORM_IDS, dormLabel } from './dorms'
 import { bodyAppearance, bodyNegative, bodyOf } from './characterBody'
 import { bodyTagsFor, describesNothingOn } from './photoBody'
 import { framingInTags, framingOf } from './photoFraming'
-import { photoPose, withoutCameraHold, withoutHeldObject, withoutSelfieWord } from './photoPose'
+import {
+  PHOTO_CLAUSE_END,
+  photoPose,
+  withoutCameraHold,
+  withoutHeldObject,
+  withoutSelfieWord
+} from './photoPose'
 import { LOCATIONS, NARRATIVE_LOCATIONS } from './locations'
 import type { Character } from '@vx/modkit/shared'
 // Carries Photo's message and post augmentations into whatever imports this module. The
@@ -11,7 +17,7 @@ import type { Character } from '@vx/modkit/shared'
 // and pulls in what they import — so the feature brings its own types rather than relying on a
 // tsconfig line, which would be one more thing to re-add on a sync.
 import type {} from './photoTypes'
-import { photoWardrobe } from './photoWardrobe'
+import { photoWardrobe, photoWardrobeNames } from './photoWardrobe'
 import { says, saysAny } from './photoWords'
 
 /**
@@ -114,6 +120,7 @@ const CLOTHING_WORDS = [
   'sundress',
   'gown',
   'coat',
+  'raincoat',
   'jacket',
   'hoodie',
   'sweater',
@@ -411,6 +418,27 @@ export interface PhotoPrompts {
   negative: string
 }
 
+/** A named outfit has already become tags; keep the place and action around its name. */
+function withoutOutfitName(scene: string, names: readonly string[]): string {
+  if (names.length === 0) return scene
+  const named = names
+    .map(escaped)
+    .sort((a, b) => b.length - a.length)
+    .join('|')
+  const reference = new RegExp(
+    `\\b(?:dressed\\s+in|wearing|in)\\s+(?:(?:her|their)\\s+)?(?:own\\s+)?` +
+      `(?:["“])?(?:${named})(?:s|es)?(?![a-z0-9])(?:["”])?` +
+      '(?:\\s+(?:clothes|cloth|outfit)\\b)?',
+    'gi'
+  )
+  return scene
+    .replace(reference, '')
+    .replace(/\s{2,}/g, ' ')
+    .replace(/\s+([,.;])/g, '$1')
+    .replace(/,\s*,/g, ',')
+    .replace(/^[\s,]+|[\s,]+$/g, '')
+}
+
 /**
  * Assembles one photo's prompts. The tier has already been settled by `photoGate`; everything
  * here only draws what it allows.
@@ -449,6 +477,8 @@ export function buildPhotoPrompt(
         (photoWardrobe(character, scene, dressed, tier !== 'everyday') ?? []).map(heldColour).join(', ')
       )
 
+  const caption = bare ? scene : withoutOutfitName(scene, photoWardrobeNames(character, scene))
+
   // Her appearance, with her build and her chest in it while the body switch is on. It opens on
   // the subject tag where she has one, so the base does not say it a second time.
   const appearance = bodyAppearance(character, 'photo')
@@ -465,11 +495,8 @@ export function buildPhotoPrompt(
     // The sentence's own full stop would sit in front of the tags that follow it.
     [
       lookingAtViewer(
-        withoutSelfieWord(withoutHeldObject(withoutCameraHold(withoutWhoTookIt(scene))))
-      ).replace(
-        /[.!?]+$/,
-        ''
-      ),
+        withoutSelfieWord(withoutHeldObject(withoutCameraHold(withoutWhoTookIt(caption))))
+      ).replace(/[.!?]+$/, ''),
       pose.tags.join(', ')
     ]
       .filter((part) => part.length > 0)
@@ -532,7 +559,8 @@ export interface DuoPhotoPrompts {
 const TOUCHING = new RegExp(
   '\\s*,?\\s*\\b(?:hugg\\w*|hugs?|cuddl\\w*|snuggl\\w*|embrac\\w*|kiss\\w*|holding hands|hand in hand|' +
     'arm in arm|arms? (?:around|linked|wrapped)|leaning (?:on|against) (?:each other|her)|' +
-    'cheek to cheek|head on (?:her|each other)\\S*\\s+shoulder)[^,.;]*?(?=\\s+and\\s|[,.;]|$)',
+    'cheek to cheek|head on (?:her|each other)\\S*\\s+shoulder)' +
+    `[^,.;]*?(?=\\s+and\\s|${PHOTO_CLAUSE_END})`,
   'gi'
 )
 
@@ -546,7 +574,11 @@ export function withoutTouching(scene: string): string {
  * two split it between them, and one in an open shirt over another's camisole was left in nothing
  * under it. Each half is dressed from her own wardrobe instead.
  */
-const WORN_CLAUSE = /,?\s*\b(?:wearing|dressed in|in (?:their|her|matching)\b)[^,.;]*/gi
+const WORN_CLAUSE = new RegExp(
+  ',?\\s*\\b(?:wearing|dressed in|in (?:their|her|matching)\\b)' +
+    `[^,.;]*?(?=\\s+(?:wearing|dressed in)\\b|${PHOTO_CLAUSE_END})`,
+  'gi'
+)
 
 /**
  * The faces a caption asks of the two, as tags each half carries: the face pass redraws each face
@@ -704,11 +736,22 @@ export function buildDuoPhotoPrompt(
       : []
   const phoneNegative = selfie && !mirror ? ['phone', 'cellphone', 'smartphone', 'holding_phone'] : []
 
+  const dressedScene = bare
+    ? scene
+    : withoutOutfitName(scene, [
+        ...photoWardrobeNames(sender, scene),
+        ...photoWardrobeNames(friend, scene)
+      ])
   // A selfie lying down did not hold for two, so it is said as the photo it is drawn as.
   const sentence = lookingAtViewer(
-    withoutWhoTookIt(withoutCameraHold(lying ? scene.replace(/\bselfie\b/gi, 'photo') : scene))
+    withoutWhoTookIt(
+      withoutCameraHold(lying ? dressedScene.replace(/\bselfie\b/gi, 'photo') : dressedScene)
+    )
   )
-    .replace(WORN_CLAUSE, '')
+    // "in her room" is a place, even when a clothing clause follows it.
+    .replace(WORN_CLAUSE, (clause) => (describesClothing(clause) ? '' : clause))
+    .replace(/\s{2,}/g, ' ')
+    .replace(/\s+([,.;])/g, '$1')
     .replace(/[.!?]+$/, '')
 
   const shared = [...framing.tags]

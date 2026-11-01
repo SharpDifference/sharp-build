@@ -224,6 +224,12 @@ describe('a selfie caption that says how she holds the phone', () => {
     expect(withoutSelfieWord(beanbag)).toMatch(/^A relaxed photo taken/)
   })
 
+  it('keeps the place after a camera hold', () => {
+    expect(
+      withoutCameraHold('A selfie holding her phone up high beside the arcade cabinets.')
+    ).toBe('A selfie beside the arcade cabinets.')
+  })
+
   it('leaves a mirror selfie, a camera of her own, and any other picture alone', () => {
     const mirror = 'a mirror selfie, holding her phone up'
     expect(withoutCameraHold(mirror)).toBe(mirror)
@@ -308,6 +314,47 @@ describe('a mirror selfie, her other hand empty', () => {
     ).toBe('a close mirror selfie, sitting cross-legged on the bed')
     const coffee = 'a mirror selfie in the hallway, holding an iced coffee, smiling'
     expect(withoutHeldObject(coffee)).toBe('a mirror selfie in the hallway, smiling')
+  })
+
+  it('keeps the arcade after the held cup', () => {
+    expect(
+      withoutHeldObject(
+        'A mirror selfie of her in her everyday clothes holding an empty token cup ' +
+          'beside a row of brightly lit arcade cabinets.'
+      )
+    ).toBe(
+      'A mirror selfie of her in her everyday clothes beside a row of brightly lit arcade cabinets.'
+    )
+  })
+
+  it.each([
+    'beside the cabinets',
+    'next to the cabinets',
+    'in front of the cabinets',
+    'near the cabinets',
+    'against the wall',
+    'under the awning',
+    'outside the arcade',
+    'inside the arcade',
+    'while smiling',
+    'as she smiles',
+    'with her friend'
+  ])('keeps the place or clause: %s', (place) => {
+    expect(withoutHeldObject(`A mirror selfie holding a cup ${place}.`)).toBe(
+      `A mirror selfie ${place}.`
+    )
+    expect(withoutHeldObject(`A mirror selfie holding a cup in her other hand ${place}.`)).toBe(
+      `A mirror selfie ${place}.`
+    )
+  })
+
+  it('drops the held object with its container or position', () => {
+    expect(
+      withoutHeldObject('A mirror selfie in her room holding an iced coffee in a paper cup.')
+    ).toBe('A mirror selfie in her room.')
+    expect(
+      withoutHeldObject('A mirror selfie of her holding a bouquet at her chest beside the window.')
+    ).toBe('A mirror selfie of her beside the window.')
   })
 
   it('keeps a gesture, the phone, and any picture that is not in a mirror', () => {

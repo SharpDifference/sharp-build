@@ -43,6 +43,75 @@ describe('photoWardrobe', () => {
     expect(drawn('everyday', 'in her everyday clothes at her desk')).toContain('pink_cardigan')
   })
 
+  it('keeps the arcade, replacing her everyday clothes with their tags', () => {
+    const positive = drawn(
+      'everyday',
+      'A mirror selfie of her in her everyday clothes holding an empty token cup ' +
+        'beside a row of brightly lit arcade cabinets.'
+    )
+    expect(positive).toContain('A mirror selfie of her beside a row of brightly lit arcade cabinets')
+    expect(positive).toContain('pink_cardigan')
+    expect(positive).not.toMatch(/everyday clothes|token cup/)
+  })
+
+  it('keeps her room and smile around a named outfit', () => {
+    const positive = drawn(
+      'everyday',
+      'A mirror selfie of her in her room wearing her everyday clothes, ' +
+        'smiling sweetly at the viewer.'
+    )
+    expect(positive).toContain('A mirror selfie of her in her room, smiling sweetly at the viewer')
+    expect(positive).not.toContain('everyday clothes')
+  })
+
+  it.each([
+    ['in her own everyday cloth', 'pink_cardigan'],
+    ['dressed in their everyday outfit', 'pink_cardigan'],
+    ['wearing her own usual clothes', 'pink_cardigan'],
+    ['in her clothes', 'pink_cardigan'],
+    ['in their PE kit', 'gym_uniform'],
+    ['wearing her swimsuit', 'white_bikini'],
+    ['dressed in her Date night', 'black_dress'],
+    ['in Date night', 'black_dress'],
+    ['wearing her Date night outfit', 'black_dress']
+  ])('replaces only the named set in %s', (reference, tag) => {
+    const positive = drawn('suggestive', `At her desk ${reference}, smiling.`)
+    expect(positive).toContain(tag)
+    expect(positive).toContain('At her desk, smiling')
+    expect(positive).not.toContain(reference)
+  })
+
+  it('handles punctuation and quotes in a custom set name', () => {
+    const girl = {
+      ...mina,
+      customOutfits: { custom1: { name: 'After-hours (rain)', tags: ['yellow_raincoat'] } }
+    } as Character
+    const positive = buildPhotoPrompt(
+      girl,
+      'everyday',
+      'At the arcade, dressed in her "After-hours (rain)" outfit, smiling.'
+    ).positive
+    expect(positive).toContain('yellow_raincoat')
+    expect(positive).toContain('At the arcade, smiling')
+    expect(positive).not.toContain('After-hours')
+  })
+
+  it('keeps real clothes instead of replacing them with a wardrobe', () => {
+    const positive = drawn('everyday', 'At the arcade in a red raincoat, smiling.')
+    expect(positive).toContain('At the arcade in a red raincoat, smiling')
+    expect(positive).not.toContain('pink_cardigan')
+  })
+
+  it('keeps an outfit reference when no outfit tags were supplied', () => {
+    const undressed = { ...mina, outfit: [] }
+    expect(
+      buildPhotoPrompt(undressed, 'everyday', 'In her everyday clothes at home').positive
+    ).toContain('In her everyday clothes at home')
+    expect(
+      buildPhotoPrompt(mina, 'explicit', 'In her everyday clothes, skirt lifted').positive
+    ).toContain('In her everyday clothes')
+  })
+
   it('leaves clothes none of her sets is to the caption', () => {
     expect(photoWardrobe(mina, 'wrapped in a towel after a shower', true, true)).toBeNull()
   })

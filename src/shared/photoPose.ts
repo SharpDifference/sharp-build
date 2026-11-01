@@ -659,6 +659,11 @@ function onePlacement(tags: readonly string[]): string[] {
   return tags.filter((tag) => !PLACEMENT_TAGS.has(tag) || tag === first)
 }
 
+/** A place or a new clause after an action belongs to the picture, not the held object. */
+export const PHOTO_CLAUSE_END =
+  '(?=\\s+(?:beside|next to|in front of|near|against|under|outside|inside|' +
+  'while|as|with her)\\b|[,.;]|$)'
+
 /**
  * A mirror selfie's sentence without what her other hand holds. One hand is on the phone, and
  * the checkpoint never put anything in the other: "a glass in hand", "holding a glass in her
@@ -671,11 +676,12 @@ export function withoutHeldObject(scene: string): string {
   const hand = 'in\\s+(?:her\\s+|one\\s+|her\\s+free\\s+|her\\s+other\\s+)?hand'
   // "with a glass of pink drink in hand", "holding a coffee in her other hand"
   const held = new RegExp(
-    `\\s*,?\\s*\\b(?:with|${verb})\\s+(?:a|an|her|the|some|one)?\\s*[^,.;]*?\\b${hand}\\b`,
+    `\\s*,?\\s*\\b(?:with|${verb})\\s+(?:a|an|her|the|some|one)?\\s*` +
+      `(?:(?!${PHOTO_CLAUSE_END})[^,.;])*?\\b${hand}\\b`,
     'gi'
   )
-  // "holding an iced coffee", up to the next comma
-  const holding = new RegExp(`\\s*,?\\s*\\b${verb}\\s+[^,.;]*`, 'gi')
+  // "holding an iced coffee beside the arcade cabinets": the cabinets stay.
+  const holding = new RegExp(`\\s*,?\\s*\\b${verb}\\s+[^,.;]*?${PHOTO_CLAUSE_END}`, 'gi')
   return scene
     .replace(held, (part) => (/\b(?:phone|camera)\b/i.test(part) ? part : ''))
     .replace(holding, (part) => (/\b(?:phone|camera)\b/i.test(part) ? part : ''))

@@ -28,12 +28,15 @@ const PE_GARMENTS = [
 
 /** Her main outfit, called what the brief calls it. */
 const MAIN_NAMES = [
-  'everyday clothes',
-  'everyday outfit',
-  'usual clothes',
-  'usual outfit',
-  'her clothes',
-  'her outfit'
+  ...['everyday', 'usual'].flatMap((kind) =>
+    ['clothes', 'cloth', 'outfit'].map((garment) => `${kind} ${garment}`)
+  ),
+  ...['her', 'their'].flatMap((who) =>
+    ['clothes', 'cloth', 'outfit'].flatMap((garment) => [
+      `${who} ${garment}`,
+      `${who} own ${garment}`
+    ])
+  )
 ]
 
 /**
@@ -68,6 +71,34 @@ function namedCustomSet(character: Character, text: string): CustomOutfitSlot | 
   return null
 }
 
+/** A set named in the caption, with the words that stand for its tags. */
+function namedWardrobe(
+  character: Character,
+  text: string
+): { tags: readonly string[]; names: readonly string[] } | null {
+  const custom = namedCustomSet(character, text)
+  const name = custom && character.customOutfits?.[custom]?.name?.trim()
+  if (custom && name) {
+    return {
+      tags: outfitTagsFor(character, custom),
+      names: [name]
+    }
+  }
+  if (saysAny(text, SWIM_GARMENTS)) {
+    return { tags: outfitTagsFor(character, 'swim'), names: SWIM_GARMENTS }
+  }
+  if (saysAny(text, PE_GARMENTS)) {
+    return { tags: outfitTagsFor(character, 'pe'), names: PE_GARMENTS }
+  }
+  return saysAny(text, MAIN_NAMES) ? { tags: character.outfit, names: MAIN_NAMES } : null
+}
+
+/** Only a named set whose tags dress her can replace its name in the prompt. */
+export function photoWardrobeNames(character: Character, caption: string): readonly string[] {
+  const set = namedWardrobe(character, caption.toLowerCase())
+  return set && set.tags?.length > 0 ? set.names : []
+}
+
 /**
  * Her own wardrobe for this picture as tags, or null where the caption dresses her in something
  * none of her sets is — a towel, a bra, pyjamas — which its own words then describe.
@@ -84,11 +115,8 @@ export function photoWardrobe(
 ): readonly string[] | null {
   const text = caption.toLowerCase()
 
-  const custom = namedCustomSet(character, text)
-  if (custom) return outfitTagsFor(character, custom)
-  if (saysAny(text, SWIM_GARMENTS)) return outfitTagsFor(character, 'swim')
-  if (saysAny(text, PE_GARMENTS)) return outfitTagsFor(character, 'pe')
-  if (saysAny(text, MAIN_NAMES)) return character.outfit
+  const named = namedWardrobe(character, text)
+  if (named) return named.tags
 
   if (captionDressesHer) return null
   if (swimwearAllowed && saysAny(text, SWIM_PLACES)) return outfitTagsFor(character, 'swim')
