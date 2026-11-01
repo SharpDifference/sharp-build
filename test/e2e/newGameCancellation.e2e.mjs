@@ -19,26 +19,32 @@ const {useCharacterStore}=await import('./src/renderer/stores/characterStore');
 const {useSaveStore}=await import('./src/renderer/stores/saveStore');
 const {useSettingsStore}=await import('./src/renderer/stores/settingsStore');
 const {useAudioStore}=await import('./src/renderer/stores/audioStore');useAudioStore.setState({play:()=>{}});
-const {useCrossingStore}=await import('./src/renderer/stores/crossingStore');
-const {stageEnrollment}=await import('./src/renderer/stores/newGame');
+const {useCrossingStore,cancelCrossing}=await import('./src/renderer/stores/crossingStore');
+const {stageEnrollment,stageContinuation}=await import('./src/renderer/stores/newGame');
 const {MODS}=await import('./src/shared/mods');
 const {NewGameView}=await import('./src/renderer/views/NewGameView');
-const {character,enrollment,classEntry,peClassEntry}=await import('./test/fixtures');
+const {character,enrollment,classEntry,peClassEntry,playthroughRecord}=await import('./test/fixtures');
 const {stampEnrollment}=await import('./src/shared/saveRules');
 const {slotFullLabel}=await import('./src/shared/classes');
 const root=createRoot(document.getElementById('root')), calls={enroll:0,create:0}, girl=character({charId:'a',firstName:'Test',lastName:'Student'});
 let release,visit=0;
-const draw=()=>root.render(<MotionConfig reducedMotion="always">{useUiStore.getState().view==='classSelect'?<NewGameView key={visit}/>:<p>Main menu fixture</p>}</MotionConfig>);
+const draw=()=>root.render(<MotionConfig reducedMotion="always">{['classSelect','nextSemester'].includes(useUiStore.getState().view)?<NewGameView key={visit}/>:<p>Main menu fixture</p>}</MotionConfig>);
 useUiStore.subscribe((state,previous)=>{if(state.view!==previous.view)draw()});
 useCharacterStore.setState({characters:{a:girl},load:async()=>{}});useSettingsStore.setState({settings:null});
-useSaveStore.setState({enroll:async()=>{calls.enroll++;return await new Promise(resolve=>{release=()=>resolve({ok:true,data:{playthroughId:'7000001'}})})},
+useSaveStore.setState({enroll:async draft=>{calls.enroll++;calls.lastDraft=structuredClone(draft);return await new Promise(resolve=>{release=()=>resolve({ok:true,data:{playthroughId:'7000001'}})})},
 createPlaythrough:async()=>{calls.create++;return {ok:false,error:{code:'QA_CAPTURED',message:'No disk write'}}}});
 const classes=Object.fromEntries([peClassEntry({slot:0,code:'PE 100',name:'Fixture PE'}),...[1,2,3].map(slot=>classEntry({slot,code:'QA '+slot,name:'Fixture Course '+slot}))].map(c=>[c.code,c]));
 window.__qa={calls,labels:[0,1,2,3].map(slot=>'Enroll in a course on '+slotFullLabel(slot)),
-start:({dynamics=false,echo=false}={})=>{root.render(null);visit++;release=undefined;calls.enroll=0;calls.create=0;useGameStore.getState().reset();useCrossingStore.setState({phase:'idle'});
+start:({dynamics=false,echo=false}={})=>{root.render(null);visit++;release=undefined;calls.enroll=0;calls.create=0;useGameStore.getState().reset();cancelCrossing();useCrossingStore.setState({phase:'idle'});
 useModsStore.setState({switches:{on:Object.fromEntries(MODS.map(m=>[m.id,m.id==='echo'&&echo])),options:{}}});
 const draft=enrollment({chars:['a'],mods:dynamics?['character-dynamics']:[],classes,perChar:{a:{year:2,major:'Art',dorm:'lowrise_1',schedule:{}}}});
 stageEnrollment({playthroughId:'7000001',enrollment:stampEnrollment(draft,1),characters:[girl]});useUiStore.setState({view:'classSelect',error:null});draw()},
+next:()=>{root.render(null);visit++;release=undefined;calls.enroll=0;calls.create=0;useGameStore.getState().reset();cancelCrossing();useCrossingStore.setState({phase:'idle'});
+useModsStore.setState({switches:{on:Object.fromEntries(MODS.map(m=>[m.id,false])),options:{}}});
+const handoff={index:1,continuing:['a'],graduated:[],alumni:[],priorProfiles:{},jobs:{},haunts:{},majorLoads:{},carry:{...useGameStore.getState().toGameSave(),mods:{}}};
+const continued={...handoff,id:'next-fixture',taken:[]},semester={schedules:{classes,perChar:{a:{year:2,major:'Art',dorm:'lowrise_1',schedule:{}}}},jobs:{},haunts:{},feeds:{},springBreakPlans:{},occasions:[],fixedEdits:{},secrets:{},starts:{},pairs:{}};
+window.__qa.composed=[semester,{firstName:'Avrix',lastName:'Test',stats:{brain:-60,body:-30,heart:0}},[girl],continued,[]];
+stageContinuation({playthroughId:'7000001',record:playthroughRecord({mods:[]}),handoff,from:undefined,ending:'0-123-1'});useUiStore.setState({view:'nextSemester',error:null});draw()},
 release:()=>release(),leave:()=>useUiStore.getState().setView('mainMenu'),unmount:()=>root.render(<p>Unmounted fixture</p>)};
 document.getElementById('root').style.width='1920px';document.getElementById('root').style.height='1080px';
 `
@@ -47,7 +53,13 @@ writeFileSync(html, '<!doctype html><html><body><div id="root"></div><script typ
 writeFileSync(tsx, fixture)
 let server, browser
 try {
-  server = await createServer({ root: repo, configFile: false, logLevel: 'error', resolve: { alias: {
+  server = await createServer({ root: repo, configFile: false, logLevel: 'error', plugins: [{
+    // Exercise the real controller callback with a completed synthetic semester; no generation calls.
+    name: 'qa-composed-semester',
+    enforce: 'pre',
+    resolveId(id, importer) { if (/NewGameFlow(?:\.tsx)?$/.test(id) && importer?.replaceAll('\\', '/').endsWith('/views/NewGameView.tsx')) return '\0qa-composed-semester' },
+    load(id) { if (id === '\0qa-composed-semester') return "import {createElement} from 'react';export function NewGameFlow({onComposed}){return createElement('button',{onClick:()=>onComposed(...window.__qa.composed)},'Finish fixture setup')}" }
+  }], resolve: { alias: {
     '@shared': resolve(repo, 'src/shared'), '@vx/modkit/host': resolve(repo, 'packages/modkit/src/host'),
     '@vx/modkit/shared': resolve(repo, 'packages/modkit/src/shared'), '@vx/modkit/renderer': resolve(repo, 'packages/modkit/src/renderer')
   } }, esbuild: { jsx: 'automatic' }, define: { __APP_VERSION__: JSON.stringify('cancellation-regression') }, server: { host: '127.0.0.1', port: 0, fs: { allow: [repo, resolve(repo, '..')] } } })
@@ -80,6 +92,25 @@ try {
     assert.equal(await page.evaluate(() => window.__qa.calls.enroll), 1, scenario + ': stale follow-up enrollment write')
     assert.equal(await page.evaluate(() => window.__qa.calls.create), scenario === 'success' ? 1 : 0, scenario + ': stale opening-save write')
     if (scenario !== 'success') assert.equal(await page.getByRole('dialog', { name: 'Echoes', exact: true }).count(), 0)
+    console.log('PASS ' + scenario)
+  }
+  for (const scenario of ['next-semester', 'next-cancel', 'next-unmount']) {
+    await page.evaluate(() => window.__qa.next())
+    await page.getByRole('button', { name: 'Finish fixture setup', exact: true }).click()
+    await page.waitForFunction(() => window.__qa.calls.enroll === 1)
+    if (scenario === 'next-cancel') await page.evaluate(() => window.__qa.leave())
+    if (scenario === 'next-unmount') await page.evaluate(() => window.__qa.unmount())
+    if (scenario !== 'next-semester') await page.getByText(scenario === 'next-unmount' ? 'Unmounted fixture' : 'Main menu fixture', { exact: true }).waitFor()
+    await page.evaluate(() => window.__qa.release())
+    if (scenario === 'next-semester') {
+      await page.getByRole('button', { name: 'Enroll', exact: true }).waitFor()
+      assert.equal(await page.evaluate(() => window.__qa.calls.lastDraft.continued.index), 1)
+      assert.deepEqual(await page.evaluate(() => window.__qa.calls.lastDraft.stats), { brain: -60, body: -30, heart: 0 })
+    } else {
+      await page.waitForTimeout(350)
+      assert.equal(await page.getByRole('button', { name: 'Enroll', exact: true }).count(), 0, scenario + ': abandoned registrar reopened')
+    }
+    assert.equal(await page.evaluate(() => window.__qa.calls.create), 0)
     console.log('PASS ' + scenario)
   }
   assert.deepEqual(errors, [])

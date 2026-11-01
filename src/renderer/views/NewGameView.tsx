@@ -138,7 +138,7 @@ export function NewGameView(): JSX.Element {
   function currentCompletion(token: number): boolean {
     const screen = useUiStore.getState().view
     return mounted.current && completion.current === token &&
-      (screen === 'newGame' || screen === 'quickstart' || screen === 'classSelect')
+      (screen === 'newGame' || screen === 'quickstart' || screen === 'classSelect' || screen === 'nextSemester')
   }
   function cancelSetup(): void {
     completion.current += 1
