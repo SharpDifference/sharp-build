@@ -152,6 +152,20 @@ const PLACEMENT_TAGS: ReadonlySet<string> = new Set([
 
 /** Direct descriptions of her occupied hands, including the ones removed from mirror prose. */
 const OCCUPIED_HAND_CUES = [
+  'pulling',
+  'pulling down',
+  'pulling up',
+  'tugging',
+  'lifting',
+  'lowering',
+  'unbuttoning',
+  'unzipping',
+  'slipping off',
+  'sliding off',
+  'peeling off',
+  'holding up her top',
+  'holding up her skirt',
+  'holding up her shirt',
   'holding',
   'holds',
   'clutching',

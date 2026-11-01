@@ -126,7 +126,7 @@ describe('photoWardrobe', () => {
       buildPhotoPrompt(undressed, 'everyday', 'In her everyday clothes at home').positive
     ).toContain('In her everyday clothes at home')
     expect(
-      buildPhotoPrompt(mina, 'explicit', 'In her everyday clothes, skirt lifted').positive
+      buildPhotoPrompt(undressed, 'explicit', 'In her everyday clothes, skirt lifted').positive
     ).toContain('In her everyday clothes')
   })
 

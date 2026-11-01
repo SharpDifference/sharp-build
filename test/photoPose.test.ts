@@ -287,6 +287,37 @@ describe('her hands on an activity', () => {
   })
 })
 
+describe('undressing hands', () => {
+  it.each([
+    'pulling',
+    'pulling down',
+    'pulling up',
+    'tugging',
+    'lifting',
+    'lowering',
+    'unbuttoning',
+    'unzipping',
+    'slipping off',
+    'sliding off',
+    'peeling off',
+    'holding up her top',
+    'holding up her skirt',
+    'holding up her shirt'
+  ])('clears placements for %s in a clothed or explicit pose', (action) => {
+    for (const bare of [false, true]) {
+      const tags = posePhotoTags(`Standing in her room, ${action}.`, bare)
+      expect(tags).not.toContain('hand_on_own_hip')
+      expect(tags).not.toContain('hands_on_own_thighs')
+    }
+  })
+
+  it('keeps the existing hand action when she is holding herself open', () => {
+    expect(posePhotoTags('Naked, standing, holding herself open', true)).toEqual(
+      expect.arrayContaining(['spread_pussy', 'spread_legs'])
+    )
+  })
+})
+
 describe('a selfie', () => {
   it('keeps the phone out, her arm reaching out of the picture', () => {
     const pose = photoPose('a selfie in the cafe, smiling', false)

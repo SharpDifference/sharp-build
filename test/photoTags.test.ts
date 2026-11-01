@@ -16,6 +16,18 @@ import { describe, expect, it } from 'vitest'
 
 /** Danbooru vocabulary checked against the API or the catalog cited beside its entries. */
 const VERIFIED = new Set([
+  // Reveals, checked against the same published Danbooru catalog below.
+  'breasts_out',
+  'underboob',
+  'panty_pull',
+  'pants_pull',
+  'open_shirt',
+  'open_clothes',
+  'bra_pull',
+  'off_shoulder',
+  'strap_slip',
+  'bra',
+  'panties',
   // Activities and instruments, checked against the published Danbooru catalog:
   // github.com/DominikDoom/a1111-sd-webui-tagcomplete/blob/main/tags/danbooru.csv
   'playing_guitar',
@@ -305,6 +317,7 @@ function emittedTags(): string[] {
     ...quoted(pose, /PLACEMENT_TAGS[^=]*=\s*new Set\(\[([^\]]*)\]/g),
     ...quoted(body, /THROUGH_CLOTH[^=]*=\s*\{([^}]*)\}/g),
     ...quoted(prompt, /tag:\s*('[^']*')/g),
+    ...quoted(prompt, /tags:\s*\[([^\]]*)\]/g).map(unweighted),
     ...quoted(prompt, /\[('partially_undressed')/g),
     ...quoted(prompt, /DRESSED_NEGATIVE[^=]*=\s*\[([^=]*?)\n\]/g).filter((tag) =>
       /^[a-z_]+$/.test(tag)
