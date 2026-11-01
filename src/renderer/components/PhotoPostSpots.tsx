@@ -4,14 +4,12 @@ import { hashString, shownComments } from '@vx/modkit/shared'
 import {
   type PostCommentsProps,
   type PostPictureProps,
-  gestures,
-  noteIn,
-  quietPress,
-  toggleLift
+  noteIn
 } from '@vx/modkit/renderer'
 import { photoFriendHandle } from '../../shared/photoDuo'
 import { useGameStore } from '../stores/gameStore'
 import { usePhotosVisible } from '../stores/photoSwitchHooks'
+import { photoRedrawKey, usePhotoRedraw } from '../stores/photoRedraw'
 import { PostPhoto } from './PhotoBubble'
 import '../vu_styles/PostComments.css'
 
@@ -25,6 +23,8 @@ export function PhotoPostPicture({ charId, postId }: PostPictureProps): JSX.Elem
   const photo = useGameStore(
     (s) => s.charInfo[charId]?.feed?.find((post) => post.id === postId)?.photo
   )
+  const playthroughId = useGameStore((s) => s.playthroughId)
+  const redraw = usePhotoRedraw(photoRedrawKey(playthroughId, charId, photo?.file))
   const handle = useGameStore((s) =>
     photoFriendHandle(s.npcRelationships, charId, photo?.with, s.charInfo)
   )
@@ -35,12 +35,13 @@ export function PhotoPostPicture({ charId, postId }: PostPictureProps): JSX.Elem
     setTagShown(false)
   }, [charId, postId, photo?.with, photo?.file, photo?.pending, photo?.failed, handle, visible])
   if (!photo || !visible) return null
-  const taggable = Boolean(handle && photo.file && !photo.pending && !photo.failed)
+  const taggable = Boolean(handle && photo.file && !photo.pending && !photo.failed && redraw !== 'drawing')
   const showing = taggable && tagShown
   return (
     <div
       className="vu-bb-post-shot"
       onClickCapture={(event) => {
+        if ((event.target as Element).closest('.vu-bb-photo-info, .vu-photo-info-veil')) return
         if (!showing) return
         event.preventDefault()
         event.stopPropagation()
@@ -50,25 +51,24 @@ export function PhotoPostPicture({ charId, postId }: PostPictureProps): JSX.Elem
       <PostPhoto charId={charId} postId={postId} photo={photo} />
       {taggable && (
         <>
-          <motion.button
+          <button
             type="button"
             className="vu-bb-photo-tags-toggle"
             aria-label={showing ? 'Hide who is in this photo' : 'Show who is in this photo'}
             aria-expanded={showing}
             aria-controls={tagId}
-            {...gestures(false, toggleLift, quietPress)}
             onClick={(event) => {
               event.stopPropagation()
               setTagShown((shown) => !shown)
             }}
           >
             <svg
-              width="16"
-              height="16"
+              width="14"
+              height="14"
               viewBox="0 0 24 24"
               fill="none"
               stroke="currentColor"
-              strokeWidth="2.75"
+              strokeWidth="2.85"
               strokeLinecap="round"
               strokeLinejoin="round"
               aria-hidden="true"
@@ -77,7 +77,7 @@ export function PhotoPostPicture({ charId, postId }: PostPictureProps): JSX.Elem
               <circle cx="12" cy="7.5" r="4" />
               <path d="M4.5 20.5a7.5 7.5 0 0 1 15 0" />
             </svg>
-          </motion.button>
+          </button>
           <span className="vu-bb-photo-tag-seat">
             <AnimatePresence>
               {showing && (
