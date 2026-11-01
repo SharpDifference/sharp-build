@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { bodyTagsFor } from '../src/shared/photoBody'
+import { bodyTagsFor, partialExposureIn } from '../src/shared/photoBody'
 import { framingOf } from '../src/shared/photoFraming'
 import { photoPose, posePhotoTags } from '../src/shared/photoPose'
 
@@ -89,5 +89,52 @@ describe('her body as far as the shot reaches', () => {
   it('leaves the rest to the caption, as before', () => {
     const scene = 'standing in her bikini on the beach'
     expect(bodyTagsFor(body, scene, false, 'knees')).toEqual(bodyTagsFor(body, scene, false))
+  })
+})
+
+describe('partial exposure and the parts in shot', () => {
+  it('masks the unmentioned half while respecting the camera framing', () => {
+    const lower = partialExposureIn('Her skirt lifted and panties removed', [
+      'skirt_lift',
+      'no_panties'
+    ])
+    expect(
+      bodyTagsFor(undefined, 'Her skirt lifted and panties removed', true, 'knees', lower)
+    ).toContain('pussy')
+    expect(
+      bodyTagsFor(undefined, 'Her skirt lifted and panties removed', true, 'knees', lower)
+    ).not.toContain('nipples')
+    expect(
+      bodyTagsFor(undefined, 'Her skirt lifted and panties removed', true, 'face', lower)
+    ).toEqual([])
+    const upper = partialExposureIn('Pulling down her top', ['clothes_pull'])
+    expect(bodyTagsFor(undefined, 'Pulling down her top', true, 'full', upper)).toContain('nipples')
+    expect(bodyTagsFor(undefined, 'Pulling down her top', true, 'full', upper)).not.toContain(
+      'pussy'
+    )
+  })
+
+  it('leaves unrecognised and fully nude coverage to the existing rules', () => {
+    expect(partialExposureIn('Her clothes bunched', ['clothes_pull'])).toBeUndefined()
+    expect(partialExposureIn('Fully naked', ['skirt_lift'])).toBeUndefined()
+    expect(bodyTagsFor(undefined, 'Fully naked', true, 'full')).toEqual([
+      'nipples',
+      'navel',
+      'pussy'
+    ])
+  })
+
+  it('names bottomless only when the lower clothes are moved away', () => {
+    expect(
+      partialExposureIn('Her skirt lifted, panties removed', ['skirt_lift', 'no_panties'])
+        ?.bottomless
+    ).toBe(true)
+    expect(partialExposureIn('In her skirt, panties removed', ['no_panties'])?.bottomless).toBe(
+      false
+    )
+    expect(
+      partialExposureIn('Her skirt lifted, panties aside', ['skirt_lift', 'panties_aside'])
+        ?.bottomless
+    ).toBe(false)
   })
 })

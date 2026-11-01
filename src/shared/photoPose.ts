@@ -153,6 +153,13 @@ const PLACEMENT_TAGS: ReadonlySet<string> = new Set([
 
 /** Direct descriptions of her occupied hands, including the ones removed from mirror prose. */
 const OCCUPIED_HAND_CUES = [
+  'dangling',
+  'dangles',
+  'swinging',
+  'twirling',
+  'hanging from her finger',
+  'holding up her panties',
+  'holding up her bra',
   'toying',
   'fiddling',
   'touching',
@@ -348,10 +355,19 @@ interface GestureRule extends ActivityRule {
  */
 const PEACE_CUES = ['peace sign', 'v sign', 'v-sign', 'flashing a v']
 
+/** A garment in her hand, in either order, including a short relative clause. */
+function heldClothing(garment: string): RegExp {
+  const gap = "(?:\\s+(?!over\\b|under\\b|with\\b|and\\b|while\\b)[a-z'’-]+){0,4}?\\s+"
+  const hold = '(?:holding(?: up)?|dangling|dangles|swinging|twirling|hanging)'
+  return new RegExp(`\\b${hold}\\b${gap}${garment}\\b|\\b${garment}\\b${gap}${hold}\\b`)
+}
+
 /** Everyday gestures, with covering reserved for the suggestive and explicit tiers. */
 const FREE_HAND_GESTURES: readonly GestureRule[] = [
   { cues: ['waving'], tags: ['waving'] },
   { cues: ['pointing'], tags: ['pointing'] },
+  { cues: heldClothing('panties'), tags: ['holding_panties'] },
+  { cues: heldClothing('bra'), tags: ['holding_bra'] },
   {
     cues: /\b(?:toying with|touching|adjusting|fiddling with)(?:\s+[a-z'’-]+){0,3}\s+(?:chokers?|necklaces?)\b/,
     tags: ['hand_on_own_neck']

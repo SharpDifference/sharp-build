@@ -316,6 +316,95 @@ describe('the clothes she is moving aside', () => {
   })
 })
 
+describe('the half a partly undressed photo bares', () => {
+  const girl = character({
+    outfit: ['ivory_blouse', 'lavender pleated mini skirt'],
+    peOutfit: ['blue_track_pants', 'sports_bra']
+  })
+  const tagsOf = (positive: string): string[] => positive.split(',').map((tag) => tag.trim())
+
+  it('draws the restroom reveal with the top from her set and only her lower half bare', () => {
+    const caption =
+      'In the restaurant restroom stall, she stands with her lavender pleated ' +
+      'mini skirt hitched up to her ribcage, having completely removed her panties which she ' +
+      'dangles from one trembling finger, fully exposing her bare pink slit and flushed inner ' +
+      'thighs, looking down toward the viewer, captured from the knees up.'
+    const { positive } = buildPhotoPrompt(girl, 'explicit', caption)
+    const tags = tagsOf(positive)
+    expect(tags).toEqual(
+      expect.arrayContaining([
+        'holding_panties',
+        'pussy',
+        'no_panties',
+        'bottomless',
+        'skirt_lift',
+        '(ivory_blouse:1.2)',
+        'lavender pleated mini skirt',
+        'partially_undressed'
+      ])
+    )
+    expect(tags).not.toContain('hand_on_own_hip')
+    expect(tags).not.toContain('nipples')
+    expect(tags).not.toContain('breasts_out')
+    expect(positive).toContain('her lavender pleated mini skirt hitched up')
+  })
+
+  it('bares only her upper half when she pulls down her top', () => {
+    const tags = tagsOf(
+      buildPhotoPrompt(girl, 'explicit', 'Standing, pulling down her top to bare her breasts.')
+        .positive
+    )
+    expect(tags).toEqual(expect.arrayContaining(['nipples', 'breasts_out', 'partially_undressed']))
+    expect(tags).not.toContain('pussy')
+    expect(tags).not.toContain('bottomless')
+  })
+
+  it.each([
+    ['Took off her panties, her skirt hitched up.', ['no_panties', 'skirt_lift', 'pussy']],
+    ['In her everyday clothes, no panties, her skirt pulled up.', ['no_panties', 'pussy']],
+    ['Her panties around her ankle, her skirt lifted.', ['panty_pull', 'pussy']],
+    ['Her panties around her knee, her skirt lifted.', ['panty_pull', 'pussy']],
+    ['Her panties around one leg, her skirt lifted.', ['panties_around_one_leg', 'pussy']],
+    ['Her skirt lifted, her pussy showing.', ['pussy', 'skirt_lift']],
+    ['Her skirt lifted, her pussy fully exposed.', ['pussy', 'skirt_lift']],
+    ['Her skirt lifted, exposing her pink slit.', ['pussy', 'skirt_lift']]
+  ])('reads the lower reveal in %s', (caption, expected) => {
+    const tags = tagsOf(buildPhotoPrompt(girl, 'explicit', caption).positive)
+    expect(tags).toEqual(expect.arrayContaining(expected))
+    expect(tags).not.toContain('nipples')
+    expect(tags).not.toContain('breasts_out')
+  })
+
+  it('keeps both bare halves when both are revealed, and fully nude photos as they were', () => {
+    const both = tagsOf(
+      buildPhotoPrompt(
+        girl,
+        'explicit',
+        'In her everyday clothes, lifting her shirt to show her breasts, her skirt lifted, no panties.'
+      ).positive
+    )
+    expect(both).toEqual(expect.arrayContaining(['nipples', 'breasts_out', 'pussy', 'no_panties']))
+    const nude = tagsOf(buildPhotoPrompt(girl, 'explicit', 'Fully naked on her bed.').positive)
+    expect(nude).toEqual(expect.arrayContaining(['nude', 'completely_nude', 'nipples', 'pussy']))
+    expect(nude).not.toContain('partially_undressed')
+    expect(nude).not.toContain('(ivory_blouse:1.2)')
+  })
+
+  it('does not select a set from a garment noun alone', () => {
+    const { positive } = buildPhotoPrompt(girl, 'explicit', 'Lifting a skirt.')
+    expect(positive).not.toContain('ivory_blouse')
+    expect(positive).not.toContain('lavender pleated mini skirt')
+    expect(tagsOf(positive)).toContain('partially_undressed')
+  })
+
+  it('does not apply garment matching or partial coverage to clothed photos', () => {
+    const { positive } = buildPhotoPrompt(girl, 'everyday', 'In a lavender mini skirt at a cafe.')
+    expect(positive).not.toContain('ivory_blouse')
+    expect(tagsOf(positive)).not.toContain('pussy')
+    expect(tagsOf(positive)).not.toContain('no_panties')
+  })
+})
+
 describe('an explicit picture she is still partly dressed in', () => {
   /** The caption a playtest drew wrong: dressed, a thong pulled aside, legs crossed, shot low. */
   const caption =

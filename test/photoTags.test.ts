@@ -16,6 +16,11 @@ import { describe, expect, it } from 'vitest'
 
 /** Danbooru vocabulary checked against the API or the catalog cited beside its entries. */
 const VERIFIED = new Set([
+  'holding_panties',
+  'holding_bra',
+  'no_panties',
+  'panties_around_one_leg',
+  'bottomless',
   // Gestures and the mirror's phone constraint, from the same published catalog.
   'hand_on_own_neck',
   'hand_in_own_hair',

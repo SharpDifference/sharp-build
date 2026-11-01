@@ -465,6 +465,25 @@ describe('her free hand', () => {
   })
 })
 
+describe('her hands holding clothes', () => {
+  it.each([
+    ['holding her panties', 'holding_panties'],
+    ['dangling her panties', 'holding_panties'],
+    ['her panties which she dangles from one trembling finger', 'holding_panties'],
+    ['her panties hanging from her finger', 'holding_panties'],
+    ['swinging her bra', 'holding_bra'],
+    ['holding up her bra', 'holding_bra']
+  ])('names %s and clears her hip hand', (caption, tag) => {
+    for (const tier of ['everyday', 'suggestive', 'explicit'] as const) {
+      const pose = photoPose(`Standing, ${caption}.`, tier)
+      expect(pose.tags).toContain(tag)
+      expect(pose.tags).not.toContain('hand_on_own_hip')
+    }
+    const mirror = photoPose(`A mirror selfie, standing, ${caption}.`, 'explicit')
+    expect(mirror.tags).toEqual(expect.arrayContaining([tag, 'holding_phone']))
+  })
+})
+
 describe('a selfie', () => {
   it('keeps the phone out, her arm reaching out of the picture', () => {
     const pose = photoPose('a selfie in the cafe, smiling', 'everyday')

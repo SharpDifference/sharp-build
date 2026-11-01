@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { buildPhotoPrompt } from '../src/shared/photoPrompt'
-import { photoWardrobe, wardrobeLine } from '../src/shared/photoWardrobe'
+import { photoWardrobe, wardrobeLine, photoWardrobeFromGarment } from '../src/shared/photoWardrobe'
 import type { Character } from '../src/shared/types'
 import { character } from './fixtures'
 
@@ -146,5 +146,33 @@ describe('wardrobeLine', () => {
     expect(line).toContain('gym uniform')
     expect(line).toContain('white bikini')
     expect(line).toContain('"Date night"')
+  })
+})
+
+describe('a set identified by one of its garments', () => {
+  const girl = {
+    ...mina,
+    outfit: ['white_blouse', '(lavender_pleated_mini_skirt:1.2)'],
+    peOutfit: ['blue_track_pants', 'sports_bra'],
+    customOutfits: { custom1: { name: 'Rainy day', tags: ['yellow_raincoat'] } }
+  } as Character
+
+  it('reads colour or style beside the garment noun, including tag separators and weights', () => {
+    expect(photoWardrobeFromGarment(girl, 'Her lavender mini skirt hitched up')).toEqual(
+      girl.outfit
+    )
+    expect(photoWardrobeFromGarment(girl, 'Her pleated skirt lifted')).toEqual(girl.outfit)
+    expect(photoWardrobeFromGarment(girl, 'Her blue track pants pulled down')).toEqual(
+      girl.peOutfit
+    )
+    expect(photoWardrobeFromGarment(girl, 'Her yellow raincoat held open')).toEqual([
+      'yellow_raincoat'
+    ])
+  })
+
+  it('requires a modifier of the same garment, not one on another item or a bare noun', () => {
+    expect(photoWardrobeFromGarment(girl, 'Lifting a skirt')).toBeNull()
+    expect(photoWardrobeFromGarment(girl, 'A lavender shirt and a plain skirt')).toBeNull()
+    expect(photoWardrobeFromGarment(girl, 'A yellow scarf and a plain raincoat')).toBeNull()
   })
 })

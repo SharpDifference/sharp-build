@@ -1,5 +1,5 @@
 import { customOutfitSlotsIn, outfitTagsFor } from './outfits'
-import { saysAny } from './photoWords'
+import { says, saysAny } from './photoWords'
 import type { CustomOutfitSlot } from './types'
 import type { Character } from '@vx/modkit/shared'
 
@@ -122,6 +122,93 @@ export function photoWardrobe(
   if (swimwearAllowed && saysAny(text, SWIM_PLACES)) return outfitTagsFor(character, 'swim')
   if (saysAny(text, PE_PLACES)) return outfitTagsFor(character, 'pe')
   return character.outfit
+}
+
+/** Garments a described item can identify within a set; accessories alone do not select one. */
+const GARMENT_NOUNS = [
+  'skirt',
+  'shirt',
+  'blouse',
+  'sweater',
+  'cardigan',
+  'hoodie',
+  'top',
+  'dress',
+  'coat',
+  'jacket',
+  'raincoat',
+  'shorts',
+  'pants',
+  'trousers',
+  'jeans',
+  'bra',
+  'panties',
+  'bikini',
+  'swimsuit',
+  'uniform',
+  'camisole',
+  'leggings',
+  'robe'
+]
+const GARMENT_FILLER = new Set(['her', 'their', 'own', 'the', 'and', 'with', 'clothes', 'clothing'])
+const GARMENT_BREAK = [
+  'and',
+  'with',
+  'beside',
+  'near',
+  'on',
+  'under',
+  'over',
+  'above',
+  'below',
+  'next',
+  'wearing',
+  'dressed',
+  ...GARMENT_NOUNS
+].join('|')
+
+/** Weights and separators carry no clothing description. */
+function garmentWords(text: string): string {
+  return text
+    .toLowerCase()
+    .replace(/\(([^():]+):[\d.]+\)/g, '$1')
+    .replace(/[_()-]/g, ' ')
+    .replace(/\bminiskirt(s?)\b/g, 'mini skirt$1')
+}
+
+/** A garment noun and one of that garment's colour or style words identify its set. */
+export function photoWardrobeFromGarment(
+  character: Character,
+  caption: string
+): readonly string[] | null {
+  const text = garmentWords(caption)
+  const sets = [
+    character.outfit,
+    character.peOutfit,
+    character.swimOutfit,
+    ...customOutfitSlotsIn(Object.keys(character.customOutfits ?? {})).map((slot) =>
+      outfitTagsFor(character, slot)
+    )
+  ]
+  for (const tags of sets) {
+    if (!tags) continue
+    for (const tag of tags) {
+      const words = garmentWords(tag)
+      for (const noun of GARMENT_NOUNS) {
+        if (!says(words, noun) || !says(text, noun)) continue
+        const modifiers = words
+          .split(/[^a-z]+/)
+          .filter((word) => word.length >= 3 && !GARMENT_FILLER.has(word) && !says(word, noun))
+        const word = `(?!(?:${GARMENT_BREAK})\\b)[a-z]+`
+        const phrase = new RegExp(
+          `(?:\\b${word}\\s+){0,5}\\b${noun}(?:s|es)?\\b(?:\\s+${word}){0,3}`,
+          'g'
+        )
+        if ([...text.matchAll(phrase)].some((match) => saysAny(match[0], modifiers))) return tags
+      }
+    }
+  }
+  return null
 }
 
 /** A wardrobe's tags as words a caption can use: `pink_cardigan` is "pink cardigan". */

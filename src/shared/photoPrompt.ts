@@ -1,7 +1,7 @@
 import type { PhotoTier } from './photoGate'
 import { DORM_IDS, dormLabel } from './dorms'
 import { bodyAppearance, bodyNegative, bodyOf } from './characterBody'
-import { bodyTagsFor, describesNothingOn } from './photoBody'
+import { bodyTagsFor, describesNothingOn, partialExposureIn, type PartialPhotoExposure } from './photoBody'
 import { framingInTags, framingOf } from './photoFraming'
 import {
   PHOTO_CLAUSE_END,
@@ -17,7 +17,7 @@ import type { Character } from '@vx/modkit/shared'
 // and pulls in what they import — so the feature brings its own types rather than relying on a
 // tsconfig line, which would be one more thing to re-add on a sync.
 import type {} from './photoTypes'
-import { photoWardrobe, photoWardrobeNames } from './photoWardrobe'
+import { photoWardrobe, photoWardrobeNames, photoWardrobeFromGarment } from './photoWardrobe'
 import { says, saysAny } from './photoWords'
 
 /**
@@ -477,9 +477,10 @@ export function buildPhotoPrompt(
   // wears it, not her undressing, and the tags pulled the picture towards it.
   if (tier === 'everyday') pose.tags = pose.tags.filter((tag) => !EVERYDAY_DROPS.has(tag))
   // Her body as far as the shot reaches: a selfie from the waist up names no hips.
-  const body = bodyTagsFor(bodyOf(character), scene, bare, framingInTags(pose.tags))
-
   const selected = wardrobeForPhoto(character, tier, scene, dressed)
+  const body = bodyTagsFor(
+    bodyOf(character), scene, bare, framingInTags(pose.tags), selected.exposure
+  )
   const wardrobe = plainColours(selected.tags.map(heldColour).join(', '))
   const caption = withoutOutfitName(scene, selected.names)
 
@@ -526,21 +527,35 @@ function wardrobeForPhoto(
   tier: PhotoTier,
   scene: string,
   captionDressesHer: boolean
-): { tags: readonly string[]; names: readonly string[] } {
+): { tags: readonly string[]; names: readonly string[]; exposure?: PartialPhotoExposure } {
   const bare = tier === 'explicit'
   const named = photoWardrobeNames(character, scene)
-  const partial = bare && (captionDressesHer || named.length > 0) && !describesNothingOn(scene)
+  const reveals = bare ? displacedTags(scene) : []
+  const partial =
+    bare &&
+    (captionDressesHer || named.length > 0 || reveals.length > 0) &&
+    !describesNothingOn(scene)
   const names = !bare || partial ? named : []
   const outfit =
     !bare || names.length > 0
       ? (photoWardrobe(character, scene, captionDressesHer, tier !== 'everyday') ?? [])
-      : []
+      : partial
+        ? (photoWardrobeFromGarment(character, scene) ?? [])
+        : []
+  const exposure = partial ? partialExposureIn(scene, reveals, outfit) : undefined
   const tags = bare
     ? partial
-      ? [...outfit, 'partially_undressed', ...displacedTags(scene), BARE_POSITIVE]
+      ? [
+          ...outfit,
+          'partially_undressed',
+          ...reveals,
+          ...(exposure?.upper ? ['breasts_out'] : []),
+          ...(exposure?.bottomless ? ['bottomless'] : []),
+          BARE_POSITIVE
+        ]
       : ['nude', 'completely_nude', BARE_POSITIVE]
     : [...outfit, ...(tier === 'suggestive' ? suggestiveReveals(scene) : [])]
-  return { tags, names }
+  return { tags: [...new Set(tags)], names, exposure }
 }
 
 /** Pose tags an everyday photo never carries. */
@@ -602,7 +617,31 @@ const DISPLACEMENTS: readonly RevealRule[] = [
     ),
     tags: ['breasts_out']
   },
-  { words: /\bunderboob\b/, tags: ['underboob'] }
+  { words: /\bunderboob\b/, tags: ['underboob'] },
+  { words: /\btopless\b/, tags: ['breasts_out'] },
+  { words: /\bbottomless\b/, tags: ['bottomless'] },
+  {
+    words: garmentMove(
+      ['panties', 'underwear', 'thong'],
+      '(?:removed|removing|took off|taken off|no)'
+    ),
+    tags: ['no_panties']
+  },
+  {
+    words: /\bpanties\b(?:\s+[a-z'’-]+){0,2}\s+around (?:her |one )?(?:ankles?|knees?|legs?)\b/,
+    tags: ['panty_pull']
+  },
+  {
+    words: /\bpanties\b(?:\s+[a-z'’-]+){0,2}\s+around (?:her )?one leg\b/,
+    tags: ['panties_around_one_leg']
+  },
+  {
+    words: new RegExp(
+      "\\b(?:bare|expos(?:e|ing|ed)|show(?:ing|n)?)(?:\\s+[a-z'’-]+){0,3}\\s+(?:slit|pussy)\\b|" +
+        "\\b(?:slit|pussy)\\b(?:\\s+[a-z'’-]+){0,3}\\s+(?:bare|showing|shown|exposed)\\b"
+    ),
+    tags: ['pussy']
+  }
 ]
 
 /** The non-explicit reveals allowed beside a suggestive photo's outfit. */
@@ -774,10 +813,10 @@ function duoHalf(
   const bare = tier === 'explicit'
   const dressed = bare && describesClothing(scene)
   const appearance = bodyAppearance(girl, 'photo').filter((tag) => tag !== '1girl')
-  const body = bodyTagsFor(bodyOf(girl), scene, bare, 'waist').filter(
+  const selected = wardrobeForPhoto(girl, tier, scene, dressed)
+  const body = bodyTagsFor(bodyOf(girl), scene, bare, 'waist', selected.exposure).filter(
     (tag) => bare || !BELOW_WAIST.test(tag)
   )
-  const selected = wardrobeForPhoto(girl, tier, scene, dressed)
   const wardrobe = selected.tags
     .filter((tag) => bare || !BELOW_WAIST.test(tag))
     .map(heldColour)
