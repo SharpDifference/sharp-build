@@ -16,6 +16,21 @@ import { describe, expect, it } from 'vitest'
 
 /** Danbooru vocabulary checked against the API or the catalog cited beside its entries. */
 const VERIFIED = new Set([
+  // Gestures and the mirror's phone constraint, from the same published catalog.
+  'hand_on_own_neck',
+  'hand_in_own_hair',
+  'hand_on_own_cheek',
+  'hand_on_own_face',
+  'finger_to_mouth',
+  'biting_own_finger',
+  'nail_biting',
+  'adjusting_clothes',
+  'blowing_kiss',
+  'heart_hands',
+  'arms_behind_back',
+  'covering_breasts',
+  'covering_crotch',
+  'dual_wielding',
   // Reveals, checked against the same published Danbooru catalog below.
   'breasts_out',
   'underboob',
@@ -312,6 +327,7 @@ function emittedTags(): string[] {
     ...quoted(pose, /\? \[\] : \[('camera')\]/g),
     ...quoted(pose, /'from_above'\],\s*\[([^\]]*)\]/g),
     ...quoted(pose, /negative: \[\.\.\.negative, ('on_back')\]/g),
+    ...quoted(pose, /negative:\s*\[([^\]]*)\]/g).map(unweighted),
     ...quoted(framing, /tags:\s*\[([^\]]*)\]/g).map(unweighted),
     ...quoted(pose, /BARE_POSITION_DEFAULT[^=]*=\s*\[([^\]]*)\]/g),
     ...quoted(pose, /PLACEMENT_TAGS[^=]*=\s*new Set\(\[([^\]]*)\]/g),

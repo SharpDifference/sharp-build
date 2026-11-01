@@ -40,15 +40,15 @@ describe('the framing a caption names', () => {
       'A medium shot selfie lying on her side',
       'A medium shot selfie lying on her stomach'
     ]) {
-      const tags = photoPose(scene, false).tags
+      const tags = photoPose(scene, 'everyday').tags
       expect(tags).toContain('(upper_body:1.3)')
       expect(tags).not.toContain('full_body')
       expect(tags).not.toContain('portrait')
     }
-    const face = photoPose('A close-up lying on her side in a booth', false).tags
+    const face = photoPose('A close-up lying on her side in a booth', 'everyday').tags
     expect(face).toEqual(expect.arrayContaining(['on_side', 'close-up', 'portrait']))
     expect(face).not.toContain('(upper_body:1.3)')
-    const knees = photoPose('A three-quarter selfie sitting in a booth', false).tags
+    const knees = photoPose('A three-quarter selfie sitting in a booth', 'everyday').tags
     expect(knees).toContain('cowboy_shot')
     expect(knees).not.toContain('full_body')
   })
@@ -64,7 +64,7 @@ describe('the framing a caption names', () => {
 
   it('keeps pose defaults only where the caption names no framing', () => {
     expect(posePhotoTags('standing by the window', false)).toContain('cowboy_shot')
-    expect(photoPose('a selfie in the cafe, waist up', false).tags).toContain('(upper_body:1.3)')
+    expect(photoPose('a selfie in the cafe, waist up', 'everyday').tags).toContain('(upper_body:1.3)')
     const side = posePhotoTags('waist up, lying on her side in bed', false)
     expect(side).toEqual(expect.arrayContaining(['on_side', '(upper_body:1.3)']))
     const stomach = posePhotoTags('waist up, on her stomach on the bed', false)

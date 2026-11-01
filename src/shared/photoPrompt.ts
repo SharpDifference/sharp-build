@@ -472,7 +472,7 @@ export function buildPhotoPrompt(
   const bare = tier === 'explicit'
   const dressed = describesClothing(scene)
 
-  const pose = photoPose(scene, bare)
+  const pose = photoPose(scene, tier)
   // An everyday photo is seen by everyone: a hoodie slipping off a shoulder there is how she
   // wears it, not her undressing, and the tags pulled the picture towards it.
   if (tier === 'everyday') pose.tags = pose.tags.filter((tag) => !EVERYDAY_DROPS.has(tag))
@@ -840,7 +840,7 @@ export function buildDuoPhotoPrompt(
   const text = scene.toLowerCase()
   const bare = tier === 'explicit'
 
-  const pose = photoPose(scene, bare)
+  const pose = photoPose(scene, tier)
   const posture = pose.tags.filter((tag) => DUO_POSTURE.has(tag))
   const framing = duoFraming(text)
 
