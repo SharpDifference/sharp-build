@@ -706,6 +706,7 @@ export interface LedgerResponse {
     }>;
     spent?: number;
     stats?: LedgerStats;
+    summary?: string;
     textMemories?: Array<{
         charKey: string;
         type: MemoryType;

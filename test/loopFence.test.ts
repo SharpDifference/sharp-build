@@ -280,7 +280,7 @@ function endingUnderWay(): {
   registerLoopHooks(registered.slotCycle)
   useGameStore.getState().setSceneEnding(true)
   useGameStore.getState().setEndingInFlight(true)
-  return { ending: runEnding(true), answer, completeLedger }
+  return { ending: runEnding(false), answer, completeLedger }
 }
 
 describe('an ending the player interjected over', () => {
