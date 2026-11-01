@@ -310,6 +310,16 @@ export function dispositionOf(affection: number): Disposition {
   return 'hostile'
 }
 
+/** Each disposition as a picker or a reading names it. */
+export const DISPOSITION_LABELS: Record<Disposition, string> = {
+  devoted: 'Devoted',
+  trusted: 'Trusted',
+  friendly: 'Friendly',
+  neutral: 'Neutral',
+  annoyed: 'Annoyed',
+  hostile: 'Hostile'
+}
+
 /** One affection score inside each tier, for a disposition set by hand rather than earned. */
 const DISPOSITION_AFFECTION: Record<Disposition, number> = {
   devoted: 60,

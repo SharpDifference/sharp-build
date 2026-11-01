@@ -54,6 +54,7 @@ const SETTINGS_REQUIRED: Record<
     | 'fullscreen'
     | 'warnEndingInterrupt'
     | 'warnEndingEdit'
+    | 'newGameWelcome'
     | 'updateAsVersion'
     | 'updateFeed'
     | 'secondaryModel'
@@ -180,8 +181,8 @@ export function defaultSettings(): Settings {
     // `streamResponses`, `comfyGpu`, `updateAsVersion` and `updateFeed` are deliberately
     // absent: they are hand-edited switches, and absent is what resolves to streaming on, to
     // whichever GPU vendor the machine reports and to the real build on itch.io. `serviceTier`
-    // is absent too, and absent is priority; so is `checkUpdates`, absent being offering, and
-    // `fullscreen`, absent being fullscreen.
+    // is absent too, and absent is priority; so is `checkUpdates`, absent being offering,
+    // `fullscreen`, absent being fullscreen, and `newGameWelcome`, absent being welcoming.
     comfyDeferred: false,
     // Nothing is withheld until the player says so; an unanswered `sfwAsked` raises the question.
     noNsfwImages: false,
@@ -432,6 +433,8 @@ export function mergePatch(current: Settings, patch: SettingsPatch): Settings {
     // Absent stays absent, and absent is warning.
     warnEndingInterrupt: patch.warnEndingInterrupt,
     warnEndingEdit: patch.warnEndingEdit,
+    // Absent stays absent, and absent is welcoming.
+    newGameWelcome: patch.newGameWelcome,
     noNsfwImages: patch.noNsfwImages,
     lessNsfwText: patch.lessNsfwText,
     sfwAsked: patch.sfwAsked,

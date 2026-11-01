@@ -24,8 +24,14 @@ interface GrabBagStoreState {
     keyOf?: (item: T) => string,
     accept?: (item: T) => boolean
   ) => T
-  /** Draws `count` distinct items from `items` under `bagId`. */
-  drawMany: <T>(bagId: string, items: readonly T[], count: number, keyOf?: (item: T) => string) => T[]
+  /** Draws `count` distinct items from `items` under `bagId`, those `accept` passes first. */
+  drawMany: <T>(
+    bagId: string,
+    items: readonly T[],
+    count: number,
+    keyOf?: (item: T) => string,
+    accept?: (item: T) => boolean
+  ) => T[]
   /** Resolves once every draw so far is on disk (or has failed to get there). */
   flush: () => Promise<void>
   /** Empties every bag and forgets the disk; for tests. */
@@ -86,8 +92,9 @@ export const useGrabBagStore = create<GrabBagStoreState>((set, get) => ({
     return item
   },
 
-  drawMany: (bagId, items, count, keyOf = itemKey) => {
-    const result = drawManyFromBag(items, get().bags[bagId] ?? [], keyOf, count)
+  drawMany: (bagId, items, count, keyOf = itemKey, accept) => {
+    const drawn = get().bags[bagId] ?? []
+    const result = drawManyFromBag(items, drawn, keyOf, count, Math.random, accept)
     set({ bags: { ...get().bags, [bagId]: result.drawn } })
     if (get().hydrated) scheduleWrite()
     return result.items

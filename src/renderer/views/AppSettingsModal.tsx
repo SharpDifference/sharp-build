@@ -58,6 +58,7 @@ import { SystemPromptModal } from './SystemPromptModal'
 import { GamepadIcon, ImageIcon, SlidersIcon, SparklesIcon } from './screenIcons'
 import { useSettingsStore } from '../stores/settingsStore'
 import { useAudioStore } from '../stores/audioStore'
+import { applicationSettled } from '../stores/applicationStore'
 import { lorebookSettled } from '../stores/lorebookStore'
 import { usePhotoStore } from '../stores/photoStore'
 import { useUiStore } from '../stores/uiStore'
@@ -697,7 +698,7 @@ export function AppSettingsModal({ theme, onClose }: AppSettingsModalProps): JSX
           <TitleTab>Settings</TitleTab>
 
           {/* The tabs stand in the panel's round end: one control in as many states. */}
-          <div className="vu-palette vu-settings-tabs" role="tablist" aria-label="Settings">
+          <div className="vu-palette vu-palette--column vu-settings-tabs" role="tablist" aria-label="Settings">
             {tabs.map((entry) => {
               const on = tab === entry.id
               return (
@@ -1164,10 +1165,12 @@ export function AppSettingsModal({ theme, onClose }: AppSettingsModalProps): JSX
             onConfirm={() => {
               setConfirmRestore(false)
               setRestoring(true)
-              // A restore swaps every save underneath a photo or a lorebook still being written.
+              // A restore swaps every save underneath a photo, a lorebook or a New Game still
+              // being written.
               void usePhotoStore
                 .getState()
                 .cancelAll()
+                .then(() => applicationSettled())
                 .then(() => lorebookSettled())
                 .then(() => importBackup())
                 .finally(() => setRestoring(false))

@@ -1,0 +1,27 @@
+/* New Game's Setting screen: its tabs beside one panel (NewGame.css), the panel holding either
+   the setting's box or the lorebook laid out as the Bunnyboard's tab lays it out (Bunnyboard.css
+   and Lorebook.css, which `LorebookPage` brings). Imported from the view module. */
+
+/* The setting's box fills the page and scrolls inside itself, the reset and the status line at
+   its foot. */
+.vu-ngset-setting {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
+  padding: 36px 48px 28px;
+}
+
+.vu-ngset-setting .vu-field {
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+.vu-ngset-setting .vu-input--multiline {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: hidden auto;
+  resize: none;
+  line-height: 1.55;
+}

@@ -210,7 +210,7 @@ async function boot() {
   let enrolled = fromMenu === 'quickstart'
   for (;;) {
     // Continue opens the registrar when the enrollment is the newest thing in the profile.
-    if (!enrolled && (await page.$('#class-select-finalize'))) {
+    if (!enrolled && (await page.$('#class-select-enroll'))) {
       say('registrar: enrolling')
       await D.enrol(page)
       enrolled = true

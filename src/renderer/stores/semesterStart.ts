@@ -11,8 +11,9 @@ import {
   observedUpperHalves
 } from '@shared/relationship'
 import { SAVE_SCHEMA_VERSION } from '@shared/saveRules'
+import { pairsOver } from '@shared/sceneCreator'
 import { observedSecretTiers } from '@shared/secrets'
-import { seasonOf } from '@shared/semesters'
+import { calendarOf, seasonOf } from '@shared/semesters'
 import { shuffle } from '@shared/shuffle'
 import {
   type CharJob,
@@ -35,7 +36,7 @@ import { buildHiddenSchedules, type HiddenScheduleInput } from './hiddenSchedule
 
 /**
  * A semester's start, where the registrar's timetable meets what was generated for it: the
- * winter posts New Game dates, and the record and opening save a next semester's Finalize writes.
+ * winter posts New Game dates, and the record and opening save a next semester's Enroll writes.
  */
 
 /** The days a break's posts are dated into, counted back from the semester's day 0. */
@@ -84,7 +85,7 @@ export function dealBreakPosts(
     }))
 }
 
-/** What a next semester's Finalize writes: the semester for the record, and its opening save. */
+/** What a next semester's Enroll writes: the semester for the record, and its opening save. */
 export interface ContinuedStart {
   id: string
   semester: SemesterRecord
@@ -119,10 +120,12 @@ function cooledByBreak(entry: CharState, character: Character, stats: PlayerStat
 }
 
 /**
- * A next semester as Finalize writes it, off its registration and the reader's timetable: the
- * roster's shifts and weeks dealt around the new catalog, the break's posts dated, the profiles
- * of the roster and the graduates, and the save it opens on, carrying what the last ending left
- * less what the break cost.
+ * A next semester as Enroll writes it, off its registration and the reader's timetable: the
+ * roster's shifts and weeks dealt around the new catalog, the pairs the player set laid over the
+ * carried ones, the break's posts dated, the profiles of the roster and the graduates, and the
+ * save it opens on, carrying what the last ending left less what the break cost. A girl new to
+ * the roster opens where the Profiles screen set her, a stranger where it set nothing, and one who
+ * gave him her contact info earns him BunnyMap where nobody has yet.
  */
 export function continuedStartOf(
   enrollment: EnrollmentDraft,
@@ -133,11 +136,17 @@ export function continuedStartOf(
   if (!continued) throw new Error('a first semester has no continuation')
   const season = seasonOf(continued.index)
   const { carry, priorProfiles, alumni } = continued
+  // Who knows whom: the carried pairs, those the player set laid over them.
+  const npcRelationships = pairsOver(carry.npcRelationships, enrollment.pairs ?? {})
   const returning = new Set(roster.map((c) => c.charId).filter((charId) => priorProfiles[charId]))
 
   // Rolled once and read twice: by the record and by the roster's shift placement.
   const jobClosures = rollJobClosures(playerSchedule)
-  const weather = rollSemesterWeather(dryOccasionDates(season), season)
+  const fixedEdits = enrollment.fixedEdits ?? {}
+  const weather = rollSemesterWeather(
+    dryOccasionDates(calendarOf(season, enrollment.occasions, fixedEdits)),
+    season
+  )
 
   // Shifts: a returning girl keeps her employer and her count, re-placed around her new
   // timetable; a newcomer starts hers some weeks in, as a first semester's freshmen do.
@@ -197,7 +206,7 @@ export function continuedStartOf(
   const breakPostsOf = (charId: string): SocialPost[] =>
     dealBreakPosts(
       enrollment.feeds[charId]?.winterPosts ?? [],
-      npcFriendsOf(carry.npcRelationships, charId, [...rosterIds, ...alumni]).length,
+      npcFriendsOf(npcRelationships, charId, [...rosterIds, ...alumni]).length,
       window
     )
 
@@ -205,6 +214,8 @@ export function continuedStartOf(
   const stats = breakDecayedStats(carry.stats)
   const decayed = STAT_KEYS.filter((key) => tierOf(stats[key]) < tierOf(carry.stats[key]))
   const penalized: string[] = []
+  // Whether a newcomer gave him her contact info before the semester.
+  let contactAtStart = false
 
   const profiles: Record<string, CharProfile> = {}
   const charInfo: Record<string, CharState> = {}
@@ -244,11 +255,12 @@ export function continuedStartOf(
       if (entry.breakPenalty && entry.breakPenalty !== carried.breakPenalty) penalized.push(charId)
       charInfo[charId] = entry
     } else {
-      // A first-year: a stranger to everybody, posting nothing from before she arrived.
+      // New to the roster: where the Profiles screen set her, else a stranger to everybody, and
+      // posting nothing from before she arrived.
+      const start = enrollment.starts?.[charId]
+      if (start?.flags.gaveContactInfo) contactAtStart = true
       charInfo[charId] = {
-        memories: [],
-        flags: initialFlags(character),
-        nameKnown: false,
+        ...(start ?? { memories: [], flags: initialFlags(character), nameKnown: false }),
         ...(job ? { job } : {}),
         ...(written.length > 0 ? { secrets: written } : {})
       }
@@ -284,6 +296,8 @@ export function continuedStartOf(
     alumni,
     classes: enrollment.classes,
     occasions: enrollment.occasions,
+    ...(Object.keys(fixedEdits).length > 0 ? { fixedEdits } : {}),
+    ...(enrollment.masked?.length ? { masked: enrollment.masked } : {}),
     jobClosures,
     weather,
     profiles,
@@ -293,6 +307,14 @@ export function continuedStartOf(
       : {}),
     before: carry.before
   }
+
+  // A newcomer who gave him her contact info earns him BunnyMap as a first contact would, where
+  // none has yet: queued for BunnyBot's next delivery, it being long past its introduction.
+  const handover = contactAtStart && !carry.bunnybotContactIntroSent
+  const bunnybotDeferred =
+    handover && !carry.bunnybotDeferred.includes('contact')
+      ? [...carry.bunnybotDeferred, 'contact' as const]
+      : carry.bunnybotDeferred
 
   const save: SaveDraft = {
     // The mods' own fields first, each as its mod carried it, so none can stand in for the game's.
@@ -332,16 +354,16 @@ export function continuedStartOf(
     bunnymapUnlocked: carry.bunnymapUnlocked,
     bunnyshopUnlocked: carry.bunnyshopUnlocked,
     venusJobIntroSent: carry.venusJobIntroSent,
-    bunnybotContactIntroSent: carry.bunnybotContactIntroSent,
+    bunnybotContactIntroSent: carry.bunnybotContactIntroSent || handover,
     bunnybotFirstPostNudgeSent: carry.bunnybotFirstPostNudgeSent,
     bunnybotTwoTimingTipSent: carry.bunnybotTwoTimingTipSent,
     ...(carry.bunnybotSeenTipSent !== undefined
       ? { bunnybotSeenTipSent: carry.bunnybotSeenTipSent }
       : {}),
-    bunnybotDeferred: carry.bunnybotDeferred,
+    bunnybotDeferred,
     droppedClasses: {},
     addedClasses: {},
-    npcRelationships: carry.npcRelationships,
+    npcRelationships,
     npcFriendships: carry.npcFriendships ?? [],
     // Generated occasion ids repeat from semester to semester, so nothing turned down carries.
     occasionsDeclined: [],

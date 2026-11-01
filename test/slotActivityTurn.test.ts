@@ -33,7 +33,7 @@ describe('interactive training at the scene boundary', () => {
   it.each(['completed', 'abandoned'] as const)('settles the slot after %s even if the model leaves it open', async status => {
     useGameStore.setState({ sceneActivity: { ...activity, status }, busy: true })
     await runSceneTurn(reply(false), { scene: null, action: 'Aftermath' }, [], [], true)
-    expect(ending).toHaveBeenCalledExactlyOnceWith(true)
+    expect(ending).toHaveBeenCalledExactlyOnceWith(false)
     expect(useGameStore.getState().sceneEnding).toBe(true)
   })
   it('lets a turn taken over the closing run as any other once the closing has landed', async () => {
@@ -44,11 +44,11 @@ describe('interactive training at the scene boundary', () => {
     // The reader talks over the goodbye: the ending is dropped and his turn goes out.
     useGameStore.setState({ sceneEnding: false, busy: true })
     await runSceneTurn(reply(false), { scene: null, action: 'I ask her to play' }, ['girl'], [girl], false)
-    expect(ending).toHaveBeenCalledOnce()
+    expect(ending).toHaveBeenCalledExactlyOnceWith(true)
     expect(useGameStore.getState().sceneEnding).toBe(false)
   })
   it('keeps an ordinary solo scene on its original ending path', async () => {
     await runSceneTurn(reply(false), { scene: null, action: 'Read' }, [], [], true)
-    expect(ending).toHaveBeenCalledExactlyOnceWith(true)
+    expect(ending).toHaveBeenCalledExactlyOnceWith(false)
   })
 })

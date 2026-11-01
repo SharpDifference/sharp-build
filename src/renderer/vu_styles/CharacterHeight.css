@@ -124,6 +124,23 @@
   object-position: top center;
 }
 
+/* A random pick New Game still masks stands as her shape alone, so her height still reads
+   against the girls beside her. An SVG filter and not a CSS mask, which `charimg://` never
+   loads; the flood is a role, read off the panel's theme. */
+.vu-heights-sprite--masked {
+  filter: url('#vu-heights-mask');
+}
+
+.vu-heights-mask-defs {
+  position: absolute;
+  width: 0;
+  height: 0;
+}
+
+.vu-heights-mask-ink {
+  flood-color: var(--vu-border);
+}
+
 /* Her label: the one chip that names her, worn at her feet on the floor above and beside
    her face in the cluster below, so the two read as the same girl. It takes her hair's
    colour where one was read, and the surface otherwise (the focus lineup, whose ruler is
@@ -272,3 +289,11 @@
   text-align: right;
 }
 
+
+/* What the answer reaches beyond this lineup, on its own line over the foot: the voice lineup,
+   which wears this panel, says the same of its own answer. */
+.vu-heights-note {
+  margin: 0;
+  color: var(--vu-text-muted);
+  font: italic 500 14px/1.5 var(--font-body);
+}

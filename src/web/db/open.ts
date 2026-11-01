@@ -1,5 +1,6 @@
 import { openDB, type DBSchema, type IDBPDatabase } from 'idb'
 import { APP_ID } from '@shared/appId'
+import type { Application } from '@shared/application'
 import type { BackupPlaythrough } from '@shared/backup'
 import type { BgVariant, CustomBackground } from '@shared/customBackgrounds'
 import { appError, messageOf } from '@shared/errors'
@@ -60,6 +61,7 @@ export interface VenusUniversityDb extends DBSchema {
   scenes: { key: string; value: SavedScene }
   replays: { key: [string, string]; value: SlotReplay }
   lorebooks: { key: string; value: LorebookRecord }
+  applications: { key: string; value: Application }
 }
 
 /**
@@ -81,10 +83,11 @@ const STORES = [
   'backgrounds',
   'scenes',
   'replays',
-  'lorebooks'
+  'lorebooks',
+  'applications'
 ] as const
 
-const DB_VERSION = 8
+const DB_VERSION = 9
 
 let opened: Promise<IDBPDatabase<VenusUniversityDb>> | null = null
 

@@ -693,6 +693,7 @@ export interface LedgerResponse {
     }>;
     spent?: number;
     stats?: LedgerStats;
+    summary?: string;
     textMemories?: Array<{
         charKey: string;
         type: MemoryType;
@@ -910,7 +911,9 @@ export interface PlayerStats {
 export interface PlaythroughRecord extends ModPlaythroughFields {
     chars: string[];
     classes: Record<string, ClassEntry>;
+    fixedEdits?: FixedOccasionEdits;
     jobClosures: Record<string, ShiftSlot[]>;
+    masked?: string[];
     name?: string;
     occasions: Occasion[];
     playerFirstName: string;

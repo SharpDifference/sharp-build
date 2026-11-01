@@ -67,9 +67,11 @@ import {
   listPlaythroughs,
   listSaves,
   overwriteSlotSave,
+  readApplication,
   readEnrollment,
   readSave,
   renamePlaythrough,
+  writeApplication,
   writeAutosave,
   writeEnrollment,
   writeManualSave,
@@ -141,6 +143,7 @@ import {
   testImages,
   testWriter
 } from '@shared/llm/endpointProbe'
+import type { ApplicationDraft } from '@shared/application'
 import { backupName } from '@shared/backup'
 import {
   parseWorldInfo,
@@ -148,6 +151,11 @@ import {
   type LorebookRecord,
   type WorldInfoFile
 } from '@shared/lorebookRecord'
+import {
+  occasionsExportName,
+  parseOccasionsFile,
+  type OccasionsFile
+} from '@shared/occasionsFile'
 import { photoExportName, type PhotoMeta, type PhotoRequest } from '@shared/photos'
 import { exportFileName } from '@shared/characterTransfer'
 import { endingArtExportName } from '@shared/endingPicture'
@@ -189,6 +197,7 @@ import {
   writeLorebook,
   writeWorldInfoFile
 } from './services/lorebookService'
+import { readOccasionsFile, writeOccasionsFile } from './services/occasionsService'
 import { deleteReplay, listReplayIds, readReplay } from './services/replayService'
 import { deleteScene, listScenes, readScene, writeScene } from './services/sceneService'
 import {
@@ -444,6 +453,9 @@ export function registerIpcHandlers(): void {
 
   handle('saves:playthroughs', () => listPlaythroughs())
   handle('saves:list', (_event, playthroughId: string) => listSaves(playthroughId))
+  handle('saves:apply', (_event, draft: ApplicationDraft, playthroughId?: string) =>
+    writeApplication(draft, playthroughId)
+  )
   handle('saves:enroll', (_event, draft: EnrollmentDraft, playthroughId?: string) =>
     writeEnrollment(draft, playthroughId)
   )
@@ -457,6 +469,7 @@ export function registerIpcHandlers(): void {
       draft: SaveDraft
     ) => continueSemester(playthroughId, semesterId, semester, draft)
   )
+  handle('saves:application', (_event, playthroughId: string) => readApplication(playthroughId))
   handle('saves:enrollment', (_event, playthroughId: string) => readEnrollment(playthroughId))
   handle(
     'saves:create',
@@ -626,6 +639,31 @@ export function registerIpcHandlers(): void {
     if (canceled || filePath === undefined || filePath === '') return null
 
     await writeWorldInfoFile(filePath, world)
+    return filePath
+  })
+  // An occasions file picked in the native dialog and read, never written; dismissed is `null`.
+  handle('occasions:import', async (event) => {
+    const { canceled, filePaths } = await showOpenDialogFor(event, {
+      title: 'Import occasions',
+      filters: [{ name: 'Occasions', extensions: ['json'] }],
+      properties: ['openFile']
+    })
+    if (canceled || filePaths.length === 0) return null
+
+    return readOccasionsFile(filePaths[0])
+  })
+  // The occasions the renderer composed, saved where the native dialog points; a file the game
+  // would not read back is never written, and a dismissed dialog resolves `null`.
+  handle('occasions:export', async (event, file: OccasionsFile) => {
+    const { season } = parseOccasionsFile(file)
+    const { canceled, filePath } = await showSaveDialogFor(event, {
+      title: 'Export occasions',
+      defaultPath: occasionsExportName(season),
+      filters: [{ name: 'Occasions', extensions: ['json'] }]
+    })
+    if (canceled || filePath === undefined || filePath === '') return null
+
+    await writeOccasionsFile(filePath, file)
     return filePath
   })
 

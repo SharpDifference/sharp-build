@@ -8,11 +8,13 @@ import { AnimatePresence, motion } from 'motion/react'
 
 import { isCustomOutfitSlot, outfitLabelOf } from '@shared/outfits'
 import { STAT_KEYS, STAT_LABELS, MAX_TIER, MIN_TIER, tierNameOf, type StatTier } from '@shared/playerStats'
-import type { Disposition } from '@shared/relationship'
+import { DISPOSITION_LABELS, type Disposition } from '@shared/relationship'
 import {
   effectiveDisposition,
   normalizeMilestones,
   SCENE_DISPOSITIONS,
+  SCENE_FIRST_DATE,
+  SCENE_LAST_DATE,
   setupStartable,
   type SavedScene,
   type SceneCastEntry,
@@ -54,6 +56,7 @@ import { useUiStore } from '../stores/uiStore'
 import { BgPicker } from './BgModal'
 import { bgThumbUrl } from './bgAssets'
 import { heldScreenTheme, type ScreenTheme } from './clockTheme'
+import { DatePickerModal } from './DatePickerModal'
 import { LoadCharacterModal } from './LoadCharacterModal'
 import { LoadSceneModal } from './LoadSceneModal'
 import {
@@ -67,7 +70,6 @@ import {
   rowLift,
   rowPress
 } from './motion'
-import { SceneDateModal } from './SceneDateModal'
 import { SceneMilestonesModal } from './SceneMilestonesModal'
 import { SceneNotesModal } from './SceneNotesModal'
 import { SceneRelationshipsModal } from './SceneRelationshipsModal'
@@ -83,16 +85,6 @@ type Panel =
   | { kind: 'date' }
   | { kind: 'bg' }
   | { kind: 'load' }
-
-/** Each disposition as the dropdown names it. */
-const DISPOSITION_LABELS: Record<Disposition, string> = {
-  devoted: 'Devoted',
-  trusted: 'Trusted',
-  friendly: 'Friendly',
-  neutral: 'Neutral',
-  annoyed: 'Annoyed',
-  hostile: 'Hostile'
-}
 
 const DISPOSITION_OPTIONS = SCENE_DISPOSITIONS.map((disposition) => ({
   value: disposition,
@@ -642,9 +634,14 @@ function PanelFor({
     }
     case 'date':
       return (
-        <SceneDateModal
+        <DatePickerModal
           theme={theme}
+          id="scene-date"
           date={draft.date}
+          first={SCENE_FIRST_DATE}
+          last={SCENE_LAST_DATE}
+          season="spring"
+          occasions
           onPick={(date) => store.setDate(date)}
           onClose={onClose}
         />

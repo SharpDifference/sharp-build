@@ -302,6 +302,14 @@ export function getEnrollmentPath(playthroughId: string): string {
 }
 
 /**
+ * `/data/saves/{playthroughId}/application.json` — the New Game still being set up, removed once
+ * the registrar's enrollment replaces it.
+ */
+export function getApplicationPath(playthroughId: string): string {
+  return join(getPlaythroughPath(playthroughId), 'application.json')
+}
+
+/**
  * `/data/saves/{playthroughId}/ending.png` — the first semester's graduation picture — or
  * `ending-{semesterId}.png` for a later semester's.
  */

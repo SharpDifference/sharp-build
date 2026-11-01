@@ -1,5 +1,6 @@
-import { useEffect, useMemo, useRef, useState, type JSX } from 'react'
-import { AnimatePresence, motion, useReducedMotion } from 'motion/react'
+import { useEffect, useMemo, useState, type JSX } from 'react'
+import { AnimatePresence } from 'motion/react'
+import type { ApplicationContinuation, ApplicationReader, StartResult } from '@shared/application'
 import { appError, toAppError } from '@shared/errors'
 import { EMOTIONS } from '@shared/emotions'
 import { DEFAULT_PLAYER_STATS, type PlayerStats } from '@shared/playerStats'
@@ -7,17 +8,16 @@ import { STARTING_MONEY } from '@shared/money'
 import { emptyTallies } from '@shared/tallies'
 import { placeNpcShifts, rollFreshmanJobStart, rollJobClosures } from '@shared/jobs'
 import { rollSemesterWeather } from '@shared/weather'
-import { mintId, SAVE_SCHEMA_VERSION } from '@shared/saveRules'
-import { calendarOf, seasonOf, semesterName } from '@shared/semesters'
+import { SAVE_SCHEMA_VERSION } from '@shared/saveRules'
+import { calendarOf, seasonOf } from '@shared/semesters'
 import { initialFlags } from '@shared/relationship'
 import { npcFriendsOf, rollInitialNpcRelationships } from '@shared/npcRelationships'
 import { rollPostLikes } from '@shared/feed'
 import { postLikes } from '../mods/hooks'
-import { andList } from '@shared/sentences'
+import { pairsOver, type SceneRelation } from '@shared/sceneCreator'
 import { shuffle } from '@shared/shuffle'
 import {
   fullNameOf,
-  type AppError,
   DEFAULT_PLAYER_FIRST_NAME,
   DEFAULT_PLAYER_LAST_NAME,
   emptyBunnyboard,
@@ -26,116 +26,65 @@ import {
   type CharJob,
   type CharProfile,
   type CharSecret,
+  type CharStart,
   type EnrollmentDraft,
   type FeedAssignment,
+  type FixedOccasionEdits,
   type HiddenScheduleAssignment,
   type JobAssignment,
   type Occasion,
-  type Result,
+  type ScheduleResult,
   type ShiftSlot
 } from '@shared/types'
-import { CardCaption } from '../components/CardCaption'
-import { ConfirmModal } from '../components/ConfirmModal'
-import { LlmFailureModal } from '../components/LlmFailureModal'
 import { slotHalf } from '../prompts/gameDate'
 import { MOOD_CYCLE_LENGTH } from '../prompts/moods'
 import { dryOccasionDates } from '../prompts/weather'
-import { type ScheduleResult } from '../stores/classScheduler'
+import {
+  adoptFolder,
+  clearStagedApplication,
+  leaveApplication,
+  sealApplication,
+  stagedApplication,
+  tokensNow
+} from '../stores/applicationStore'
 import { buildHiddenSchedules, type HiddenScheduleInput } from '../stores/hiddenScheduler'
 import { enterGame } from '../stores/gameLoop'
 import { useGameStore } from '../stores/gameStore'
 import {
-  cancelNewGameStart,
   clearStagedContinuation,
   clearStagedEnrollment,
-  retryNewGameStart,
-  retryNextSemester,
   stagedContinuation,
-  stagedEnrollment,
-  startNewGame,
-  startNextSemester,
-  type NextSemesterResult,
-  type StartOutcome,
-  type StartResult
+  stagedEnrollment
 } from '../stores/newGame'
 import { continuedStartOf, dealBreakPosts, FIRST_WINTER_POSTS } from '../stores/semesterStart'
 import { useAssetStore } from '../stores/assetStore'
-import {
-  beginCrossing,
-  coverSwap,
-  endCrossing,
-  nameCrossingWait,
-  useCrossingStore
-} from '../stores/crossingStore'
+import { beginCrossing, coverSwap, endCrossing } from '../stores/crossingStore'
 import { slotStampOf } from '../stores/slotCrossing'
-import { spriteUrl, useCharacterStore, visibleOrderOf } from '../stores/characterStore'
+import { useCharacterStore } from '../stores/characterStore'
 import { playthroughModVersions, playthroughMods } from '@shared/mods'
 import { useModsStore } from '../stores/modsStore'
 import { useSaveStore } from '../stores/saveStore'
 import { useUiStore } from '../stores/uiStore'
-import { CharacterHeightModal } from './CharacterHeightModal'
-import { CharacterModal } from './CharacterModal'
 import { heldScreenTheme } from './clockTheme'
 import { ClassSelectView } from './ClassSelectView'
-import { useWarmedImages } from './imagePreload'
-import {
-  breatheDecor,
-  cardLift,
-  dealt,
-  dealtItem,
-  doubled,
-  fadeIn,
-  doorway,
-  gestures,
-  hovered,
-  lift,
-  peek,
-  press,
-  quietLift,
-  quietPress,
-  rippleChase,
-  rippleLead,
-  tuck
-} from './motion'
-import { BackIcon, ChevronIcon, CloseIcon, DiceIcon } from './screenIcons'
-import { LoadCharacterModal } from './LoadCharacterModal'
+import { NewGameFlow } from './NewGameFlow'
 import { PlayerNameModal } from './PlayerNameModal'
 import '../vu_styles/NewGame.css'
 
-/**
- * How many characters a game starts with — exact, not a cap. The registrar offers only the
- * classes a roster girl attends, and twelve girls' loads are what leave the player enough
- * non-PE courses in distinct slots to finalize a legal schedule.
- */
-const ROSTER_SIZE = 12
-
-/** What two roster entries may not share. */
-function firstNameKeyOf(character: Character): string {
-  return character.firstName.trim().toLowerCase()
+/** What a reader named at New Game is written into the enrollment as. */
+interface Reader {
+  first: string
+  last: string
+  stats: PlayerStats
+  bio: string
 }
 
 /**
- * The screen's opening, built once: a `Variants` object made during render is a new identity
- * every time, which restarts the ripple's variant tree and its completion never fires
- * (`motion.ts`, the ripple).
+ * New Game: the flow a semester is set up through — a first one's, or a later one's as New
+ * Game+ — the canned Quickstart, and the registrar each of them opens on.
  */
-const BACKDROP_IN = fadeIn(0, 0.5)
-const HEADER_IN = fadeIn(0.1)
-const GRID_IN = dealt(0.25, 0.04)
-const FOOT_IN = fadeIn(0.5)
-
-/** New Game: local roster assembly before Start Game writes the save. */
 export function NewGameView(): JSX.Element {
   const characters = useCharacterStore((s) => s.characters)
-  const allOrder = useCharacterStore((s) => s.order)
-  const removedDefaults = useCharacterStore((s) => s.removedDefaults)
-  // `order` minus the shipped characters he has removed.
-  const order = useMemo(
-    () => visibleOrderOf({ order: allOrder, removedDefaults }),
-    [allOrder, removedDefaults]
-  )
-  const expressions = useCharacterStore((s) => s.expressions)
-  const saveHeights = useCharacterStore((s) => s.saveHeights)
   const load = useCharacterStore((s) => s.load)
   const view = useUiStore((s) => s.view)
   const setView = useUiStore((s) => s.setView)
@@ -144,39 +93,44 @@ export function NewGameView(): JSX.Element {
   // The semester this screen is being reopened on, taken once at mount and dropped by the
   // effect below; absent on a start of any other kind.
   const [resumed] = useState(stagedEnrollment)
-  // The Continue this screen was raised for, taken once at mount: the roster on screen is a
-  // next semester's. Absent on any other start.
+  // The Continue this screen was raised for, taken once at mount: the flow on screen is a next
+  // semester's New Game+. Absent on any other start.
   const [next] = useState(stagedContinuation)
+  // The New Game in progress Load Game or Continue reopened, taken once at mount.
+  const [application] = useState(stagedApplication)
   useEffect(() => {
     clearStagedEnrollment()
     clearStagedContinuation()
+    clearStagedApplication()
   }, [])
 
   // A reopened registration's characters are its roster and then its graduates.
   const [roster, setRoster] = useState<Character[]>(
     resumed ? resumed.characters.filter((c) => resumed.enrollment.chars.includes(c.charId)) : []
   )
-  // A next semester's registration as Finalize writes it: the one reopened, or the one this
-  // screen's Start composes. Null on a first semester's start.
+  // A next semester's registration as Enroll writes it: the one reopened, or the one the flow
+  // composes. Null on a first semester's start.
   const [nextDraft, setNextDraft] = useState<EnrollmentDraft | null>(
     resumed?.enrollment.continued ? resumed.enrollment : null
   )
-  // Whether Back is asking first, which a next semester's roster does.
-  const [leaving, setLeaving] = useState(false)
-  // The generated catalog, held between Start Game and Finalize and seeded from the enrollment
+  // The generated catalog, held between the start and Enroll and seeded from the enrollment
   // where the registrar is being reopened; why `classSelect` routes back to this component.
   const [schedules, setSchedules] = useState<ScheduleResult | null>(
     resumed ? { classes: resumed.enrollment.classes, perChar: resumed.enrollment.perChar } : null
   )
   // The save's own occasions, held on the same terms.
   const [occasions, setOccasions] = useState<Occasion[]>(resumed?.enrollment.occasions ?? [])
-  // Who works where; the shifts themselves are placed at Finalize.
+  // Its changes to the fixed occasions, held on the same terms.
+  const [fixedEdits, setFixedEdits] = useState<FixedOccasionEdits>(
+    resumed?.enrollment.fixedEdits ?? {}
+  )
+  // Who works where; the shifts themselves are placed at Enroll.
   const [jobs, setJobs] = useState<Record<string, JobAssignment>>(resumed?.enrollment.jobs ?? {})
-  // Where each character habitually turns up; the slots are dealt at Finalize.
+  // Where each character habitually turns up; the slots are dealt at Enroll.
   const [haunts, setHaunts] = useState<Record<string, HiddenScheduleAssignment>>(
     resumed?.enrollment.haunts ?? {}
   )
-  // Her handle and her winter-break posts; their dates are dealt at Finalize.
+  // Her handle and her winter-break posts; their dates are dealt at Enroll.
   const [feeds, setFeeds] = useState<Record<string, FeedAssignment>>(
     resumed?.enrollment.feeds ?? {}
   )
@@ -184,28 +138,25 @@ export function NewGameView(): JSX.Element {
   const [springBreakPlans, setSpringBreakPlans] = useState<Record<string, string>>(
     resumed?.enrollment.springBreakPlans ?? {}
   )
-  // The secrets each girl starts the semester with; written onto her entry at Finalize.
+  // The secrets each girl starts the semester with; written onto her entry at Enroll.
   const [secrets, setSecrets] = useState<Record<string, CharSecret[]>>(
     resumed?.enrollment.secrets ?? {}
   )
-  // The folder the semester above was written into, which Finalize writes the record and the
-  // opening save into; null until the enrollment lands, and Finalize then mints one.
+  // Where each girl the reader already knows stands with him, and the pairs the player set;
+  // written onto the first save at Enroll.
+  const [starts, setStarts] = useState<Record<string, CharStart>>(resumed?.enrollment.starts ?? {})
+  const [pairs, setPairs] = useState<Record<string, SceneRelation>>(resumed?.enrollment.pairs ?? {})
+  // The random picks New Game left masked; written onto the record at Enroll.
+  const [masked, setMasked] = useState<string[]>(resumed?.enrollment.masked ?? [])
+  // The folder the semester above was written into, which Enroll writes the record and the
+  // opening save into; null until the enrollment lands.
   const [playthroughId, setPlaythroughId] = useState<string | null>(
     () => resumed?.playthroughId ?? null
   )
-  const [picking, setPicking] = useState(false)
-  const [inspecting, setInspecting] = useState<string | null>(null)
-  const [warnings, setWarnings] = useState<string[] | null>(null)
-  // Held in state so the wait below is armed by one stable promise for its lifetime.
-  const [starting, setStarting] = useState<Promise<StartOutcome> | null>(null)
-  // What the retry modal is showing: the first failure of the attempt, and
-  // every half of the semester that is still missing.
-  const [startFailure, setStartFailure] = useState<{
-    error: AppError
-    missing: string[]
-  } | null>(null)
-  // The reader's name and opening stat tiers, picked while the catalog
-  // generates behind the modal.
+  // The folder a New Game in progress was kept in, which Enroll writes into should its
+  // enrollment have been refused, replacing the application rather than minting a second folder.
+  const [applicationFolder, setApplicationFolder] = useState<string | null>(null)
+  // The canned start's one question, asked under the menu's curtain.
   const [naming, setNaming] = useState(false)
   const [playerName, setPlayerName] = useState(
     resumed
@@ -217,50 +168,30 @@ export function NewGameView(): JSX.Element {
   const [playerStats, setPlayerStats] = useState<PlayerStats>(
     resumed?.enrollment.stats ?? DEFAULT_PLAYER_STATS
   )
-  // What the reader says about himself, as the same modal took it down; blank is an answer.
+  // What the reader says about himself, as New Game took it down; blank is an answer.
   const [playerBio, setPlayerBio] = useState(resumed?.enrollment.bio ?? '')
   // What New Game's own calls cost, kept with the enrollment so the registrar can be left and
   // come back to.
   const [enrolledTokens, setEnrolledTokens] = useState(resumed?.enrollment.tokensGenerated ?? 0)
-  // Whether the height lineup is up — the first question the start asks; its answer
-  // is written to each character, not held here.
-  const [sizing, setSizing] = useState(false)
-  // Whether the reader has been named, which is what arms the wait on the generation below:
-  // a permanent failure returning inside the wipe would otherwise raise its modal and then
-  // have the name panel dealt over the top of it.
-  const [named, setNamed] = useState(false)
 
   // Drawn once per visit, worn on this screen's own root, and handed to the modals it
   // opens as a prop: they portal out of the view, which inherits it nothing.
   const [theme] = useState(heldScreenTheme)
 
-  // A player who asked their OS for less motion gets none of the flourish below: a positional
-  // target is applied *instantly* under it, so an unguarded opening would arrive on the
-  // next frame and fire a ripple nobody asked for.
-  const still = useReducedMotion()
-  // Whether the pointer is on Start, and whether the ripple its departure launched is still
-  // running. Both flags are refs: they are written from an animation rather than from a render.
-  const [hovering, setHovering] = useState(false)
-  const [rippling, setRippling] = useState(false)
-  const rippleBusy = useRef(false)
-
   // Whether this screen was entered as the canned start, held since the view moves under it.
   const [quick] = useState(() => useUiStore.getState().view === 'quickstart')
   const loadQuickstart = useAssetStore((s) => s.loadQuickstart)
+  // A semester set up from scratch, continued from an ending or reopened: the flow, which reads
+  // the roster itself.
+  const flow = !quick && !resumed
 
-  // Loads the roster here: Fill with Random needs it before the picker has ever opened.
+  // Loads the characters here: a reopened registrar's Enroll reads its graduates out of them,
+  // and the canned start its cast.
   useEffect(() => {
+    if (flow) return
     const loading = load()
     if (!quick) {
-      // A next semester's roster opens on every continuing girl still on disk, locked in.
-      if (next) {
-        void loading.then(() => {
-          const loaded = useCharacterStore.getState().characters
-          setRoster(
-            next.handoff.continuing.flatMap((charId) => (loaded[charId] ? [loaded[charId]] : []))
-          )
-        })
-      } else void loading
+      void loading
       return
     }
 
@@ -320,41 +251,12 @@ export function NewGameView(): JSX.Element {
       showError(toAppError(err))
       endCrossing(() => setView('mainMenu'))
     })
-  }, [load, quick, next, loadQuickstart, setView, showError])
+  }, [flow, load, quick, loadQuickstart, setView, showError])
 
   // Unmounting abandons the start with it.
-  useEffect(() => cancelNewGameStart, [])
+  useEffect(() => () => leaveApplication(), [])
 
-  const crossing = useCrossingStore((s) => s.phase !== 'idle')
-
-  // What the generation's reply is answered by, held in a ref so the effect below can be armed
-  // by the promise alone: the handler closes over half this screen's state and is a new
-  // function every render, and a dep on it would re-attach the wait on each one.
-  const settle = useRef(onServicesReady)
-  settle.current = onServicesReady
-
-  /**
-   * Armed only once the reader is named, so the curtain is never the first thing a failure is
-   * read over. `stale` covers both a superseded promise (Retry) and StrictMode's double run.
-   */
-  useEffect(() => {
-    if (!starting || !named) return
-    let stale = false
-    void starting.then(
-      (data) => {
-        if (!stale) settle.current({ ok: true, data })
-      },
-      (err: unknown) => {
-        console.error('[new game] the start failed', err)
-        if (!stale) settle.current({ ok: false, error: toAppError(err) })
-      }
-    )
-    return () => {
-      stale = true
-    }
-  }, [starting, named])
-
-  // Every girl who has graduated by the next semester: never pickable, and her first name taken.
+  // Every girl who has graduated by the next semester, whom its Enroll loads beside the roster.
   const alumni = useMemo(
     () => next?.handoff.alumni ?? nextDraft?.continued?.alumni ?? [],
     [next, nextDraft]
@@ -363,263 +265,131 @@ export function NewGameView(): JSX.Element {
     () => alumni.flatMap((charId) => (characters[charId] ? [characters[charId]] : [])),
     [alumni, characters]
   )
-  // The continuing girls, who stay on a next semester's roster and cannot be taken off it.
-  const locked = useMemo(() => new Set(next?.handoff.continuing ?? []), [next])
-
-  /** Characters that could still be added: fully rendered, not already picked, not graduated. */
-  const eligible = useMemo(
-    () =>
-      order.filter(
-        (charId) =>
-          EMOTIONS.every((emotion) => expressions[charId]?.[emotion]) &&
-          !roster.some((c) => c.charId === charId) &&
-          !alumni.includes(charId)
-      ),
-    [order, expressions, roster, alumni]
-  )
 
   /**
-   * Warms the picker's sprites while the reader is still on the roster: `LoadCharacterModal`
-   * mounts one per finished character at once, and decoding them all on the frame it opens is
-   * a visible stall.
-   */
-  const pickerUrls = useMemo(() => eligible.map((charId) => spriteUrl(charId, 'neutral')), [eligible])
-  useWarmedImages(pickerUrls, true)
-
-  /** First names appearing more than once among the roster and the graduates. */
-  const duplicateKeys = useMemo(() => {
-    const counts = new Map<string, number>()
-    for (const character of [...roster, ...graduates]) {
-      const key = firstNameKeyOf(character)
-      counts.set(key, (counts.get(key) ?? 0) + 1)
-    }
-    return new Set([...counts.entries()].filter(([, n]) => n > 1).map(([key]) => key))
-  }, [roster, graduates])
-
-  const isDuplicate = (character: Character): boolean =>
-    duplicateKeys.has(firstNameKeyOf(character))
-
-  const inspected = roster.find((c) => c.charId === inspecting) ?? null
-
-  // The two gates. Both go dead and say nothing: the roster beside them is what the
-  // player would be reading either way.
-  const startDead = roster.length < ROSTER_SIZE || starting !== null || startFailure !== null
-  const fillDead =
-    roster.length >= ROSTER_SIZE ||
-    eligible.length === 0 ||
-    starting !== null ||
-    startFailure !== null
-
-  // Whether the archway is on its way off the stage. A modal over a live Start is in the
-  // list because motion reports no hover *ending* for a control something covered — the
-  // arch would be left hanging above the screen with nothing to bring it back.
-  const covered = picking || inspecting !== null || warnings !== null
-  const armed = hovering && !startDead && !covered && !still
-
-  useEffect(() => {
-    if (startDead || covered) setHovering(false)
-  }, [startDead, covered])
-
-  // The wave leaves the moment the pointer lands, not when the doorway has finished opening:
-  // waiting on the arrival put a beat of nothing between the two. They run together instead,
-  // and the doorway — far the faster of them — is over the spot the wave is born before it
-  // has travelled anywhere. A ripple already running swallows the next arming rather than
-  // queueing it: what launches one is a hover nothing is answering yet.
-  useEffect(() => {
-    if (!armed || rippleBusy.current) return
-    rippleBusy.current = true
-    setRippling(true)
-  }, [armed])
-
-  /**
-   * Fills the empty slots with random eligible characters, keeping the ones already picked.
-   */
-  function fillRandom(): void {
-    const taken = new Set([...roster, ...graduates].map(firstNameKeyOf))
-    const picked: Character[] = []
-
-    for (const charId of shuffle(eligible)) {
-      if (roster.length + picked.length >= ROSTER_SIZE) break
-      const character = characters[charId]
-      const key = firstNameKeyOf(character)
-      if (taken.has(key)) continue
-      taken.add(key)
-      picked.push(character)
-    }
-
-    if (picked.length > 0) setRoster((prev) => [...prev, ...picked])
-  }
-
-  /** Starts the game-entry sequence; a shared first name blocks it. */
-  function startGame(): void {
-    if (roster.length < ROSTER_SIZE) return
-
-    if (duplicateKeys.size > 0) {
-      setWarnings(
-        [...duplicateKeys].map((key) => {
-          const names = [...roster, ...graduates]
-            .filter((c) => firstNameKeyOf(c) === key)
-            .map(fullNameOf)
-          return names.join(' and ')
-        })
-      )
-      return
-    }
-
-    // The two questions are asked over the generation's wait, heights first; the calls
-    // themselves are `stores/newGame.ts`'s.
-    setNamed(false)
-    setStarting(next ? startNextSemester(next, roster, characters) : startNewGame(roster))
-    setSizing(true)
-  }
-
-  /**
-   * Writes the settled semester into a playthrough folder of its own, so the registrar it is
-   * about to open can be left and come back to. A refused write is reported and the registrar
-   * opens anyway; Finalize then mints the folder itself.
+   * Writes the settled semester into a playthrough folder — the one `into` names, replacing the
+   * New Game kept there, or one of its own — so the registrar it is about to open can be left and
+   * come back to. A refused write is reported and the registrar opens anyway; Enroll then
+   * writes into `into` or mints the folder itself. Answers the playthrough written into, or null.
    */
   async function enroll(
     semester: StartResult,
-    first: string,
-    last: string,
-    stats: PlayerStats,
-    bio: string
-  ): Promise<void> {
-    const tokensGenerated = useGameStore.getState().tallies.tokensGenerated
+    chars: string[],
+    masked: string[],
+    reader: Reader,
+    tokensGenerated: number,
+    into?: string
+  ): Promise<string | null> {
     setEnrolledTokens(tokensGenerated)
-    const written = await useSaveStore.getState().enroll({
-      chars: roster.map((c) => c.charId),
-      classes: semester.schedules.classes,
-      perChar: semester.schedules.perChar,
-      jobs: semester.jobs,
-      haunts: semester.haunts,
-      feeds: semester.feeds,
-      springBreakPlans: semester.springBreakPlans,
-      occasions: semester.occasions,
-      secrets: semester.secrets,
-      playerFirstName: first,
-      playerLastName: last,
-      stats,
-      ...(bio ? { bio } : {}),
-      ...(tokensGenerated > 0 ? { tokensGenerated } : {})
-    })
+    const written = await useSaveStore.getState().enroll(
+      {
+        chars,
+        ...(masked.length > 0 ? { masked } : {}),
+        classes: semester.schedules.classes,
+        perChar: semester.schedules.perChar,
+        jobs: semester.jobs,
+        haunts: semester.haunts,
+        feeds: semester.feeds,
+        springBreakPlans: semester.springBreakPlans,
+        occasions: semester.occasions,
+        secrets: semester.secrets,
+        ...(Object.keys(semester.starts).length > 0 ? { starts: semester.starts } : {}),
+        ...(Object.keys(semester.pairs).length > 0 ? { pairs: semester.pairs } : {}),
+        ...(Object.keys(semester.fixedEdits).length > 0 ? { fixedEdits: semester.fixedEdits } : {}),
+        playerFirstName: reader.first,
+        playerLastName: reader.last,
+        stats: reader.stats,
+        ...(reader.bio ? { bio: reader.bio } : {}),
+        ...(tokensGenerated > 0 ? { tokensGenerated } : {})
+      },
+      into
+    )
     if (!written.ok) {
       showError(written.error)
-      return
+      return null
     }
     setPlaythroughId(written.data.playthroughId)
+    return written.data.playthroughId
   }
 
   /**
-   * Runs once the generation has settled — on to the class selector, or to the retry modal.
+   * The flow's semester has passed Finalize: the application is sealed and replaced by the
+   * enrollment under the curtain Finalize's Start game lowered, and the registrar is put up under the
+   * same cover and revealed with it. A later semester's is registered beside its record.
    */
-  function onServicesReady(result: Result<StartOutcome>): void {
-    setStarting(null)
-    if (!result.ok) {
-      showError(result.error)
-      endCrossing()
+  function onComposed(
+    semester: StartResult,
+    named: ApplicationReader,
+    composed: Character[],
+    continued: ApplicationContinuation | undefined,
+    unrevealed: string[]
+  ): void {
+    if (continued) {
+      void enrollNext(semester, named, composed, continued, unrevealed)
       return
     }
-    const outcome = result.data
-    // The player left while it was in flight.
-    if (outcome.status === 'cancelled') {
-      endCrossing()
-      return
-    }
-    // The curtain holds while the modal asks; Retry re-arms the wait behind it.
-    if (outcome.status === 'failed') {
-      setStartFailure({ error: outcome.error, missing: outcome.missing })
-      return
-    }
-
-    // The semester goes to disk under the curtain that is already holding with its caption, and
-    // the timetable is put up under the same cover and revealed with it.
     void (async () => {
-      if (next) await enrollNext(outcome.data as NextSemesterResult)
-      else await enroll(outcome.data, playerName.first, playerName.last, playerStats, playerBio)
+      const tokens = tokensNow()
+      const folder = await sealApplication()
+      const reader: Reader = {
+        first: named.firstName,
+        last: named.lastName,
+        stats: named.stats,
+        bio: named.bio ?? ''
+      }
+      const enrolled = await enroll(
+        semester,
+        composed.map((c) => c.charId),
+        unrevealed,
+        reader,
+        tokens,
+        folder ?? undefined
+      )
+      // An application never written takes the playthrough the enrollment made, so the lorebook
+      // edits held for want of one land beside it.
+      if (folder === null && enrolled !== null) adoptFolder(enrolled)
+      // The enrollment stands for the application from here.
+      leaveApplication()
       endCrossing(() => {
-        setSchedules(outcome.data.schedules)
-        setJobs(outcome.data.jobs)
-        setHaunts(outcome.data.haunts)
-        setFeeds(outcome.data.feeds)
-        setSpringBreakPlans(outcome.data.springBreakPlans)
-        setSecrets(outcome.data.secrets)
-        setOccasions(outcome.data.occasions)
+        setApplicationFolder(folder)
+        setRoster(composed)
+        setPlayerName({ first: reader.first, last: reader.last })
+        setPlayerStats(reader.stats)
+        setPlayerBio(reader.bio)
+        setSchedules(semester.schedules)
+        setJobs(semester.jobs)
+        setHaunts(semester.haunts)
+        setFeeds(semester.feeds)
+        setSpringBreakPlans(semester.springBreakPlans)
+        setSecrets(semester.secrets)
+        setStarts(semester.starts)
+        setPairs(semester.pairs)
+        setMasked(unrevealed)
+        setOccasions(semester.occasions)
+        setFixedEdits(semester.fixedEdits)
         setView('classSelect')
       })
     })()
   }
 
   /**
-   * The failure modal's Retry: re-sends only the calls still missing a
-   * reply, behind the same spinner the first attempt ran behind.
+   * A later semester's flow has passed Finalize: its application is sealed and replaced by the
+   * registration written beside its playthrough's record, so the registrar it is about to open
+   * can be left and come back to, and held here for Enroll whether or not it landed. The
+   * registrar is put up under the curtain Finalize's Start game lowered.
    */
-  function retryStart(): void {
-    setStartFailure(null)
-    setStarting(next ? retryNextSemester(next, roster, characters) : retryNewGameStart(roster))
-  }
-
-  /** The failure modal's way out. */
-  function abandonStart(): void {
-    cancelNewGameStart()
-    setStartFailure(null)
-    setStarting(null)
-    setNaming(false)
-    setNamed(false)
-    setSizing(false)
-    // Back to the roster, from under whatever cover the failure was read on.
-    endCrossing()
-    // A next semester's reader is the one already named.
-    if (next) return
-    setPlayerName({ first: DEFAULT_PLAYER_FIRST_NAME, last: DEFAULT_PLAYER_LAST_NAME })
-    setPlayerStats(DEFAULT_PLAYER_STATS)
-    setPlayerBio('')
-  }
-
-  /**
-   * The reader is named: the timetable follows on the canned start, and on a generated
-   * one the curtain holds until the semester it is waiting on is written.
-   */
-  function onNamed(first: string, last: string, stats: PlayerStats, bio: string): void {
-    setPlayerName({ first, last })
-    setPlayerStats(stats)
-    setPlayerBio(bio)
-    setNaming(false)
-    if (quick) {
-      // The canned timetable was written at mount, so the menu's crossing has only the
-      // enrollment left to wait on: the registrar is swapped in under the same cover the
-      // question was asked on, and the answer is what lets the curtain open onto it. Whatever
-      // the phase, `endCrossing` runs the swap under cover or at once — no window to miss.
-      // No bundle behind the question: back to the menu rather than a curtain over nothing.
-      if (!schedules) {
-        endCrossing(() => setView('mainMenu'))
-        return
-      }
-      void (async () => {
-        const semester = { schedules, jobs, haunts, feeds, springBreakPlans, occasions, secrets }
-        await enroll(semester, first, last, stats, bio)
-        endCrossing(() => setView('classSelect'))
-      })()
-      return
-    }
-    // What the curtain has been holding for all along, said now rather than when the cover went
-    // up: until this answer there was a modal in front of it, and a screen captioned with what
-    // it is loading while it asks the reader his name is reporting a wait he is not in.
-    nameCrossingWait('Generating class schedule')
-    setNamed(true)
-  }
-
-  /**
-   * Writes a next semester's registration beside its playthrough's record, so the registrar it is
-   * about to open can be left and come back to; held here for Finalize whether or not it landed.
-   */
-  async function enrollNext(semester: NextSemesterResult): Promise<void> {
-    if (!next) return
-    const { handoff } = next
-    const tokensGenerated = useGameStore.getState().tallies.tokensGenerated
-    setEnrolledTokens(tokensGenerated)
+  async function enrollNext(
+    semester: StartResult,
+    named: ApplicationReader,
+    composed: Character[],
+    continued: ApplicationContinuation,
+    unrevealed: string[]
+  ): Promise<void> {
+    const tokensGenerated = tokensNow()
+    const folder = await sealApplication()
     const draft: EnrollmentDraft = {
-      chars: roster.map((c) => c.charId),
+      chars: composed.map((c) => c.charId),
+      ...(unrevealed.length > 0 ? { masked: unrevealed } : {}),
       classes: semester.schedules.classes,
       perChar: semester.schedules.perChar,
       jobs: semester.jobs,
@@ -628,41 +398,101 @@ export function NewGameView(): JSX.Element {
       springBreakPlans: semester.springBreakPlans,
       occasions: semester.occasions,
       secrets: semester.secrets,
-      playerFirstName: next.record.playerFirstName,
-      playerLastName: next.record.playerLastName,
-      stats: handoff.carry.stats,
-      ...(handoff.carry.bio ? { bio: handoff.carry.bio } : {}),
+      ...(Object.keys(semester.starts).length > 0 ? { starts: semester.starts } : {}),
+      ...(Object.keys(semester.pairs).length > 0 ? { pairs: semester.pairs } : {}),
+      ...(Object.keys(semester.fixedEdits).length > 0 ? { fixedEdits: semester.fixedEdits } : {}),
+      playerFirstName: named.firstName,
+      playerLastName: named.lastName,
+      stats: named.stats,
+      ...(named.bio ? { bio: named.bio } : {}),
       ...(tokensGenerated > 0 ? { tokensGenerated } : {}),
       continued: {
-        // Minted now, so a Finalize retried after a failure writes the same semester.
-        id: mintId(new Set(Object.keys(next.record.semesters ?? {}))),
-        index: handoff.index,
-        ...(next.from !== undefined ? { parent: next.from } : {}),
-        alumni: handoff.alumni,
-        priorProfiles: handoff.priorProfiles,
-        pursuits: semester.pursuits,
+        // Minted when Continue was pressed, so an Enroll retried after a failure writes the
+        // same semester.
+        id: continued.id,
+        index: continued.index,
+        ...(continued.parent !== undefined ? { parent: continued.parent } : {}),
+        alumni: continued.alumni,
+        priorProfiles: continued.priorProfiles,
+        pursuits: semester.pursuits ?? {},
         ...(semester.fallGraduate ? { fallGraduate: semester.fallGraduate } : {}),
-        carry: handoff.carry
+        carry: continued.carry
       }
     }
+    const written = await useSaveStore.getState().enroll(draft, folder ?? undefined)
+    if (written.ok) setPlaythroughId(written.data.playthroughId)
+    else showError(written.error)
     setNextDraft(draft)
-    const written = await useSaveStore.getState().enroll(draft, next.playthroughId)
-    if (!written.ok) {
-      showError(written.error)
-      return
-    }
-    setPlaythroughId(next.playthroughId)
+    setApplicationFolder(folder)
+    setEnrolledTokens(tokensGenerated)
+    // The registration stands for the application from here.
+    leaveApplication()
+    endCrossing(() => {
+      setRoster(composed)
+      setPlayerName({ first: named.firstName, last: named.lastName })
+      setPlayerStats(named.stats)
+      setPlayerBio(named.bio ?? '')
+      setSchedules(semester.schedules)
+      setJobs(semester.jobs)
+      setHaunts(semester.haunts)
+      setFeeds(semester.feeds)
+      setSpringBreakPlans(semester.springBreakPlans)
+      setSecrets(semester.secrets)
+      setStarts(semester.starts)
+      setPairs(semester.pairs)
+      setOccasions(semester.occasions)
+      setView('classSelect')
+    })
   }
 
   /**
-   * A next semester's Finalize: the record gains the semester and its opening save under one
+   * The canned start's reader is named: the menu's crossing has only the enrollment left to wait
+   * on, so the registrar is swapped in under the same cover the question was asked on.
+   */
+  function onNamed(first: string, last: string, stats: PlayerStats, bio: string): void {
+    setPlayerName({ first, last })
+    setPlayerStats(stats)
+    setPlayerBio(bio)
+    setNaming(false)
+    // Whatever the phase, `endCrossing` runs the swap under cover or at once — no window to
+    // miss. No bundle behind the question: back to the menu rather than a curtain over nothing.
+    if (!schedules) {
+      endCrossing(() => setView('mainMenu'))
+      return
+    }
+    void (async () => {
+      const semester = {
+        schedules,
+        jobs,
+        haunts,
+        feeds,
+        springBreakPlans,
+        occasions,
+        fixedEdits: {},
+        secrets,
+        starts: {},
+        pairs: {}
+      }
+      await enroll(
+        semester,
+        roster.map((c) => c.charId),
+        [],
+        { first, last, stats, bio },
+        useGameStore.getState().tallies.tokensGenerated
+      )
+      endCrossing(() => setView('classSelect'))
+    })()
+  }
+
+  /**
+   * A next semester's Enroll: the record gains the semester and its opening save under one
    * cover, then the game opens on it with the graduates loaded beside the roster.
    */
-  async function finalizeNext(
+  async function startNext(
     draft: EnrollmentDraft,
     playerSchedule: Record<number, string>
   ): Promise<void> {
-    const target = next?.playthroughId ?? playthroughId
+    const target = next?.playthroughId ?? playthroughId ?? applicationFolder
     if (!draft.continued || !target) return
     const season = seasonOf(draft.continued.index)
     beginCrossing(undefined, {
@@ -671,7 +501,7 @@ export function NewGameView(): JSX.Element {
       splash: slotStampOf(
         FIRST_SLOT.date,
         FIRST_SLOT.time,
-        calendarOf(season, draft.occasions),
+        calendarOf(season, draft.occasions, draft.fixedEdits ?? {}),
         'clear'
       )
     })
@@ -695,32 +525,28 @@ export function NewGameView(): JSX.Element {
   }
 
   /** The save write, once the player has picked their timetable. */
-  async function onFinalize(playerSchedule: Record<number, string>): Promise<void> {
+  async function onStart(playerSchedule: Record<number, string>): Promise<void> {
     if (!schedules) return
     if (nextDraft?.continued) {
-      await finalizeNext(nextDraft, playerSchedule)
+      await startNext(nextDraft, playerSchedule)
       return
     }
 
     // The registrar is covered before the semester is written, and the curtain announces the
-    // morning it is written for. It is also what makes a second press of Finalize
+    // morning it is written for. It is also what makes a second press of Enroll
     // impossible — the layer takes the pointer from its first frame.
+    const calendar = calendarOf('spring', occasions, fixedEdits)
     beginCrossing(undefined, {
       from: theme,
       to: slotHalf(FIRST_SLOT.time),
-      splash: slotStampOf(
-        FIRST_SLOT.date,
-        FIRST_SLOT.time,
-        calendarOf('spring', occasions),
-        'clear'
-      )
+      splash: slotStampOf(FIRST_SLOT.date, FIRST_SLOT.time, calendar, 'clear')
     })
 
     const { classes, perChar } = schedules
     // Rolled once and read twice: by the save and by the roster's shift placement.
     const jobClosures = rollJobClosures(playerSchedule)
     // The whole semester's sky, rolled once; the authored days are kept clear inside the roll.
-    const weather = rollSemesterWeather(dryOccasionDates('spring'), 'spring')
+    const weather = rollSemesterWeather(dryOccasionDates(calendar), 'spring')
 
     /**
      * Every character's shifts, placed now that both her timetable and the employer's closures
@@ -768,10 +594,17 @@ export function NewGameView(): JSX.Element {
     // One shuffled permutation of the cycle, dealt out one each, so no two start in phase.
     const moodOffsets = shuffle([...Array(MOOD_CYCLE_LENGTH).keys()])
 
-    // Who already knows whom; after the schedules, since it reads the year off them.
-    const npcRelationships = rollInitialNpcRelationships(
-      roster.map((c) => ({ charId: c.charId, year: perChar[c.charId]?.year ?? 1 }))
+    // Who already knows whom, the pairs the player set laid over the roll; after the schedules,
+    // since the roll reads the year off them.
+    const npcRelationships = pairsOver(
+      rollInitialNpcRelationships(
+        roster.map((c) => ({ charId: c.charId, year: perChar[c.charId]?.year ?? 1 }))
+      ),
+      pairs
     )
+    // A girl who gave him her number before the semester earns him BunnyMap as one who gave it
+    // on day 0 would: BunnyBot hands it over after its introduction.
+    const contactAtStart = roster.some((c) => starts[c.charId]?.flags.gaveContactInfo)
 
     // The winter posts dated, and their likes rolled off the friend
     // count the pass above has just decided.
@@ -833,6 +666,8 @@ export function NewGameView(): JSX.Element {
         playerLastName: playerName.last,
         classes,
         occasions,
+        ...(Object.keys(fixedEdits).length > 0 ? { fixedEdits } : {}),
+        ...(masked.length > 0 ? { masked } : {}),
         // Each all-hours employer's two closed slots, rolled above off the fixed timetable.
         jobClosures,
         weather,
@@ -851,11 +686,10 @@ export function NewGameView(): JSX.Element {
             const job = charJobs[c.charId]
             return [
               c.charId,
-              // Every name starts hidden, and the flags are seeded off her traits.
+              // A girl he knows stands where the Profiles screen set her; anybody else starts
+              // unmet and unnamed, her flags seeded off her traits.
               {
-                memories: [],
-                flags: initialFlags(c),
-                nameKnown: false,
+                ...(starts[c.charId] ?? { memories: [], flags: initialFlags(c), nameKnown: false }),
                 ...(job ? { job } : {}),
                 // Omitted for a freshman, whose break was somewhere else.
                 ...(winterFeeds[c.charId]?.length > 0 ? { feed: winterFeeds[c.charId] } : {}),
@@ -888,10 +722,10 @@ export function NewGameView(): JSX.Element {
         bunnymapUnlocked: false,
         bunnyshopUnlocked: false,
         venusJobIntroSent: false,
-        bunnybotContactIntroSent: false,
+        bunnybotContactIntroSent: contactAtStart,
         bunnybotFirstPostNudgeSent: false,
         bunnybotTwoTimingTipSent: false,
-        bunnybotDeferred: [],
+        bunnybotDeferred: contactAtStart ? ['contact'] : [],
         // The schedule just picked is nobody's second choice.
         droppedClasses: {},
         addedClasses: {},
@@ -920,7 +754,7 @@ export function NewGameView(): JSX.Element {
         // What the mods kept with the registration, as they left it.
         ...(resumed?.enrollment.ex ? { ex: resumed.enrollment.ex } : {})
       },
-      playthroughId ?? undefined
+      playthroughId ?? applicationFolder ?? undefined
     )
     if (!written.ok) {
       // The registrar is revealed again and the error read over it, the abandon idiom.
@@ -942,14 +776,14 @@ export function NewGameView(): JSX.Element {
   }
 
   // The registrar, written once and returned from two branches — the canned start's, where the
-  // name modal's exit has to outlive the swap to it, and the generated flow's.
+  // name modal's exit has to outlive the swap to it, and every other start's.
   const classSelect =
     view === 'classSelect' && schedules ? (
       <ClassSelectView
         schedules={schedules}
         playerName={playerName}
         saved={playthroughId !== null}
-        onFinalize={(playerSchedule) => void onFinalize(playerSchedule)}
+        onStart={(playerSchedule) => void onStart(playerSchedule)}
         onCancel={() => setView('mainMenu')}
       />
     ) : null
@@ -980,362 +814,16 @@ export function NewGameView(): JSX.Element {
 
   if (classSelect) return classSelect
 
-  return (
-    // The crossing takes the pointer from its first frame but not the keyboard, and a screen
-    // behind a curtain must answer neither.
-    <div className="vu-newgame" data-theme={theme} inert={crossing}>
-      {/* The corner archway, and the wave its departure leaves. Written before everything
-          the player reads, so tree order keeps the content in front of it. */}
-      <motion.div
-        className="vu-newgame-backdrop"
-        variants={BACKDROP_IN}
-        initial="hidden"
-        animate="shown"
-      >
-        {rippling && (
-          <>
-            <motion.div
-              className="vu-newgame-decor vu-newgame-ripple"
-              variants={rippleLead}
-              initial="rest"
-              animate="spread"
-            >
-              <div className="vu-newgame-decor-arch" />
-            </motion.div>
-            <motion.div
-              className="vu-newgame-decor vu-newgame-ripple"
-              variants={rippleChase}
-              initial="rest"
-              animate="spread"
-              // The ground has covered the stage, so there is nothing left to see: the pair
-              // goes, and the next opening may launch another.
-              onAnimationComplete={(label) => {
-                if (label !== 'spread') return
-                rippleBusy.current = false
-                setRippling(false)
-              }}
-            >
-              <div className="vu-newgame-decor-arch vu-newgame-decor-arch--ground" />
-            </motion.div>
-          </>
-        )}
-        {/* Last, so it stands over the wave it is hiding the birth of. The box breathes and
-            the arch inside it answers the pointer: both are `scale`, and on one element the
-            last writer would win. */}
-        <motion.div className="vu-newgame-decor" animate={breatheDecor}>
-          <motion.div
-            className="vu-newgame-decor-arch"
-            variants={doorway}
-            initial={false}
-            animate={armed ? 'open' : 'rest'}
-          />
-        </motion.div>
-      </motion.div>
+  if (flow) {
+    return (
+      <NewGameFlow
+        theme={theme}
+        staged={application}
+        continuation={next}
+        onComposed={onComposed}
+      />
+    )
+  }
 
-      <motion.header
-        className="vu-newgame-header"
-        variants={HEADER_IN}
-        initial="hidden"
-        animate="shown"
-      >
-        <motion.button
-          className="vu-circle vu-newgame-back"
-          aria-label="Main Menu"
-          {...gestures(false, quietLift, quietPress)}
-          onClick={() => (next ? setLeaving(true) : setView('mainMenu'))}
-        >
-          <BackIcon />
-        </motion.button>
-
-        <div className="vu-title">
-          <h1 className="vu-title-text">{next ? 'New Game+' : 'New Game'}</h1>
-        </div>
-        {next && <span className="vu-newgame-semester">{semesterName(next.handoff.index)}</span>}
-
-        <span className="vu-newgame-count">
-          {roster.length}/{ROSTER_SIZE} characters
-        </span>
-
-        <motion.button
-          id="new-game-fill"
-          className="vu-btn vu-btn--outline vu-btn--panel vu-paper vu-newgame-fill"
-          {...gestures(fillDead, lift, press)}
-          disabled={fillDead}
-          onClick={fillRandom}
-        >
-          <DiceIcon pips={5} />
-          Fill empty slots randomly
-        </motion.button>
-      </motion.header>
-
-      {/* All ROSTER_SIZE tiles are rendered, filled ones first, so the count reads at a glance. */}
-      <motion.ul
-        className="vu-newgame-grid"
-        variants={GRID_IN}
-        initial="hidden"
-        animate="shown"
-      >
-        {Array.from({ length: ROSTER_SIZE }, (_, index) => {
-          const character = roster[index]
-          return character ? (
-            <RosterTile
-              key={character.charId}
-              character={character}
-              duplicate={isDuplicate(character)}
-              locked={locked.has(character.charId)}
-              onOpen={() => setInspecting(character.charId)}
-              onRemove={() => setRoster((prev) => prev.filter((c) => c.charId !== character.charId))}
-            />
-          ) : (
-            <EmptyTile key={`slot-${index}`} onPick={() => setPicking(true)} />
-          )
-        })}
-      </motion.ul>
-
-      <motion.footer
-        className="vu-newgame-foot"
-        variants={FOOT_IN}
-        initial="hidden"
-        animate="shown"
-      >
-        {/* The wrapper wears the state; the button inside keeps its own lift and press.
-            `initial={false}` so a return from the timetable lands already doubled. */}
-        <motion.div
-          className="vu-newgame-start"
-          variants={doubled}
-          initial={false}
-          animate={roster.length >= ROSTER_SIZE ? 'double' : 'single'}
-        >
-          <motion.button
-            id="new-game-start"
-            className="vu-btn vu-btn--primary vu-btn--panel vu-paper"
-            {...gestures(startDead, lift, press)}
-            disabled={startDead}
-            onHoverStart={() => setHovering(true)}
-            onHoverEnd={() => setHovering(false)}
-            onClick={startGame}
-          >
-            Start game
-            {/* The mark says where the button goes, which is as true of one that cannot go
-                there yet — so it stays whether or not the button is live. */}
-            <ChevronIcon />
-          </motion.button>
-        </motion.div>
-      </motion.footer>
-
-      <AnimatePresence>
-        {picking && (
-          <LoadCharacterModal
-            key="picker"
-            taken={[...roster.map((c) => c.charId), ...alumni]}
-            theme={theme}
-            onClose={() => setPicking(false)}
-            onPick={(character) => {
-              setPicking(false)
-              setRoster((prev) => [...prev, character])
-            }}
-          />
-        )}
-      </AnimatePresence>
-
-      <AnimatePresence>
-        {inspected && (
-          <CharacterModal
-            key={inspected.charId}
-            character={inspected}
-            theme={theme}
-            duplicate={isDuplicate(inspected)}
-            onClose={() => setInspecting(null)}
-          />
-        )}
-      </AnimatePresence>
-
-      {/* Leaving a next semester's roster loses nothing: the ending it came from still stands. */}
-      <AnimatePresence>
-        {leaving && (
-          <ConfirmModal
-            key="leaving"
-            id="new-game-leave"
-            theme={theme}
-            title="Return to main menu?"
-            message="You can return to this screen by going home on your Goodbyes save."
-            cancelText="Cancel"
-            confirmText="Return to main menu"
-            onCancel={() => setLeaving(false)}
-            onConfirm={() => {
-              setLeaving(false)
-              setView('mainMenu')
-            }}
-          />
-        )}
-      </AnimatePresence>
-
-      {/* A4's frame with one answer: nothing here is a choice, only a thing to go and fix,
-          so the dismiss button is the confirm and Escape is the same word. */}
-      <AnimatePresence>
-        {warnings && (
-          <ConfirmModal
-            key="warnings"
-            id="new-game-warnings"
-            theme={theme}
-            title="Duplicate first names"
-            message={`Two characters have the same first name: ${warnings.join('; ')}. Change one of their first names in Manage Characters first.`}
-            confirmText="Okay"
-            onConfirm={() => setWarnings(null)}
-          />
-        )}
-      </AnimatePresence>
-
-      {/* One presence for both questions the start asks: the lineup's answer starts a crossing,
-          and the name panel is raised under its cover well after the lineup's own exit finishes. */}
-      <AnimatePresence>
-        {naming && <PlayerNameModal key="naming" theme={theme} onSubmit={onNamed} />}
-
-        {sizing && (
-          <CharacterHeightModal
-            key="heights"
-            roster={roster}
-            theme={theme}
-            onConfirm={(scales) => {
-              // Written to the characters themselves; the roster takes the records
-              // back so `enterGame` stages the heights just written.
-              void saveHeights(roster, scales).then((written) => {
-                if (written.length === 0) return
-                const byId = Object.fromEntries(written.map((c) => [c.charId, c]))
-                setRoster((prev) => prev.map((c) => byId[c.charId] ?? c))
-              })
-              setSizing(false)
-              // The roster is left behind here: the name is asked once the curtain is down,
-              // and what is under it from then on is the wait itself — the semester being
-              // written, which is the longest load in the app and is declared as one. A next
-              // semester's reader is already named, so its wait goes straight on.
-              beginCrossing(
-                next
-                  ? () => {
-                      nameCrossingWait('Generating class schedule')
-                      setNamed(true)
-                    }
-                  : () => setNaming(true),
-                { wait: true }
-              )
-            }}
-          />
-        )}
-      </AnimatePresence>
-
-      {/* Every prompt is retryable and none is optional. `alwaysRetryable` since a
-          re-roll fixes the permanent validators; `lockOut` as for the classifier. */}
-      <AnimatePresence>
-        {startFailure && (
-          <LlmFailureModal
-            key="start-failed"
-            id="new-game-failed"
-            theme={theme}
-            error={startFailure.error}
-            title="Couldn't start the game"
-            retryMessage={`Failed: ${andList(startFailure.missing)}.`}
-            cancelText="Back to character select"
-            alwaysRetryable
-            lockOut
-            onRetry={retryStart}
-            onAbandon={abandonStart}
-          />
-        )}
-      </AnimatePresence>
-
-    </div>
-  )
+  return <></>
 }
-
-/**
- * One character on the roster: her archway, her name, and the ✕ that takes her off it — or, for
- * a girl returning to a next semester, the sticker saying she stays.
- */
-function RosterTile({
-  character,
-  duplicate,
-  locked,
-  onOpen,
-  onRemove
-}: {
-  character: Character
-  duplicate: boolean
-  locked: boolean
-  onOpen: () => void
-  onRemove: () => void
-}): JSX.Element {
-  // Held on the tile rather than in the view, so a character removed under the cursor takes
-  // her hover with her — motion reports no hover ending for an element that unmounts.
-  const [pointerOver, setPointerOver] = useState(false)
-  const name = fullNameOf(character)
-
-  return (
-    <motion.li
-      className={`vu-card vu-newgame-card${duplicate ? ' vu-newgame-card--duplicate' : ''}`}
-      variants={dealtItem}
-      onHoverStart={() => setPointerOver(true)}
-      onHoverEnd={() => setPointerOver(false)}
-      {...hovered(false, cardLift)}
-    >
-      <motion.button className="vu-card-face" whileTap={press} onClick={onOpen}>
-        <div className="vu-arch vu-newgame-arch vu-paper">
-          <div className="vu-crop vu-card-crop">
-            <img
-              className="vu-card-sprite"
-              src={spriteUrl(character.charId, 'neutral')}
-              alt=""
-            />
-          </div>
-        </div>
-        <CardCaption character={character} />
-      </motion.button>
-
-      {/* A sibling of the face, never inside it: a button in a button is not a thing, and
-          the arrangement is what keeps a removal from also opening her. */}
-      {locked ? (
-        <span className="vu-sticker vu-newgame-sticker">Returning</span>
-      ) : (
-        <motion.button
-          className="vu-x vu-card-x"
-          aria-label={`Remove ${name} from the roster`}
-          initial={false}
-          animate={pointerOver ? peek : tuck}
-          whileFocus={peek}
-          whileTap={quietPress}
-          onClick={onRemove}
-        >
-          <CloseIcon />
-        </motion.button>
-      )}
-    </motion.li>
-  )
-}
-
-/** A slot with nobody in it: the same tile, quiet and dashed, that opens the picker. */
-function EmptyTile({ onPick }: { onPick: () => void }): JSX.Element {
-  return (
-    <motion.li
-      className="vu-card vu-newgame-card vu-newgame-card--empty"
-      variants={dealtItem}
-      {...hovered(false, cardLift)}
-    >
-      <motion.button
-        className="vu-card-face"
-        aria-label="Add a character"
-        whileTap={press}
-        onClick={onPick}
-      >
-        {/* No paper layer: a slot that is waiting has no weight. */}
-        <div className="vu-arch vu-newgame-arch">
-          <div className="vu-crop vu-card-crop vu-card-crop--empty">
-            <span className="vu-newgame-plus">+</span>
-          </div>
-        </div>
-        <div className="vu-card-caption">
-          <span className="vu-card-name">Empty</span>
-        </div>
-      </motion.button>
-    </motion.li>
-  )
-}
-

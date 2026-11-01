@@ -1,4 +1,6 @@
+import type { Application } from '@shared/application'
 import {
+  applicationsFromBackup,
   BACKUP_NAME,
   preflightBackup,
   BACKUP_READ,
@@ -41,7 +43,7 @@ import { readLorebookRecord, type LorebookRecord } from '@shared/lorebookRecord'
 import { assertSafePhotoId } from '@shared/photos'
 import { validateReplay } from '@shared/replays'
 import { validateSavedScene, type SavedScene } from '@shared/sceneCreator'
-import { SAFE_NUMERIC_ID } from '@shared/saveRules'
+import { readApplicationRecord, SAFE_NUMERIC_ID } from '@shared/saveRules'
 import { settingsFromBackup } from '@shared/settingsRules'
 import { checkArchiveContent } from '@shared/zipRules'
 import { forgetBackgroundUrls } from './backgrounds'
@@ -201,6 +203,19 @@ export async function exportBackup(): Promise<string> {
       }
     }
 
+    // An application a restore would refuse would cost the whole backup, so it costs only itself.
+    const applications: Record<string, Application> = {}
+    for (const key of await db.getAllKeys('applications')) {
+      try {
+        applications[key] = readApplicationRecord(
+          await db.get('applications', key),
+          `applications/${key}`
+        )
+      } catch (err) {
+        console.warn(`[backup] leaving out application ${key}:`, err)
+      }
+    }
+
     const backup: BackupFile = {
       schemaVersion: BACKUP_SCHEMA_VERSION,
       settings: await rendererSettings(),
@@ -215,6 +230,7 @@ export async function exportBackup(): Promise<string> {
       scenes,
       replays,
       ...(Object.keys(lorebooks).length > 0 ? { lorebooks } : {}),
+      ...(Object.keys(applications).length > 0 ? { applications } : {}),
       characters: (await db.getAll('characters')).filter(
         (character) => !isPackRead(character.charId)
       )
@@ -267,6 +283,7 @@ export async function importBackup(): Promise<boolean> {
   const scenes = scenesFromBackup(record)
   const replays = replaysFromBackup(record)
   const lorebooks = lorebooksFromBackup(record)
+  const applications = applicationsFromBackup(record)
   const semesterPictures = semesterPicturesFromBackup(record)
   // Nothing the backup does not name is written: an entry naming a path of its own choosing
   // would put a file where this build never looks for one.
@@ -288,7 +305,8 @@ export async function importBackup(): Promise<boolean> {
         'backgrounds',
         'scenes',
         'replays',
-        'lorebooks'
+        'lorebooks',
+        'applications'
       ],
       'readwrite'
     )
@@ -326,6 +344,13 @@ export async function importBackup(): Promise<boolean> {
         // A lorebook goes back only beside a playthrough the backup restores.
         if (!Object.hasOwn(record.playthroughs, playthroughId)) continue
         await keptLorebooks.put(lorebook, playthroughId)
+      }
+
+      const keptApplications = tx.objectStore('applications')
+      await keptApplications.clear()
+      for (const [playthroughId, application] of Object.entries(applications)) {
+        if (!Object.hasOwn(record.playthroughs, playthroughId)) continue
+        await keptApplications.put(application, playthroughId)
       }
 
       const art = tx.objectStore('endingArt')

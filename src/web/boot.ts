@@ -122,9 +122,14 @@ async function boot(): Promise<void> {
   setImagesLoadedSink((charId) => useCharacterStore.getState().refreshImages(charId))
 
   const { writesPending } = await import('../renderer/stores/loop/saves')
-  // A tab closed mid-write loses the save; the browser asks on the app's behalf.
+  const { applicationWritesPending } = await import('../renderer/stores/applicationStore')
+  const { lorebookWritesPending } = await import('../renderer/stores/lorebookStore')
+  // A tab closed mid-write loses the save, the New Game or the lorebook edit; the browser asks on
+  // the app's behalf.
   window.addEventListener('beforeunload', (event) => {
-    if (writesPending()) event.preventDefault()
+    if (writesPending() || applicationWritesPending() || lorebookWritesPending()) {
+      event.preventDefault()
+    }
   })
 
   // A wheel over the stage that nothing inside can take would scroll the page itch embeds the

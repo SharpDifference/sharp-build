@@ -3,6 +3,7 @@ import { tmpdir } from 'os'
 import { join } from 'path'
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { installMods } from '@shared/mods'
+import { emptyCatalog } from '@shared/application'
 import type { SaveDraft } from '@shared/types'
 import type { BackupPart } from '@vx/modkit/main'
 import { useGameStore } from '../src/renderer/stores/gameStore'
@@ -24,7 +25,7 @@ const { exportBackup, importBackup } = await import('../src/main/services/backup
 const { backupPart, requiredBackupPart } = await import('@vx/modkit/main')
 const { clearModParts } = await import('../src/main/services/modParts')
 const { modDataPath } = await import('../src/main/services/modDataService')
-const { createPlaythrough, listPlaythroughs } = await import('../src/main/services/saveService')
+const { createPlaythrough, listPlaythroughs, writeApplication, readApplication } = await import('../src/main/services/saveService')
 const { createZip, extractZip } = await import('../src/main/services/archiveService')
 const { BACKUP_NAME } = await import('../src/shared/backup')
 const { defaultSettings } = await import('../src/shared/settingsRules')
@@ -128,6 +129,23 @@ async function backedUp(): Promise<{ archive: string; playthroughId: string }> {
 }
 
 describe('a backup part', () => {
+  it('restores an unfinished setup alongside a mod part without passing native setup data as legacy mod data', async () => {
+    const seen: Seen = { committed: false, discarded: false }
+    tapePart(seen)
+    const { playthroughId, application } = await writeApplication({
+      screen: 'profiles', season: 'spring', chars: ['a'], plan: [], occasions: {},
+      catalog: emptyCatalog(), girls: {}, pairs: {}, replies: {}
+    })
+    const archive = join(await tempDir('venus-university-setup-part-'), 'out.zip')
+    await exportBackup(archive)
+    await freshRoot()
+    await importBackup(archive)
+    expect(await readApplication(playthroughId)).toEqual(application)
+    expect(seen.committed).toBe(true)
+    expect(seen.legacy?.record).not.toHaveProperty('applications')
+    expect(await readFile(join(getModDataPath('tape-mod'), 'side-a.bin'))).toEqual(TAPE)
+  })
+
   describe('export failure policy', () => {
     it.each([
       ['omit', 'missing source'], ['omit', 'unwritten file'], ['omit', 'invalid JSON'],

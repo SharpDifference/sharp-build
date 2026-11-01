@@ -1,0 +1,29 @@
+/* The voice lineup: the height lineup's panel (CharacterHeight.css) with a row apiece in place of
+   its floor — her face and name, the slider between its two ends, and the square that plays it.
+   Imported from the view module, never from index.css. */
+
+/* Two columns read down first, so a roster of twelve is two stacks of six and the panel never
+   scrolls; the rows share the width, so a long name ellipsizes rather than pushing the slider. */
+.vu-voices-list {
+  display: grid;
+  grid-auto-flow: column;
+  grid-template-rows: repeat(6, auto);
+  grid-auto-columns: minmax(0, 1fr);
+  gap: 12px 48px;
+}
+
+.vu-voices-row {
+  display: grid;
+  grid-template-columns: 56px minmax(0, 120px) auto minmax(120px, 1fr) auto 46px;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+
+.vu-voices-name {
+  overflow: hidden;
+  color: var(--vu-text);
+  font: 700 15px var(--font-body);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

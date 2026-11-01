@@ -860,6 +860,7 @@ export function SelectField(input: SelectFieldProps): JSX.Element;
 
 // @public (undocumented)
 export interface SelectFieldOption {
+    disabled?: boolean;
     // (undocumented)
     label: string;
     // (undocumented)

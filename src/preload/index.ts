@@ -137,6 +137,8 @@ const api: VenusUniversityApi = {
     playthroughs: () => ipcRenderer.invoke('saves:playthroughs'),
     list: (playthroughId) => ipcRenderer.invoke('saves:list', playthroughId),
     read: (playthroughId, saveId) => ipcRenderer.invoke('saves:read', playthroughId, saveId),
+    apply: (draft, playthroughId) => ipcRenderer.invoke('saves:apply', draft, playthroughId),
+    application: (playthroughId) => ipcRenderer.invoke('saves:application', playthroughId),
     enroll: (draft, playthroughId) => ipcRenderer.invoke('saves:enroll', draft, playthroughId),
     enrollment: (playthroughId) => ipcRenderer.invoke('saves:enrollment', playthroughId),
     create: (playthrough, draft, playthroughId) =>
@@ -194,6 +196,10 @@ const api: VenusUniversityApi = {
       ipcRenderer.invoke('lorebook:write', playthroughId, lorebook),
     import: () => ipcRenderer.invoke('lorebook:import'),
     export: (world) => ipcRenderer.invoke('lorebook:export', world)
+  },
+  occasions: {
+    import: () => ipcRenderer.invoke('occasions:import'),
+    export: (file) => ipcRenderer.invoke('occasions:export', file)
   },
   comfy: {
     start: () => ipcRenderer.invoke('comfy:start'),

@@ -22,7 +22,7 @@ import { shiftNow } from '../src/renderer/stores/timetable'
 import { useGameStore } from '../src/renderer/stores/gameStore'
 import { classEntry, peClassEntry } from './fixtures'
 
-const SPRING = calendarOf('spring', [])
+const SPRING = calendarOf('spring', [], {})
 
 /**
  * The store half of the shift sweep: the strikes it banks, the boss texts it sends, the roster
@@ -38,7 +38,7 @@ const MONDAY_DAY_SHIFT = shiftSlotOf(0, 0)
 /** Puts the clock on a slot with a job already in force, sweeping from `from`. */
 function seed(date: number, time: TimeSlot, job: JobState, occasions: Occasion[] = []): void {
   useGameStore.getState().reset()
-  useGameStore.setState({ date, time, job, calendar: calendarOf('spring', occasions) })
+  useGameStore.setState({ date, time, job, calendar: calendarOf('spring', occasions, {}) })
 }
 
 /** A closure spanning `startDate`–`endDate`, of the kind that shuts the university. */

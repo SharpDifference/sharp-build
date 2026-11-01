@@ -38,8 +38,6 @@
   position: absolute;
   top: 50%;
   left: 118px;
-  grid-auto-flow: row;
-  grid-auto-columns: auto;
   width: 132px;
   transform: translateY(-50%);
 }

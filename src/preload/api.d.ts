@@ -1,3 +1,4 @@
+import type { ApplicationDraft, Application, KeptApplication } from '@shared/application'
 import type { ClassifierPromptRequest, ClassifierVerdict } from '@shared/classifier'
 import type { ComfyModelLists, ComfyModelRole, ComfyProbe } from '@shared/comfyModels'
 import type {
@@ -9,6 +10,7 @@ import type { PromptEdit } from '@shared/imagePrompt'
 import type { ModSwitches } from '@shared/mods'
 import type { ModSessionTable, ModStatus } from '@shared/modSession'
 import type { LorebookRecord, WorldInfoFile, WorldInfoImport } from '@shared/lorebookRecord'
+import type { OccasionsFile, OccasionsImport } from '@shared/occasionsFile'
 import type {
   PhotoEntry,
   PhotoMeta,
@@ -374,12 +376,21 @@ export interface VenusUniversityApi {
     /** One save with the record it is read against — everything loading it needs. */
     read: (playthroughId: string, saveId: string) => Promise<Result<SaveReadResult>>
     /**
-     * Writes the semester the registrar is about to offer: a first semester into a playthrough
-     * folder it mints, a next one beside the record of the playthrough `playthroughId` names.
+     * Writes the semester the registrar is about to offer: a first semester in place of the
+     * application kept in the folder `playthroughId` names, or into a folder it mints where none
+     * is named; a next one beside the record of the playthrough `playthroughId` names.
      */
     enroll: (draft: EnrollmentDraft, playthroughId?: string) => Promise<Result<CreatedEnrollment>>
     /** The semester waiting in one folder, for the registrar reopening on it. */
     enrollment: (playthroughId: string) => Promise<Result<Enrollment>>
+    /**
+     * Keeps a New Game in progress: the first write into a playthrough folder it mints, every
+     * later one into the folder `playthroughId` names — refused, and nothing created, where that
+     * folder is gone or its semester has already been composed.
+     */
+    apply: (draft: ApplicationDraft, playthroughId?: string) => Promise<Result<KeptApplication>>
+    /** The New Game in progress in one folder, for New Game reopening on it. */
+    application: (playthroughId: string) => Promise<Result<Application>>
     /**
      * Starts a new playthrough: its record, then its opening slot-save — into the folder its
      * enrollment minted, whose file it replaces, or a freshly minted one.
@@ -518,6 +529,19 @@ export interface VenusUniversityApi {
      * path or `null` when dismissed; the download panel in the browser, answering `null`.
      */
     export: (world: WorldInfoFile) => Promise<Result<string | null>>
+  }
+  occasions: {
+    /**
+     * Has the player pick an occasions file — the native dialog on the desktop, the browser's
+     * own picker in the browser — and answers its season and usable entries, or `null` when
+     * dismissed. Writes nothing.
+     */
+    import: () => Promise<Result<OccasionsImport | null>>
+    /**
+     * Hands the player the occasions as a file: the native dialog on the desktop, answering the
+     * path or `null` when dismissed; the download panel in the browser, answering `null`.
+     */
+    export: (file: OccasionsFile) => Promise<Result<string | null>>
   }
   comfy: {
     /** Starts the app's own server, or checks the player's own one answers. */

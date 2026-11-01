@@ -1,8 +1,9 @@
-import type { Season, TimeSlot } from '@shared/types'
+import type { SemesterCalendar } from '@shared/semesters'
+import type { TimeSlot } from '@shared/types'
 import { isWet, weatherAt, type Weather } from '@shared/weather'
 import { formatRelativeSlot, formatWeekday, prevSlot } from './gameDate'
 import { isEpilogueNight } from './graduation'
-import { staticOccasionsOf } from './occasions'
+import { fixedOccasionsOf } from './occasions'
 
 /**
  * The sky as the game reads it: which days are authored clear, the one reading every screen
@@ -28,10 +29,10 @@ export const DRY_OCCASION_IDS: ReadonlySet<string> = new Set([
   'halloween'
 ])
 
-/** Every date a season's dry occasions cover, for the roll to keep clear. */
-export function dryOccasionDates(season: Season): Set<number> {
+/** Every date a semester's dry occasions cover, wherever it moved them, for the roll to keep clear. */
+export function dryOccasionDates(calendar: SemesterCalendar): Set<number> {
   const dates = new Set<number>()
-  for (const occasion of staticOccasionsOf(season)) {
+  for (const occasion of fixedOccasionsOf(calendar.season, calendar.fixedEdits)) {
     if (!DRY_OCCASION_IDS.has(occasion.id)) continue
     for (let date = occasion.startDate; date <= occasion.endDate; date++) dates.add(date)
   }

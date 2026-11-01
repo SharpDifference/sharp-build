@@ -274,6 +274,23 @@ body {
   color: var(--vu-accent);
 }
 
+/* A random pick's name behind New Game's mask, in the words or the heading it stands in: quiet
+   and recessed, the struck eye before the mask, and itself the control that lifts it. */
+.vu-spoiler {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 10px;
+  border: none;
+  border-radius: 999px;
+  background: var(--vu-recessed);
+  color: var(--vu-text-muted);
+  font: 700 0.85em var(--font-mono);
+  letter-spacing: 0.08em;
+  vertical-align: middle;
+  white-space: nowrap;
+}
+
 /* An outward link inside prose: underlined at rest, so it says it leaves the app
    before the cursor is ever on it. */
 .vu-link {
@@ -435,6 +452,23 @@ body {
   height: 100%;
   object-fit: cover;
   object-position: top;
+}
+
+/* A random pick's face behind New Game's mask: her archway's own shape in a dashed outline with
+   a question in it, sized off the archway it stands in. */
+.vu-crop--masked {
+  display: grid;
+  place-items: center;
+  container-type: size;
+  border: 2.5px dashed var(--vu-border);
+  background: var(--vu-ground);
+  color: var(--vu-text-muted);
+}
+
+/* The question, a child so the crop it sits in is the container it is measured against. */
+.vu-crop--masked > span {
+  font: 700 46cqh var(--font-mono);
+  line-height: 1;
 }
 
 /* Sprites are full-body 1160x1696 but display thigh-up: the container shows the top of the
@@ -1319,6 +1353,13 @@ body {
 
 .vu-palette-btn--on svg {
   color: inherit;
+}
+
+/* A palette stood as a column of tabs, each a row of its own: Settings' tabs and New Game's
+   Setting screen. */
+.vu-palette--column {
+  grid-auto-flow: row;
+  grid-auto-columns: auto;
 }
 
 /* Interaction states with no duration — everything that moves is motion's, in views/motion.ts.

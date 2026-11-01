@@ -1,4 +1,5 @@
 import { create } from 'zustand'
+import type { Application } from '@shared/application'
 import { playthroughLabel, playthroughNameOf, renamedRecord } from '@shared/saveRules'
 import { semesterOf, type SemesterView } from '@shared/semesters'
 import {
@@ -61,11 +62,25 @@ export interface ResolvedEnrollment {
   unloadable: string | null
 }
 
-/** Which of the two a resume answered with: a save, or a semester still at the registrar. */
-export function isEnrollment(
-  entry: LoadedSave | ResolvedEnrollment
-): entry is ResolvedEnrollment {
+/** One playthrough that is still a New Game being set up: the application, its roster and its gate. */
+export interface ResolvedApplication {
+  playthroughId: string
+  application: Application
+  /** Why New Game cannot reopen on it, or null when it can. */
+  unloadable: string | null
+}
+
+/** What a resume answers with: a save, a semester still at the registrar, or a New Game being set up. */
+export type Resumed = LoadedSave | ResolvedEnrollment | ResolvedApplication
+
+/** Whether a resume answered with a semester still at the registrar. */
+export function isEnrollment(entry: Resumed): entry is ResolvedEnrollment {
   return 'enrollment' in entry
+}
+
+/** Whether a resume answered with a New Game still being set up. */
+export function isApplication(entry: Resumed): entry is ResolvedApplication {
+  return 'application' in entry
 }
 
 interface SaveStoreState {
@@ -112,11 +127,17 @@ interface SaveStoreState {
    */
   resolveEnrollment: (playthrough: PlaythroughSummary) => Promise<ResolvedEnrollment | null>
   /**
-   * What Continue opens on the most recently played playthrough: its newest save, or the
-   * semester waiting at the registrar where it has none. Roster resolved and load gate
-   * applied either way; null when nothing is on disk, the newest file was refused or a read failed.
+   * Reads one playthrough's New Game in progress, with the roster resolved and the same load gate
+   * an enrollment gets. Null when the file was refused, which reports itself.
    */
-  continueNewest: () => Promise<LoadedSave | ResolvedEnrollment | null>
+  resolveApplication: (playthrough: PlaythroughSummary) => Promise<ResolvedApplication | null>
+  /**
+   * What Continue opens on the most recently played playthrough: its newest save, or the
+   * semester waiting at the registrar or the New Game being set up where it has none. Roster
+   * resolved and load gate applied either way; null when nothing is on disk, the newest file was
+   * refused or a read failed.
+   */
+  continueNewest: () => Promise<Resumed | null>
   /**
    * Writes the semester the registrar is about to offer: a first semester into a playthrough
    * folder it mints, a next one beside the record of `playthroughId`. The caller reads the
@@ -382,10 +403,28 @@ export const useSaveStore = create<SaveStoreState>((set, get) => ({
     }
   },
 
+  resolveApplication: async (playthrough) => {
+    const result = await window.api.saves.application(playthrough.playthroughId)
+    if (!result.ok) {
+      useUiStore.getState().showError(result.error)
+      return null
+    }
+
+    const application = result.data
+    const resolved = get().characters
+    const alumni = application.continued?.alumni ?? []
+    return {
+      playthroughId: playthrough.playthroughId,
+      application,
+      unloadable: unloadableReason(application.chars, resolved, alumni)
+    }
+  },
+
   continueNewest: async () => {
     const newest = newestPlaythrough(get().playthroughs)
     if (!newest) return null
-    // A folder with no save in it has a registrar behind it rather than a game.
+    // A folder with no save in it has a registrar or a New Game behind it rather than a game.
+    if (newest.applying) return get().resolveApplication(newest)
     if (newest.enrolling) return get().resolveEnrollment(newest)
 
     // The same read Load Game's second level makes. The listing orders each kind of save

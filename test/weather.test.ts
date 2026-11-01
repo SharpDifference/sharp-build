@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { FINAL_DATE } from '@shared/classes'
+import { calendarOf } from '@shared/semesters'
 import type { Season } from '@shared/types'
 import {
   isWet,
@@ -23,7 +24,7 @@ const SEASONS: readonly Season[] = ['spring', 'fall']
 
 /** `rollSemesterWeather` under many seeds, over the dry-occasion mask a season's start uses. */
 function seededRolls(count: number, season: Season): Weather[][] {
-  const dryDates = dryOccasionDates(season)
+  const dryDates = dryOccasionDates(calendarOf(season, [], {}))
   const tables: Weather[][] = []
   for (let seed = 1; seed <= count; seed++) tables.push(rollSemesterWeather(dryDates, season, lcg(seed)))
   return tables
@@ -124,11 +125,17 @@ describe('DRY_OCCASION_IDS / dryOccasionDates', () => {
     for (const id of DRY_OCCASION_IDS) expect(ids.has(id)).toBe(true)
   })
 
-  it('covers every day of the Selkie MusicFest and day 0', () => {
-    const dates = dryOccasionDates('spring')
+  it('covers every day of the Selkie MusicFest and day 0, wherever the festival was moved', () => {
+    const dates = dryOccasionDates(calendarOf('spring', [], {}))
     expect(dates.has(0)).toBe(true)
     expect(dates.has(102)).toBe(true)
     expect(dates.has(103)).toBe(true)
     expect(dates.has(104)).toBe(true)
+
+    const moved = dryOccasionDates(
+      calendarOf('spring', [], { 'selkie-beach-party': { startDate: 95 } })
+    )
+    expect([95, 96, 97].every((date) => moved.has(date))).toBe(true)
+    expect(moved.has(102)).toBe(false)
   })
 })

@@ -20,7 +20,7 @@ import {
 import type { ClassRecord } from '@shared/types'
 import { classEntry as entry, peClassEntry } from './fixtures'
 
-const SPRING = calendarOf('spring', [])
+const SPRING = calendarOf('spring', [], {})
 
 /**
  * The timetable's meeting calendar: "Week 3" counts meetings held, not weeks elapsed, and

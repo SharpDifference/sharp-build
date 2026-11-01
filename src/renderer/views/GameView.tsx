@@ -19,7 +19,7 @@ import { isPermanent } from '@shared/errors'
 import { canContinueAfter, GAME_OVER_SCENES, gameCompleteSceneOf } from '@shared/gameOver'
 import { hashString } from '@shared/hash'
 import { isGameOver } from '@shared/money'
-import { calendarOf } from '@shared/semesters'
+import { semesterCalendarOf } from '@shared/semesters'
 import { quizAnswers, type QuizAnswer } from '@shared/academics'
 import {
   allBackgrounds,
@@ -93,6 +93,7 @@ import {
   advance,
   dismissStatusModal,
   endReplay,
+  endScene,
   enterReplay,
   hasDecisionPoint,
   interject,
@@ -136,6 +137,7 @@ import { useAudioStore } from '../stores/audioStore'
 import { useBunnyboardStore } from '../stores/bunnyboardStore'
 import { giftGivenOf, useGameStore } from '../stores/gameStore'
 import {
+  endSceneOpenOf,
   forwardOpenOf,
   openingLockOf,
   replyRowOfferOf,
@@ -296,6 +298,7 @@ type OpenPanel =
   | { kind: 'leaving' }
   | { kind: 'quitting' }
   | { kind: 'interruptEnding'; turn: Interjection }
+  | { kind: 'endScene' }
   /**
    * A created scene's save question: over the curtain on its way back to the creator once it is
    * over (`leftIn` the half it was left in), or in front of a leave or a quit while it runs.
@@ -676,6 +679,8 @@ export function GameView(): JSX.Element {
   const offer = useGameStore(replyRowOfferOf)
   /** Whether an earlier line of the reply may be stepped back to. */
   const rewindOpen = useGameStore(rewindOpenOf)
+  /** Whether End scene may end the scene now. */
+  const endSceneOpen = useGameStore((s) => endSceneOpenOf(s) && !s.turnError && (!s.sceneActivity || s.sceneActivity.closed))
   /** Bumped by every line a rewind steps back. */
   const lineRewound = useGameStore((s) => s.lineRewound)
   /**
@@ -1004,7 +1009,7 @@ export function GameView(): JSX.Element {
         ? undefined
         : earlierSemesters().find(({ view }) => view.index === semesterIndex)?.view
     const earlier = from && {
-      calendar: calendarOf(from.season, from.occasions),
+      calendar: semesterCalendarOf(from),
       weather: from.weather,
       semesterIndex: from.index
     }
@@ -2201,6 +2206,9 @@ export function GameView(): JSX.Element {
           giftDead={inventory.length === 0 || !bunnyshopUnlocked || giftNote !== null}
           giftNote={giftNote}
           onGift={() => setPanel({ kind: 'gift' })}
+          endSceneShown={!cinematic && !epilogue && !replaying && !created}
+          endSceneDead={!endSceneOpen}
+          onEndScene={() => setPanel({ kind: 'endScene' })}
           calendarBadge={calendarBadge}
           bunnyboardBadge={bunnyboardBadge}
           railDead={false}
@@ -2924,6 +2932,26 @@ export function GameView(): JSX.Element {
             onConfirm={() => {
               setQuitting(true)
               void quitToDesktop()
+            }}
+          />
+        )}
+
+        {/* The ask in front of End scene. The well's words and a wait still reported go with the
+            scene; a scene that ended itself meanwhile is left to its own ending. */}
+        {panel?.kind === 'endScene' && (
+          <ConfirmModal
+            key="end-scene"
+            id="end-scene"
+            theme={half}
+            title="End the scene?"
+            message="The scene up until the last line you read will be saved and the game will skip to the book-keeping prompts."
+            confirmText="End"
+            onCancel={closePanel}
+            onConfirm={() => {
+              closePanel()
+              if (!endScene()) return
+              setAction('')
+              setSending(false)
             }}
           />
         )}

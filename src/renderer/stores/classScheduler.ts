@@ -7,7 +7,8 @@ import {
   type Character,
   type ClassEntry,
   type ClassSlot,
-  type PeClassEntry
+  type PeClassEntry,
+  type ScheduleResult
 } from '@shared/types'
 import { LAST_NAMES } from '../prompts/characterSuggestions'
 import type { DecoratedClassGenDraft } from '../prompts/classPrompt'
@@ -17,23 +18,16 @@ import type { DecoratedClassGenDraft } from '../prompts/classPrompt'
  * Pure and randomised — no IO, no store access.
  */
 
-export interface ScheduleResult {
-  /** Classes with at least one student, keyed by code. */
-  classes: Record<string, ClassEntry>
-  /** Keyed by charId. */
-  perChar: Record<string, CharSchedule>
-}
-
 /**
- * The one PE class every save is guaranteed: after seating, the most-attended generated PE
- * class becomes this, for the swimsuit wardrobes. The blurb is the whole of a description;
- * the coach it inherits at the swap is spoken only where one is asked for.
+ * The PE class a save is given for the swimsuit wardrobes: after seating, the most-attended PE
+ * class the player did not write becomes this. The blurb is the whole of a description; the
+ * coach it inherits at the swap is spoken only where one is asked for.
  */
 export const SWIM_CLASS = {
   code: 'SWIM 102',
   name: 'Fitness Swimming',
   description:
-    'Stroke technique, endurance and water safety in the university pool, from freestyle fundamentals to open turns.'
+    'A lap swimming course building freestyle stroke mechanics, aquatic endurance, and water safety skills in the university pool.'
 } as const
 
 /** The three pools a filler class may come from, in no particular order. */
@@ -65,10 +59,13 @@ export function buildSchedules(
     const fewest = Math.min(...load)
     const slot = shuffle(CLASS_SLOTS.filter((s) => load[s] === fewest))[0] as ClassSlot
     load[slot]++
-    // `owner` is a scheduling detail, not save state.
-    const { owner: _owner, ...entry } = draftEntry
+    // `owner` and `written` are scheduling details, not save state.
+    const { owner: _owner, written: _written, ...entry } = draftEntry
     return { ...entry, slot }
   })
+  const written = new Set(
+    draft.classes.filter((entry) => entry.written).map((entry) => entry.code)
+  )
 
   const byCode = new Map(slotted.map((entry) => [entry.code, entry]))
   const enrollment = new Map<string, number>(slotted.map((entry) => [entry.code, 0]))
@@ -98,7 +95,10 @@ export function buildSchedules(
       return true
     }
 
-    /** Picks from `candidates` by {@link seatRank}, at random within a tier. */
+    /**
+     * Picks from `candidates` by {@link seatRank}, the player's own classes first within the best
+     * tier, at random among those left.
+     */
     const choose = (candidates: readonly ClassEntry[]): ClassEntry | null => {
       const open = candidates.filter(
         (entry) =>
@@ -108,7 +108,9 @@ export function buildSchedules(
 
       const rankOf = (entry: ClassEntry): number => seatRank(enrollment.get(entry.code) ?? 0)
       const best = Math.min(...open.map(rankOf))
-      return shuffle(open.filter((entry) => rankOf(entry) === best))[0]
+      const tier = open.filter((entry) => rankOf(entry) === best)
+      const own = tier.filter((entry) => written.has(entry.code))
+      return shuffle(own.length > 0 ? own : tier)[0]
     }
 
     // 1. Her interest class, which is hers by construction and always has room.
@@ -120,12 +122,14 @@ export function buildSchedules(
     const pe = choose(slotted.filter((entry) => entry.category === 'pe'))
     if (pe) seat(pe)
 
-    // 3. Her major; the first always fits inside the smallest load there is.
+    // 3. Her major; the first always fits inside the smallest load there is. Major classes of no
+    //    major in particular, which a catalog dealt without regard to majors holds, come after hers.
     const majorPool = slotted.filter(
       (entry) => entry.category === 'major' && entry.major === profile.major
     )
+    const openPool = slotted.filter((entry) => entry.category === 'major' && !entry.major)
     for (let i = 0; i < profile.majorClassesTaken; i++) {
-      const pick = choose(majorPool)
+      const pick = choose(majorPool) ?? choose(openPool)
       if (!pick || !seat(pick)) break
     }
 
@@ -154,19 +158,20 @@ export function buildSchedules(
     if ((enrollment.get(entry.code) ?? 0) > 0) classes[entry.code] = entry
   }
 
-  swapInSwimClass(classes, perChar)
+  swapInSwimClass(classes, perChar, written)
 
   return { classes, perChar }
 }
 
 /**
- * Replaces the most-attended PE class with {@link SWIM_CLASS} in place, ties to the first seen;
- * keeps the replaced class's code and coach when the model already used the swim code. The
- * swim blurb comes with it, over whatever the class it replaced was described as.
+ * Replaces the most-attended PE class the player did not write with {@link SWIM_CLASS} in place,
+ * ties to the first seen, keeping the replaced class's code and coach when the swim code is taken;
+ * the swim blurb comes with it. Where every PE class attended is the player's, none is replaced.
  */
 function swapInSwimClass(
   classes: Record<string, ClassEntry>,
-  perChar: Record<string, CharSchedule>
+  perChar: Record<string, CharSchedule>,
+  written: ReadonlySet<string>
 ): void {
   const attendance = new Map<string, number>()
   for (const { schedule } of Object.values(perChar)) {
@@ -176,13 +181,17 @@ function swapInSwimClass(
   }
 
   let target: PeClassEntry | null = null
+  let peAttended = false
   for (const entry of Object.values(classes)) {
     if (entry.category !== 'pe') continue
+    peAttended = true
+    if (written.has(entry.code)) continue
     if (!target || (attendance.get(entry.code) ?? 0) > (attendance.get(target.code) ?? 0)) {
       target = entry
     }
   }
-  // Nothing attended to convert: the swim class is seated itself, in the
+  if (!target && peAttended) return
+  // No PE attended to convert: the swim class is seated itself, in the
   // emptiest slot, under the next free number if its code is taken.
   if (!target) {
     if (Object.keys(classes).length === 0) return

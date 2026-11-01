@@ -149,6 +149,18 @@ const PERMANENT_CODES = new Set([
   'LOREBOOK_IMPORT_INVALID',
   // The file picked to import holds nothing the game can use.
   'LOREBOOK_IMPORT_EMPTY',
+  // The file picked to import is not an occasions file.
+  'OCCASIONS_IMPORT_INVALID',
+  // New Game
+  // The playthrough an application belongs to no longer exists, or has already been started.
+  'APPLICATION_PLAYTHROUGH_GONE',
+  'APPLICATION_SETTLED',
+  // A kept application is not valid JSON, or is not one a write would have left.
+  'APPLICATION_MALFORMED',
+  // A kept application names a schema version this build does not read.
+  'APPLICATION_SCHEMA_VERSION',
+  // An application handed over to be written is not one a read would take back.
+  'APPLICATION_INVALID',
   // Import
   // The zip is not one of ours, or is one this build cannot read.
   'IMPORT_MANIFEST_MISSING',

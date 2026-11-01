@@ -1,6 +1,7 @@
 import { mkdir, readdir, readFile, rename, rm, utimes, writeFile } from 'fs/promises'
 import { basename, dirname, join } from 'path'
 import {
+  applicationsFromBackup,
   BACKUP_NAME,
   preflightBackup,
   BACKUP_READ,
@@ -34,6 +35,7 @@ import {
 import { isCharFileRel, isStaleTwinRel, STAGING_DIR, storedRel } from '@shared/characterFiles'
 import { CHARACTER_NOT_FOUND, SAFE_CHAR_ID } from '@shared/characterRules'
 import { BG_VARIANTS, type BgVariant, type CustomBackground } from '@shared/customBackgrounds'
+import type { Application } from '@shared/application'
 import { appError, messageOf } from '@shared/errors'
 import { imageTypeOf } from '@shared/imageBytes'
 import type { LorebookRecord } from '@shared/lorebookRecord'
@@ -41,6 +43,7 @@ import { isSafeEntryName, MOD_PARTS_DIR } from '@shared/modParts'
 import { REPLAY_NOT_FOUND } from '@shared/replays'
 import { SCENE_NOT_FOUND, type SavedScene } from '@shared/sceneCreator'
 import {
+  APPLICATION_NOT_FOUND,
   classifySaveId,
   ENROLLMENT_NOT_FOUND,
   listedSaveIds,
@@ -55,6 +58,7 @@ import {
   hasShippedCopy,
   isPregenChar,
   markCopied,
+  getApplicationPath,
   getCharacterFilePath,
   getCharacterPath,
   getCharactersPath,
@@ -102,6 +106,7 @@ import {
   forgetParsedSaves,
   loadSave,
   playthroughIds,
+  readApplication,
   readEnrollment,
   readPlaythroughRecord,
   saveIdsOf
@@ -304,9 +309,17 @@ export async function exportBackup(targetPath: string): Promise<void> {
     const profilePictures: string[] = []
     const photos: BackupPhoto[] = []
     const lorebooks: Record<string, LorebookRecord> = {}
+    const applications: Record<string, Application> = {}
 
     for (const playthroughId of await playthroughIds()) {
       playthroughs[playthroughId] = await backupPlaythrough(playthroughId)
+
+      const application = await optional(
+        `${playthroughId}'s new game in progress`,
+        APPLICATION_NOT_FOUND.code,
+        () => readApplication(playthroughId)
+      )
+      if (application) applications[playthroughId] = application
 
       // A lorebook the game would refuse is left out rather than carried into a backup a
       // restore would refuse.
@@ -410,6 +423,7 @@ export async function exportBackup(targetPath: string): Promise<void> {
       replays,
       ...(Object.keys(lorebooks).length > 0 ? { lorebooks } : {}),
       ...(Object.keys(mods).length > 0 ? { mods } : {}),
+      ...(Object.keys(applications).length > 0 ? { applications } : {}),
       characters
     }
     await writeAtomicJson(join(scratch, BACKUP_NAME), record, {
@@ -468,7 +482,8 @@ async function restoreSaves(
   record: BackupFile,
   replays: readonly BackupReplay[],
   semesterPictures: readonly SemesterPicture[],
-  lorebooks: Readonly<Record<string, LorebookRecord>>
+  lorebooks: Readonly<Record<string, LorebookRecord>>,
+  applications: Readonly<Record<string, Application>>
 ): Promise<void> {
   const staged = scratchDir('saves')
 
@@ -481,8 +496,15 @@ async function restoreSaves(
       const saves = record.saves.filter(
         (entry) => entry.playthroughId === playthroughId && classifySaveId(entry.saveId) !== null
       )
-      // A folder with none of the three is not a playthrough anybody can be put back into.
-      if (!playthrough.record && !playthrough.enrollment && saves.length === 0) continue
+      // A folder with none of the four is not a playthrough anybody can be put back into.
+      if (
+        !playthrough.record &&
+        !playthrough.enrollment &&
+        !Object.hasOwn(applications, playthroughId) &&
+        saves.length === 0
+      ) {
+        continue
+      }
 
       const folder = join(staged, playthroughId)
       await mkdir(folder, { recursive: true })
@@ -494,6 +516,10 @@ async function restoreSaves(
       if (playthrough.enrollment) {
         const name = basename(getEnrollmentPath(playthroughId))
         await writeAtomicJson(join(folder, name), playthrough.enrollment, RESTORE_FAILED)
+      }
+      if (Object.hasOwn(applications, playthroughId)) {
+        const name = basename(getApplicationPath(playthroughId))
+        await writeAtomicJson(join(folder, name), applications[playthroughId], RESTORE_FAILED)
       }
       for (const entry of saves) {
         const path = join(folder, basename(getSaveFilePath(playthroughId, entry.saveId)))
@@ -775,6 +801,7 @@ export async function importBackup(archivePath: string): Promise<void> {
     const replays = replaysFromBackup(record)
     const semesterPictures = semesterPicturesFromBackup(record)
     const lorebooks = lorebooksFromBackup(record)
+    const applications = applicationsFromBackup(record)
     const mods = modPartsFromBackup(record)
 
     // Every mod's share is read before anything is written, and made only once the game's is.
@@ -783,7 +810,7 @@ export async function importBackup(archivePath: string): Promise<void> {
     try {
       await replaceSettings(settings)
       await setGrabBags(record.grabbags)
-      await restoreSaves(scratch, record, replays, semesterPictures, lorebooks)
+      await restoreSaves(scratch, record, replays, semesterPictures, lorebooks, applications)
       await restoreCharacters(scratch, record)
       await restoreBackgrounds(scratch, backgrounds)
       await restoreScenes(scenes)

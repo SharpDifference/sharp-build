@@ -3,6 +3,7 @@ import { tmpdir } from 'os'
 import { dirname, join } from 'path'
 import { unzipSync } from 'fflate'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { emptyCatalog } from '@shared/application'
 import { EMOTIONS } from '@shared/emotions'
 import type { BackupFile } from '@shared/backup'
 import type { SlotReplay } from '@shared/replays'
@@ -41,6 +42,8 @@ const {
   createPlaythrough,
   listPlaythroughs,
   loadSave,
+  readApplication,
+  writeApplication,
   writeAutosave,
   writeManualSave,
   writeSlotSave
@@ -367,6 +370,32 @@ describe('importBackup', () => {
     await rm(getSavesPath(), { recursive: true, force: true })
     await importBackup(archive)
     expect(await readLorebook(playthroughId)).toEqual(lorebook)
+  })
+
+  it('carries a new game in progress out and back', async () => {
+    await seedSettings()
+    const { playthroughId, application } = await writeApplication({
+      screen: 'loading',
+      season: 'spring',
+      chars: ['a', 'b'],
+      plan: [],
+      occasions: {},
+      catalog: emptyCatalog(),
+      girls: {},
+      pairs: {},
+      replies: {}
+    })
+    const archive = join(root, 'applying.zip')
+    await exportBackup(archive)
+
+    const backup = JSON.parse(
+      new TextDecoder().decode((await entriesOf(archive))[BACKUP_NAME])
+    ) as BackupFile
+    expect(backup.applications).toEqual({ [playthroughId]: application })
+
+    await rm(getSavesPath(), { recursive: true, force: true })
+    await importBackup(archive)
+    expect(await readApplication(playthroughId)).toEqual(application)
   })
 
   it('puts a backup back and keeps the stored key', async () => {

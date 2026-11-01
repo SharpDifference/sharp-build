@@ -76,6 +76,7 @@ import { emitter } from './emitter'
 import { convertLegacyImages } from './legacyImages'
 import { exportWorldInfo, importWorldInfo } from './lorebook'
 import { exportLog, writeLogLine } from './log'
+import { exportOccasionsFile, importOccasionsFile } from './occasions'
 import { currentSettings, patchSettings, rendererSettings, setUnversionedSeen } from './settings'
 import { duplicateCharacter, exportCharacter, importCharacter, ZIP_TYPE } from './transfer'
 import { storedBlob } from './webp'
@@ -371,6 +372,10 @@ export function buildApi(): VenusUniversityApi {
         result('save the class registration', () => saves.writeEnrollment(draft, playthroughId)),
       enrollment: (playthroughId) =>
         result('read the class registration', () => saves.readEnrollment(playthroughId)),
+      apply: (draft, playthroughId) =>
+        result('save the new game in progress', () => saves.writeApplication(draft, playthroughId)),
+      application: (playthroughId) =>
+        result('read the new game in progress', () => saves.readApplication(playthroughId)),
       create: (playthrough, draft, playthroughId) =>
         result('start the playthrough', () =>
           saves.createPlaythrough(playthrough, draft, playthroughId)
@@ -500,6 +505,11 @@ export function buildApi(): VenusUniversityApi {
       // The picker opens synchronously inside the click: `result` calls this before any await.
       import: () => result('import the lorebook', importWorldInfo),
       export: (world) => result('save the lorebook', () => exportWorldInfo(world))
+    },
+    occasions: {
+      // The picker opens synchronously inside the click: `result` calls this before any await.
+      import: () => result('import the occasions', importOccasionsFile),
+      export: (file) => result('save the occasions', () => exportOccasionsFile(file))
     },
     // Local image generation is the desktop's; no control in the browser reaches any of these.
     comfy: {

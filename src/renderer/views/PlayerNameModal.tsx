@@ -9,10 +9,12 @@ import {
   STAT_LABELS,
   statsForTiers,
   tierNameOf,
+  tierOf,
   type PlayerStats,
   type StatKey,
   type StatTier
 } from '@shared/playerStats'
+import type { ApplicationReader } from '@shared/application'
 import { DEFAULT_PLAYER_FIRST_NAME, DEFAULT_PLAYER_LAST_NAME } from '@shared/types'
 import { useModalShell } from '../components/useModalShell'
 import { TextField } from '../components/TextField'
@@ -63,6 +65,13 @@ export interface PlayerNameModalProps {
   askDetails?: boolean
   /** Drawn by the screen that opened this — a portal inherits neither palette nor state rules. */
   theme: 'day' | 'night'
+  /** The answers given before, which a New Game reopened on its wait asks again from. */
+  initial?: ApplicationReader
+}
+
+/** A name as its box shows it: the default is the placeholder, so it opens blank. */
+function shownName(name: string | undefined, fallback: string): string {
+  return name === undefined || name === fallback ? '' : name
 }
 
 /**
@@ -74,16 +83,25 @@ export interface PlayerNameModalProps {
 export function PlayerNameModal({
   onSubmit,
   askDetails = true,
-  theme
+  theme,
+  initial
 }: PlayerNameModalProps): JSX.Element | null {
-  const [firstName, setFirstName] = useState('')
-  const [lastName, setLastName] = useState('')
-  const [bio, setBio] = useState('')
-  const [tiers, setTiers] = useState<Record<StatKey, StatTier>>({
-    brain: STARTING_TIER,
-    body: STARTING_TIER,
-    heart: STARTING_TIER
-  })
+  const [firstName, setFirstName] = useState(() =>
+    shownName(initial?.firstName, DEFAULT_PLAYER_FIRST_NAME)
+  )
+  const [lastName, setLastName] = useState(() =>
+    shownName(initial?.lastName, DEFAULT_PLAYER_LAST_NAME)
+  )
+  const [bio, setBio] = useState(initial?.bio ?? '')
+  const [tiers, setTiers] = useState<Record<StatKey, StatTier>>(() =>
+    initial
+      ? {
+          brain: tierOf(initial.stats.brain),
+          body: tierOf(initial.stats.body),
+          heart: tierOf(initial.stats.heart)
+        }
+      : { brain: STARTING_TIER, body: STARTING_TIER, heart: STARTING_TIER }
+  )
 
   function step(key: StatKey, delta: 1 | -1): void {
     setTiers((prev) => ({ ...prev, [key]: (prev[key] + delta) as StatTier }))
