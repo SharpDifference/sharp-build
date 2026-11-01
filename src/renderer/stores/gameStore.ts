@@ -2215,12 +2215,17 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
       const transcript = state.currentSceneTranscript
       const last = transcript.length - 1
       if (last < 0 || transcript[last].speaker !== READER_SPEAKER) return {}
-      const log = state.sceneLog
+      const kept = transcript.slice(0, last)
+      const reconciled = reconcileTalentBreakthrough(state, kept,
+        !state.replaying && !state.createdScene ? transcript : undefined)
       return {
-        currentSceneTranscript: transcript.slice(0, last),
-        sceneLog: log[log.length - 1]?.speaker === READER_SPEAKER ? log.slice(0, -1) : log,
+        ...reconciled,
+        ...rewindReckoning({ ...state, ...reconciled }, last),
+        currentSceneTranscript: kept,
+        sceneLog: state.sceneLog.at(-1)?.speaker === READER_SPEAKER ? state.sceneLog.slice(0, -1) : state.sceneLog,
         ...summariesWithin(state.sceneSummaries, last),
-        ...giftsWithin(state, last)
+        ...giftsWithin(state, last),
+        ...presetVarsCut(state.scenePresetVars, last)
       }
     })
   },

@@ -694,7 +694,7 @@ export function GameView(): JSX.Element {
   /** Whether an earlier line of the reply may be stepped back to. */
   const rewindOpen = useGameStore(rewindOpenOf)
   /** Whether End scene may end the scene now. */
-  const endSceneOpen = useGameStore(endSceneOpenOf)
+  const endSceneOpen = useGameStore((s) => endSceneOpenOf(s) && !s.turnError && (!s.sceneActivity || s.sceneActivity.closed))
   /** Bumped by every line a rewind steps back. */
   const lineRewound = useGameStore((s) => s.lineRewound)
   /**
