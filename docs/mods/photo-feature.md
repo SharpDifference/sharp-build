@@ -120,6 +120,9 @@ If a photo stays PNG while WebP is on, look in `data/app.log` for a `[photo] kep
 
 ## 1.6.0
 
+- **A head start on her photo**: it starts drawing as soon as she decides to send it, while she's
+  still typing. It arrives on her last text as before.
+
 - **See what drew a photo**: hover it and open the info icon for its prompt, negative, seed and
   LoRA. Photos taken before 1.6.0 show a rebuilt prompt and no seed.
 - **Redraw a photo**: edit its prompts, or **Rebuild** them from her current tags first, and draw
