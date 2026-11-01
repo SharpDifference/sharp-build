@@ -1,4 +1,4 @@
-import { exercisedStats, projectSlotMemories, settleSceneStats, slotActivityAvailable, slotSettled, slotStatusLines, statFloor } from '../mods/hooks'
+import { promptTextEdits, exercisedStats, projectSlotMemories, settleSceneStats, slotActivityAvailable, slotSettled, slotStatusLines, statFloor } from '../mods/hooks'
 import { withSlotActivityPrompt } from '../prompts/slotActivity'
 import { GAME_OVER_SCENES, gameCompleteSceneOf, gameOverReasonOf } from '@shared/gameOver'
 import { earnLine, spendLine, spentOf } from '@shared/money'
@@ -1109,6 +1109,7 @@ async function fetchSlotIntro(
           stats: game.stats,
           opening,
           lessNsfwText: lessNsfwTextNow(),
+          globalTextEdits: promptTextEdits()?.global,
           secretBudget: secretBudgetNow(),
           recent: recentSummaries(date, time, pendingSummary),
           askers,
@@ -2269,7 +2270,7 @@ function startTextLedger(
 
   return (async () => {
     const built = await buildOrAsk(
-      () => buildTextLedgerPrompt(schedule, useGameStore.getState().charInfo),
+      () => buildTextLedgerPrompt(schedule, useGameStore.getState().charInfo, promptTextEdits()?.global),
       useGameStore.getState().setTextLedgerError,
       stale
     )

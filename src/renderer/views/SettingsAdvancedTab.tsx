@@ -18,6 +18,8 @@ import {
 } from '@shared/settingsRules'
 import type { MemoryBudgets, SettingsPatch } from '@shared/types'
 import { TextField } from '../components/TextField'
+import { ModSlot } from '../mods/ModSlot'
+import type { ScreenTheme } from './clockTheme'
 import { useSettingsStore } from '../stores/settingsStore'
 import { gestures, quietLift, quietPress } from './motion'
 
@@ -30,6 +32,10 @@ export interface SettingsAdvancedTabProps {
   onEditPrompt: () => void
   /** Raises the player's own backgrounds over Settings. */
   onBackgrounds: () => void
+  /** The half of the day Settings wears, which the mods' entries wear too. */
+  theme: ScreenTheme
+  /** A backup or a restore is running. */
+  busy: boolean
 }
 
 /** The three memory fields, in the order the column shows them. */
@@ -57,7 +63,9 @@ export function SettingsAdvancedTab({
   onProblemChange,
   commitRef,
   onEditPrompt,
-  onBackgrounds
+  onBackgrounds,
+  theme,
+  busy
 }: SettingsAdvancedTabProps): JSX.Element | null {
   const settings = useSettingsStore((s) => s.settings)
   const update = useSettingsStore((s) => s.update)
@@ -272,6 +280,7 @@ export function SettingsAdvancedTab({
               maxLength={3}
               onBlur={() => void commitSecrets()}
             />
+            <ModSlot slot="advancedSettingsEntry" props={{ theme, busy }} />
           </div>
           <div className="vu-scroll-fade" />
         </div>

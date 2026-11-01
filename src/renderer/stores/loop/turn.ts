@@ -9,7 +9,7 @@ import { castCharactersOf } from './cast'
 import { dispatchTurn, runEnding } from './hooks'
 import { queuedScene, writeAutosave } from './saves'
 import { authoredTurn, currentRun, loopState, runStale, type TurnSnapshot } from './state'
-import { deliverSceneLines, unpark, type SceneCall } from './stream'
+import { deliverSceneLines, landScene, unpark, type SceneCall } from './stream'
 
 /** One turn, from the reply landing to the scene being over. */
 
@@ -202,6 +202,7 @@ export async function runSceneTurn(
     await deliverSceneLines(result.data.lines, run)
     if (superseded()) return
     fileSummary(result.data.summary)
+    landScene(result.data.reply, result.data.spot, result.data.lines.length)
     useGameStore.getState().setStreaming(false)
   } else {
     // `streamScene` has already waited out its own delivery, so the lines are on the transcript.

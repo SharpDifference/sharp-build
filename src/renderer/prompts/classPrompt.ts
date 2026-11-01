@@ -10,8 +10,6 @@ import {
 import { rollDifficulty, rollProfessor, type ClassKind } from '@shared/academics'
 import {
   CATALOG_POOLS,
-  CLASSES_PER_MAJOR,
-  POOL_SIZES,
   type CatalogEntry,
   type CatalogPool
 } from '@shared/application'
@@ -20,6 +18,15 @@ import type { DormId } from '@shared/dorms'
 import { appError } from '@shared/errors'
 import { LAST_NAMES } from './characterSuggestions'
 import { objectSchema } from './schema'
+import {
+  CLASS_CATALOG_RANGES,
+  DEFAULT_CLASS_CATALOG,
+  type ClassCatalogEdits,
+  type ClassCatalogKey,
+  type GlobalTextId,
+  type TextEdits
+} from '@shared/promptText'
+import { newGameText, withAdditions, CLASS_INSTRUCTION_RUNS } from './promptBlocks'
 
 /**
  * Builds and validates the one-shot class-generation request; pure, no IO. It asks only for
@@ -96,6 +103,8 @@ export type FilledCatalog = Record<CatalogPool, readonly CatalogEntry[]> & {
 
 /** Everything the class call is built from. */
 export interface ClassPromptInput {
+  /** The pool sizes a mod hands the call; an absent or out-of-range one is the shipped size. */
+  catalog?: ClassCatalogEdits
   /** The roster, in order. */
   students: readonly ClassStudent[]
   filled: FilledCatalog
@@ -167,21 +176,33 @@ function askedOf(student: ClassStudent): { interestClass: boolean } {
   return { interestClass: student.interest === undefined }
 }
 
+/** One pool size: the one a mod handed the call where it is a whole number in range, else the shipped one. */
+export function catalogSize(catalog: ClassCatalogEdits | undefined, key: ClassCatalogKey): number {
+  const size = catalog?.[key]
+  const { min, max } = CLASS_CATALOG_RANGES[key]
+  return typeof size === 'number' && Number.isInteger(size) && size >= min && size <= max
+    ? size
+    : DEFAULT_CLASS_CATALOG[key]
+}
+
 /** How many classes each pool, and each decided major, is still short of. */
 export function shortfallOf(input: ClassPromptInput): {
   pools: Record<CatalogPool, number>
   majors: [string, number][]
 } {
   const pools = Object.fromEntries(
-    CATALOG_POOLS.map((pool) => [pool, Math.max(0, POOL_SIZES[pool] - input.filled[pool].length)])
+    CATALOG_POOLS.map((pool) => [
+      pool,
+      Math.max(0, catalogSize(input.catalog, pool === 'pe' ? 'pe' : 'filler') - input.filled[pool].length)
+    ])
   ) as Record<CatalogPool, number>
   const decided = [...new Set(input.students.flatMap((s) => (s.major ? [s.major] : [])))]
   const majors = decided.map(
     (major) =>
-      [major, Math.max(0, CLASSES_PER_MAJOR - (input.filled.major[major]?.length ?? 0))] as [
-        string,
-        number
-      ]
+      [
+        major,
+        Math.max(0, catalogSize(input.catalog, 'perMajor') - (input.filled.major[major]?.length ?? 0))
+      ] as [string, number]
   )
   return { pools, majors }
 }
@@ -198,7 +219,10 @@ const POOL_LINES: Record<CatalogPool, string> = {
  * Builds the class-catalog request, or null when every class it could ask for is already
  * written. A next semester's passes `taken`, so the catalog keeps away from every class run.
  */
-export function buildClassPrompt(input: ClassPromptInput): StructuredRequest | null {
+export function buildClassPrompt(
+  input: ClassPromptInput,
+  textEdits?: TextEdits<GlobalTextId>
+): StructuredRequest | null {
   const { students } = input
   const keys = students.map(({ character }) => charKeyOf(character.firstName, character.lastName))
   const asked = students.map(askedOf)
@@ -216,39 +240,32 @@ export function buildClassPrompt(input: ClassPromptInput): StructuredRequest | n
   ]
 
   const system = [
-    'You are a university registrar building a course catalog and enrolling students.',
-    'You return a single JSON object matching the provided schema exactly.',
-    'Course codes follow real university convention: a subject prefix and a three-digit number, like "BIO 210".',
+    withAdditions(
+      newGameText(textEdits, 'newgame.classes.system'),
+      textEdits,
+      'newgame.classes.additions'
+    ),
     '',
     'SETTING',
     input.setting
   ].join('\n')
 
-  const preamble = [
-    'Build a course catalog for a university, then enroll each student below.',
-    '',
-    ...(askInterest ? ['FOR EACH STUDENT'] : []),
-    ...(askInterest
-      ? [
-          'interestClass: one course this specific student would sign up for out of pure personal interest.',
-          'It should read like something only she would pick.'
-        ]
-      : []),
-    ...(askInterest ? [''] : []),
-    ...(askClasses
-      ? [
-          'THE CATALOG',
-          ...CATALOG_POOLS.flatMap((pool) =>
-            pools[pool] > 0 ? [`Create ${pools[pool]} ${POOL_LINES[pool]}.`] : []
-          ),
-          ...(majorsShort.length > 0
-            ? [
-                'For each major under MAJORS, create as many classes as written beside it, with category "major" and that major\'s exact name in the "major" field. Leave "major" out for every other category.'
-              ]
-            : ['Leave "major" out of every class.']),
-          ''
-        ]
-      : []),
+  // The lines the call locks: the pool sizes it asks for, and the rule about codes.
+  const catalogLines = askClasses
+    ? [
+        'THE CATALOG',
+        ...CATALOG_POOLS.flatMap((pool) =>
+          pools[pool] > 0 ? [`Create ${pools[pool]} ${POOL_LINES[pool]}.`] : []
+        ),
+        ...(majorsShort.length > 0
+          ? [
+              'For each major under MAJORS, create as many classes as written beside it, with category "major" and that major\'s exact name in the "major" field. Leave "major" out for every other category.'
+            ]
+          : ['Leave "major" out of every class.']),
+        ''
+      ]
+    : []
+  const ruleLines = [
     'RULE: every "code" in the whole reply must be unique, including the interest classes.',
     'No two courses may share a code.',
     ...(taken.length > 0
@@ -260,14 +277,21 @@ export function buildClassPrompt(input: ClassPromptInput): StructuredRequest | n
       ? [
           'Classes listed under ALREADY IN THE CATALOG are written already: never reuse one of their codes, and never write one of them again under another code.'
         ]
-      : []),
-    'Every course needs a one-sentence description written the way a real course catalog writes them.',
-    '',
-    'EVERY COURSE ALSO NEEDS A KIND',
-    'kind "lecture": the class meets to be taught. The professor lectures, students take notes, and the course is assessed by a midterm and a final exam.',
-    'kind "project": the class is built around producing work. Students spend the term making something, and the course is assessed by showcasing that work instead of by exams.',
-    'Pick whichever genuinely fits the subject — a studio, a workshop or a design course is a project class; a survey, a theory or a history course is a lecture class.',
-    'Physical education classes are neither, so answer "lecture" for those and it will be ignored.',
+      : [])
+  ]
+  // The shipped instructions stand in runs around the locked lines; an edited text goes ahead of them whole.
+  const instructions = newGameText(textEdits, 'newgame.classes.instructions')
+  const shipped = instructions === newGameText(undefined, 'newgame.classes.instructions')
+  const preamble = [
+    ...(shipped
+      ? [
+          ...CLASS_INSTRUCTION_RUNS.intro,
+          ...(askInterest ? CLASS_INSTRUCTION_RUNS.student : []),
+          ...catalogLines,
+          ...ruleLines,
+          ...CLASS_INSTRUCTION_RUNS.course
+        ]
+      : [instructions, '', ...catalogLines, ...ruleLines]),
     '',
     '---',
     ''

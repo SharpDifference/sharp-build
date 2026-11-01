@@ -90,7 +90,7 @@ import {
 } from '@shared/types'
 import { useBunnyboardStore } from './bunnyboardStore'
 import { useGameStore } from './gameStore'
-import { afterDmReply, afterReachOut } from '../mods/hooks'
+import { afterDmReply, afterReachOut, promptTextEdits } from '../mods/hooks'
 import { lorebookNow } from './lorebookStore'
 import { prefetchHangoutScene, startHangoutScene } from './loop/hooks'
 import { createRetryGate } from './retryGate'
@@ -599,7 +599,8 @@ export async function sendMessage(charId: string, text: string): Promise<void> {
         ),
         memoryBudget: memoryBudgetsOf(useSettingsStore.getState().settings ?? {}).one,
         secretBudget: secretBudgetOf(useSettingsStore.getState().settings ?? {}),
-        history: game.history
+        history: game.history,
+        globalTextEdits: promptTextEdits()?.global
       },
       // The same reader block a scene gets, grades and all.
       readerBlockOf(game)

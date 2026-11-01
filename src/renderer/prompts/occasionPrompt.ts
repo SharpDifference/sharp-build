@@ -6,7 +6,6 @@ import { withOccasionWords, type OccasionEntry, type PlannedOccasion } from '@sh
 import {
   halfOrder,
   NAMED_OCCASION_KINDS,
-  type NamedOccasionKind,
   type OccasionKind,
   type OccasionsFileEntry
 } from '@shared/occasionsFile'
@@ -14,6 +13,8 @@ import type { Occasion, Season, StructuredRequest, TimeSlot } from '@shared/type
 import { formatDatePart } from './gameDate'
 import { breakWeekOf, fixedOccasionsOf, occasionsOn, SEMESTER_WEEKS, weekOf } from './occasions'
 import { objectSchema } from './schema'
+import { blockText, type GlobalTextId, type TextEdits } from '@shared/promptText'
+import { newGameText, OCCASION_BRIEFS, withAdditions } from './promptBlocks'
 
 /**
  * The one-shot occasion-generation request; pure, no IO. Asks only for the planned occasions
@@ -63,18 +64,6 @@ function takeWeek(pool: number[], need: number): number | null {
   const week = shuffle(eligible)[0]
   pool.splice(pool.indexOf(week), 1)
   return week
-}
-
-/** What each named event is, given to the model verbatim; its when-line says the days. */
-export const OCCASION_BRIEFS: Record<NamedOccasionKind, string> = {
-  gala:
-    'A formal gala thrown by the SEB — the most expensive, most photographed thing the student government does all year. Give it a name students would actually use.',
-  dance:
-    'A formal dance, smaller and cheaper than the gala — a themed dance students dress up for, run in one of the campus venues.',
-  'career-fair':
-    'A career fair — recruiters at tables, free branded junk, and students in interview clothes they own one of. Give it a name and say who is recruiting.',
-  concert:
-    'A concert in Thorne Auditorium — one booked act plus student openers, run by the SEB. Say who is playing and what they sound like.'
 }
 
 /** A planned occasion's kind: a small event, or its id's named kind less any `-<n>`. */
@@ -408,8 +397,25 @@ export interface OccasionPromptInput {
   book: readonly { text: string }[]
 }
 
+/** What a named event is asked to be: the edit for its kind where there is one, else the brief it was planned with. */
+function occasionBrief(request: PlannedOccasion, textEdits?: TextEdits<GlobalTextId>): string {
+  const kind = occasionKindOf(request)
+  const ids = {
+    gala: 'newgame.occasions.gala',
+    dance: 'newgame.occasions.dance',
+    'career-fair': 'newgame.occasions.careerFair',
+    concert: 'newgame.occasions.concert'
+  } as const
+  return kind && kind !== 'small-event'
+    ? blockText(textEdits, ids[kind], request.brief ?? '')
+    : (request.brief ?? '')
+}
+
 /** Builds the invented-occasions request for a semester. */
-export function buildOccasionPrompt(input: OccasionPromptInput): StructuredRequest {
+export function buildOccasionPrompt(
+  input: OccasionPromptInput,
+  textEdits?: TextEdits<GlobalTextId>
+): StructuredRequest {
   const { season, asked } = input
   const named = asked.filter((request) => !request.filler)
   const fillers = asked.filter((request) => request.filler)
@@ -418,9 +424,11 @@ export function buildOccasionPrompt(input: OccasionPromptInput): StructuredReque
   )
 
   const system = [
-    'You invent the events on a university calendar: what the campus and the city put on, and what it is called.',
-    'You return a single JSON object matching the provided schema exactly.',
-    'Everything you invent is set in the world below and nowhere else. Use its real places and institutions by name.',
+    withAdditions(
+      newGameText(textEdits, 'newgame.occasions.system'),
+      textEdits,
+      'newgame.occasions.additions'
+    ),
     '',
     'SETTING',
     input.setting,
@@ -436,20 +444,17 @@ export function buildOccasionPrompt(input: OccasionPromptInput): StructuredReque
     '',
     'EVENTS TO WRITE',
     'One entry in "events" for each id below, and nothing else. The dates are already decided — do not restate them.',
-    '"title" is a few words, the way it would be printed on a poster or said out loud on campus.',
-    '"description" is one or two sentences of what actually happens: who runs it, where on campus or in the city it is, what a student would see. Present tense.',
-    'Each id carries an inspiration word. Let it colour that one event, loosely — it is a nudge, not a subject.',
-    'Make them different from each other. Spread them across the campus and the city rather than putting everything in the Quad.',
+    newGameText(textEdits, 'newgame.occasions.instructions'),
     '',
     ...named.flatMap((request) => [
       `"${request.id}" — ${requestWhenLine(request, season)} — ${request.seed}`,
-      request.brief ?? '',
+      occasionBrief(request, textEdits),
       ''
     ]),
     ...(fillers.length > 0
       ? [
           'FILLERS',
-          'Each id below is something small happening on campus or in the city — a club running a table, a market, a screening, a tournament, a protest, a food thing. Ordinary scale. Not a dance, not a gala, not a fair.',
+          newGameText(textEdits, 'newgame.occasions.fillers'),
           `Ids marked ${BREAK_TAG[season]} ${BREAK_NOTE[season]}`,
           '',
           ...fillers.map(

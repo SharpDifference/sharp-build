@@ -23,6 +23,7 @@ import type { ViewName } from '../bridge/renderer'
 import type { ManualSaveOffer } from '../bridge/renderer'
 import type { ScreenTheme } from '../bridge/renderer'
 import type { ModDef } from '../bridge/shared'
+import type { ClassCatalogEdits, SceneSpotTag, TextEditSet } from '../bridge/shared'
 
 /**
  * The places in the game a mod adds to, without editing the game's code there.
@@ -264,6 +265,38 @@ export interface SceneReplied {
 }
 
 /**
+ * The game's rewritable prompt text as a mod rewrites it. Only one mod rewrites it at a time: the
+ * first that is on and has one ({@link promptTextEdits}).
+ */
+export interface PromptTextSpot {
+  /** The edits every builder reads its text blocks through; undefined sends the shipped text. */
+  edits?: () => TextEditSet | undefined
+  /** The class call's pool sizes; undefined, or an absent size, is the shipped one. */
+  classCatalog?: () => ClassCatalogEdits | undefined
+}
+
+/** A scene call about to go out, after the reader's edit of a failed prompt is laid over it. */
+export interface SceneCall {
+  /** The request as it will be sent, `parts` and `sceneSpot` included. */
+  request: Readonly<StructuredRequest>
+  spot: SceneSpotTag
+  playthroughId: string | null
+  /** The reader's first name. */
+  readerName: string
+}
+
+/** A scene call's reply that has landed, its lines on the transcript. */
+export interface SceneReplyLanded {
+  /** The reply as the model wrote it. */
+  reply: Readonly<Record<string, unknown>>
+  /** What main-process request hooks handed back with the reply, by mod id. */
+  modReply: Readonly<Record<string, unknown>>
+  spot: SceneSpotTag
+  /** The transcript length the reply's lines start at. */
+  at: number
+}
+
+/**
  * A page of a mod's own beside the feed in the Updates tab, behind a title of its own beside the
  * feed's. `unread` is what its title and the Updates tile on the rail count; `Action` is drawn at
  * the end of the titles' row while the page is showing.
@@ -482,6 +515,19 @@ export interface ModHooks {
   contactPostExtra?: ComponentType<ScreenSlotProps['contactPostExtra']>
   /** A reading of her of the mod's own on her contact page; see {@link ContactTab}. */
   contactTab?: ContactTab
+  /** Drawn on the Advanced tab of app settings, under its own controls. */
+  advancedSettingsEntry?: ComponentType<ScreenSlotProps['advancedSettingsEntry']>
+  /** The game's prompt text as the mod rewrites it; see {@link PromptTextSpot}. */
+  promptText?: PromptTextSpot
+  /**
+   * A scene call about to go out: what the mod returns is copied onto the request for its
+   * main-process request hook, and never sent. Undefined tags nothing.
+   */
+  sceneCall?: (ctx: SceneCall) => unknown
+  /** Every scene call's reply once its lines are on the transcript, the closing's included. */
+  sceneReplyLanded?: (ctx: SceneReplyLanded) => void
+  /** The scene's transcript was cut back to `length` lines, by an interjection or a rewind. */
+  sceneCut?: (ctx: { length: number }) => void
 }
 
 /**
@@ -567,6 +613,12 @@ export interface ScreenSlotProps {
     Item: ComponentType<GameMenuItemProps>
     /** Whether a save can be written now (`'open'`), only once the reply in flight lands, or not at all. */
     saveOffer: ManualSaveOffer
+  }
+  advancedSettingsEntry: {
+    /** The half of the day the settings wear, which a modal raised over them wears too. */
+    theme: ScreenTheme
+    /** A backup or a restore is running. */
+    busy: boolean
   }
 }
 
@@ -791,6 +843,56 @@ export function afterSceneReply(ctx: SceneReplied): void {
       hooks.afterSceneReply?.(ctx)
     } catch (error) {
       console.warn('[mods] afterSceneReply failed', error)
+    }
+  }
+}
+
+/** The text edits the builders read: the first mod's that is on and rewrites the game's text, or none. */
+export function promptTextEdits(): TextEditSet | undefined {
+  return active().find((hooks) => hooks.promptText?.edits)?.promptText?.edits?.()
+}
+
+/** The class call's pool sizes: the first mod's that is on and sets them, or none. */
+export function classCatalogEdits(): ClassCatalogEdits | undefined {
+  return active().find((hooks) => hooks.promptText?.classCatalog)?.promptText?.classCatalog?.()
+}
+
+/**
+ * Each enabled mod's tag for a scene call, copied, by mod id. A tag that throws or cannot be
+ * copied is left off with a warning, and the call goes out without it.
+ */
+export function sceneCallTags(ctx: SceneCall): Readonly<Record<string, unknown>> {
+  const tags: Record<string, unknown> = Object.create(null)
+  for (const { modId, hooks } of activeEntries()) {
+    if (!hooks.sceneCall) continue
+    try {
+      const tag = hooks.sceneCall(ctx)
+      if (tag !== undefined) tags[modId] = structuredClone(tag)
+    } catch (error) {
+      console.warn(`[mods] ${modId}: sceneCall failed; the call goes out without its tag`, error)
+    }
+  }
+  return Object.freeze(tags)
+}
+
+/** Tells each enabled mod that a scene reply has landed. */
+export function sceneReplyLanded(ctx: SceneReplyLanded): void {
+  for (const { modId, hooks } of activeEntries()) {
+    try {
+      hooks.sceneReplyLanded?.(ctx)
+    } catch (error) {
+      console.warn(`[mods] ${modId}: sceneReplyLanded failed`, error)
+    }
+  }
+}
+
+/** Tells each enabled mod that the scene's transcript was cut back. */
+export function sceneCut(ctx: { length: number }): void {
+  for (const { modId, hooks } of activeEntries()) {
+    try {
+      hooks.sceneCut?.(ctx)
+    } catch (error) {
+      console.warn(`[mods] ${modId}: sceneCut failed`, error)
     }
   }
 }

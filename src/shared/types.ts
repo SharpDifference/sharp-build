@@ -22,6 +22,7 @@ import type { Weather } from './weather'
 import type { ReaderTallies } from './tallies'
 import type { PromptEdit } from './imagePrompt'
 import type { SceneEventId } from './sceneEvents'
+import type { PromptPart, SceneSpotTag } from './promptText'
 
 /** Discriminated result envelope returned by every IPC handler. */
 export type Result<T> = { ok: true; data: T } | { ok: false; error: AppError }
@@ -76,6 +77,12 @@ export interface StructuredRequest {
    * before. Absent logs the whole message.
    */
   logFrom?: number
+  /** Local-only: the parts a scene builder emitted, each found verbatim in `system` or `user`. */
+  parts?: PromptPart[]
+  /** Local-only: which scene call a builder made and who is in it. */
+  sceneSpot?: SceneSpotTag
+  /** Local-only: each mod's tag for its main-process request hook, by mod id. */
+  modTags?: Record<string, unknown>
 }
 
 /** One inline image on a {@link StructuredRequest} — never written to disk. */
@@ -2604,6 +2611,8 @@ export interface SceneResponse {
   summary?: string
   /** "The scene is resolved." What it *meant* is the ledger call's job. */
   end_scene?: boolean | null
+  /** Set by main: what a main-process request hook handed back with the reply, by mod id. Never on the wire. */
+  modReply?: Record<string, unknown>
 }
 
 /**

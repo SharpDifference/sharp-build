@@ -287,8 +287,12 @@ A mod's panel draws its title and fields with the game's own components, from
 - `SceneDivider`: the rule and state word that stand in the well's place while a reply is read,
   with a `className` of the panel's own beside its class.
 
-- `CloseIcon`, `HeartIcon`, `BunnyMark`, `EyeIcon` and `EyeOffIcon`: the same marks the game's
-  controls draw, in the control's own colour.
+- `CheckField`: a labelled checkbox, as the settings draw one.
+- `ConfirmModal`: the game's question with a confirm and a cancel, raised over the panel.
+- `TextEditModal`: the game's editor for one long text, with its shipped text to reset to.
+
+- `CloseIcon`, `HeartIcon`, `BunnyMark`, `EyeIcon`, `EyeOffIcon`, `ChevronIcon` and `PlusIcon`: the
+  same marks the game's controls draw, in the control's own colour.
 
 They are the game's components, so a mod's panel looks and behaves as a native one does and
 changes with it. Their props are the ones the game's own screens pass, typed in the kit.
@@ -307,6 +311,19 @@ A few of the game's own readers, each declared as `renderer:<name>` or `shared:<
   volume as the game's mix applies it.
 - `modsOnLine()` and `buildLabel()` (`renderer`): the mods that are on, each with its version, as
   the log lists them, and the build's name and version: for a bug report.
+- `gameFacts()` and `useGameFacts()` (`renderer`): the playthrough being played, or null, and the
+  reader's first name.
+- `useScenePersona()` (`renderer`): the cast-scene persona the player set in Settings, or
+  undefined where none is set or the settings are not read yet.
+- `showError(error)` (`renderer`): the game's own error modal, for an `AppError` a mod's call answered.
+- `PROMPT_BLOCKS`, `defaultBlockText(id, settings)` and `isNewGameBlock(block)` (`renderer`): the
+  game's text blocks, the text each sends unedited under the player's settings, and whether a block
+  is one of New Game's (The game's prompt text and its scene calls, below).
+- `blockText`, `SCENE_TEXT_IDS`, `GLOBAL_TEXT_IDS`, `PROMPT_PARTS`, `CLASS_CATALOG_RANGES` and
+  `DEFAULT_CLASS_CATALOG` (`shared`): the text blocks' ids and how an edit is read, the parts a scene
+  builder emits, and the class call's pool sizes with the range each is kept to.
+- `validateRecord` and `assertSafeId` (`shared`): the game's checks for a record read from disk and
+  for an id that becomes a path segment.
 - `READER_SPEAKER` and `charKeyOf(firstName, lastName)` (`shared`): the speaker of the reader's own
   lines, and a character's key in prompts and replies.
 - `globalSlotOf(date, time)` (`shared`): a slot's global id, the same one the game keeps.
@@ -618,6 +635,11 @@ cap. Extract only into the mod's own staging folder, from `modDataPath` or a bac
 Main code is trusted: these functions accept paths, and core does not enforce that destination.
 The sniffer reads the file's opening bytes and answers its image type, or null.
 
+`readJsonFile`, `writeAtomicJson` and `writeAtomicBytes` from `@vx/modkit/main` (`main:readJsonFile`,
+`main:writeAtomicJson`, `main:writeAtomicBytes`) are how the game reads and writes its own records:
+a missing file is answered, not thrown, and a write lands in a temporary file renamed over the
+target, retried briefly while Windows holds the file.
+
 `modOptionOn(modId, optionId)` from `@vx/modkit/main` (`main:modOptionOn`) applies the game's
 option rule to the switches main last read or wrote, read again on each call. An unset option
 uses its declared default; an unknown option answers false. It answers the option alone, even
@@ -705,6 +727,9 @@ optionGroups: [{ id: 'loader', label: 'Loading animation', hint: 'The animation 
 | `packages/modkit/src/renderer/saveField.ts`, `modState.ts` | A mod's slice of the save and of a record, its writes at a safe point, and its unsaved state. |
 | `src/renderer/stores/gameStore.ts`, `src/renderer/stores/loop/saves.ts` | Where the slices are read on a load and written back (`SAVE_KEYS`, `SCENE_KEYS` list what core owns), and the write lane a mod's write takes (`writeModSlices`). |
 | `src/main/services/modDataService.ts`, `modParts.ts`, `src/shared/modParts.ts` | A mod's folders outside the save (`modDataPath`), and its parts of a backup and of a character's transfer, which `backupService.ts` and `characterTransferService.ts` run. |
+| `src/shared/promptText.ts`, `src/renderer/prompts/promptBlocks.ts` | The text blocks' ids, edits and shipped text, and the parts and spot a scene builder hands back. |
+| `src/main/services/finalRequest.ts` | The main-process request hook, at the one place every structured call goes out. |
+| `packages/modkit/src/renderer/sceneField.ts` | A mod's field on the scene being played. |
 | `src/renderer/modEntries/` | One file per mod with hooks, named for its id: its `registerHooks`. |
 | `src/renderer/mods/index.ts` | Loads every file in `modEntries/` at boot, then imports each installed mod's `renderer.js`. |
 | `src/shared/modSession.ts` | The session table: what the loader found and what became of each installed mod. |
@@ -898,6 +923,11 @@ else names it.
 | `messageAttachment` | `BunnyboardModal.tsx` | Draw a component after a phone message's text bubble, or alone where the message has no text. Props: `message` |
 | `contactPostExtra` | `ContactPage.tsx` | Draw a component beside a post's like, in the feed on her contact page. Props: `charId`, `post` |
 | `contactTab` | `ContactPage.tsx` | Add a reading of her beside Profile on her contact page: a tab, and a panel drawn in place of her cards |
+| `advancedSettingsEntry` | `SettingsAdvancedTab.tsx` | Draw a component on the Advanced tab of app settings, under its own controls. Props: `theme`, `busy` (a backup or restore is running) |
+| `promptText` | `loop/promptState.ts`, `textingLoop.ts`, `applicationStore.ts` and the other stores that build a request | Rewrite the game's own prompt text and the class call's pool sizes; one mod at a time |
+| `sceneCall` | `loop/stream.ts` | Tag a scene call as it goes out, for the mod's request hook in main |
+| `sceneReplyLanded` | `loop/stream.ts`, `loop/turn.ts` | Read every scene call's reply once it has landed, the closing's included, with what main handed back |
+| `sceneCut` | `gameStore.ts` | Undo what the replies past a cut in the transcript changed |
 
 The two ways on (`endingChoice`, `saveChoice`) share one shape, `WayOn`. Its `prepare` runs
 while nothing has been torn down, does whatever may fail and reports it, and returns `enter`,
@@ -906,7 +936,7 @@ screen to show. The first mod that answers is offered; the game's own choice alw
 While `prepare` runs, the screen that offered the choice keeps every button locked; an answer
 that comes back after that screen closed, or after its game was left, opens nothing.
 
-The places on screen (`settingsSection` to `contactPostExtra` above, `railButton`, `landingTool` and `gameMenuEntry`) each take a component. Every mod
+The places on screen (`settingsSection` to `contactPostExtra` above, `railButton`, `landingTool`, `gameMenuEntry` and `advancedSettingsEntry`) each take a component. Every mod
 that is on and has one there is drawn, in list order, and drawn again when a switch moves or a
 game is entered or left (a `playthrough` mod is on as the game's record says); a mod that is
 off is not drawn. The props are the facts the game has at that place, and only the ones a
@@ -1105,6 +1135,55 @@ A mod may augment `ModCarryFields` and register its own pure adapter with `regis
 Fields a mod adds to a feed post that hold a time (the last slot it answered, say) are carried by the mod too: New Game+ moves each post's own date back onto the next semester's clock, and `registerPostCarry(modId, (post, days) => …)` in `shared/modCarry.ts` moves the mod's fields back the same `days` (a global slot moves twice that). Like the adapters, it runs with the switch off.
 
 Files a mod keeps per playthrough outside the save (pictures, say) need nothing: New Game+ continues the same playthrough, so they stay where they are. `registerTermFiles(modId, async ({ from, to }) => …)` is kept for an extension that starts a new playthrough per semester, which calls `carryModFiles({ from, to })` once the new playthrough is written, before it is entered; the game itself never calls it. A copier runs with its mod's switch off too, and one that fails costs only its own files.
+
+## The game's prompt text and its scene calls
+
+The game's own prompt text is kept in text blocks: the personas, the cast scene's instructions and
+the prose of New Game's four calls. Each block has an id (`SCENE_TEXT_IDS` and `GLOBAL_TEXT_IDS` in
+`shared/promptText.ts`) and its shipped text (`PROMPT_BLOCKS` in `renderer/prompts/promptBlocks.ts`),
+and every builder reads it through `blockText(edits, id, shipped)`. A mod that rewrites the text
+registers `promptText`: `edits()` answers a `TextEditSet`, the cast scene's edits under `scene` and
+every other call's under `global`, and `classCatalog()` answers the class call's pool sizes. One
+mod rewrites at a time, the first that is on and has one. A blank or absent edit sends the shipped
+text; with no mod answering, every request is the game's own, byte for byte.
+
+The cast scene's persona is chosen in this order: the mod's `persona.scene` edit, then the persona
+the player set in Settings, then the shipped one. An edited persona is sent as written, whatever
+Less NSFW text says.
+
+Each scene builder (the opening, a continuation, the closing and the solo scene) also hands back
+`parts`, each section of its request as it stands in `system` or `user`, and `sceneSpot`, which
+call it is and who is in it. Neither reaches the provider.
+
+A mod reshapes a scene call in two halves:
+
+- **In the window**, `sceneCall` is asked as the call goes out, after the reader's edit of a failed
+  prompt is laid over it. It is handed the request, its spot, the playthrough and the reader's
+  first name, and what it returns is copied onto the request as the mod's tag. Undefined tags
+  nothing; a throw costs a warning, and the call goes out without the tag.
+- **In main**, a trusted `main.js` registers `registerFinalRequest(modId, hook)` from
+  `@vx/modkit/main` (`main:registerFinalRequest`). The hook is handed the request and the mod's tag
+  at the one place every structured call goes out, and returns a plan: the request to send,
+  sampler values for this call alone (`temperature`, `topP`, `topK`, `repetitionPenalty`, sent to a
+  custom endpoint and never to Gemini), and `finish(reply)`, which reads the parsed reply and may
+  take out the fields the mod's own schema put there. What `finish` returns comes back with the
+  reply.
+
+One mod reshapes a call: the first by id that tagged it, is on, and has a hook; any other that
+tagged it is named in a warning and skipped. A hook that throws or answers null costs a warning,
+and the call goes as built. Registering returns a disposer, and a second registration for the same
+id throws. The browser build runs no main-process hooks, so there a tag reaches nothing.
+
+`sceneReplyLanded` is told of every scene call's reply once its lines are on the transcript, the
+closing's included, before the save that pays for it. It is handed the reply, `modReply` (what
+each mod's `finish` returned, by id), the spot, and `at`, the transcript length the reply's lines
+start at. `sceneCut` is told the length the transcript was cut back to, by an interjection or by
+taking back the reader's last line, so a mod can undo what the replies past it changed.
+
+What a mod keeps for the scene being played goes in `sceneField(id, { empty })` from
+`@vx/modkit/renderer` (`renderer:sceneField`): `read()`, `set(next)` and `use()`. It is saved with the
+scene and restored with it, and is back to `empty` once the next scene is cast. `set` changes only
+the mod's own field, and goes out with the next save.
 
 ## Managed ComfyUI launch environment
 

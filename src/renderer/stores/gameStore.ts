@@ -1,7 +1,7 @@
 import { blocksNewRomance } from '@shared/romanceRequirements'
 import { savedModScene } from '@shared/modScene'
-import { statFloor } from '../mods/hooks'
-import { bindGameBoundary, bindSaveFieldStore, readModSlices, writeModSlices } from '@vx/modkit/host/renderer'
+import { sceneCut, statFloor } from '../mods/hooks'
+import { bindGameBoundary, bindSaveFieldStore, bindSceneFieldStore, readModSlices, writeModSlices } from '@vx/modkit/host/renderer'
 import { useModSessionStore } from './modSessionStore'
 import { create } from 'zustand'
 import {
@@ -2109,9 +2109,11 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
       sceneSummaries: [...state.sceneSummaries, { at, summary }]
     })),
 
-  truncateUnread: () =>
+  truncateUnread: () => {
+    let length = 0
     set((state) => {
       const kept = cutLengthOf(state)
+      length = kept
       return {
         currentSceneTranscript: state.currentSceneTranscript.slice(0, kept),
         pendingLines: [],
@@ -2119,16 +2121,20 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
         ...summariesWithin(state.sceneSummaries, kept),
         ...giftsWithin(state, kept)
       }
-    }),
+    })
+    sceneCut({ length })
+  },
 
   cutToRead: () => {
     while (get().forwardLine()) continue
     get().truncateUnread()
+    let length: number | null = null
     set((state) => {
       const transcript = state.currentSceneTranscript
       const last = transcript.length - 1
       if (last < 0 || transcript[last].speaker !== READER_SPEAKER) return {}
       const log = state.sceneLog
+      length = last
       return {
         currentSceneTranscript: transcript.slice(0, last),
         sceneLog: log[log.length - 1]?.speaker === READER_SPEAKER ? log.slice(0, -1) : log,
@@ -2136,6 +2142,7 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
         ...giftsWithin(state, last)
       }
     })
+    if (length !== null) sceneCut({ length })
   },
 
   rewindLine: () => {
@@ -3368,6 +3375,17 @@ bindSaveFieldStore({
   subscribe: (onChange) =>
     useGameStore.subscribe((state, before) => {
       if (state.modValues !== before.modValues) onChange()
+    })
+})
+
+// The mods' scene fields read and write their values here.
+bindSceneFieldStore({
+  values: () => useGameStore.getState().sceneMods as Readonly<Record<string, unknown>>,
+  set: (modId, value) =>
+    useGameStore.setState((state) => ({ sceneMods: { ...state.sceneMods, [modId]: value } })),
+  subscribe: (onChange) =>
+    useGameStore.subscribe((state, before) => {
+      if (state.sceneMods !== before.sceneMods) onChange()
     })
 })
 

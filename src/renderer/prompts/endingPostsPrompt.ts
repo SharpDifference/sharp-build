@@ -12,10 +12,11 @@ import { formatGameDate } from './gameDate'
 import { GRADUATION_DATE } from './occasions'
 import { relationshipLines } from './relationship'
 import { objectSchema } from './schema'
+import type { TextEdits, GlobalTextId } from '@shared/promptText'
+import { narrationPersonaFor } from './promptBlocks'
 import {
   memoryLines,
   notesLines,
-  personaFor,
   profileLines,
   secretLines,
   spaced
@@ -47,6 +48,8 @@ export interface EndingPostsInput {
   stats?: PlayerStats
   /** The player's `lessNsfwText` setting; picks which persona heads this call's prefix. */
   lessNsfwText: boolean
+  /** The edits a mod hands the global text blocks; absent when none is supplied. */
+  globalTextEdits?: TextEdits<GlobalTextId>
   /** How many of her told secrets each poster's entry carries; absent is the default. */
   secretBudget?: number
   /** The semester's season, which names the month of every date and the break that follows it. */
@@ -159,7 +162,7 @@ export function buildEndingPostsPrompt(
 
   return {
     system: [
-      personaFor(input.lessNsfwText),
+      narrationPersonaFor(input.lessNsfwText, input.globalTextEdits),
       '',
       'SETTING',
       setting,

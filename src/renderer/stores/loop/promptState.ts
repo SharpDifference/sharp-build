@@ -9,6 +9,7 @@ import { pendingSecretOf } from '@shared/secrets'
 import { memoryBudgetsOf, secretBudgetOf } from '@shared/settingsRules'
 import { affectionsOf } from '@shared/sceneCreator'
 import { promptStateParts } from '@vx/modkit/host/renderer'
+import { promptTextEdits } from '../../mods/hooks'
 import {
   charKeyOf,
   type CharInfo,
@@ -377,6 +378,7 @@ function withCancellation(
 export function promptState(): PromptState {
   const game = useGameStore.getState()
   const scenePersona = scenePersonaNow()
+  const textEdits = promptTextEdits()
 
   // The Bunnyboard recap each character carries into the scene.
   const textingSummaries: Record<string, string[]> = {}
@@ -542,6 +544,7 @@ export function promptState(): PromptState {
     lessNsfwText: lessNsfwTextNow(),
     // Absent when the player has set no custom one, which is what `scenePersonaFor` reads as.
     ...(scenePersona !== undefined ? { scenePersona } : {}),
+    ...(textEdits !== undefined ? { textEdits } : {}),
     memoryBudgets: memoryBudgetsNow(),
     secretBudget: secretBudgetNow(),
     history: game.history,

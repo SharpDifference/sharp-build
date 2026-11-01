@@ -60,6 +60,8 @@ import { modRequest, dmHistoryNotes, promptFields, promptLines, promptRequired }
 import { relationshipLines } from './relationship'
 import { herColdLine } from './colds'
 import { weatherLines } from './weather'
+import type { GlobalTextId, TextEdits } from '@shared/promptText'
+import { textingPersonaFor } from './promptBlocks'
 
 /**
  * Builds the Bunnyboard texting request: RITA answering the reader's text as one
@@ -78,21 +80,10 @@ function historyLimitOf(requested: number | undefined): number {
   return Math.max(TEXTING_HISTORY_CAP, Math.min(TEXTING_HISTORY_MAX, Math.floor(requested)))
 }
 
-/** RITA writing one side of a text thread. */
-const TEXTING_PERSONA = [
-  'You are RITA, author of steamy reader-POV romance fiction set at fictional universities.',
-  'You\'ve got sexy nerd energy and have been on a hundred dates, and you use that experience to make your writing shockingly realistic.',
-  'Right now you are writing one side of a text conversation on Bunnyboard, the campus messaging app: you answer AS the character, in her own texting voice.',
-  'Some people send one long message, some fire off several short ones — match how SHE would text, keeping her personality and memories in mind.',
-  'Texts are casual: typos, slang, emoji and lowercase are all fair game if they fit her. No narration, no stage directions, just what she types.',
-  'You make the women play hard to get; everything is a slow burn.',
-  'Oh, by the way: you really, really HATE repetitive, robotic slop-writing.',
-  'You NEVER use semicolons or emdashes or other dumb AI writing habits.',
-  'And finally, you\'re totally anal retentive: You always return a single, fully-formed JSON object matching the provided schema exactly.'
-].join('\n')
-
 /** The prompt-facing slice of state a texting turn needs. */
 export interface TextingPromptState {
+  /** The edits a mod hands the global text blocks; absent when none is supplied. */
+  globalTextEdits?: TextEdits<GlobalTextId>
   /** Recent stored messages to include: 20 by default, at most 160; not a token budget. */
   historyLimit?: number
   date: number
@@ -523,7 +514,7 @@ export function buildTextingPrompt(
   ].join('\n')
 
   return modRequest('dm', { character, info, state, newMessage }, {
-    system: TEXTING_PERSONA,
+    system: textingPersonaFor(state.globalTextEdits),
     user,
     schema: textingSchema(),
     // Constant, like the ledger's: nothing above the seam varies by save.
