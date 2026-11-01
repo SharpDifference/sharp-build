@@ -150,13 +150,8 @@ const PLACEMENT_TAGS: ReadonlySet<string> = new Set([
   'crossed_arms'
 ])
 
-/**
- * Her hands already busy with something the sentence names: a cup, a book, a wave. The
- * checkpoint draws these from the sentence alone, and an object tag beside it only adds a
- * second cup; what does get in the way is a position's own hand, `hand_on_own_hip` beside the
- * cup she is holding. So nothing is added here, and the placements are struck out.
- */
-const BUSY_HAND_CUES = [
+/** Direct descriptions of her occupied hands, including the ones removed from mirror prose. */
+const OCCUPIED_HAND_CUES = [
   'holding',
   'holds',
   'clutching',
@@ -191,6 +186,57 @@ const BUSY_HAND_CUES = [
   'on her elbows',
   'all fours',
   'hands and knees'
+]
+
+/**
+ * An activity or its object owns her hands too. These cues strike placements; the activity
+ * table supplies action tags without adding a second cup or meal beside the prose.
+ */
+const BUSY_HAND_CUES = [
+  ...OCCUPIED_HAND_CUES,
+  'playing',
+  'strumming',
+  'practising',
+  'practicing',
+  'typing',
+  'writing',
+  'drawing',
+  'sketching',
+  'painting',
+  'texting',
+  'scrolling',
+  'cooking',
+  'stirring',
+  'brushing',
+  'applying',
+  'tying',
+  'fixing',
+  'adjusting',
+  'knitting',
+  'sewing',
+  'holding up',
+  'showing off',
+  'pointing',
+  'guitar',
+  'ukulele',
+  'violin',
+  'cello',
+  'bass',
+  'keyboard',
+  'piano',
+  'flute',
+  'microphone',
+  'mic',
+  'singing',
+  // The activity rows below also own her hands when the caption uses these words.
+  'studying',
+  'doing homework',
+  'on her laptop',
+  'gaming',
+  'controller',
+  'handheld console',
+  'handheld game console',
+  'cuddling'
 ]
 
 /** What her hands are doing. Up to two fire — she has two of them. */
@@ -265,6 +311,103 @@ const HAND_ACTIONS: readonly ActionRule[] = [
     implies: ['sitting', 'solo', 'spread_legs']
   }
 ]
+
+/** A caption may need both an object and an action to name the activity. */
+interface ActivityRule extends ActionRule {
+  readonly needs?: readonly string[]
+}
+
+const PLAYING_INSTRUMENT = ['playing', 'strumming', 'practising', 'practicing']
+
+/** A free-hand gesture still fits beside the phone in a mirror selfie. */
+const FREE_HAND_GESTURES: readonly Rule[] = [
+  { cues: ['waving'], tags: ['waving'] },
+  { cues: ['pointing'], tags: ['pointing'] }
+]
+
+/** One activity, most specific first. Its action owns the object unless it has no action tag. */
+const ACTIVITIES: readonly ActivityRule[] = [
+  // This phrase already clears placements without adding an action tag.
+  { cues: ['playing with her hair'], tags: [] },
+  { cues: ['guitar'], needs: PLAYING_INSTRUMENT, tags: ['playing_guitar', 'holding_instrument'] },
+  {
+    cues: ['ukulele'],
+    needs: PLAYING_INSTRUMENT,
+    tags: ['playing_instrument', 'holding_instrument', 'ukulele']
+  },
+  {
+    cues: ['bass'],
+    needs: PLAYING_INSTRUMENT,
+    tags: ['playing_bass_guitar', 'holding_instrument']
+  },
+  {
+    cues: ['violin'],
+    needs: PLAYING_INSTRUMENT,
+    tags: ['playing_instrument', 'holding_instrument', 'violin']
+  },
+  { cues: ['guitar'], tags: ['holding_instrument', 'guitar'] },
+  { cues: ['ukulele'], tags: ['holding_instrument', 'ukulele'] },
+  { cues: ['bass'], tags: ['holding_instrument', 'bass_guitar'] },
+  { cues: ['violin'], tags: ['holding_instrument', 'violin'] },
+  { cues: ['cello'], tags: ['holding_instrument', 'cello'] },
+  { cues: ['flute'], tags: ['holding_instrument', 'flute'] },
+  { cues: ['piano'], tags: ['playing_piano'], implies: ['sitting'] },
+  { cues: ['keyboard'], tags: ['keyboard_(instrument)'], implies: ['sitting'] },
+  {
+    cues: ['microphone', 'mic', 'singing'],
+    needs: ['singing'],
+    tags: ['holding_microphone', 'singing']
+  },
+  { cues: ['microphone', 'mic'], tags: ['holding_microphone'] },
+  { cues: ['reading'], needs: ['book'], tags: ['reading', 'holding_book'] },
+  { cues: ['reading'], tags: ['reading'] },
+  { cues: ['typing', 'on her laptop'], tags: ['typing', 'laptop'] },
+  { cues: ['writing', 'studying', 'doing homework'], tags: ['writing', 'holding_pen'] },
+  { cues: ['drawing', 'sketching'], tags: ['drawing_(action)', 'holding_pencil'] },
+  {
+    cues: ['painting'],
+    needs: ['picture', 'canvas', 'portrait', 'landscape', 'easel'],
+    tags: ['painting_(action)', 'holding_paintbrush']
+  },
+  {
+    cues: ['handheld console', 'handheld game console'],
+    tags: ['playing_games', 'handheld_game_console']
+  },
+  {
+    cues: ['playing games', 'playing a game', 'playing video games', 'gaming', 'controller'],
+    tags: ['playing_games', 'holding_controller']
+  },
+  { cues: ['eating'], tags: ['eating'] },
+  { cues: ['drinking', 'sipping'], tags: ['drinking'] },
+  { cues: ['cooking', 'stirring'], tags: ['cooking'] },
+  { cues: ['knitting'], tags: ['knitting'] },
+  { cues: ['brushing her hair', 'brushing hair'], tags: ['brushing_hair'] },
+  { cues: ['applying makeup', 'applying lipstick'], tags: ['applying_makeup'] },
+  {
+    cues: ['hugging', 'cuddling'],
+    needs: ['plush', 'plushie', 'pillow'],
+    tags: ['hugging_object']
+  },
+  ...FREE_HAND_GESTURES
+]
+
+/** A mirror keeps the phone hand and only takes a free-hand gesture from this table. */
+function activityOf(text: string, mirror: boolean): ActivityRule | null {
+  if (mirror) return firstMatch(text, FREE_HAND_GESTURES)
+  return (
+    ACTIVITIES.find((row) => fires(text, row.cues) && (!row.needs || fires(text, row.needs))) ??
+    null
+  )
+}
+
+/** An angle or framing alone has not said whether she is sitting or standing. */
+function hasPosition(text: string): boolean {
+  return [...DRESSED_POSITIONS, ...BARE_POSITIONS].some(
+    (row) =>
+      fires(text, row.cues) &&
+      row.tags.some((tag) => !FRAMING_TAGS.has(tag) && !PLACEMENT_TAGS.has(tag) && tag !== 'solo')
+  )
+}
 
 /** Where the breast row sits, for the loose nipple phrasing below. */
 const BREAST_ACTION = HAND_ACTIONS[1]
@@ -736,6 +879,17 @@ export function posePhotoTags(caption: string, bare: boolean): string[] {
 export function photoPose(caption: string, bare: boolean): PhotoPose {
   const text = caption.toLowerCase()
   let tags = poseTagsOf(caption, bare)
+  const mirror = says(text, 'mirror') && says(text, 'selfie')
+  const activity = activityOf(text, mirror)
+  if (activity) {
+    // Existing body actions keep their position; a piano only supplies one where none was said.
+    const bodyAction = bare && HAND_ACTIONS.some((row) => fires(text, row.cues))
+    if (activity.implies && !hasPosition(text) && !bodyAction) {
+      tags = tags.filter((tag) => tag !== 'standing')
+      tags.push(...activity.implies)
+    }
+    tags.push(...activity.tags)
+  }
   // Caught unawares: "not looking at the camera" says "at the camera" too, which is the wrong way.
   if (saysAny(text, CANDID_CUES)) {
     tags = [...new Set([...tags.filter((tag) => tag !== 'looking_at_viewer'), 'looking_away'])]
@@ -750,7 +904,12 @@ export function photoPose(caption: string, bare: boolean): PhotoPose {
   if (tags.includes('looking_at_viewer')) tags = tags.filter((tag) => tag !== 'profile')
   const lying = closeLying(text, tags)
   tags = lying ?? withFraming(text, tags)
-  if (saysAny(text, BUSY_HAND_CUES)) tags = tags.filter((tag) => !PLACEMENT_TAGS.has(tag))
+  const busy = saysAny(text, mirror ? OCCUPIED_HAND_CUES : BUSY_HAND_CUES)
+  if (activity || busy) {
+    tags = tags.filter((tag) => !PLACEMENT_TAGS.has(tag))
+  }
+  // The mirror's phone hand is added after the activity has settled her free hand.
+  tags = [...new Set(tags)]
   // A camera lying about in the picture turned up beside a photo nobody took as a selfie too.
   const noCamera = saysAny(text, CAMERA_CUES) ? [] : ['camera']
   const pose = selfieShot(text, tags) ?? { tags, negative: [...lyingNegative(tags), ...noCamera] }

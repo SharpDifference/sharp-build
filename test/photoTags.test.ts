@@ -9,13 +9,51 @@ import { describe, expect, it } from 'vitest'
  * deprecated, or simply made up — is read as loose English at best and ignored at worst. Several
  * were: `arms_above_head`, `ass_up`, `hand_between_legs` and `text` among them.
  *
- * Reads the tables as text, like `photoHooks.test.ts`, and checks each tag against a list that
- * was verified by hand against the Danbooru API — present, not deprecated, and in use. A new tag
- * fails here until somebody has looked it up and added it below.
+ * Reads the tables as text, like `photoHooks.test.ts`, and checks each tag against a list
+ * checked against the Danbooru API or a published tag catalog. A new tag fails here until
+ * somebody has looked it up and added it below.
  */
 
-/** Verified against danbooru.donmai.us: each exists, is not deprecated, and has posts. */
+/** Danbooru vocabulary checked against the API or the catalog cited beside its entries. */
 const VERIFIED = new Set([
+  // Activities and instruments, checked against the published Danbooru catalog:
+  // github.com/DominikDoom/a1111-sd-webui-tagcomplete/blob/main/tags/danbooru.csv
+  'playing_guitar',
+  'playing_instrument',
+  'playing_bass_guitar',
+  'holding_instrument',
+  'guitar',
+  'ukulele',
+  'bass_guitar',
+  'violin',
+  'cello',
+  'flute',
+  'playing_piano',
+  'keyboard_(instrument)',
+  'holding_microphone',
+  'singing',
+  'reading',
+  'holding_book',
+  'typing',
+  'laptop',
+  'writing',
+  'holding_pen',
+  'drawing_(action)',
+  'holding_pencil',
+  'painting_(action)',
+  'holding_paintbrush',
+  'playing_games',
+  'holding_controller',
+  'handheld_game_console',
+  'eating',
+  'drinking',
+  'cooking',
+  'knitting',
+  'brushing_hair',
+  'applying_makeup',
+  'hugging_object',
+  'waving',
+  'pointing',
   // The body pools and a petite girl's negatives, looked up on the API for `characterBody`: each
   // present, not deprecated, not an alias, with thousands of posts.
   'petite',

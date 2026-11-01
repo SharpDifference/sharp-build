@@ -111,6 +111,182 @@ describe('her hands already busy', () => {
   })
 })
 
+describe('her hands on an activity', () => {
+  const placements = [
+    'hand_on_own_hip',
+    'hands_on_own_thighs',
+    'hand_on_own_thigh',
+    'hands_on_lap',
+    'hands_on_own_knees',
+    'hands_on_own_ass',
+    'head_rest',
+    'arms_at_sides',
+    'arms_up',
+    'hand_up',
+    'hand_on_own_chin',
+    'crossed_arms'
+  ]
+
+  it('puts her hands on the guitar balanced against her hip', () => {
+    const tags = posePhotoTags(
+      'In her room, sitting cross-legged on an unmade bed with a dark acoustic guitar ' +
+        'balanced against her hip, taken from the waist up.',
+      false
+    )
+    expect(tags).toEqual(
+      expect.arrayContaining([
+        'sitting',
+        'indian_style',
+        '(upper_body:1.3)',
+        'holding_instrument',
+        'guitar'
+      ])
+    )
+    expect(tags.some((tag) => placements.includes(tag))).toBe(false)
+  })
+
+  it.each([
+    ['strumming her guitar on the bed', ['playing_guitar', 'holding_instrument']],
+    ['practising her ukulele', ['playing_instrument', 'holding_instrument', 'ukulele']],
+    ['practicing her bass', ['playing_bass_guitar', 'holding_instrument']],
+    ['playing her violin', ['playing_instrument', 'holding_instrument', 'violin']],
+    ['with her ukulele', ['holding_instrument', 'ukulele']],
+    ['with her bass', ['holding_instrument', 'bass_guitar']],
+    ['with her violin', ['holding_instrument', 'violin']],
+    ['with her cello', ['holding_instrument', 'cello']],
+    ['with her flute', ['holding_instrument', 'flute']],
+    ['at her desk typing on her laptop', ['typing', 'laptop']],
+    ['on her laptop', ['typing', 'laptop']],
+    ['curled up on the sofa reading a book', ['reading', 'holding_book']],
+    ['reading a letter', ['reading']],
+    ['writing in her notebook', ['writing', 'holding_pen']],
+    ['studying', ['writing', 'holding_pen']],
+    ['doing homework', ['writing', 'holding_pen']],
+    ['drawing a picture', ['drawing_(action)', 'holding_pencil']],
+    ['sketching a landscape', ['drawing_(action)', 'holding_pencil']],
+    ['painting a picture', ['painting_(action)', 'holding_paintbrush']],
+    ['gaming with a controller', ['playing_games', 'holding_controller']],
+    ['playing games on a handheld console', ['playing_games', 'handheld_game_console']],
+    ['eating ramen at a counter', ['eating']],
+    ['sipping a coffee', ['drinking']],
+    ['drinking tea', ['drinking']],
+    ['cooking dinner', ['cooking']],
+    ['stirring a pot', ['cooking']],
+    ['knitting', ['knitting']],
+    ['brushing her hair', ['brushing_hair']],
+    ['applying makeup', ['applying_makeup']],
+    ['applying lipstick', ['applying_makeup']],
+    ['hugging a plush', ['hugging_object']],
+    ['cuddling a pillow', ['hugging_object']],
+    ['singing into a microphone', ['holding_microphone', 'singing']],
+    ['singing by the window', ['holding_microphone', 'singing']],
+    ['with a mic', ['holding_microphone']],
+    ['waving', ['waving']],
+    ['pointing at the view', ['pointing']]
+  ])('owns her hands while %s', (activity, expected) => {
+    const tags = posePhotoTags(`Sitting on the bench, ${activity}.`, false)
+    expect(tags).toEqual(expect.arrayContaining(expected))
+    expect(tags.some((tag) => placements.includes(tag))).toBe(false)
+  })
+
+  it('keeps her hands on the laptop or book in the reported scenes', () => {
+    const typing = posePhotoTags('Sitting at her desk typing on her laptop', false)
+    expect(typing).toEqual(expect.arrayContaining(['sitting', 'typing', 'laptop']))
+    expect(typing.some((tag) => placements.includes(tag))).toBe(false)
+    const reading = posePhotoTags('Curled up on the sofa reading a book', false)
+    expect(reading).toEqual(expect.arrayContaining(['reading', 'holding_book']))
+    expect(reading.some((tag) => placements.includes(tag))).toBe(false)
+  })
+
+  it('adds an action without another food, cup, book, controller or instrument', () => {
+    expect(posePhotoTags('eating ramen at a counter', false)).toEqual(['eating'])
+    expect(posePhotoTags('sipping a coffee', false)).toEqual(['drinking'])
+    expect(posePhotoTags('reading a letter', false)).toEqual(['reading'])
+    const guitar = posePhotoTags('strumming her guitar', false)
+    expect(guitar).not.toContain('guitar')
+    const handheld = posePhotoTags('gaming on a handheld game console', false)
+    expect(handheld).not.toContain('holding_controller')
+    expect(posePhotoTags('painting her nails', false)).not.toContain('painting_(action)')
+  })
+
+  it('matches one specific activity and leaves her hair gesture unchanged', () => {
+    const guitar = posePhotoTags('playing her guitar beside a book she was reading', false)
+    expect(guitar).toEqual(['playing_guitar', 'holding_instrument'])
+    expect(posePhotoTags('Sitting on the bench, playing with her hair', false)).toEqual([
+      'sitting',
+      'cowboy_shot'
+    ])
+  })
+
+  it('seats her at a piano or keyboard only when no position was given', () => {
+    for (const [instrument, action] of [
+      ['piano', 'playing_piano'],
+      ['keyboard', 'keyboard_(instrument)']
+    ]) {
+      for (const bare of [false, true]) {
+        const tags = posePhotoTags(`A close-up at her ${instrument}`, bare)
+        expect(tags).toEqual(expect.arrayContaining(['sitting', action]))
+        expect(tags).not.toContain('standing')
+        const standing = posePhotoTags(`A close-up standing at her ${instrument}`, bare)
+        expect(standing).not.toContain('sitting')
+      }
+    }
+  })
+
+  it.each([
+    'texting',
+    'scrolling',
+    'tying',
+    'fixing',
+    'adjusting',
+    'sewing',
+    'holding up',
+    'showing off'
+  ])('clears placements for %s without inventing an activity tag', (activity) => {
+    const tags = posePhotoTags(`Standing by the window, ${activity}.`, false)
+    expect(tags).toEqual(['standing', 'cowboy_shot'])
+  })
+
+  it('matches plural nouns and keeps bass and mic out of other words', () => {
+    expect(posePhotoTags('with her guitars', false)).toContain('holding_instrument')
+    expect(posePhotoTags('with her microphones', false)).toContain('holding_microphone')
+    expect(posePhotoTags('standing by a bassinet under a microscopic pattern', false)).toEqual([
+      'standing',
+      'cowboy_shot',
+      'hand_on_own_hip'
+    ])
+  })
+
+  it('keeps mirror selfies and their phone hand out of instrument and activity rules', () => {
+    const scene = 'A mirror selfie in her room, sitting on the bed'
+    const original = photoPose(scene, false)
+    for (const activity of [
+      'with her guitar behind her',
+      'strumming her guitar',
+      'typing on her laptop',
+      'gaming with a controller'
+    ]) {
+      expect(photoPose(`${scene} ${activity}`, false)).toEqual(original)
+    }
+    const reading = photoPose(`${scene} reading a book`, false).tags
+    expect(reading).toContain('holding_phone')
+    expect(reading).not.toContain('reading')
+    expect(reading).not.toContain('holding_book')
+    expect(reading.some((tag) => placements.includes(tag))).toBe(false)
+    expect(
+      photoPose('A mirror selfie in her room with her guitar behind her', false).tags
+    ).not.toContain('holding_instrument')
+    for (const gesture of ['waving', 'pointing']) {
+      expect(photoPose(`${scene}, ${gesture}`, false).tags).toEqual(
+        expect.arrayContaining(['holding_phone', gesture])
+      )
+    }
+    expect(posePhotoTags('A photo by a mirror with her guitar', false)).toContain(
+      'holding_instrument'
+    )
+  })
+})
+
 describe('a selfie', () => {
   it('keeps the phone out, her arm reaching out of the picture', () => {
     const pose = photoPose('a selfie in the cafe, smiling', false)
