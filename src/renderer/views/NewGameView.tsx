@@ -124,6 +124,29 @@ export function NewGameView(): JSX.Element {
   const [choosingEcho, setChoosingEcho] = useState(false)
   const [echoSetupId] = useState(() => crypto.randomUUID())
   const setupWriting = useRef(false)
+  // Every asynchronous completion belongs to this visit and its current setup attempt.
+  const completion = useRef(0)
+  const mounted = useRef(true)
+  useEffect(() => {
+    mounted.current = true
+    return () => {
+      mounted.current = false
+      completion.current += 1
+      leaveApplication()
+    }
+  }, [])
+  function currentCompletion(token: number): boolean {
+    const screen = useUiStore.getState().view
+    return mounted.current && completion.current === token &&
+      (screen === 'newGame' || screen === 'quickstart' || screen === 'classSelect')
+  }
+  function cancelSetup(): void {
+    completion.current += 1
+    setChoosingDynamics(false)
+    setChoosingEcho(false)
+    setPendingSchedule(null)
+    setView('mainMenu')
+  }
   useEffect(() => {
     clearStagedEnrollment()
     clearStagedContinuation()
@@ -215,6 +238,7 @@ export function NewGameView(): JSX.Element {
   // and the canned start its cast.
   useEffect(() => {
     if (flow) return
+    const token = completion.current
     const loading = load()
     if (!quick) {
       void loading
@@ -226,9 +250,10 @@ export function NewGameView(): JSX.Element {
     // from under a curtain that only `endCrossing` may lift.
     void (async () => {
       const [bundle] = await Promise.all([loadQuickstart(), loading])
+      if (!currentCompletion(token)) return
       // `loadQuickstart` has already reported its own failure.
       if (!bundle) {
-        endCrossing(() => setView('mainMenu'))
+        endCrossing(() => { if (currentCompletion(token)) setView('mainMenu') })
         return
       }
 
@@ -257,7 +282,7 @@ export function NewGameView(): JSX.Element {
           )
         )
         // The error is read over the curtain opening back onto the menu, the abandon idiom.
-        endCrossing(() => setView('mainMenu'))
+        endCrossing(() => { if (currentCompletion(token)) setView('mainMenu') })
         return
       }
 
@@ -273,14 +298,12 @@ export function NewGameView(): JSX.Element {
       // the answer is what ends the menu's crossing.
       setNaming(true)
     })().catch((err: unknown) => {
+      if (!currentCompletion(token)) return
       // A read that rejected outright would otherwise strand the curtain, which nothing times out.
       showError(toAppError(err))
-      endCrossing(() => setView('mainMenu'))
+      endCrossing(() => { if (currentCompletion(token)) setView('mainMenu') })
     })
   }, [flow, load, quick, loadQuickstart, setView, showError])
-
-  // Unmounting abandons the start with it.
-  useEffect(() => () => leaveApplication(), [])
 
   // Every girl who has graduated by the next semester, whom its Enroll loads beside the roster.
   const alumni = useMemo(
@@ -306,6 +329,8 @@ export function NewGameView(): JSX.Element {
     tokensGenerated: number,
     into?: string
   ): Promise<string | null> {
+    const token = completion.current
+    if (!currentCompletion(token)) return null
     setEnrolledTokens(tokensGenerated)
     const draft: EnrollmentDraft = {
         chars,
@@ -331,6 +356,7 @@ export function NewGameView(): JSX.Element {
       }
     setSetupDraft(draft)
     const written = await useSaveStore.getState().enroll(draft, into)
+    if (!currentCompletion(token)) return null
     if (!written.ok) {
       showError(written.error)
       return null
@@ -351,6 +377,8 @@ export function NewGameView(): JSX.Element {
     continued: ApplicationContinuation | undefined,
     unrevealed: string[]
   ): void {
+    const token = completion.current
+    if (!currentCompletion(token)) return
     if (continued) {
       void enrollNext(semester, named, composed, continued, unrevealed)
       return
@@ -358,6 +386,7 @@ export function NewGameView(): JSX.Element {
     void (async () => {
       const tokens = tokensNow()
       const folder = await sealApplication()
+      if (!currentCompletion(token)) return
       const reader: Reader = {
         first: named.firstName,
         last: named.lastName,
@@ -372,12 +401,14 @@ export function NewGameView(): JSX.Element {
         tokens,
         folder ?? undefined
       )
+      if (!currentCompletion(token)) return
       // An application never written takes the playthrough the enrollment made, so the lorebook
       // edits held for want of one land beside it.
       if (folder === null && enrolled !== null) adoptFolder(enrolled)
       // The enrollment stands for the application from here.
       leaveApplication()
       endCrossing(() => {
+        if (!currentCompletion(token)) return
         setApplicationFolder(folder)
         setRoster(composed)
         setPlayerName({ first: reader.first, last: reader.last })
@@ -412,8 +443,11 @@ export function NewGameView(): JSX.Element {
     continued: ApplicationContinuation,
     unrevealed: string[]
   ): Promise<void> {
+    const token = completion.current
+    if (!currentCompletion(token)) return
     const tokensGenerated = tokensNow()
     const folder = await sealApplication()
+    if (!currentCompletion(token)) return
     const draft: EnrollmentDraft = {
       chars: composed.map((c) => c.charId),
       ...(unrevealed.length > 0 ? { masked: unrevealed } : {}),
@@ -448,6 +482,7 @@ export function NewGameView(): JSX.Element {
       }
     }
     const written = await useSaveStore.getState().enroll(draft, folder ?? undefined)
+    if (!currentCompletion(token)) return
     if (written.ok) setPlaythroughId(written.data.playthroughId)
     else showError(written.error)
     setNextDraft(draft)
@@ -457,6 +492,7 @@ export function NewGameView(): JSX.Element {
     // The registration stands for the application from here.
     leaveApplication()
     endCrossing(() => {
+      if (!currentCompletion(token)) return
       setRoster(composed)
       setPlayerName({ first: named.firstName, last: named.lastName })
       setPlayerStats(named.stats)
@@ -480,6 +516,8 @@ export function NewGameView(): JSX.Element {
    * on, so the registrar is swapped in under the same cover the question was asked on.
    */
   function onNamed(first: string, last: string, stats: PlayerStats, bio: string): void {
+    const token = completion.current
+    if (!currentCompletion(token)) return
     setPlayerName({ first, last })
     setPlayerStats(stats)
     setPlayerBio(bio)
@@ -487,7 +525,7 @@ export function NewGameView(): JSX.Element {
     // Whatever the phase, `endCrossing` runs the swap under cover or at once — no window to
     // miss. No bundle behind the question: back to the menu rather than a curtain over nothing.
     if (!schedules) {
-      endCrossing(() => setView('mainMenu'))
+      endCrossing(() => { if (currentCompletion(token)) setView('mainMenu') })
       return
     }
     void (async () => {
@@ -510,7 +548,8 @@ export function NewGameView(): JSX.Element {
         { first, last, stats, bio },
         useGameStore.getState().tallies.tokensGenerated
       )
-      endCrossing(() => setView('classSelect'))
+      if (!currentCompletion(token)) return
+      endCrossing(() => { if (currentCompletion(token)) setView('classSelect') })
     })()
   }
 
@@ -520,8 +559,10 @@ export function NewGameView(): JSX.Element {
    */
   async function startNext(
     draft: EnrollmentDraft,
-    playerSchedule: Record<number, string>
+    playerSchedule: Record<number, string>,
+    token: number
   ): Promise<void> {
+    if (!currentCompletion(token)) return
     const target = next?.playthroughId ?? playthroughId ?? applicationFolder
     if (!draft.continued || !target) return
     const season = seasonOf(draft.continued.index)
@@ -541,6 +582,7 @@ export function NewGameView(): JSX.Element {
     const written = await useSaveStore
       .getState()
       .continueSemester(target, start.id, start.semester, save)
+    if (!currentCompletion(token)) return
     if (!written.ok) {
       // The registrar is revealed again and the error read over it, the abandon idiom.
       endCrossing()
@@ -550,16 +592,17 @@ export function NewGameView(): JSX.Element {
 
     const loaded = Object.fromEntries([...roster, ...graduates].map((c) => [c.charId, c]))
     coverSwap(() => {
+      if (!currentCompletion(token)) return
       enterGame(written.data.save, written.data.record, loaded)
       setView('game')
     })
   }
 
   /** The save write, once the player has picked their timetable. */
-  async function onStart(playerSchedule: Record<number, string>, draft: EnrollmentDraft): Promise<void> {
-    if (!schedules) return
+  async function onStart(playerSchedule: Record<number, string>, draft: EnrollmentDraft, token: number): Promise<void> {
+    if (!schedules || !currentCompletion(token)) return
     if (draft.continued) {
-      await startNext(draft, playerSchedule)
+      await startNext(draft, playerSchedule, token)
       return
     }
 
@@ -796,6 +839,7 @@ export function NewGameView(): JSX.Element {
       },
       playthroughId ?? applicationFolder ?? undefined
     )
+    if (!currentCompletion(token)) return
     if (!written.ok) {
       // The registrar is revealed again and the error read over it, the abandon idiom.
       endCrossing()
@@ -806,6 +850,7 @@ export function NewGameView(): JSX.Element {
     // Under the cover: the game boots and opens its first slot behind the splash announcing it,
     // and the curtain peels back off the opening scroll — which `enterGame` is what waits for.
     coverSwap(() => {
+      if (!currentCompletion(token)) return
       enterGame(
         written.data.save,
         written.data.record,
@@ -819,8 +864,8 @@ export function NewGameView(): JSX.Element {
   const returning = setupDraft ? returningSetupIds(setupDraft) : []
   const carriedEcho = setupDraft?.continued?.carry.mods?.exEcho
 
-  async function keepSetup(dynamics = exCharacterDynamics, echoes = echoDraft): Promise<EnrollmentDraft | null> {
-    if (!setupDraft || setupWriting.current) return null
+  async function keepSetup(token: number, dynamics = exCharacterDynamics, echoes = echoDraft): Promise<EnrollmentDraft | null> {
+    if (!setupDraft || setupWriting.current || !currentCompletion(token)) return null
     setupWriting.current = true
     try {
       const settledDynamics = dynamics && setupDraft.continued ? continuedDynamics(setupDraft, roster, dynamics) : dynamics
@@ -829,45 +874,58 @@ export function NewGameView(): JSX.Element {
         exCharacterDynamicsEnabled: dynamicsEnabled,
         ...(echoes ? { exEcho: echoes } : {}) }
       const written = await useSaveStore.getState().enroll(draft, playthroughId ?? applicationFolder ?? undefined)
+      if (!currentCompletion(token)) return null
       if (!written.ok) { showError(written.error); return null }
       setPlaythroughId(written.data.playthroughId)
       setSetupDraft(draft)
       return draft
-    } catch (error) { showError(toAppError(error)); return null }
+    } catch (error) { if (currentCompletion(token)) showError(toAppError(error)); return null }
     finally { setupWriting.current = false }
   }
 
-  function requestEchoSetup(schedule: Record<number, string>, dynamics = exCharacterDynamics): void {
+  function requestEchoSetup(schedule: Record<number, string>, token: number, dynamics = exCharacterDynamics): void {
+    if (!currentCompletion(token)) return
     if (modIsOn('echo')) {
       setEchoDraft(prepareEchoSetup(echoDraft ?? carriedEcho, playthroughId ?? echoSetupId, roster,
         playerName.first + ' ' + playerName.last, playerBio))
       setChoosingEcho(true)
-    } else void keepSetup(dynamics).then(draft => { if (draft) void onStart(schedule, draft) })
+    } else void keepSetup(token, dynamics).then(draft => { if (draft && currentCompletion(token)) void onStart(schedule, draft, token) })
   }
 
   function requestStart(schedule: Record<number, string>): void {
     if (!setupDraft || setupWriting.current || choosingDynamics || choosingEcho) return
+    const token = ++completion.current
+    if (!currentCompletion(token)) return
     setPendingSchedule(schedule)
     if (dynamicsEnabled && visibleRoster.some(girl => !returning.includes(girl.charId))) setChoosingDynamics(true)
-    else requestEchoSetup(schedule)
+    else requestEchoSetup(schedule, token)
   }
 
   const setupModals = <AnimatePresence>
     {choosingDynamics && <CharacterDynamicsModal key="dynamics" theme={theme} roster={visibleRoster}
       initial={exCharacterDynamics} returning={returning} onContinue={choices => {
+        const token = completion.current
+        if (!currentCompletion(token)) return
         setCharacterDynamics(choices)
         setChoosingDynamics(false)
-        void keepSetup(choices).then(draft => { if (draft && pendingSchedule) requestEchoSetup(pendingSchedule, choices) })
+        void keepSetup(token, choices).then(draft => { if (draft && pendingSchedule && currentCompletion(token)) requestEchoSetup(pendingSchedule, token, choices) })
       }} />}
-    {choosingEcho && echoDraft && <EchoPanel key="echo" hidden={false} onClose={() => setChoosingEcho(false)} setup={{
+    {choosingEcho && echoDraft && <EchoPanel key="echo" hidden={false} onClose={() => {
+      completion.current += 1
+      setChoosingEcho(false)
+      setPendingSchedule(null)
+    }} setup={{
       id: echoSetupId, value: echoDraft, roster: visibleRoster, first: playerName.first, last: playerName.last,
       bio: playerBio, locked: echoSetupLocks(carriedEcho), onChange: setEchoDraft,
       onContinue: async value => {
+        const token = completion.current
+        if (!currentCompletion(token)) return
         const settled = finalizeEchoSetup(value, roster, carriedEcho)
         setEchoDraft(settled)
-        const draft = await keepSetup(exCharacterDynamics, settled)
+        const draft = await keepSetup(token, exCharacterDynamics, settled)
+        if (!currentCompletion(token)) return
         setChoosingEcho(false)
-        if (draft && pendingSchedule) await onStart(pendingSchedule, draft)
+        if (draft && pendingSchedule) await onStart(pendingSchedule, draft, token)
       }
     }} />}
   </AnimatePresence>
@@ -881,7 +939,7 @@ export function NewGameView(): JSX.Element {
         playerName={playerName}
         saved={playthroughId !== null}
         onStart={requestStart}
-        onCancel={() => setView('mainMenu')}
+        onCancel={cancelSetup}
       />
     ) : null
 
