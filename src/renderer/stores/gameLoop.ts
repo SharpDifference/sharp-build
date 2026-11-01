@@ -2702,7 +2702,7 @@ export function interject(action: string): boolean {
  */
 export function endScene(): boolean {
   const game = useGameStore.getState()
-  if (game.createdScene || !endSceneOpenOf(game)) return false
+  if (game.createdScene || game.turnError || (game.sceneActivity && !game.sceneActivity.closed) || !endSceneOpenOf(game)) return false
 
   abortSceneCall()
   loopState.turnStartedAt = null

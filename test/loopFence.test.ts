@@ -48,7 +48,7 @@ vi.mock('../src/renderer/stores/loop/hooks', async (importOriginal) => {
 // `gameLoop` reaches `jobStore`, which subscribes to `jobs:progress` at module scope — so the
 // bridge has to exist before the import, not the call.
 stubApi({ jobs: { onProgress: () => () => {} } })
-const { dropEnding, retryEndingCall } = await import('../src/renderer/stores/gameLoop')
+const { dropEnding, retryEndingCall, endScene } = await import('../src/renderer/stores/gameLoop')
 const { registerHooks, setHookRules } = await import('../packages/modkit/src/renderer/hooks')
 
 /** One scene call the test resolves by hand, so leaving can be timed inside it. */
@@ -102,6 +102,19 @@ beforeEach(() => {
 afterEach(() => {
   restoreApi()
   vi.restoreAllMocks()
+})
+
+describe('manual ending with an interactive activity', () => {
+  it.each(['pending', 'completed', 'abandoned'] as const)('cannot skip a %s activity before its closing reply', status => {
+    const action = { speaker: READER_SPEAKER, text: 'I practice.' }
+    const lines = sceneLines('The practice begins.')
+    useGameStore.setState({ date: 8, time: 0, cast: ['a'], currentSceneTranscript: [action, ...lines],
+      sceneLog: [action, ...lines], currentLine: lines[0], pendingLines: [],
+      sceneActivity: { owner: 'training', id: 'practice', label: 'Practice', location: 'quad', stat: 'body', status } })
+    expect(endScene()).toBe(false)
+    expect(useGameStore.getState().sceneEnding).toBe(false)
+    expect(autosave).not.toHaveBeenCalled()
+  })
 })
 
 describe('the run token', () => {
