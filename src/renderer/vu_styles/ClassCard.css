@@ -1,0 +1,71 @@
+/* A section's classes as cards two across in the entries panel (NewGameEntries.css), each a
+   quiet rounded rectangle of fields: New Game's Classes screen writes them and Finalize edits
+   them. A code's chip is the schedule's (CourseSchedule.css). Imported from the two views. */
+
+.vu-classes-grid {
+  display: grid;
+  flex: none;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 20px;
+}
+
+/* A class to write: quiet, so recessed and without paper, its fields on the ground. */
+.vu-classcard {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  min-width: 0;
+  padding: 18px 22px 22px;
+  border-radius: 28px;
+  background: var(--vu-recessed);
+}
+
+/* Its place in the section, or whose it is, and its code as the schedule will print it. */
+.vu-classcard-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+  min-height: 26px;
+}
+
+.vu-classcard-label {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--vu-text-muted);
+  font: 700 12px var(--font-mono);
+  letter-spacing: 0.12em;
+  text-overflow: ellipsis;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+/* An interest class is hers, so it is headed by her name beside her face. */
+.vu-classcard-label--name {
+  color: var(--vu-text);
+  font: 700 16px var(--font-body);
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+/* Her face, quiet: lifted onto the surface tone so it reads on the card. */
+.vu-classcard-face {
+  flex: none;
+  width: 40px;
+  height: 48px;
+  background: var(--vu-surface);
+}
+
+.vu-classcard-code {
+  flex: none;
+  max-width: 50%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* A course with no kind picked yet has no group to wear. */
+.vu-classcard-code:not([data-group]) {
+  background: var(--vu-tint);
+  color: var(--vu-text-body);
+}

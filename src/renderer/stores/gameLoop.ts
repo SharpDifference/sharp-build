@@ -3,7 +3,7 @@ import { withSlotActivityPrompt } from '../prompts/slotActivity'
 import { talentProjectWork } from '@shared/talentPerks'
 import { canContinueReckoning, pendingReckoningAftermath } from './reckoning'
 import { withReckoningAftermath } from '../prompts/reckoningPrompt'
-import { dynamicFor } from '@shared/characterDynamics'
+import { dynamicFor, dynamicsKnowsReader } from '@shared/characterDynamics'
 import { fullNameOf } from '@shared/types'
 import { currentStorySnapshot } from './storyMemory'
 import { finishBreakthrough, rearmBreakthrough, withBreakthrough } from './breakthrough'
@@ -59,9 +59,8 @@ import {
   introScrollLines,
   isOrientationSlot,
   isTutorialSlot,
-  ORIENTATION_PREMISE,
   orientationAcquaintancePremise,
-  orientationLeaderPremise,
+  orientationPremise,
   tutorialLines
 } from '../prompts/introScript'
 import {
@@ -293,7 +292,13 @@ import {
   stageCast
 } from './loop/promptState'
 import { textEditsNow } from './promptStudioStore'
-import { forwardOpenOf, interjectOfferOf, replyRowOfferOf, rewindOpenOf } from './loop/playback'
+import {
+  endSceneOpenOf,
+  forwardOpenOf,
+  interjectOfferOf,
+  replyRowOfferOf,
+  rewindOpenOf
+} from './loop/playback'
 import {
   authoredTurn,
   currentRun,
@@ -577,21 +582,31 @@ async function startOrientationScene(): Promise<void> {
   const run = currentRun()
   const game = useGameStore.getState()
 
-  // A freshman, or anyone at all when there are none, who gets the leader premise instead.
-  // No attendance filter: orientation cancels every class on day 0.
-  const freshmen = game.chars.filter((charId) => game.charInfo[charId]?.year === 1)
-  const pool = freshmen.length > 0 ? freshmen : game.chars
+  // A girl he has not met, a freshman first and else an upperclassman leading the group; one he
+  // knew before he came only where he knew them all. No attendance filter: orientation cancels
+  // every class on day 0.
+  const met = (charId: string): boolean => game.charInfo[charId]?.flags?.hasMet === true
+  const freshman = (charId: string): boolean => game.charInfo[charId]?.year === 1
+  const unmet = game.chars.filter((charId) => !met(charId))
+  const pool = [
+    unmet.filter(freshman),
+    unmet,
+    game.chars.filter(freshman),
+    game.chars
+  ].find((candidates) => candidates.length > 0) ?? []
   if (pool.length === 0) {
     console.warn('[intro] no characters on the roster; orientation plays solo')
   }
   const picked = pool.length > 0 ? anyOf(pool) : null
   const cast = picked ? [picked] : []
-  const action =
-    picked && game.charInfo[picked]?.flags.hasMet
-      ? orientationAcquaintancePremise(game.characters[picked]?.firstName ?? 'she', freshmen.length === 0)
-      : picked && freshmen.length === 0
-        ? orientationLeaderPremise(game.characters[picked]?.firstName ?? 'she')
-        : ORIENTATION_PREMISE
+  const action = picked && dynamicsKnowsReader(game.exCharacterDynamics, picked)
+    ? orientationAcquaintancePremise(game.characters[picked]?.firstName ?? 'she', !freshman(picked))
+    : orientationPremise({
+    firstName: (picked && game.characters[picked]?.firstName) || 'she',
+    freshman: picked === null || freshman(picked),
+    met: picked !== null && met(picked),
+    knowsSomebody: game.chars.some(met)
+  })
 
   const snapshot: TurnSnapshot = { scene: game.captureScene(), action, intro: true }
   loopState.lastTurn = snapshot
@@ -1901,10 +1916,11 @@ function buildTurnRequest(
 }
 
 /**
- * The whole end of a scene, as one unit. It mints the ending's token first; an interjection
- * re-mints it, and every step below bails at its next check.
+ * The whole end of a scene, as one unit, the goodbye call among it unless `goodbye` is false. It
+ * mints the ending's token first; an interjection re-mints it, and every step below bails at its
+ * next check.
  */
-async function runEnding(solo: boolean): Promise<void> {
+async function runEnding(goodbye: boolean): Promise<void> {
   const run = currentRun()
   const ending = {}
   loopState.endingToken = ending
@@ -1915,7 +1931,7 @@ async function runEnding(solo: boolean): Promise<void> {
   // A goodbye runs the goodbye and nothing else; its one status line is `advance()`'s. So does a
   // created scene, whose screen after the goodbye is the save question.
   if (isGraduationSlot(game.date, game.time) || game.createdScene) {
-    const closed = await runClosing(dropped)
+    const closed = goodbye ? await runClosing(dropped) : true
     if (runStale(run) || dropped()) return
     useGameStore.getState().setBusy(false)
     if (!closed) return
@@ -1927,12 +1943,14 @@ async function runEnding(solo: boolean): Promise<void> {
   // Read once, synchronously, and shared by both ledgers, so the texting claim is keyed on the
   // same message set and the two calls agree on their scheduling blocks.
   const schedule = scheduleInput(game.date, game.time)
-  const ledgerCall = startLedger(schedule, dropped)
+  // With no goodbye to fold the scene's last lines in, the ledger recaps whatever the running
+  // summary does not reach.
+  const recap = !goodbye && game.sceneSummaries.at(-1)?.at !== game.currentSceneTranscript.length
+  const ledgerCall = startLedger(schedule, dropped, recap)
   // Usually the prefetch fired when the scene started; a resumed scene
   // or a mismatched message set pays for the call here instead.
   const textLedgerCall = claimTextLedger(game.date, game.time)
-  // A solo scene wrote its own landing: no goodbye.
-  const closingCall = solo ? Promise.resolve(true) : runClosing(dropped)
+  const closingCall = goodbye ? runClosing(dropped) : Promise.resolve(true)
 
   const [ledger, textLedger, closed] = await Promise.all([ledgerCall, textLedgerCall, closingCall])
   // The player walked out of this scene, or interjected over its ending: nothing below may land.
@@ -1941,8 +1959,13 @@ async function runEnding(solo: boolean): Promise<void> {
   // Abandoned: nothing is written, and the Game View is already leaving for the menu.
   if (!closed || ledger === null || textLedger === null) return
 
+  // The recap is the scene's summary, filed before the opening reads it and never banked.
+  const { summary, ...books } = ledger
+  const live = useGameStore.getState()
+  if (summary?.trim()) live.setSceneSummary(summary.trim(), live.currentSceneTranscript.length)
+
   // One object from here down: the status lines, the save and the boundary read it.
-  const merged = mergeLedgerReplies(ledger, textLedger)
+  const merged = mergeLedgerReplies(books, textLedger)
   loopState.pendingLedgerResult = merged
 
   // Hands the scene back to a player parked on the spinner while the opening is still out;
@@ -2200,15 +2223,17 @@ function withoutLogFrom(request: StructuredRequest): StructuredRequest {
 }
 
 /**
- * Fires the end-of-scene bookkeeping call, in parallel with the closing call; null is an
- * abandoned or dropped ending.
+ * Fires the end-of-scene bookkeeping call, in parallel with the closing call, asking it for the
+ * scene's recap too under `recap`; null is an abandoned or dropped ending.
  */
 function startLedger(
   schedule: SchedulePromptInput,
-  dropped: () => boolean
+  dropped: () => boolean,
+  recap: boolean
 ): Promise<LedgerResponse | null> {
   const run = currentRun()
   const game = useGameStore.getState()
+
   const cast = loopState.closingCast ?? []
   // The scene as *written*: the read log plus whatever is still queued. Read once, so a build
   // tried again after the goodbye has landed still leaves the goodbye out.
@@ -2218,7 +2243,7 @@ function startLedger(
 
   return (async () => {
     const built = await buildOrAsk(
-      () => buildLedgerPrompt(cast, written, promptState(), reader(), schedule),
+      () => buildLedgerPrompt(cast, written, promptState(), reader(), schedule, recap),
       useGameStore.getState().setLedgerError,
       dropped
     )
@@ -2702,6 +2727,40 @@ export function interject(action: string): boolean {
   const text = action.trim()
   if (!text || !takeTurnFromReply()) return false
   void submitAction(text)
+  return true
+}
+
+/**
+ * Ends the scene on the player's word — End scene's confirm. The live scene call is aborted, the
+ * scene is cut to what he has read, and its ending runs with no goodbye; nothing is written until
+ * the ending's own write. False, doing nothing, where the scene cannot be ended now.
+ */
+export function endScene(): boolean {
+  const game = useGameStore.getState()
+  if (game.createdScene || game.turnError || (game.sceneActivity && !game.sceneActivity.closed) || !endSceneOpenOf(game)) return false
+
+  abortSceneCall()
+  loopState.turnStartedAt = null
+  game.setStreaming(false)
+  game.setWaitingForLine(false)
+  game.setAwaitingInput(false)
+  game.cutToRead()
+
+  // The ending a resolved reply would have begun, with nobody left to say goodbye: the ledger's
+  // cast is everyone who was in it, and the save carries no lines still to play.
+  const live = useGameStore.getState()
+  loopState.closingCast = castCharactersOf(live.cast, true)
+  loopState.closingCastPresent = null
+  loopState.endBase = live.captureScene()
+  loopState.endLines = []
+  live.setSceneEnding(true, true)
+  live.setEndingInFlight(true)
+  live.setBusy(true)
+  loopState.endingAbandoned = false
+
+  // Parks on the spinner until the ending is written.
+  advance()
+  void runEnding(false)
   return true
 }
 
@@ -3242,7 +3301,13 @@ export async function leaveForNextSemester(): Promise<boolean> {
     if (Object.keys(mods).length > 0) handoff.carry.mods = mods
     const ex = modSlicesLeaving(game.modData, game.modValues, leaving)
     if (ex) handoff.carry.ex = ex
-    stageContinuation({ playthroughId, record, from: view.id, handoff })
+    stageContinuation({
+      playthroughId,
+      record,
+      from: view.id,
+      ending: loopState.slotSaveId,
+      handoff
+    })
   }
   await leaveToMenu({ keepCrossing: true })
   return Boolean(record && playthroughId)

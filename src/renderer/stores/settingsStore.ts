@@ -178,6 +178,8 @@ export function patchOf(settings: RendererSettings): SettingsPatch {
     // Carried, or a save made from anywhere else would turn the ending warnings back on.
     warnEndingInterrupt: settings.warnEndingInterrupt,
     warnEndingEdit: settings.warnEndingEdit,
+    // Carried, or a save made from anywhere else would turn the New Game setup welcome back on.
+    newGameWelcome: settings.newGameWelcome,
     noNsfwImages: settings.noNsfwImages,
     lessNsfwText: settings.lessNsfwText,
     sfwAsked: settings.sfwAsked,

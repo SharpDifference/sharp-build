@@ -20,14 +20,14 @@ export interface Month {
 }
 
 /**
- * The months a semester touches, each drawn whole: the first one's days before day 0 and the
- * last one's after graduation are on the grid, dimmed, so a month is always a month and the
- * arrows never change the shape of what they page.
+ * The months the days from `from` to `to` touch, printed in a `season` semester's dates, each
+ * drawn whole: the first one's days before `from` and the last one's after `to` are on the grid,
+ * dimmed, so a month is always a month and the arrows never change the shape of what they page.
  */
-function monthsTouched(season: Season): readonly Month[] {
+export function monthsBetween(from: number, to: number, season: Season): readonly Month[] {
   const months: Month[] = []
-  let first = 1 - dayOfMonth(0, season)
-  while (first <= FINAL_DATE) {
+  let first = from + 1 - dayOfMonth(from, season)
+  while (first <= to) {
     let next = first + 28
     while (dayOfMonth(next, season) !== 1) next++
     months.push({ first, last: next - 1 })
@@ -38,8 +38,8 @@ function monthsTouched(season: Season): readonly Month[] {
 
 /** Each season's months, worked out once. */
 const MONTHS_BY_SEASON: Record<Season, readonly Month[]> = {
-  spring: monthsTouched('spring'),
-  fall: monthsTouched('fall')
+  spring: monthsBetween(0, FINAL_DATE, 'spring'),
+  fall: monthsBetween(0, FINAL_DATE, 'fall')
 }
 
 /** The months a `season` semester touches, in order. */
@@ -49,9 +49,14 @@ export function monthsOf(season: Season): readonly Month[] {
 
 /** Which of a season's months a date falls in. */
 export function monthIndexOf(date: number, season: Season): number {
+  return monthIndexIn(monthsOf(season), date)
+}
+
+/** Which of `months` a date falls in, the first where it falls in none. */
+export function monthIndexIn(months: readonly Month[], date: number): number {
   return Math.max(
     0,
-    monthsOf(season).findIndex((month) => date >= month.first && date <= month.last)
+    months.findIndex((month) => date >= month.first && date <= month.last)
   )
 }
 

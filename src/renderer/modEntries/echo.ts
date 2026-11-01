@@ -1,6 +1,6 @@
 import { assignEchoes, settleEchoMemories } from '../../shared/echo'
 import { createElement, lazy, Suspense } from 'react'
-import { registerHooks, type ScreenSlotProps } from '../mods/hooks'
+import { registerHooks, type ScreenSlotProps } from '@vx/modkit/renderer'
 import { useGameStore } from '../stores/gameStore'
 import { ensureEchoes } from '../stores/echoAssignments'
 import type { GameModalProps } from '@vx/modkit/renderer'

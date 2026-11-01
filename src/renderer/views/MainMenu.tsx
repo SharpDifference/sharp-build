@@ -17,13 +17,14 @@ import { beginCrossing, coverSwap, endCrossing, useCrossingStore } from '../stor
 import { entryCrossing } from '../stores/slotCrossing'
 import { firstPhotoFailure, usePhotoStore } from '../stores/photoStore'
 import { useAssetStore } from '../stores/assetStore'
+import { stageApplication } from '../stores/applicationStore'
 import { stageEnrollment } from '../stores/newGame'
 import {
+  isApplication,
   isEnrollment,
   newestPlaythrough,
   useSaveStore,
-  type LoadedSave,
-  type ResolvedEnrollment
+  type Resumed
 } from '../stores/saveStore'
 import { useModsStore } from '../stores/modsStore'
 import { useSettingsStore } from '../stores/settingsStore'
@@ -70,9 +71,6 @@ interface Shot {
   url: string
 }
 
-/** What the top slot's read answers with: the newest save, or a semester still at the registrar. */
-type Resumed = LoadedSave | ResolvedEnrollment
-
 /**
  * The version as the menu prints it. A major of 0 is still early access and says so; from 1.0.0
  * the number stands on its own.
@@ -89,6 +87,9 @@ export function MainMenu(): JSX.Element {
   const setView = useUiStore((s) => s.setView)
   const playthroughs = useSaveStore((s) => s.playthroughs)
   const loadPlaythroughs = useSaveStore((s) => s.loadPlaythroughs)
+  // The listing being read again as the menu comes up: until it lands, the newest playthrough is
+  // the one the last listing named, which a New Game just left may no longer be.
+  const listing = useSaveStore((s) => s.loading)
   const continueNewest = useSaveStore((s) => s.continueNewest)
 
   // Whether characters can be rendered, which the footer's setup notice answers for.
@@ -185,17 +186,23 @@ export function MainMenu(): JSX.Element {
     const resumed = result.ok ? result.data : null
 
     // A playthrough that never got a timetable reopens the registrar on the semester it holds,
-    // under a plain cut: nothing is loading behind this cover, so it holds its quiet second and
-    // opens again. A roster it can no longer be played with is explained by its own card.
-    if (resumed && isEnrollment(resumed)) {
+    // and one still being set up reopens New Game, under a plain cut: nothing is loading behind
+    // this cover, so it holds its quiet second and opens again. A roster it can no longer be
+    // played with is explained by its own card.
+    if (resumed && (isEnrollment(resumed) || isApplication(resumed))) {
       if (resumed.unloadable) {
         openModal('loadGame')
         return
       }
       beginCrossing(
         () => {
-          stageEnrollment(resumed)
-          setView('classSelect')
+          if (isApplication(resumed)) {
+            stageApplication(resumed)
+            setView('newGame')
+          } else {
+            stageEnrollment(resumed)
+            setView('classSelect')
+          }
         },
         { from: theme }
       )
@@ -262,7 +269,7 @@ export function MainMenu(): JSX.Element {
      `opacity`, which beats the CSS dim, so a dead one is dealt to the dim instead. The writer
      gate reaches New Game and Load Game alone — the top slot answers it with a button of its
      own. */
-  const continueDead = resuming !== null
+  const continueDead = resuming !== null || listing
   const loadDead = playDead || !newest
 
   return (
@@ -369,9 +376,13 @@ export function MainMenu(): JSX.Element {
             >
               Continue
               <span className="vu-btn-sub">
-                {newest.enrolling
-                  ? 'class registration'
-                  : whereYouLeftOff(newest.date, seasonOf(newest.semesterIndex ?? 0))}
+                {newest.applying
+                  ? (newest.semesterIndex ?? 0) > 0
+                    ? 'new game+'
+                    : 'new game'
+                  : newest.enrolling
+                    ? 'class registration'
+                    : whereYouLeftOff(newest.date, seasonOf(newest.semesterIndex ?? 0))}
               </span>
             </motion.button>
           ) : (

@@ -1,3 +1,4 @@
+import './fixtures/maestroModelKit'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { TALENTS, buyTalent, normalizeTalents, seedTalents, settleTalentPoints, settleSavings, talentBalance, talentEffect, talentPrice, transferSavings, talentAffinity, talentSpirit, talentAbilityCost, type TalentState } from '@shared/campusTalents'
 import { compileTalentPacks } from '@shared/talentCatalog'

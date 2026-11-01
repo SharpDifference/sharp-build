@@ -5,7 +5,7 @@ import { abilityRank, farewellRomance, TALENT_ABILITIES } from '../../shared/tal
 import { abilityUsedThisWeek } from '../../shared/talentAbilityState'
 import { fullNameOf } from '@vx/modkit/shared'
 import { useGameStore } from '../stores/gameStore'
-import { useModOn } from '../stores/modsStore'
+import { useModOn } from '@vx/modkit/renderer'
 import { availableEchoBreakthrough, activateBreakthrough, canBreakthrough } from '../stores/breakthrough'
 import { eurekaProjects, talentSceneOpen, talentGoodbyeOpen, type TalentChange } from '../stores/talentActions'
 import { interject } from '../stores/gameLoop'

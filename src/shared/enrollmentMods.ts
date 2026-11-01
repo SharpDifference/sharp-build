@@ -19,3 +19,8 @@ export function enrollmentMods(draft: EnrollmentDraft | undefined, switches: Mod
   else selected.delete(CHARACTER_DYNAMICS_MOD)
   return [...selected]
 }
+
+// Setup is now saved before an enrollment exists. Keep its playthrough switches across resumes.
+declare module './application' {
+  interface ApplicationDraft { mods?: string[] }
+}

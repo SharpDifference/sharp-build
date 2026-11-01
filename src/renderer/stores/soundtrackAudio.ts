@@ -1,6 +1,6 @@
 import { isSoundtrackKey, assertSoundtrackDuration, SOUNDTRACK_MOD, SOUNDTRACK_LABELS, type SoundtrackKey } from '../../shared/soundtracks'
 import type { AudioKey } from '@shared/audio'
-import { modIsOn } from './modsStore'
+import { modIsOn } from '@vx/modkit/renderer'
 import { soundtrackActive, soundtrackError, useSoundtrackStore } from './soundtrackStore'
 
 /** Decoded imports stay separate from the shipped-file cache; at most 128 MiB is retained. */

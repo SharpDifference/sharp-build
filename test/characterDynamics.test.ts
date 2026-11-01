@@ -1,3 +1,4 @@
+import './fixtures/maestroModelKit'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import {
   CHARACTER_DYNAMICS_MOD, dynamicFor, emptyCharacterDynamics, invalidDynamicsReasons,

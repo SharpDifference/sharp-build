@@ -5,6 +5,8 @@ import { fieldDim } from '../views/motion'
 export interface SelectFieldOption {
   value: string
   label: string
+  /** Offered and not pickable, where something else on the form rules it out. */
+  disabled?: boolean
 }
 
 export interface SelectFieldProps {
@@ -51,7 +53,7 @@ export function SelectField({
         onChange={(e) => onChange(e.target.value)}
       >
         {options.map((option) => (
-          <option key={option.value} value={option.value}>
+          <option key={option.value} value={option.value} disabled={option.disabled}>
             {option.label}
           </option>
         ))}

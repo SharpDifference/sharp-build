@@ -46,7 +46,7 @@ function input(over: Partial<CarryInput> = {}): CarryInput {
     classRecords: {},
     classes: {},
     playerSchedule: { 0: 'HIS 101' },
-    calendar: calendarOf('spring', []),
+    calendar: calendarOf('spring', [], {}),
     finalsScoresShown: true,
     history: { 4: { 0: 'met Ana' } },
     replays: {},
@@ -115,7 +115,7 @@ describe('who stays and who graduates', () => {
       },
       fallGraduate: 'picked'
     }
-    const handoff = carryOf(input({ calendar: calendarOf('fall', []) }), view)
+    const handoff = carryOf(input({ calendar: calendarOf('fall', [], {}) }), view)
 
     expect(handoff.index).toBe(2)
     expect(handoff.graduated).toEqual(['picked', 'january-senior'])
@@ -124,6 +124,26 @@ describe('who stays and who graduates', () => {
     expect(handoff.priorProfiles.fresh.year).toBe(2)
     expect(handoff.priorProfiles['august-senior'].year).toBe(4)
     expect(handoff.priorProfiles.old.pursuing).toBe('teaching')
+  })
+})
+
+describe('a continuing girl’s share of her major', () => {
+  it('counts the major classes on her settled timetable, read off her entry where the view has none', () => {
+    const classes = {
+      'HIS 101': { category: 'major' },
+      'HIS 210': { category: 'major' },
+      'ART 100': { category: 'arts' }
+    } as unknown as CarryInput['classes']
+    const a = { ...profile(2), schedule: { 0: 'HIS 101', 2: 'HIS 210', 4: 'ART 100' } }
+    const b = { ...profile(1), schedule: { 1: 'HIS 101', 3: 'ART 100' } }
+    const view: SemesterView = {
+      ...springView({ a, senior: profile(4) }),
+      chars: ['a', 'b', 'senior']
+    }
+    const handoff = carryOf(input({ classes, charInfo: { b: entry(b) } }), view)
+
+    // The graduate is no longer on a timetable, so she has no share to carry.
+    expect(handoff.majorLoads).toEqual({ a: 2, b: 1 })
   })
 })
 
@@ -186,7 +206,7 @@ describe('the clock across the break', () => {
     const view: SemesterView = { ...springView({ a: girl }), index: 1, season: 'fall' }
     const handoff = carryOf(
       input({
-        calendar: calendarOf('fall', []),
+        calendar: calendarOf('fall', [], {}),
         charInfo: { a: entry(girl, { memories: [{ date: 100, type: 'liked', desc: 'x', breakDays: 87 }] }) }
       }),
       view

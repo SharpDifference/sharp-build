@@ -1,9 +1,9 @@
-import { calendarOf, semesterOf, type SemesterCalendar } from '@shared/semesters'
-import type { GameSave, PlaythroughRecord, Season, TimeSlot } from '@shared/types'
+import { semesterCalendarOf, semesterOf, type SemesterCalendar } from '@shared/semesters'
+import type { GameSave, PlaythroughRecord, TimeSlot } from '@shared/types'
 import type { Weather } from '@shared/weather'
 import { nextSlot, slotHalf } from '../prompts/gameDate'
 import { GOODBYES_SPLASH, isEpilogueNight } from '../prompts/graduation'
-import { endVacationOf, GRADUATION_DATE, occasionsAt } from '../prompts/occasions'
+import { endVacationOf, fixedOccasionIn, GRADUATION_DATE, occasionsAt } from '../prompts/occasions'
 import { slotWeather } from '../prompts/weather'
 import type { ScreenTheme } from '../views/clockTheme'
 import {
@@ -39,12 +39,13 @@ function saveTheme(save: GameSave): ScreenTheme {
  * What the curtain announces the goodbye menu with: the epilogue's own words in place of a
  * date, over the evening the end-of-term vacation has started in.
  */
-function goodbyesStamp(season: Season): SlotStamp {
+function goodbyesStamp(calendar: SemesterCalendar): SlotStamp {
+  const { season } = calendar
   return {
     date: GRADUATION_DATE,
     time: 1,
     season,
-    occasion: endVacationOf(season).title,
+    occasion: fixedOccasionIn(calendar, endVacationOf(season).id).title,
     weather: 'clear',
     words: GOODBYES_SPLASH
   }
@@ -81,12 +82,13 @@ export function entryCrossing(
   record: PlaythroughRecord
 ): CrossingOptions {
   const semester = semesterOf(record, save.semester)
+  const calendar = semesterCalendarOf(semester)
   const splash = save.graduationSeen
-    ? goodbyesStamp(semester.season)
+    ? goodbyesStamp(calendar)
     : slotStampOf(
         save.date,
         save.time,
-        calendarOf(semester.season, semester.occasions),
+        calendar,
         slotWeather(semester.weather, save.date, save.time, save.graduationSeen)
       )
   return {
@@ -151,7 +153,7 @@ export async function coverGoodbyesCrossing(): Promise<boolean> {
   const raised = beginCrossing(undefined, {
     from: gameThemeNow(),
     to: 'night',
-    splash: goodbyesStamp(useGameStore.getState().calendar.season)
+    splash: goodbyesStamp(useGameStore.getState().calendar)
   })
   if (!raised) return false
   await untilPhase((phase) => phase === 'holding' || phase === 'idle')

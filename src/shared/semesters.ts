@@ -6,6 +6,7 @@ import type {
   CharProfile,
   CharState,
   ClassEntry,
+  FixedOccasionEdits,
   Occasion,
   PlaythroughRecord,
   Season,
@@ -70,15 +71,23 @@ export function breakDaysOf(season: Season): number {
   return semesterShiftOf(season) - FINAL_DATE
 }
 
-/** One semester's fixed calendar and the occasions it invented — every occasion read takes one. */
+/**
+ * One semester's fixed calendar, the changes it made to it and the occasions it invented — every
+ * occasion read takes one.
+ */
 export interface SemesterCalendar {
   readonly season: Season
   readonly generated: readonly Occasion[]
+  readonly fixedEdits: Readonly<FixedOccasionEdits>
 }
 
-/** The calendar of a semester whose season and generated occasions are these. */
-export function calendarOf(season: Season, generated: readonly Occasion[]): SemesterCalendar {
-  return { season, generated }
+/** The calendar of a semester whose season, generated occasions and fixed-occasion changes are these. */
+export function calendarOf(
+  season: Season,
+  generated: readonly Occasion[],
+  fixedEdits: Readonly<FixedOccasionEdits>
+): SemesterCalendar {
+  return { season, generated, fixedEdits }
 }
 
 /** One semester of a playthrough, read off its record the same way whichever semester it is. */
@@ -91,6 +100,9 @@ export interface SemesterView {
   alumni: string[]
   classes: Record<string, ClassEntry>
   occasions: Occasion[]
+  fixedEdits: FixedOccasionEdits
+  /** The random picks its New Game left masked. */
+  masked: string[]
   jobClosures: Record<string, ShiftSlot[]>
   weather: Weather[]
   profiles: Record<string, CharProfile>
@@ -122,6 +134,8 @@ export function semesterOf(record: PlaythroughRecord, id?: string): SemesterView
       alumni: [],
       classes: record.classes,
       occasions: record.occasions,
+      fixedEdits: record.fixedEdits ?? {},
+      masked: record.masked ?? [],
       jobClosures: record.jobClosures,
       weather: record.weather,
       profiles: record.profiles,
@@ -139,12 +153,21 @@ export function semesterOf(record: PlaythroughRecord, id?: string): SemesterView
     alumni: semester.alumni,
     classes: semester.classes,
     occasions: semester.occasions,
+    fixedEdits: semester.fixedEdits ?? {},
+    masked: semester.masked ?? [],
     jobClosures: semester.jobClosures,
     weather: semester.weather,
     profiles: semester.profiles,
     fallGraduate: semester.fallGraduate,
     ...names
   }
+}
+
+/** The calendar a semester of the record plays on. */
+export function semesterCalendarOf(
+  view: Pick<SemesterView, 'season' | 'occasions' | 'fixedEdits'>
+): SemesterCalendar {
+  return calendarOf(view.season, view.occasions, view.fixedEdits)
 }
 
 /** One semester of a chain, with how it ended where a later semester in the chain recorded it. */
@@ -172,6 +195,22 @@ export function semesterChain(record: PlaythroughRecord, id?: string): ChainedSe
       log: next === undefined ? null : (record.semesters?.[next]?.before ?? null)
     }
   })
+}
+
+/**
+ * The fixed-occasion changes a New Game+ for a `season` semester opens on: those of the newest
+ * semester of that season in the chain ending at `from`, none where there is none.
+ */
+export function carriedFixedEdits(
+  record: PlaythroughRecord,
+  from: string | undefined,
+  season: Season
+): FixedOccasionEdits {
+  const chain = semesterChain(record, from)
+  for (let i = chain.length - 1; i >= 0; i--) {
+    if (chain[i].view.season === season) return chain[i].view.fixedEdits
+  }
+  return {}
 }
 
 /**

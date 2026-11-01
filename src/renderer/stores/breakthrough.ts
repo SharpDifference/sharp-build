@@ -10,7 +10,8 @@ import { echoBreakthroughPrompt } from '../prompts/echoBreakthroughPrompt'
 import { echoBreakthroughAbility, ECHO_BREAKTHROUGH_OPTION, type EchoBreakthroughAspect } from '@shared/echoBreakthrough'
 import { optionOn } from '@vx/modkit/shared'
 import { useGameStore } from './gameStore'
-import { modIsOn, useModsStore } from './modsStore'
+import { useModsStore } from './modsStore'
+import { modIsOn } from '@vx/modkit/renderer'
 import { interjectOfferOf, replyRowOfferOf } from './loop/playback'
 
 type Game = ReturnType<typeof useGameStore.getState>

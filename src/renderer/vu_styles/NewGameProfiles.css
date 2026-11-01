@@ -1,0 +1,70 @@
+/* New Game's Profiles screen, in the entries panel (NewGameEntries.css, which draws its
+   sections): what a girl's pane adds to them, and the memories panel it opens (MemoryEdit.css's frame). Imported from the two view
+   modules, never from index.css. */
+
+/* ---- the pane --------------------------------------------------------------- */
+
+/* The milestone boxes, abreast as the grid's fields are. */
+.vu-profile-checks {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 14px 22px;
+}
+
+/* The memories pill with the count and the disposition they set beside it. */
+.vu-profile-memories {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px 20px;
+}
+
+/* A reading in the state voice: a count, or the disposition she opens the semester at. */
+.vu-profile-reading {
+  color: var(--vu-text-muted);
+  font: 700 13px var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.vu-profile-reading--on {
+  color: var(--vu-text);
+}
+
+/* ---- the memories panel ----------------------------------------------------- */
+
+/* One memory: the sentence row, its day after it, and the ✕ its hover raises on its end. */
+.vu-startmem-line {
+  position: relative;
+}
+
+.vu-startmem-line .vu-memrow {
+  padding-right: 70px;
+}
+
+/* The day, a pill standing on the field's first line as the sentence's other words do. */
+.vu-startmem-date {
+  flex: none;
+  justify-content: center;
+  min-width: 96px;
+  margin-top: 4px;
+}
+
+.vu-startmem-x {
+  position: absolute;
+  top: 18px;
+  right: 14px;
+}
+
+/* Add memory, and the disposition the rows set her at, over the foot. */
+.vu-startmem-tools {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 18px;
+}
+
+.vu-startmem-tools .vu-field-label {
+  margin-left: auto;
+}

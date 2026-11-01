@@ -1,0 +1,68 @@
+/* The date picker: the calendar's month frame with its day pane taken off, so the panel
+   narrows to the one column it holds. Imported from the view module, never from index.css; the
+   month, the grid, the cells and the legend are Calendar.css's. */
+.vu-cal--pick {
+  width: min(1240px, 100% - 60px);
+  padding-right: 60px;
+}
+
+/* A day of the range the pick may not take: as dim as a day outside it, and not a control, but
+   what is on it stays, so the player sees what holds it. */
+.vu-cal-cell--barred {
+  opacity: 0.38;
+}
+
+/* The slot picker's three ways to take the days, the palette at a reading's scale at the end of
+   the month's head, where the date picker stands its legend. */
+.vu-slot-halves {
+  width: 330px;
+  margin-left: auto;
+}
+
+.vu-slot-halves .vu-palette-btn {
+  height: 58px;
+  gap: 4px;
+}
+
+.vu-slot-mark {
+  display: flex;
+  gap: 3px;
+}
+
+.vu-slot-mark svg {
+  display: block;
+  width: 20px;
+  height: 20px;
+}
+
+/* A day's two halves at its foot, the day half beside the night half: dim at rest,
+   filled in the accent where the run takes them, so the slots an occasion holds are read off the
+   grid. */
+.vu-slot-pair {
+  display: flex;
+  flex: none;
+  gap: 4px;
+  margin-top: auto;
+}
+
+.vu-slot-half {
+  display: flex;
+  flex: 1;
+  justify-content: center;
+  padding: 2px 0;
+  border-radius: 999px;
+  color: var(--vu-text-muted);
+  opacity: 0.45;
+}
+
+.vu-slot-half--on {
+  background: var(--vu-accent);
+  color: var(--vu-accent-ink);
+  opacity: 1;
+}
+
+.vu-slot-half svg {
+  display: block;
+  width: 12px;
+  height: 12px;
+}

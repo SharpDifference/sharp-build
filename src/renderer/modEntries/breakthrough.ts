@@ -2,7 +2,7 @@ import { BREAKTHROUGH_MOD } from '../../shared/breakthrough'
 import { breakthroughContinuity } from '../prompts/breakthroughPrompt'
 import { settleSpirit } from '../stores/breakthrough'
 import { useGameStore } from '../stores/gameStore'
-import { registerHooks } from '../mods/hooks'
+import { registerHooks } from '@vx/modkit/renderer'
 
 registerHooks(BREAKTHROUGH_MOD, {
   prompts: {

@@ -25,7 +25,7 @@ import { gestures, lift, panelUnderTab, press, veilIn } from './motion'
 import '../vu_styles/SceneCreator.css'
 
 /** What each box says, her name standing in where the milestone is hers or his. */
-function milestoneLabel(key: SceneMilestone, name: string): string {
+export function milestoneLabel(key: SceneMilestone, name: string): string {
   switch (key) {
     case 'met':
       return `Met before`

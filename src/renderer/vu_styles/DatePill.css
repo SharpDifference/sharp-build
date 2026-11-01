@@ -1,0 +1,6 @@
+/* A date a pill opens the picker on, at a field's height. */
+.vu-date-pill {
+  justify-content: center;
+  min-width: 170px;
+  height: 52px;
+}

@@ -75,9 +75,12 @@ describe('withSecretTold', () => {
 describe('validateSecretDraft', () => {
   const sara = character({ firstName: 'Sara', lastName: 'Lee' })
   const mia = character({ charId: 'mia', firstName: 'Mia', lastName: 'Park' })
+  const ivy = character({ charId: 'ivy', firstName: 'Ivy', lastName: 'Cole' })
   const entries = [
     { character: sara, tiers: ['friendly', 'trusted', 'devoted'] as const, held: [] },
-    { character: mia, tiers: ['devoted'] as const, held: ['Mia is afraid of birds.'] }
+    { character: mia, tiers: ['devoted'] as const, held: ['Mia is afraid of birds.'] },
+    // The player wrote her friendly secret, so only the two above it are asked.
+    { character: ivy, tiers: ['devoted', 'trusted'] as const, held: ['Ivy juggles.'] }
   ]
 
   it('keeps each tier written, closed with a stop, and drops a blank one', () => {
@@ -92,10 +95,11 @@ describe('validateSecretDraft', () => {
             devoted: 'Sara lied.'
           }
         ],
-        returning: [
+        devoted: [
           { key: charKeyOf('Mia', 'Park'), devoted: 'Mia has a twin' },
           { key: 'nobody', devoted: 'x' }
-        ]
+        ],
+        trusted_devoted: [{ key: charKeyOf('Ivy', 'Cole'), trusted: 'Ivy lied.', devoted: 'Ivy left.' }]
       },
       entries
     )
@@ -105,6 +109,10 @@ describe('validateSecretDraft', () => {
     ])
     expect(secrets[charKeyOf('Mia', 'Park')]).toEqual([
       { text: 'Mia has a twin.', tier: 'devoted' }
+    ])
+    expect(secrets[charKeyOf('Ivy', 'Cole')]).toEqual([
+      { text: 'Ivy lied.', tier: 'trusted' },
+      { text: 'Ivy left.', tier: 'devoted' }
     ])
   })
 

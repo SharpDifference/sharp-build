@@ -6,7 +6,7 @@ import { FINAL_DATE, TIME_SLOTS } from '@shared/classes'
 import { jobDefOf, shiftSlotOf, WEEK_COLUMNS, WEEK_DAY_HEADERS } from '@shared/jobs'
 import type { GameReplays } from '@shared/replays'
 import {
-  calendarOf,
+  semesterCalendarOf,
   semesterName,
   type SemesterCalendar,
   type SemesterView
@@ -300,7 +300,7 @@ export function CalendarModal({
     earlierSemesters().map(({ view, log }) => ({
       view,
       log,
-      calendar: calendarOf(view.season, view.occasions)
+      calendar: semesterCalendarOf(view)
     }))
   )
 

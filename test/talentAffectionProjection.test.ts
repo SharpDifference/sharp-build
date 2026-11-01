@@ -1,3 +1,4 @@
+import './fixtures/maestroModelKit'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { normalizeTalents } from '@shared/campusTalents'
 import { echoAffinity, normalizeEcho } from '@shared/echo'

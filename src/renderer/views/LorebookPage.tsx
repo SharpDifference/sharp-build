@@ -16,10 +16,13 @@ import { bgThumbUrl } from './bgAssets'
 import { dealt, gestures, quietLift, quietPress, rowLift, rowPress, slideInQuick } from './motion'
 import { PlusIcon } from './screenIcons'
 import { TextEditModal } from './TextEditModal'
+import '../vu_styles/Bunnyboard.css'
 import '../vu_styles/Lorebook.css'
 
 export interface LorebookPageProps {
   theme: 'day' | 'night'
+  /** Whether the setting opens from a pill here; New Game's Setting screen has a tab of its own for it. */
+  settingPill?: boolean
 }
 
 /** The list dealing itself in, on the tab pages' own clock. Module scope. */
@@ -46,6 +49,8 @@ function SettingModal({
   onClose: () => void
 }): JSX.Element | null {
   const setting = useLorebookStore((s) => s.setting)
+  // The lorebook this editor opened on; a save after a reload or an import lands nothing.
+  const [revision] = useState(() => useLorebookStore.getState().revision)
   return (
     <TextEditModal
       theme={theme}
@@ -56,7 +61,7 @@ function SettingModal({
       discardMessage="The setting has not been saved."
       stored={setting}
       shipped={SETTING}
-      save={(value) => useLorebookStore.getState().editSetting(value)}
+      save={(value) => useLorebookStore.getState().editSetting(value, revision)}
       onClose={onClose}
     />
   )
@@ -240,6 +245,8 @@ function LoreEditor({
           onChange={(next) => {
             setText(next)
             textRef.current = next
+            // An entry already made keeps its words as they are typed; a new one is made on leaving.
+            if (handleRef.current !== null && !loreTextProblem(next)) save({ text: next })
           }}
           onBlur={() => {
             if (!loreTextProblem(textRef.current)) save({ text: textRef.current })
@@ -341,7 +348,7 @@ function LoreEditor({
  * the one picked open for editing beside it, the setting opened over it from a pill, and the
  * lorebook's way in and out as a SillyTavern World Info file.
  */
-export function LorebookPage({ theme }: LorebookPageProps): JSX.Element {
+export function LorebookPage({ theme, settingPill = true }: LorebookPageProps): JSX.Element {
   const status = useLorebookStore((s) => s.status)
   const book = useLorebookStore((s) => s.book)
   const record = useLorebookStore((s) => s.record)
@@ -406,20 +413,22 @@ export function LorebookPage({ theme }: LorebookPageProps): JSX.Element {
                   <PlusIcon size={14} />
                   New entry
                 </motion.button>
-                <div className="vu-lore-setting">
-                  <motion.button
-                    id="lore-setting"
-                    className="vu-pill"
-                    type="button"
-                    {...gestures(false, quietLift, quietPress)}
-                    onClick={() => setEditingSetting(true)}
-                  >
-                    Edit setting
-                  </motion.button>
-                  {record.setting !== undefined && (
-                    <span className="vu-sticker vu-lore-sticker">Edited</span>
-                  )}
-                </div>
+                {settingPill && (
+                  <div className="vu-lore-setting">
+                    <motion.button
+                      id="lore-setting"
+                      className="vu-pill"
+                      type="button"
+                      {...gestures(false, quietLift, quietPress)}
+                      onClick={() => setEditingSetting(true)}
+                    >
+                      Edit setting
+                    </motion.button>
+                    {record.setting !== undefined && (
+                      <span className="vu-sticker vu-lore-sticker">Edited</span>
+                    )}
+                  </div>
+                )}
               </div>
             )}
             <div className="vu-bb-scroll vu-lore-scroll">

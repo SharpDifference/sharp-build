@@ -1,3 +1,4 @@
+import './fixtures/maestroModelKit'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { editStoryEncounter, formatStoryRecall, normalizeStoryMemory, storySnapshot, type StoryFact } from '@shared/storyMemory'
 import type { SaveDraft } from '@shared/types'

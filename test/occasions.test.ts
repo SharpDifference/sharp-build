@@ -5,6 +5,9 @@ import {
   breakWeekOf,
   classSlotOf,
   FINALS_WEEK,
+  fixedOccasionMoves,
+  fixedOccasionsOf,
+  keptFixedEdits,
   meetingDatesOf,
   midtermWeekOf,
   occasionLeadUpLines,
@@ -12,16 +15,14 @@ import {
   hauntClosedOn,
   jobClosedOn,
   staticOccasionsOf,
-  weekOf
+  weekOf,
+  withFixedEdit
 } from '../src/renderer/prompts/occasions'
-import {
-  normalizeOccasions,
-  planOccasionSlots,
-  type OccasionRequest
-} from '../src/renderer/prompts/occasionPrompt'
-import type { Occasion, Season, TimeSlot } from '@shared/types'
+import { normalizeOccasions, planOccasionSlots } from '../src/renderer/prompts/occasionPrompt'
+import type { PlannedOccasion } from '@shared/application'
+import type { FixedOccasionEdits, Occasion, Season, TimeSlot } from '@shared/types'
 
-const SPRING = calendarOf('spring', [])
+const SPRING = calendarOf('spring', [], {})
 const MIDTERM_WEEK = midtermWeekOf('spring')
 const SPRING_BREAK = breakWeekOf('spring')
 const STATIC_OCCASIONS = staticOccasionsOf('spring')
@@ -138,7 +139,7 @@ describe('hauntClosedOn', () => {
 })
 
 describe.each(['spring', 'fall'] as const)('planOccasionSlots in a %s', (season: Season) => {
-  const calendar = calendarOf(season, [])
+  const calendar = calendarOf(season, [], {})
   const breakWeek = breakWeekOf(season)
   const breakId = season === 'spring' ? 'spring-break' : 'thanksgiving-break'
   /** Which weeks the fixed calendar touches at all — the four named events' bar. */
@@ -158,7 +159,7 @@ describe.each(['spring', 'fall'] as const)('planOccasionSlots in a %s', (season:
     for (let run = 0; run < 60; run++) {
       const requests = planOccasionSlots(
         (n) => Array.from({ length: n }, (_, i) => `word${i}`),
-        season
+        calendarOf(season, [], {})
       )
       const ids = requests.map((r) => r.id)
       expect(new Set(ids).size).toBe(ids.length)
@@ -213,7 +214,7 @@ describe('occasionLeadUpLines', () => {
   const D = 20
 
   it('leads a night occasion up in the day before it, and in no other slot', () => {
-    const gala = calendarOf('spring', [generatedOccasion('gala', 'Gala', D, D, 1)])
+    const gala = calendarOf('spring', [generatedOccasion('gala', 'Gala', D, D, 1)], {})
     expect(announces(occasionLeadUpLines(D, 0, gala), 'Gala')).toBe(true)
     expect(announces(occasionLeadUpLines(D, 1, gala), 'Gala')).toBe(false)
     expect(announces(occasionLeadUpLines(D - 1, 1, gala), 'Gala')).toBe(false)
@@ -221,14 +222,14 @@ describe('occasionLeadUpLines', () => {
   })
 
   it('leads a day occasion up in the night before it, and in no other slot', () => {
-    const fair = calendarOf('spring', [generatedOccasion('career-fair', 'Career Fair', D, D, 0)])
+    const fair = calendarOf('spring', [generatedOccasion('career-fair', 'Career Fair', D, D, 0)], {})
     expect(announces(occasionLeadUpLines(D - 1, 1, fair), 'Career Fair')).toBe(true)
     expect(announces(occasionLeadUpLines(D - 1, 0, fair), 'Career Fair')).toBe(false)
     expect(announces(occasionLeadUpLines(D, 0, fair), 'Career Fair')).toBe(false)
   })
 
   it('leads a whole-day occasion up in both slots of the day before', () => {
-    const dance = calendarOf('spring', [generatedOccasion('dance', 'Dance', D, D, null)])
+    const dance = calendarOf('spring', [generatedOccasion('dance', 'Dance', D, D, null)], {})
     expect(announces(occasionLeadUpLines(D - 1, 0, dance), 'Dance')).toBe(true)
     expect(announces(occasionLeadUpLines(D - 1, 1, dance), 'Dance')).toBe(true)
     expect(announces(occasionLeadUpLines(D - 2, 0, dance), 'Dance')).toBe(false)
@@ -237,7 +238,7 @@ describe('occasionLeadUpLines', () => {
   })
 
   it('leads a three-day run up for the three days before it', () => {
-    const fest = calendarOf('spring', [generatedOccasion('concert', 'Fest', D, D + 2, null)])
+    const fest = calendarOf('spring', [generatedOccasion('concert', 'Fest', D, D + 2, null)], {})
     for (const date of [D - 3, D - 2, D - 1]) {
       expect(announces(occasionLeadUpLines(date, 0, fest), 'Fest')).toBe(true)
       expect(announces(occasionLeadUpLines(date, 1, fest), 'Fest')).toBe(true)
@@ -250,7 +251,7 @@ describe('occasionLeadUpLines', () => {
   it('leads up nothing that is announced elsewhere', () => {
     const week = calendarOf('spring', [
       generatedOccasion('midterm-week', 'Fixture Midterms', D, D + 4, null)
-    ])
+    ], {})
     expect(announces(occasionLeadUpLines(D - 1, 0, week), 'Fixture Midterms')).toBe(false)
     expect(announces(occasionLeadUpLines(D - 1, 1, week), 'Fixture Midterms')).toBe(false)
     expect(
@@ -260,7 +261,7 @@ describe('occasionLeadUpLines', () => {
 })
 
 describe('normalizeOccasions', () => {
-  const request: OccasionRequest = {
+  const request: PlannedOccasion = {
     id: 'gala',
     startDate: 12,
     endDate: 13,
@@ -308,5 +309,75 @@ describe('normalizeOccasions', () => {
       [request]
     )
     expect(occasion.cancelsClasses).toBe(false)
+  })
+})
+
+/**
+ * A semester keeps its changes to the fixed occasions and every calendar read lays them over the
+ * build: a move the rules refuse must read as the build's, or a day off could take a class's only
+ * exam meeting or shadow a break, and a run could spill onto graduation day.
+ */
+describe('fixed occasion edits', () => {
+  it('moves a holiday whole and keeps only what differs from the build', () => {
+    const fest = occasionById('selkie-beach-party')
+    const edits: FixedOccasionEdits = {
+      'selkie-beach-party': { startDate: 95, title: '  Selkie Fest  ', description: '' },
+      valentines: { startDate: occasionById('valentines').startDate, title: "Valentine's Day" },
+      'no-such-day': { title: 'Nothing' },
+      'april-fools': null as unknown as FixedOccasionEdits[string]
+    }
+    expect(keptFixedEdits('spring', edits)).toEqual({
+      'selkie-beach-party': { startDate: 95, title: 'Selkie Fest' }
+    })
+    const moved = fixedOccasionsOf('spring', edits).find((o) => o.id === 'selkie-beach-party')
+    expect(moved).toMatchObject({
+      startDate: 95,
+      endDate: 95 + fest.endDate - fest.startDate,
+      title: 'Selkie Fest',
+      description: fest.description
+    })
+  })
+
+  it('reads a move the rules refuse as the build’s day', () => {
+    const refused: [Season, string, number][] = [
+      ['spring', 'midterm-week', 63],
+      ['spring', 'mothers-day', FINAL_DATE],
+      ['spring', 'selkie-beach-party', FINAL_DATE - 2],
+      ['spring', 'good-friday', MIDTERM_WEEK.startDate + 2],
+      ['spring', 'good-friday', FINALS_WEEK.startDate],
+      ['spring', 'thorne-day', 61],
+      ['spring', 'presidents-day', 57],
+      ['spring', 'presidents-day', occasionById('reading-day').startDate],
+      ['spring', 'presidents-day', SPRING_BREAK.startDate],
+      ['fall', 'labor-day', 56]
+    ]
+    for (const [season, id, startDate] of refused) {
+      expect(fixedOccasionMoves(season, id, startDate)).toBe(false)
+      expect(keptFixedEdits(season, { [id]: { startDate } })).toEqual({})
+      const shipped = staticOccasionsOf(season).find((o) => o.id === id)
+      const read = fixedOccasionsOf(season, { [id]: { startDate } }).find((o) => o.id === id)
+      expect(read?.startDate).toBe(shipped?.startDate)
+    }
+    expect(fixedOccasionMoves('spring', 'good-friday', 64)).toBe(true)
+    expect(fixedOccasionMoves('fall', 'labor-day', 28)).toBe(true)
+  })
+
+  it('takes a holiday or a day off off the semester, its other changes kept, and never the days it is built around', () => {
+    const edits: FixedOccasionEdits = {
+      'presidents-day': { removed: true, title: 'Gone' },
+      'midterm-week': { removed: true }
+    }
+    expect(keptFixedEdits('spring', edits)).toEqual({
+      'presidents-day': { removed: true, title: 'Gone' }
+    })
+    const ids = fixedOccasionsOf('spring', edits).map((o) => o.id)
+    expect(ids).not.toContain('presidents-day')
+    expect(ids).toContain('midterm-week')
+    // Presidents' Day is a Monday: with it gone, Monday's classes meet.
+    expect(classSlotOf(28, 0, calendarOf('spring', [], edits))).not.toBeNull()
+
+    const off = withFixedEdit('spring', undefined, 'presidents-day', { removed: true })
+    expect(off).toEqual({ 'presidents-day': { removed: true } })
+    expect(withFixedEdit('spring', off, 'presidents-day', { removed: undefined })).toBeUndefined()
   })
 })

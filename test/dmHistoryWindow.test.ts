@@ -22,7 +22,7 @@ function state(historyLimit?: number): TextingPromptState {
   return {
     historyLimit, date: 7, time: 0, roster: [], lorebook: [], charInfo: {},
     npcRelationships: {}, classes: {}, playerSchedule: {}, classRosters: {},
-    playerJob: null, calendar: { season: 'fall', generated: [] }, memoryBudget: 10, history: {}
+    playerJob: null, calendar: { season: 'fall', generated: [], fixedEdits: {} }, memoryBudget: 10, history: {}
   }
 }
 

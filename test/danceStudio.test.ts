@@ -1,3 +1,4 @@
+import './fixtures/maestroModelKit'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { availableJobs, jobDefOf, meetsRequirements, newJobState, payOf, shiftRecordOf, unmetSkillRequirements } from '@shared/jobs'
 import { ACTIVITY_LOCATIONS, FUN_LOCATIONS, isLocationOpen, locationDefOf } from '@shared/locations'

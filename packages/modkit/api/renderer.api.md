@@ -203,6 +203,11 @@ export function hasTexted(conversation: Conversation | undefined): boolean;
 export function HeartIcon(input?: MarkProps): JSX.Element;
 
 // @public
+export function invoke<T>(modId: string, name: string, args: unknown[], options?: {
+    signal?: AbortSignal;
+}): Promise<Result<T>>;
+
+// @public
 export function isFeedContact(info: CharInfo | undefined): boolean;
 
 // @public
@@ -867,6 +872,7 @@ export function SelectField(input: SelectFieldProps): JSX.Element;
 
 // @public (undocumented)
 export interface SelectFieldOption {
+    disabled?: boolean;
     // (undocumented)
     label: string;
     // (undocumented)

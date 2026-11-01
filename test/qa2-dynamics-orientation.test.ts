@@ -1,3 +1,4 @@
+import './fixtures/maestroModelKit'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { CharacterDynamics } from '@shared/characterDynamics'
 import type { StructuredRequest } from '@shared/types'

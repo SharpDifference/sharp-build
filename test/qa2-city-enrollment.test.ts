@@ -25,7 +25,7 @@ it('keeps resumed generated assignments coherent with the recorded location swit
   expect(cityLifeLocationsOn()).toBe(true)
   const girl = character({ charId: 'a' })
   const generated = validateProfileDraft({ characters: [{
-    key: 'sarah_rose', year: 2, classesTaken: 4, dorm: 'lowrise_1',
+    key: 'sarah_rose', year: 2, major: 'Art', majorClassesTaken: 1, classesTaken: 4, dorm: 'lowrise_1',
     job: 'ex_bowling', jobShifts: 2, homeSlots: 1, study: '',
     fun: ['roller_skating'], activity: '', activityLocation: '', meal: '',
     handle: 'sarahrose', winterPosts: [], springBreakPlans: 'Go home.'

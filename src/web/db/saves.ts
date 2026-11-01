@@ -1,4 +1,5 @@
 import type { IDBPTransaction } from 'idb'
+import type { Application, ApplicationDraft, KeptApplication } from '@shared/application'
 import { appError } from '@shared/errors'
 import { validateRecord } from '@shared/jsonValidate'
 import {
@@ -11,6 +12,11 @@ import {
 } from '@shared/replays'
 import { hasSemester, recordReplayIds, SEMESTER_NOT_FOUND, semesterOf } from '@shared/semesters'
 import {
+  APPLICATION_INVALID,
+  APPLICATION_NOT_FOUND,
+  APPLICATION_PLAYTHROUGH_GONE,
+  APPLICATION_SETTLED,
+  applicationSummary,
   assertManualSlot,
   assertSafePlaythroughId,
   assertSafeSaveId,
@@ -23,19 +29,23 @@ import {
   isSlotSaveId,
   listedSaveIds,
   manualSaveId,
+  maskedField,
   mintId,
   playthroughLabel,
   prunedSlotIds,
+  readApplicationRecord,
   RECORD_NOT_FOUND,
   RECORD_READ,
   renamedRecord,
   SAFE_NUMERIC_ID,
   SAVE_NOT_FOUND,
   SAVE_READ,
+  stampApplication,
   stampEnrollment,
   stampRecord,
   stampSave,
   summaryOf,
+  withApplication,
   withPlaythroughName,
   withRegistration,
   type SaveIdGroups
@@ -68,9 +78,10 @@ import {
 } from './open'
 
 /**
- * Saves, playthrough records and enrollments in the browser's storage. One row per playthrough
- * holds its record or the enrollment standing in for one, and every save is its own row under
- * a `[playthroughId, saveId]` key.
+ * Saves, playthrough records, enrollments and applications in the browser's storage. One row per
+ * playthrough holds its record or the enrollment standing in for one, a New Game still being set
+ * up is a row of its own beside an empty playthrough row, and every save is its own row under a
+ * `[playthroughId, saveId]` key.
  */
 
 /** The row one playthrough keeps, or `null` where there is none. */
@@ -116,6 +127,18 @@ export async function readEnrollment(playthroughId: string): Promise<Enrollment>
   return validateRecord<Enrollment>(enrollment, playthroughId, ENROLLMENT_READ)
 }
 
+/** Reads and validates the New Game in progress kept for one playthrough. */
+export async function readApplication(playthroughId: string): Promise<Application> {
+  assertSafePlaythroughId(playthroughId)
+  const application = await storage('read the new game in progress', async () =>
+    (await database()).get('applications', playthroughId)
+  )
+  if (application === undefined) {
+    throw appError(APPLICATION_NOT_FOUND.code, APPLICATION_NOT_FOUND.message, playthroughId)
+  }
+  return readApplicationRecord(application, playthroughId)
+}
+
 /** Reads and validates one save; where it was found wins over what it carries. */
 export async function loadSave(playthroughId: string, saveId: string): Promise<GameSave> {
   assertSafePlaythroughId(playthroughId)
@@ -148,6 +171,21 @@ function registrationIn(row: PlaythroughRow, playthroughId: string): Enrollment 
     return validateRecord<Enrollment>(row.enrollment, playthroughId, ENROLLMENT_READ)
   } catch (err) {
     console.warn(`[saves] ${playthroughId}'s class registration is unreadable:`, err)
+    return null
+  }
+}
+
+/**
+ * The New Game in progress kept beside a playthrough's saves, or null; one that cannot be read is
+ * passed over, the saves beside it still standing for the playthrough.
+ */
+async function applicationBeside(playthroughId: string): Promise<Application | null> {
+  try {
+    return await readApplication(playthroughId)
+  } catch (err) {
+    if ((err as AppError).code !== APPLICATION_NOT_FOUND.code) {
+      console.warn(`[saves] ${playthroughId}'s new game in progress is unreadable:`, err)
+    }
     return null
   }
 }
@@ -197,7 +235,8 @@ async function newestSave(
 /**
  * Lists every playthrough in creation order, each summarised from its newest readable save of
  * any kind; one with no readable save is listed with the reason instead, and one with no save
- * at all from the enrollment waiting in it. A row holding neither is skipped.
+ * at all from the enrollment waiting in it, or failing that the New Game in progress. A row
+ * holding none of them is skipped.
  */
 export async function listPlaythroughs(): Promise<PlaythroughSummary[]> {
   const summaries: PlaythroughSummary[] = []
@@ -220,25 +259,51 @@ export async function listPlaythroughs(): Promise<PlaythroughSummary[]> {
     }
 
     // Nothing has been played yet: the row stands for the semester still at the registrar,
-    // opening where every playthrough does, or for nothing at all.
+    // opening where every playthrough does, for the New Game still being set up, or for nothing
+    // at all.
     if (saveIds.length === 0) {
       try {
         const enrollment = await readEnrollment(playthroughId)
         const semesterIndex = enrollment.continued?.index ?? 0
-        summaries.push({
-          ...base,
-          enrolling: true,
-          chars: enrollment.chars,
-          date: FIRST_SLOT.date,
-          time: FIRST_SLOT.time,
-          ...(semesterIndex > 0
-            ? { semesterIndex, registration: { savedAt: enrollment.savedAt, semesterIndex } }
-            : {}),
-          savedAt: enrollment.savedAt,
-          unloadable: null
-        })
+        // A later semester's New Game written after the registration stands over it.
+        summaries.push(
+          withApplication(
+            {
+              ...base,
+              enrolling: true,
+              chars: enrollment.chars,
+              ...maskedField(enrollment.chars, enrollment.masked),
+              date: FIRST_SLOT.date,
+              time: FIRST_SLOT.time,
+              ...(semesterIndex > 0
+                ? { semesterIndex, registration: { savedAt: enrollment.savedAt, semesterIndex } }
+                : {}),
+              savedAt: enrollment.savedAt,
+              unloadable: null
+            },
+            await applicationBeside(playthroughId),
+            await readPlaythroughRecord(playthroughId).catch(() => null),
+            enrollment.continued?.id
+          )
+        )
       } catch (err) {
-        if ((err as AppError).code === 'ENROLLMENT_NOT_FOUND') continue
+        if ((err as AppError).code === ENROLLMENT_NOT_FOUND.code) {
+          try {
+            summaries.push(applicationSummary(base, await readApplication(playthroughId)))
+          } catch (applicationErr) {
+            if ((applicationErr as AppError).code === APPLICATION_NOT_FOUND.code) continue
+            summaries.push({
+              ...base,
+              applying: true,
+              chars: [],
+              date: FIRST_SLOT.date,
+              time: FIRST_SLOT.time,
+              savedAt: row.createdAt,
+              unloadable: (applicationErr as AppError).message
+            })
+          }
+          continue
+        }
         summaries.push({
           ...base,
           enrolling: true,
@@ -267,28 +332,38 @@ export async function listPlaythroughs(): Promise<PlaythroughSummary[]> {
     if (!reason) reason = newest.reason
     // The roster and the semester the newest save is in.
     const semester = newest.save && record ? semesterOf(record, newest.save.semester) : null
+    const registration = registrationIn(row, playthroughId)
     summaries.push(
-      withRegistration(
-        newest.save
-          ? {
-              ...named,
-              chars: semester?.chars ?? [],
-              date: newest.save.date,
-              time: newest.save.time,
-              ...(semester && semester.index > 0 ? { semesterIndex: semester.index } : {}),
-              savedAt: newest.save.saveDate,
-              // A refused record outranks a readable save: without it nothing resolves.
-              unloadable: record ? null : reason
-            }
-          : {
-              ...named,
-              chars: [],
-              date: 0,
-              time: 0,
-              savedAt: row.createdAt,
-              unloadable: reason
-            },
-        registrationIn(row, playthroughId)
+      withApplication(
+        withRegistration(
+          newest.save
+            ? {
+                ...named,
+                chars: semester?.chars ?? [],
+                // A pick New Game left masked stays masked until she has been met.
+                ...(semester
+                  ? maskedField(semester.chars, semester.masked, newest.save.charInfo)
+                  : {}),
+                date: newest.save.date,
+                time: newest.save.time,
+                ...(semester && semester.index > 0 ? { semesterIndex: semester.index } : {}),
+                savedAt: newest.save.saveDate,
+                // A refused record outranks a readable save: without it nothing resolves.
+                unloadable: record ? null : reason
+              }
+            : {
+                ...named,
+                chars: [],
+                date: 0,
+                time: 0,
+                savedAt: row.createdAt,
+                unloadable: reason
+              },
+          registration
+        ),
+        await applicationBeside(playthroughId),
+        record,
+        registration?.continued?.id
       )
     )
   }
@@ -342,23 +417,139 @@ async function mintPlaythroughId(): Promise<string> {
 }
 
 /**
+ * Keeps the New Game in progress: a first semester's first write mints a playthrough row to hold
+ * it, and a later one names that playthrough and replaces it. A playthrough that is gone, or that
+ * has already become a registration or a record, is refused and nothing is written. A later
+ * semester's is written only beside its playthrough's record, and refused once that semester is
+ * on the record or at the registrar.
+ */
+export async function writeApplication(
+  draft: ApplicationDraft,
+  playthroughId?: string
+): Promise<KeptApplication> {
+  const now = Date.now()
+  // Checked before any transaction opens, which an await outside the database would close.
+  const application = readApplicationRecord(
+    stampApplication(draft, now),
+    'application',
+    APPLICATION_INVALID
+  )
+  const semesterId = application.continued?.id
+
+  if (playthroughId === undefined) {
+    if (semesterId !== undefined) {
+      throw appError(
+        APPLICATION_INVALID.code,
+        APPLICATION_INVALID.message,
+        "application: a later semester's application needs its playthrough"
+      )
+    }
+    const minted = await mintPlaythroughId()
+    await storage('save the new game in progress', async () => {
+      const tx = (await database()).transaction(['playthroughs', 'applications'], 'readwrite')
+      // Both puts are database requests, so the transaction is still open for the second.
+      const row = { record: null, enrollment: null, createdAt: now }
+      void tx.objectStore('playthroughs').put(row, minted)
+      void tx.objectStore('applications').put(application, minted)
+      await tx.done
+    })
+    return { playthroughId: minted, application }
+  }
+
+  assertSafePlaythroughId(playthroughId)
+  const outcome = await storage('save the new game in progress', async () => {
+    const tx = (await database()).transaction(['playthroughs', 'applications'], 'readwrite')
+    const row = await tx.objectStore('playthroughs').get(playthroughId)
+    // A later semester's belongs beside a record; a first semester's, beside nothing settled.
+    if (!row || (semesterId !== undefined && !row.record)) {
+      await tx.done
+      return 'gone' as const
+    }
+    const settled =
+      semesterId === undefined
+        ? Boolean(row.record || row.enrollment)
+        : Boolean(row.record?.semesters?.[semesterId]) ||
+          row.enrollment?.continued?.id === semesterId
+    if (settled) {
+      await tx.done
+      return 'settled' as const
+    }
+    void tx.objectStore('applications').put(application, playthroughId)
+    await tx.done
+    return 'kept' as const
+  })
+  if (outcome === 'gone') {
+    throw appError(
+      APPLICATION_PLAYTHROUGH_GONE.code,
+      APPLICATION_PLAYTHROUGH_GONE.message,
+      playthroughId
+    )
+  }
+  if (outcome === 'settled') {
+    throw appError(APPLICATION_SETTLED.code, APPLICATION_SETTLED.message, playthroughId)
+  }
+  return { playthroughId, application }
+}
+
+/**
  * Writes a semester that has no timetable yet, so the registrar offering it can be left and
- * come back to: a first semester into a row of its own, a next one beside the record of the
- * playthrough `playthroughId` names, replacing any registration already waiting there.
+ * come back to: a first semester into a row of its own, or into the playthrough
+ * `playthroughId` names where its New Game in progress is replaced by it, and a next one beside
+ * the record of the playthrough `playthroughId` names, replacing any registration waiting there
+ * and the New Game in progress set up for the same semester.
  */
 export async function writeEnrollment(
   draft: EnrollmentDraft,
   playthroughId?: string
 ): Promise<CreatedEnrollment> {
+  if (playthroughId !== undefined && draft.continued === undefined) {
+    assertSafePlaythroughId(playthroughId)
+    const enrollment = stampEnrollment(draft, Date.now())
+    const outcome = await storage('save the class registration', async () => {
+      const tx = (await database()).transaction(['playthroughs', 'applications'], 'readwrite')
+      const row = await tx.objectStore('playthroughs').get(playthroughId)
+      if (!row) {
+        await tx.done
+        return 'gone' as const
+      }
+      if (row.record) {
+        await tx.done
+        return 'begun' as const
+      }
+      // Both are database requests, so the registration and the removal land together.
+      void tx.objectStore('playthroughs').put({ ...row, enrollment }, playthroughId)
+      void tx.objectStore('applications').delete(playthroughId)
+      await tx.done
+      return 'kept' as const
+    })
+    if (outcome === 'gone') {
+      throw appError(
+        'ENROLLMENT_PLAYTHROUGH_GONE',
+        'That playthrough no longer exists.',
+        playthroughId
+      )
+    }
+    if (outcome === 'begun') {
+      throw appError('PLAYTHROUGH_EXISTS', 'That playthrough has already begun.', playthroughId)
+    }
+    return { playthroughId, enrollment }
+  }
   if (playthroughId !== undefined) {
     assertSafePlaythroughId(playthroughId)
     const enrollment = stampEnrollment(draft, Date.now())
+    const semesterId = draft.continued?.id
     const written = await storage('save the class registration', async () => {
-      const tx = (await database()).transaction('playthroughs', 'readwrite')
-      const row = await tx.store.get(playthroughId)
+      const tx = (await database()).transaction(['playthroughs', 'applications'], 'readwrite')
+      const row = await tx.objectStore('playthroughs').get(playthroughId)
       // A next semester belongs to a playthrough that has begun.
       if (!row?.record) return false
-      await tx.store.put({ ...row, enrollment }, playthroughId)
+      const waiting = await tx.objectStore('applications').get(playthroughId)
+      // Both are database requests, so the registration and the removal land together.
+      void tx.objectStore('playthroughs').put({ ...row, enrollment }, playthroughId)
+      // The New Game in progress this semester was set up on is spent.
+      if (semesterId !== undefined && waiting?.continued?.id === semesterId) {
+        void tx.objectStore('applications').delete(playthroughId)
+      }
       await tx.done
       return true
     })
@@ -378,7 +569,7 @@ export async function writeEnrollment(
 /**
  * Starts a new playthrough: its record and its opening slot-save, into the row its enrollment
  * minted or a freshly minted one. The record replaces the enrollment in the same put, so the
- * two are never both there and never both gone.
+ * two are never both there and never both gone, and a stray application goes with it.
  */
 export async function createPlaythrough(
   playthrough: PlaythroughDraft,
@@ -397,7 +588,10 @@ export async function createPlaythrough(
   const save = stampSave(draft, folder, folder, Date.now())
 
   const started = await storage('start the playthrough', async () => {
-    const tx = (await database()).transaction(['playthroughs', 'saves'], 'readwrite')
+    const tx = (await database()).transaction(
+      ['playthroughs', 'saves', 'applications'],
+      'readwrite'
+    )
     // A row whose playthrough has already begun is never written over.
     const existing = await tx.objectStore('playthroughs').get(folder)
     if (existing?.record) {
@@ -410,6 +604,8 @@ export async function createPlaythrough(
     // Both puts are database requests, so the transaction is still open for the second.
     void tx.objectStore('playthroughs').put({ record, enrollment: null, createdAt }, folder)
     void tx.objectStore('saves').put(save, [folder, folder])
+    // A stray application goes with the enrollment it was spent for.
+    void tx.objectStore('applications').delete(folder)
     await tx.done
     return true
   })
@@ -701,18 +897,27 @@ export async function renamePlaythrough(playthroughId: string, name: string): Pr
 }
 
 /**
- * Deletes a whole playthrough: its row, every save and replay in it, its lorebook and both of
- * its pictures.
+ * Deletes a whole playthrough: its row, every save and replay in it, its lorebook,
+ * its New Game in progress and both of its pictures.
  */
 export async function deletePlaythrough(playthroughId: string): Promise<void> {
   assertSafePlaythroughId(playthroughId)
 
   await storage('delete the playthrough', async () => {
     const tx = (await database()).transaction(
-      ['playthroughs', 'saves', 'endingArt', 'profilePictures', 'photos', 'replays', 'lorebooks'],
+      [
+        'playthroughs',
+        'saves',
+        'endingArt',
+        'profilePictures',
+        'photos',
+        'replays',
+        'lorebooks',
+        'applications'
+      ],
       'readwrite'
     )
-    // Eight deletes, all database requests, so the transaction sees all of them.
+    // Nine deletes, all database requests, so the transaction sees all of them.
     void tx.objectStore('playthroughs').delete(playthroughId)
     void tx.objectStore('saves').delete(partRange(playthroughId))
     void tx.objectStore('endingArt').delete(playthroughId)
@@ -721,6 +926,7 @@ export async function deletePlaythrough(playthroughId: string): Promise<void> {
     void tx.objectStore('photos').delete(partRange(playthroughId))
     void tx.objectStore('replays').delete(partRange(playthroughId))
     void tx.objectStore('lorebooks').delete(playthroughId)
+    void tx.objectStore('applications').delete(playthroughId)
     await tx.done
   })
 }

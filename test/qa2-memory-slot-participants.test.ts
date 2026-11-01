@@ -1,3 +1,4 @@
+import './fixtures/maestroModelKit'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { normalizeStoryMemory, storySnapshot, formatStoryRecall, assertStoryRecall, type StoryFact } from '@shared/storyMemory'
 import { DatabaseSync } from 'node:sqlite'

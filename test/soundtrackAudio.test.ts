@@ -1,3 +1,4 @@
+import './fixtures/maestroModelKit'
 /// <reference path="../src/renderer/signalsmith-stretch.d.ts" />
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import { volumesOf, type AudioKey } from '@shared/audio'

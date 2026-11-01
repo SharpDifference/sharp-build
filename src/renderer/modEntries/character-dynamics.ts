@@ -1,5 +1,5 @@
 import { CHARACTER_DYNAMICS_MOD } from '../../shared/characterDynamics'
-import { registerHooks } from '../mods/hooks'
+import { registerHooks } from '@vx/modkit/renderer'
 import { characterDynamicsLines, withCharacterDynamics } from '../prompts/characterDynamics'
 
 registerHooks(CHARACTER_DYNAMICS_MOD, {

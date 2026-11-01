@@ -41,7 +41,7 @@ function promptState() {
     classes: {},
     playerSchedule: {},
     classRosters: {},
-    calendar: calendarOf('spring', []),
+    calendar: calendarOf('spring', [], {}),
     bg: null,
     classCode: null,
     projectClass: null,

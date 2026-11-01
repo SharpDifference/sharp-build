@@ -1,5 +1,5 @@
 import { challengeStatFloor, STARTING_CHALLENGE_MOD } from '../../shared/startingChallenge'
-import { registerHooks } from '../mods/hooks'
+import { registerHooks } from '@vx/modkit/renderer'
 import { useGameStore } from '../stores/gameStore'
 
 // The playthrough's saved floors remain fixed; the menu switch only chooses new games.
