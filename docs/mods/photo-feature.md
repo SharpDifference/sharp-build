@@ -1,6 +1,6 @@
 # Photo Feature
 
-An unofficial mod for Venus University by **naudh1r**. Version **1.6.0**, for the game's 0.6.0.
+An unofficial mod for Venus University by **naudh1r**. Version **1.7.0**, for the game's 0.6.0.
 
 The girls send you photos in their DMs and post them on their feeds, with comments from the rest
 of campus. Each contact gets a gallery, and characters can get optional body details. Photos are
@@ -114,20 +114,21 @@ from-behind shots hold less well than plain ones. Pictures from below are drawn 
 Hover the photo and open the **info icon** in its bottom-right corner. It shows the prompt,
 negative, seed and LoRA used to draw it. Send those with the picture: most problems so far were
 one word in her sentence the model drew too literally, and each is a small fix. A photo taken
-before 1.6.0 shows a rebuilt prompt and no seed.
+before 1.7.0 shows a rebuilt prompt and no seed.
 
 If a photo stays PNG while WebP is on, look in `data/app.log` for a `[photo] kept ... as PNG:` line.
 
-## 1.6.0
-
-- **A head start on her photo**: it starts drawing as soon as she decides to send it, while she's
-  still typing. It arrives on her last text as before.
+## 1.7.0
 
 - **See what drew a photo**: hover it and open the info icon for its prompt, negative, seed and
-  LoRA. Photos taken before 1.6.0 show a rebuilt prompt and no seed.
+  LoRA. Photos taken before 1.7.0 show a rebuilt prompt and no seed.
 - **Redraw a photo**: edit its prompts, or **Rebuild** them from her current tags first, and draw
   it again with the same seed or a new one. The new picture replaces it once it lands; if it
   fails, the old one stays and says so for a few seconds. Nothing she said changes.
+- **A head start on her photo**: it starts drawing as soon as she decides to send it, while she's
+  still typing. It arrives on her last text as before.
+
+## 1.6.0
 
 - **Her friend tagged in the picture**: a person icon on a photo of two girls shows her friend's
   `@handle` when tapped, only while the two are friends with each other. Tap it again, or tap
