@@ -115,6 +115,19 @@ describe('a picture of two', () => {
     expect(prompts.right).toContain('(brown_sweater:1.2)')
   })
 
+  it('keeps a close-up selfie at waist framing in both halves', () => {
+    const prompts = buildDuoPhotoPrompt(
+      risa,
+      ana,
+      'everyday',
+      'A close-up selfie of her and Ana in her room'
+    )
+    for (const prompt of [prompts.scene, prompts.left, prompts.right]) {
+      expect(prompt).toContain('(upper_body:1.3)')
+      expect(prompt).not.toContain('portrait')
+    }
+  })
+
   it('gives the phone to the girl who sent it alone', () => {
     const prompts = buildDuoPhotoPrompt(risa, ana, 'everyday', 'A selfie of me and Ana at the park')
     expect(prompts.left).toContain('outstretched_arm')

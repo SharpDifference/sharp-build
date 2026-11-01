@@ -121,6 +121,8 @@ If a photo stays PNG while WebP is on, look in `data/app.log` for a `[photo] kep
 
 ## 1.7.0
 
+- **More than selfies**: her photos can be from earlier or taken by a friend, closer or wider,
+  from different angles, and in what she wore that day.
 - **Keep the place**: photos keep the place she described, and no longer put the name of her
   outfit into the picture's prompt once her own tags dress her.
 

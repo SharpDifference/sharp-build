@@ -102,6 +102,24 @@ describe('photoWardrobe', () => {
     expect(positive).not.toContain('pink_cardigan')
   })
 
+  it.each([
+    'hat', 'beanie', 'cap', 'scarf', 'glasses', 'sunglasses', 'earrings', 'necklace',
+    'choker', 'bracelet', 'ring', 'bag', 'purse', 'backpack', 'hair clip', 'ribbon',
+    'headphones', 'watch'
+  ])('keeps her set underneath an accessory alone: %s', (accessory) => {
+    for (const caption of [`Waving in a ${accessory}`, `Wearing a ${accessory}, waving`]) {
+      const positive = drawn('everyday', caption)
+      expect(positive).toContain('pink_cardigan')
+      expect(positive).toContain(caption)
+    }
+  })
+
+  it('keeps a described dress and choker without adding her set', () => {
+    const positive = drawn('everyday', 'In a black slip dress and a choker')
+    expect(positive).toContain('In a black slip dress and a choker')
+    expect(positive).not.toContain('pink_cardigan')
+  })
+
   it('keeps an outfit reference when no outfit tags were supplied', () => {
     const undressed = { ...mina, outfit: [] }
     expect(

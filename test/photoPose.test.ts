@@ -10,7 +10,7 @@ import {
 describe('posePhotoTags', () => {
   it('reads the framing off an ordinary caption', () => {
     expect(posePhotoTags('a close-up in her new coat', false)).toEqual(
-      expect.arrayContaining(['close-up', 'upper_body'])
+      expect.arrayContaining(['close-up', 'portrait'])
     )
   })
 
@@ -168,13 +168,13 @@ describe('a selfie', () => {
     expect(photoPose('a full body selfie on her back', false).tags).toContain('full_body')
   })
 
-  it('keeps how she is lying in a close-up, closer on her side or back', () => {
+  it('keeps how she is lying with the close-up she asked for', () => {
     const side = photoPose('a close-up of her lying on her side in bed', false)
-    expect(side.tags).toEqual(expect.arrayContaining(['lying', 'on_side', '(upper_body:1.3)']))
-    expect(side.tags).not.toContain('close-up')
+    expect(side.tags).toEqual(expect.arrayContaining(['lying', 'on_side', 'close-up', 'portrait']))
+    expect(side.tags).not.toContain('(upper_body:1.3)')
     expect(side.negative).toEqual(['on_back', 'on_stomach', 'camera'])
     const stomach = photoPose('close up, on her stomach on the bed', false)
-    expect(stomach.tags).toEqual(expect.arrayContaining(['on_stomach', 'upper_body']))
+    expect(stomach.tags).toEqual(expect.arrayContaining(['on_stomach', 'close-up', 'portrait']))
   })
 
   it('keeps a picture somebody else took from flipping her over', () => {
@@ -373,5 +373,18 @@ describe('a candid picture', () => {
     expect(tags).toContain('looking_away')
     expect(tags).not.toContain('looking_at_viewer')
     expect(posePhotoTags('smiling at the camera', false)).toContain('looking_at_viewer')
+  })
+})
+
+describe('angles named for where the camera is', () => {
+  it.each([
+    ['An overhead shot in her room', 'from_above'],
+    ['A photo in her room from overhead', 'from_above'],
+    ["A bird's-eye shot in the garden", 'from_above'],
+    ['A birds-eye shot in the garden', 'from_above'],
+    ["A worm's-eye shot beside a wall", 'from_below'],
+    ['A worms-eye shot beside a wall', 'from_below']
+  ])('reads %s', (caption, angle) => {
+    expect(photoPose(caption, false).tags).toContain(angle)
   })
 })

@@ -340,6 +340,8 @@ const MODIFIERS: readonly Rule[] = [
     cues: [
       'from below',
       'low angle',
+      "worm's-eye",
+      'worms-eye',
       'from under',
       'shot low',
       'shot from low',
@@ -355,6 +357,9 @@ const MODIFIERS: readonly Rule[] = [
       'from above',
       'high angle',
       'overhead shot',
+      'overhead',
+      "bird's-eye",
+      'birds-eye',
       'shot from above',
       'looking down at her',
       'angled down',
@@ -563,9 +568,9 @@ const LYING_CUES: readonly (readonly [string, readonly string[]])[] = [
 ]
 
 /**
- * Her lying down, drawn close. The close-up row used to win and drop how she was lying; and on
- * her back or side the checkpoint keeps her whole body in shot through `upper_body`, `portrait`
- * and every framing tried but `(upper_body:1.3)`. On her stomach the plain tag already holds.
+ * Her lying down, kept when the close-up row wins. A close shot defaults to weighted upper
+ * body on her back or side, plain upper body on her stomach; the caption's explicit framing
+ * replaces that default at the end.
  */
 function closeLying(text: string, tags: readonly string[]): string[] | null {
   if (!saysAny(text, CLOSE_CUES)) return null
@@ -748,5 +753,7 @@ export function photoPose(caption: string, bare: boolean): PhotoPose {
   if (saysAny(text, BUSY_HAND_CUES)) tags = tags.filter((tag) => !PLACEMENT_TAGS.has(tag))
   // A camera lying about in the picture turned up beside a photo nobody took as a selfie too.
   const noCamera = saysAny(text, CAMERA_CUES) ? [] : ['camera']
-  return selfieShot(text, tags) ?? { tags, negative: [...lyingNegative(tags), ...noCamera] }
+  const pose = selfieShot(text, tags) ?? { tags, negative: [...lyingNegative(tags), ...noCamera] }
+  // A caption's framing wins over the defaults for a selfie or a close shot lying down.
+  return { ...pose, tags: withFraming(text, pose.tags) }
 }

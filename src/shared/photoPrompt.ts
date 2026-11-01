@@ -162,11 +162,24 @@ const CLOTHING_WORDS = [
   'costume'
 ]
 
+/** These go with her set rather than replacing it. */
+const ACCESSORIES = [
+  'hat', 'beanie', 'cap', 'scarf', 'glasses', 'sunglasses', 'earrings', 'necklace',
+  'choker', 'bracelet', 'ring', 'bag', 'purse', 'backpack', 'hair clip', 'ribbon',
+  'headphones', 'watch'
+]
+
+/** A garment or outfit, apart from words that can introduce an accessory alone. */
+const GARMENT_WORDS = CLOTHING_WORDS.filter((word) => word !== 'wearing' && word !== 'dressed')
+
 /** Whether her description dresses her, in which case her everyday wardrobe stays out of it. */
 function describesClothing(photoPrompt: string): boolean {
   // "on top of the bed" is a place, not something she has on.
   const text = photoPrompt.toLowerCase().replace(/\btop of\b/g, '')
-  return saysAny(text, CLOTHING_WORDS)
+  return (
+    saysAny(text, GARMENT_WORDS) ||
+    (!saysAny(text, ACCESSORIES) && saysAny(text, ['wearing', 'dressed']))
+  )
 }
 
 /**
@@ -634,7 +647,7 @@ function duoFraming(text: string): { tags: string[]; scene: string[] } {
     }
   }
   // A close-up needed the framing weighted in both halves before either was drawn close.
-  if (framingOf(text) === 'face' || saysAny(text, ['close-up', 'close up', 'closeup'])) {
+  if (framingOf(text) === 'face') {
     return { tags: ['(close-up:1.3)', '(portrait:1.3)'], scene: [] }
   }
   // Waist up, always: a whole-body shot of two drew one of them smaller, as if a step behind,

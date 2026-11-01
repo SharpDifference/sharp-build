@@ -12,6 +12,47 @@ describe('the framing a caption names', () => {
     expect(framingOf('in the cafe, smiling')).toBeNull()
   })
 
+  it.each([
+    ['A close-up in a cozy booth', 'face'],
+    ['A closeup in a cozy booth', 'face'],
+    ['A close up in a cozy booth', 'face'],
+    ['A close-up selfie in a sunlit dorm room', 'waist'],
+    ['A closeup selfie in a sunlit dorm room', 'waist'],
+    ['A close up selfie in a sunlit dorm room', 'waist'],
+    ['A medium shot standing in an aisle', 'waist'],
+    ['A medium close-up in the cafe', 'waist'],
+    ['A medium close up in the cafe', 'waist'],
+    ['A half body shot in the cafe', 'waist'],
+    ['A half-body shot in the cafe', 'waist'],
+    ['A three-quarter shot in the park', 'knees'],
+    ['A three quarter shot in the park', 'knees'],
+    ['A cowboy shot in the park', 'knees'],
+    ['A shot from the thighs up in the park', 'knees'],
+    ['A full shot in the park', 'full']
+  ])('reads the framing in %s', (caption, framing) => {
+    expect(framingOf(caption)).toBe(framing)
+  })
+
+  it('keeps explicit framing through selfie and lying-down defaults', () => {
+    for (const scene of [
+      'A close-up mirror selfie in her room',
+      'A medium shot selfie sitting in a booth',
+      'A medium shot selfie lying on her side',
+      'A medium shot selfie lying on her stomach'
+    ]) {
+      const tags = photoPose(scene, false).tags
+      expect(tags).toContain('(upper_body:1.3)')
+      expect(tags).not.toContain('full_body')
+      expect(tags).not.toContain('portrait')
+    }
+    const face = photoPose('A close-up lying on her side in a booth', false).tags
+    expect(face).toEqual(expect.arrayContaining(['on_side', 'close-up', 'portrait']))
+    expect(face).not.toContain('(upper_body:1.3)')
+    const knees = photoPose('A three-quarter selfie sitting in a booth', false).tags
+    expect(knees).toContain('cowboy_shot')
+    expect(knees).not.toContain('full_body')
+  })
+
   it("replaces the framing her position came with", () => {
     const full = posePhotoTags('standing in the hallway, full body, in her sundress', false)
     expect(full).toEqual(expect.arrayContaining(['standing', 'full_body']))
@@ -21,13 +62,13 @@ describe('the framing a caption names', () => {
     expect(waist).not.toContain('cowboy_shot')
   })
 
-  it('leaves a caption with no framing, a selfie, and a close shot lying down as they were', () => {
+  it('keeps pose defaults only where the caption names no framing', () => {
     expect(posePhotoTags('standing by the window', false)).toContain('cowboy_shot')
-    expect(photoPose('a selfie in the cafe, waist up', false).tags).toContain('upper_body')
+    expect(photoPose('a selfie in the cafe, waist up', false).tags).toContain('(upper_body:1.3)')
     const side = posePhotoTags('waist up, lying on her side in bed', false)
     expect(side).toEqual(expect.arrayContaining(['on_side', '(upper_body:1.3)']))
     const stomach = posePhotoTags('waist up, on her stomach on the bed', false)
-    expect(stomach).toContain('upper_body')
+    expect(stomach).toContain('(upper_body:1.3)')
   })
 })
 
