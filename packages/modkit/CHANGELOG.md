@@ -2,6 +2,10 @@
 
 ## 0.7.0
 
+- `lead` on a `dm` prompt addition puts its fields ahead of the reply's own, and `dmReplyLead`
+  hands them over the moment they have streamed in, before her first text lands. Once per reply,
+  never for an abandoned one; the finished reply, and `afterDmReply`, stay authoritative.
+
 - Startup readers have a ten-second wait limit per mod. A timeout names the mod in a warning
   and lets startup continue. It does not cancel the reader; mods must still handle their own
   asynchronous work. Later switch-on notifications use the same limit.

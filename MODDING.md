@@ -873,7 +873,7 @@ else names it.
 
 | Hook | Where the game asks | What a mod can do |
 | --- | --- | --- |
-| `prompts.dm` | `textingPrompt.ts` | Add lines to her DM prompt, and fields to its reply |
+| `prompts.dm` | `textingPrompt.ts` | Add lines to her DM prompt, and fields to its reply. `lead: true` puts those fields ahead of her messages, so they stream in first |
 | `prompts['slot-posts']` | `slotIntroPrompt.ts` | Add lines about status posts, and fields to each post |
 | `prompts['slot-poster']` | `slotIntroPrompt.ts` | Add lines under each girl posting, by her name, given the slot the opening is for |
 | `prompts['slot-reach-outs']` | `slotIntroPrompt.ts` | Add lines under a girl texting first, and fields to her entry |
@@ -881,6 +881,7 @@ else names it.
 | `prompts.character` | `characterPrompt.ts` | Add lines and fields to character generation |
 | `dmHistoryNote` | `textingPrompt.ts` | Add a note after a DM in the history the prompt quotes |
 | `characterFromDraft` | `characterPrompt.ts` | Fill fields of a generated character from the reply |
+| `dmReplyLead` | `textingLoop.ts` | Read the `lead` fields of her DM reply the moment they have streamed in, before her first text lands. Once per reply, never for one already abandoned; her finished reply stays the one to act on |
 | `afterDmReply` | `textingLoop.ts` | Act after her reply in a DM has landed |
 | `afterSceneReply` | `loop/turn.ts` | Read a landed scene reply as the model wrote it, fields a mod asked for included. A turn's reply only: a scene's closing reply is not handed over |
 | `scenePlay` | `SceneChrome.tsx`, `GameView.tsx` | Stand a seat on the scene's rail, and open a panel of its own over the scene |

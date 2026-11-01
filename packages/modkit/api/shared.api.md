@@ -393,6 +393,12 @@ export const HOOKS: readonly [{
     readonly dispatch: readonly ["characterFromDraft"];
     readonly since: '0.1.0';
 }, {
+    readonly name: 'dmReplyLead';
+    readonly side: 'renderer';
+    readonly kind: 'event';
+    readonly dispatch: readonly ["dmReplyLead"];
+    readonly since: '0.7.0';
+}, {
     readonly name: 'afterDmReply';
     readonly side: 'renderer';
     readonly kind: 'event';

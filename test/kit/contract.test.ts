@@ -331,6 +331,7 @@ const PROBES: Record<RendererHook, (id: string) => Probe> = {
     }
   },
   characterFromDraft: fn('characterFromDraft', {}, (host) => host.characterFromDraft({}, { baseAppearance: [] }, {})),
+  dmReplyLead: fn('dmReplyLead', undefined, (host) => host.dmReplyLead({ charId: 'c', character: never, lead: {} })),
   afterDmReply: fn('afterDmReply', undefined, (host) => host.afterDmReply({ charId: 'c', character: never, reply: never })),
   sceneReplyLanded: fn('sceneReplyLanded', undefined, (host) => host.sceneReplyLanded({ reply: {}, modReply: {}, spot: { spot: 'opening', cast: [] }, at: 0 })),
   sceneCut: fn('sceneCut', undefined, (host) => host.sceneCut({ length: 0 })),
