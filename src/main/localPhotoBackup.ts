@@ -13,7 +13,7 @@ import {
   relPathsUnder,
   scratchDir
 } from './services/archiveService'
-import { sniffImageFile } from './services/imageFiles'
+import { sniffImageFile } from '@vx/modkit/main'
 
 /**
  * Her DM and feed photos, kept beside a backup rather than in it.

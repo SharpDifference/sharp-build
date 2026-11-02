@@ -1,7 +1,6 @@
 [
   "src/main/localPhotoBackup.ts -> ./paths",
   "src/main/localPhotoBackup.ts -> ./services/archiveService",
-  "src/main/localPhotoBackup.ts -> ./services/imageFiles",
   "src/main/photoIpc.ts -> ./services/comfyService",
   "src/main/photoIpc.ts -> @shared/jobQueue",
   "src/main/photoProtocol.ts -> ./paths",
@@ -23,7 +22,6 @@
   "src/main/services/echoService.ts -> @shared/reflectionPortrait",
   "src/main/services/localPhotoService.ts -> ./comfyService",
   "src/main/services/localPhotoService.ts -> ./imageFiles",
-  "src/main/services/localPhotoService.ts -> ./jsonFile",
   "src/main/services/presetsService.ts -> ../paths",
   "src/main/services/reflectionLocalImage.ts -> ../paths",
   "src/main/services/reflectionLocalImage.ts -> ./comfyService",
