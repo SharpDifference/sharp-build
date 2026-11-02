@@ -491,9 +491,8 @@ folder if wanted. Oversized output answers `RENDER_TOO_LARGE`, unrecognized byte
 `main:runForCharacter`) gives work a character's cancellation lifetime without queuing it.
 Deleting or resetting her aborts the supplied signal and waits until the work, including its
 writes and cleanup, settles. All mods working for her share this lifetime; another character
-is unaffected. This work must stop promptly on its signal and finish cleanup before returning,
-or deleting her waits on it. Existing `runAbortable` callers are still aborted without being
-awaited; only character work opts into this wait.
+is unaffected. Like queued work, a callback that ignores cancellation can hold deletion open
+indefinitely. Always observe the signal and finish cleanup before returning.
 This signal covers character cancellation, not an individual invoke or redraw. Combine it with
 the caller's signal using `AbortSignal.any` when either lifetime must stop the operation, and
 pass that combined signal through the render and persistence checks.

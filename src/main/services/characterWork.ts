@@ -6,8 +6,7 @@ import { runAbortable } from '@shared/jobQueue'
 /**
  * Runs unqueued work belonging to a character. Her cancellation aborts it and waits for all
  * its writes and cleanup to settle. This does not queue: renderComfyImage may be called inside.
- * Every mod working for this character shares her cancellation lifetime. Work must stop
- * promptly on its signal; otherwise deleting her waits for it.
+ * Every mod working for this character shares her cancellation lifetime.
  */
 export async function runForCharacter<T>(
   modId: string,
@@ -27,5 +26,5 @@ export async function runForCharacter<T>(
       if (signal.aborted) throw appError('CANCELLED', 'Character work was cancelled.')
       throw error
     }
-  }, { waitOnCancel: true })
+  })
 }

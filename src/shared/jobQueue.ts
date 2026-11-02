@@ -40,14 +40,14 @@ let runningSettled: Promise<void> | null = null
 let pumping = false
 
 /** Non-queued work by group, so `cancelGroup` can abort the pre-sprite LLM write too. */
-interface Abortable { controller: AbortController; settled: Promise<void>; waitOnCancel: boolean }
+interface Abortable { controller: AbortController; settled: Promise<void> }
 const abortables = new Map<string, Set<Abortable>>()
 
 /** Enrols a non-queued operation in `group`; callers must `release()` in `finally`. */
-function registerAbortable(group: string, waitOnCancel: boolean): { signal: AbortSignal; release: () => void } {
+function registerAbortable(group: string): { signal: AbortSignal; release: () => void } {
   const controller = new AbortController()
   let settle!: () => void
-  const entry: Abortable = { controller, waitOnCancel, settled: new Promise<void>(resolve => { settle = resolve }) }
+  const entry: Abortable = { controller, settled: new Promise<void>(resolve => { settle = resolve }) }
   const set = abortables.get(group) ?? new Set<Abortable>()
   set.add(entry)
   abortables.set(group, set)
@@ -191,7 +191,7 @@ async function cancelMatching(matches: (job: QueuedJob) => boolean): Promise<voi
 
 /**
  * Cancels queued, running and registered non-queued work in `group`, resolving
- * only after the running job and operations opting into waiting settle.
+ * only after the running job and registered operations settle.
  */
 export async function cancelGroup(group: string): Promise<void> {
   const inGroup = (job: QueuedJob): boolean => job.group === group
@@ -202,7 +202,7 @@ export async function cancelGroup(group: string): Promise<void> {
 
   for (const entry of work) entry.controller.abort()
 
-  await Promise.all([settling, ...work.filter(entry => entry.waitOnCancel).map(entry => entry.settled)])
+  await Promise.all([settling, ...work.map(entry => entry.settled)])
 }
 
 /** Cancels one *set* of a character's images rather than the whole character. */
@@ -211,13 +211,12 @@ export async function cancelKeys(group: string, keys: string[]): Promise<void> {
   await cancelMatching((job) => job.group === group && job.key !== undefined && wanted.has(job.key))
 }
 
-/** Runs unqueued work under the group's abort signal. Cancellation does not wait unless opted in. */
+/** Runs one unqueued operation under `group`'s abort signal, releasing it however it ends. */
 export async function runAbortable<T>(
   group: string,
-  run: (signal: AbortSignal) => Promise<T>,
-  { waitOnCancel = false }: { waitOnCancel?: boolean } = {}
+  run: (signal: AbortSignal) => Promise<T>
 ): Promise<T> {
-  const { signal, release } = registerAbortable(group, waitOnCancel)
+  const { signal, release } = registerAbortable(group)
   try {
     return await run(signal)
   } finally {

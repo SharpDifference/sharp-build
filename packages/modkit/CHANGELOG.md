@@ -4,9 +4,7 @@
 
 - Mod renders reject a missing output-node id before queueing.
 
-- `main:runForCharacter` runs unqueued work in a character's lifetime; cancellation waits for
-  this work and its cleanup as well as queued jobs. Existing `runAbortable` work is aborted
-  without being awaited.
+- `main:runForCharacter` runs unqueued work in a character's lifetime; cancellation now waits for registered work and its cleanup as well as queued jobs.
 
 - `lead` on a `dm` prompt addition puts its fields ahead of the reply's own, and `dmReplyLead`
   hands them over the moment they have streamed in, before her first text lands. Once per reply,
