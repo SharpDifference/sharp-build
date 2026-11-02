@@ -84,7 +84,8 @@ export interface ArrayExtractor<T> {
 export function createArrayExtractor<T>(
   arrayKey: string,
   element: ElementScanner,
-  warnTag: string
+  warnTag: string,
+  { topLevel = false }: { topLevel?: boolean } = {}
 ): ArrayExtractor<T> {
   let buffer = ''
   /** Index the next scan starts from — everything before it is already emitted. */
@@ -97,6 +98,36 @@ export function createArrayExtractor<T>(
   /** Locates the `[` that opens the array, once the key has streamed in. */
   function findArrayStart(): boolean {
     if (arrayStart !== -1) return true
+
+    if (topLevel) {
+      let depth = 0
+      let expectingKey = false
+      for (let i = 0; i < buffer.length; i++) {
+        const char = buffer[i]
+        if (char === '"') {
+          const end = stringElement.scan(buffer, i)
+          if (end < 0) return false
+          if (depth === 1 && expectingKey) {
+            let name: unknown
+            try { name = JSON.parse(buffer.slice(i, end + 1)) } catch { return false }
+            if (name === arrayKey) {
+              const suffix = buffer.slice(end + 1).match(/^\s*:\s*\[/)
+              if (!suffix) return false
+              arrayStart = end + 1 + suffix[0].length
+              scanFrom = arrayStart
+              return true
+            }
+          }
+          if (depth === 1) expectingKey = false
+          i = end
+        } else if (char === '{' || char === '[') {
+          depth++
+          if (depth === 1) expectingKey = true
+        } else if (char === '}' || char === ']') depth--
+        else if (char === ',' && depth === 1) expectingKey = true
+      }
+      return false
+    }
 
     const key = buffer.indexOf(`"${arrayKey}"`)
     if (key === -1) return false

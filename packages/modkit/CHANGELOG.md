@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+- `lead` on a `dm` prompt addition puts its fields ahead of the reply's own, and `dmReplyLead`
+  hands them over the moment they have streamed in, before her first text lands. Once per reply,
+  never for an abandoned one. Its signal aborts when the reply does not land; the finished
+  reply, and `afterDmReply`, stay authoritative.
+
+- Main’s `renderComfyImage` queues a mod-owned ComfyUI graph and returns checked image bytes, capped at 32 MiB, with per-call cancellation and an optional `onProgress` for its steps.
+
 - `sceneField` takes `legacy`, the key a mod kept its scene data under before it had a field, read
   and then moved to its id; and `normalize`, for a value a load brings back. Its handle gains
   `save(next)`: the value written into the save a reload lands on, the reader's last turn, without
