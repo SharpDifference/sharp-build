@@ -1245,10 +1245,28 @@ each mod's `finish` returned, by id), the spot, and `at`, the transcript length 
 start at. `sceneCut` is told the length the transcript was cut back to, by an interjection or by
 taking back the reader's last line, so a mod can undo what the replies past it changed.
 
-What a mod keeps for the scene being played goes in `sceneField(id, { empty })` from
-`@vx/modkit/renderer` (`renderer:sceneField`): `read()`, `set(next)` and `use()`. It is saved with the
-scene and restored with it, and is back to `empty` once the next scene is cast. `set` changes only
-the mod's own field, and goes out with the next save.
+What a mod keeps for the scene being played goes in `sceneField(id, { empty, legacy?, normalize? })`
+from `@vx/modkit/renderer` (`renderer:sceneField`): `read()`, `set(next)`, `use()` and `save(next)`.
+It is saved with the scene and restored with it, and is back to `empty` once the next scene is cast.
+`set` changes only the mod's own field, and goes out with the next save.
+
+`save(next)` sets the value and writes it into the save a reload lands on: the reader's last turn in
+the scene, or the scene as it stands before its first. Only the mod's own keys change there; another
+mod's value still goes out with that mod's next save. It does not wait for a safe point, so a game
+can keep its state mid-match, and the game's later writes of that point carry the value too. It is
+refused, changing nothing, with `MOD_WRITE_NO_GAME` where there is no playthrough (a replay or a
+created scene included), `MOD_WRITE_OFF` with the mod off, and `MOD_WRITE_NO_SCENE` with no scene to
+save into, or its ending being written. `MOD_WRITE_STALE` means the game was left before the write's
+turn. A failed write comes back with the disk's error, and the player is shown it as for any
+autosave.
+
+`legacy` names the key a mod kept its scene data under before it had a field. It is read where the
+mod's id holds nothing, and the next `set` or `save` moves the value to the id. It must not be a valid
+mod id, so it can never be another mod's, and only one field may claim it. `normalize(stored)` makes
+a stored value the mod's own as a load brings it back from a save an older version may have written.
+It is handed a copy and must be pure. A throw reads as `empty`, with a warning naming the mod, and
+leaves the stored value as it was until the next `set`. A value the mod set itself is read back as
+set.
 
 ## Managed ComfyUI launch environment
 
@@ -1287,7 +1305,7 @@ Windows aliases, errors/disposal, and the real service's launch boundary with mo
   `ModSceneFields` in `shared/types.ts` by declaration merging, and reading and writing them on
   the game store's `sceneMods`, leaving other mods' fields as they are. They are saved as the
   scene's `mods`, restored with it and cleared when the next scene is cast, so they must be
-  plain data.
+  plain data. A mod moving onto `sceneField` names its old field as the field's `legacy`.
 - A slot activity is something a mod offers on the landing in place of a stat suggestion
   (`statActivities`), such as a game to train a stat with. Committing to one saves it with the
   scene as `activity`; the scene is cast as usual, held open while the activity is pending, and

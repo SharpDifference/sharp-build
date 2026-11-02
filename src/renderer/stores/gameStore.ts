@@ -3430,8 +3430,15 @@ bindSaveFieldStore({
 // The mods' scene fields read and write their values here.
 bindSceneFieldStore({
   values: () => useGameStore.getState().sceneMods as Readonly<Record<string, unknown>>,
-  set: (modId, value) =>
-    useGameStore.setState((state) => ({ sceneMods: { ...state.sceneMods, [modId]: value } })),
+  set: (changes) =>
+    useGameStore.setState((state) => {
+      const sceneMods: Record<string, unknown> = { ...state.sceneMods }
+      for (const [key, value] of Object.entries(changes)) {
+        if (value === undefined) delete sceneMods[key]
+        else sceneMods[key] = value
+      }
+      return { sceneMods: sceneMods as import('@shared/types').ModSceneFields }
+    }),
   subscribe: (onChange) =>
     useGameStore.subscribe((state, before) => {
       if (state.sceneMods !== before.sceneMods) onChange()
