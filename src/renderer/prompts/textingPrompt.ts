@@ -524,18 +524,24 @@ export function buildTextingPrompt(
 }
 
 /**
- * The `TextingResponse` schema: `messages` first so they stream ahead; the preview
- * reader stops at that array's `]`.
+ * Lead mod fields precede the native reply; trailing additions keep their usual place.
  */
 function textingSchema(): {
   name: string
   schema: Record<string, unknown>
 } {
-  return objectSchema('texting', ['messages', 'summary', 'blocked', ...promptRequired('dm')], {
+  const leadFields = promptFields('dm', 'lead')
+  const trailingFields = promptFields('dm', 'trailing')
+  const leadRequired = promptRequired('dm', 'lead')
+  const trailingRequired = promptRequired('dm', 'trailing')
+  return objectSchema('texting', [...new Set([
+    ...leadRequired, 'messages', 'summary', 'blocked', ...trailingRequired
+  ])], {
+    ...leadFields,
     messages: { type: 'array', items: { type: 'string' } },
     summary: { type: 'string' },
     // Required: an optional boolean drifts into never being considered.
     blocked: { type: 'boolean' },
-    ...promptFields('dm')
+    ...trailingFields
   })
 }
