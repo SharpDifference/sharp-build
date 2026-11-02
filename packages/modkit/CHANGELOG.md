@@ -9,6 +9,12 @@
 
 - Main’s `renderComfyImage` queues a mod-owned ComfyUI graph and returns checked image bytes, capped at 32 MiB, with per-call cancellation and an optional `onProgress` for its steps.
 
+- `sceneField` takes `legacy`, the key a mod kept its scene data under before it had a field, read
+  and then moved to its id; and `normalize`, for a value a load brings back. Its handle gains
+  `save(next)`: the value written into the save a reload lands on, the reader's last turn, without
+  waiting for a safe point, every other mod's value there left as it was. Refused, changing nothing,
+  with `MOD_WRITE_NO_GAME`, `MOD_WRITE_OFF` or the new `MOD_WRITE_NO_SCENE`.
+
 ## 0.7.0
 
 - Startup readers have a ten-second wait limit per mod. A timeout names the mod in a warning
