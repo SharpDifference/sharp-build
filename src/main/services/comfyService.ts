@@ -1376,7 +1376,7 @@ export interface ComfyRenderRequest {
 export async function renderComfyImage(
   modId: string,
   request: ComfyRenderRequest,
-  { signal }: { signal: AbortSignal }
+  { signal, onProgress }: { signal: AbortSignal; onProgress?: (step: string) => void }
 ): Promise<Uint8Array> {
   if (typeof modId !== 'string' || !MOD_ID_RULE.test(modId)) {
     throw appError('MOD_ID_INVALID', 'A render needs a valid mod id.')
@@ -1399,7 +1399,16 @@ export async function renderComfyImage(
   return enqueue({
     group: `mod:${modId}:render`,
     signal,
-    run: async ({ signal: jobSignal, report }) => {
+    run: async ({ signal: jobSignal, report: queueReport }) => {
+      // The mod hears each step the queue does; its callback throwing can't fail the render.
+      const report = (step: string): void => {
+        queueReport(step)
+        try {
+          onProgress?.(step)
+        } catch (err) {
+          console.warn(`[mods] ${modId} render progress failed`, err)
+        }
+      }
       let scratch: string | undefined
       try {
         throwIfCancelled(jobSignal)

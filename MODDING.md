@@ -476,7 +476,11 @@ Main code is trusted; accepting a graph does not sandbox its custom nodes.
 
 All renders run on the game's serial queue, under `mod:<checked-id>:render`. The required
 `signal` cancels that call alone, including while queued, and answers `CANCELLED` after cleanup.
-Pass the invoke context's signal; the handler owns any enablement/option checks. A returned
+Pass the invoke context's signal; the handler owns any enablement/option checks. The optional
+`onProgress(step)` hears the same steps as the game's own renders, such as `Queued in ComfyUI`,
+`Rendering` and `Saving`; an error it throws is logged and the render goes on. Call
+`renderComfyImage` directly, not from inside a job of your own on the queue: the queue runs one
+job at a time, so a render waiting behind its caller never starts. A returned
 `Uint8Array` is PNG, JPEG or WebP by `imageTypeOf`, at most 32 MiB; core removes its private
 scratch files on success, refusal and cancellation. The mod writes returned bytes to its own
 folder if wanted. Oversized output answers `RENDER_TOO_LARGE`, unrecognized bytes

@@ -34,7 +34,7 @@ and the readers, components and record helpers its screens and main code use.
   `readJsonFile`, `writeAtomicJson` and `writeAtomicBytes` in `main`. Each value is its own
   capability. Nothing native changes.
 
-- Main’s `renderComfyImage` queues a mod-owned ComfyUI graph and returns checked image bytes, capped at 32 MiB, with per-call cancellation.
+- Main’s `renderComfyImage` queues a mod-owned ComfyUI graph and returns checked image bytes, capped at 32 MiB, with per-call cancellation and an optional `onProgress` for its steps.
 
 - A game started before mods recorded their versions is told so once, not once every session:
   the playthroughs told are kept in `settings.json`'s `modUnversionedSeen`, written by main. The

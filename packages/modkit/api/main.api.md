@@ -160,6 +160,7 @@ export function registerFinalRequest(modId: string, hook: FinalRequestHook): () 
 // @public
 export function renderComfyImage(modId: string, request: ComfyRenderRequest, input: {
     signal: AbortSignal;
+    onProgress?: (step: string) => void;
 }): Promise<Uint8Array>;
 
 // @public

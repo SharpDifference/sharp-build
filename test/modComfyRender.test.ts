@@ -67,6 +67,23 @@ function render(signal = new AbortController().signal): Promise<Uint8Array> {
 }
 
 describe('mod-owned ComfyUI renders', () => {
+  it('hands each step to onProgress, and renders on when the callback throws', async () => {
+    const steps: string[] = []
+    const heard = await renderComfyImage('photo-feature', request, {
+      signal: new AbortController().signal,
+      onProgress: (step) => void steps.push(step)
+    })
+    expect(heard).toEqual(png)
+    expect(steps).toContain('Saving')
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const thrown = await renderComfyImage('photo-feature', request, {
+      signal: new AbortController().signal,
+      onProgress: () => { throw Error('mod bug') }
+    })
+    expect(thrown).toEqual(png)
+    warn.mockRestore()
+  })
+
   it('returns image bytes, fills solo/extra prompt inputs, and leaves the graph unchanged', async () => {
     const original = structuredClone(request)
     for (const bytes of [png, new Uint8Array([255, 216, 255]),
