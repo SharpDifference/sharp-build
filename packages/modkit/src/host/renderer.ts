@@ -35,7 +35,12 @@ export {
   promptStateParts,
   saveChoice,
   saveNotes,
+  classCatalogEdits,
+  promptTextEdits,
+  sceneCallTags,
+  sceneCut,
   scenePlays,
+  sceneReplyLanded,
   screenSlot,
   sentText,
   setDeclaredHooks,
@@ -54,5 +59,7 @@ export {
 export type { DeclaredHooks } from '../renderer/hooks'
 export { bindModWrites, bindSaveFieldStore, carryModSlices, readModSlices, saveFields, writeModSlices } from '../renderer/saveField'
 export type { ModWrites, ReadModSlices, SaveFieldStore } from '../renderer/saveField'
+export { bindSceneFieldStore } from '../renderer/sceneField'
+export type { SceneFieldStore } from '../renderer/sceneField'
 export { bindGameBoundary } from '../renderer/modState'
 export { ModSlot, slotElements, SlotBoundary } from '../renderer/ModSlot'

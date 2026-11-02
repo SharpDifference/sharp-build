@@ -193,9 +193,9 @@ export const MOD_FILES: Record<string, ModSet> = {
       'src/main/services/presetsService.ts',
       'src/main/services/studioBackupService.ts',
       'src/main/services/studioPromptsService.ts',
-      'src/renderer/prompts/promptBlocks.ts',
-      'src/renderer/stores/promptStudioStore.ts',
-      'src/renderer/views/PromptStudio*'
+      'src/renderer/stores/promptStudio*',
+      'src/renderer/views/PromptStudio*',
+      'src/renderer/vu_styles/PromptStudio.css'
     ]
   },
   reckoning: {

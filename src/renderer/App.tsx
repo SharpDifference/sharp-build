@@ -34,6 +34,7 @@ import { useGrabBagStore } from './stores/grabBagStore'
 import { convertLegacyImages } from './stores/legacyImageStore'
 import { useSaveStore } from './stores/saveStore'
 import { modIsOn, useModsStore } from './stores/modsStore'
+import { modOn } from '@shared/mods'
 import { PROMPT_STUDIO_MOD } from '@shared/presets/types'
 import { usePromptStudioStore } from './stores/promptStudioStore'
 import { useModSessionStore } from './stores/modSessionStore'
@@ -54,6 +55,14 @@ function bootView(firstRun: boolean, comfySettled: boolean, writerOk: boolean): 
   if (isWebBuild()) return writerOk ? 'mainMenu' : 'apiKey'
   return comfySettled ? 'mainMenu' : 'setup'
 }
+
+// Prompt Studio's presets are read when its mod is switched on; the boot reads them when it
+// already is, so the first request that reads the prompt edits finds them.
+useModsStore.subscribe((state, previous) => {
+  if (modOn(state.switches, PROMPT_STUDIO_MOD) && !modOn(previous.switches, PROMPT_STUDIO_MOD)) {
+    void usePromptStudioStore.getState().load()
+  }
+})
 
 /**
  * Bootstraps stores in dependency order, then opens the cover `main.tsx` raised onto whichever

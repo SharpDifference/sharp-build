@@ -72,7 +72,6 @@ import * as replays from './db/replays'
 import * as saves from './db/saves'
 import * as scenes from './db/scenes'
 import { readGrabBags, writeGrabBags } from './db/grabbags'
-import { planPresetRequest, finishPresetReply } from '@shared/presets/request'
 import * as presets from './presets'
 import { readStudioPrompts, writeStudioPrompts } from './studioPrompts'
 import { pickStudioBackup, saveStudioBackup } from './studioBackup'
@@ -626,14 +625,9 @@ export function buildApi(): VenusUniversityApi {
 }
 
 /**
- * Sends one structured request: the story recall is prepended, the active Prompt Studio preset is
- * applied where the request asks for one, and the fields only this app reads never reach the
- * provider. A preset that cannot be loaded costs nothing but a warning.
+ * Sends one structured request with the story recall prepended; the fields only this app reads
+ * never reach the provider, and no mod reshapes the call in the browser build.
  */
 async function completeStructured<T>(request: StructuredRequest, signal?: AbortSignal, onDelta?: (delta: string) => void): Promise<T> {
-  const prepared = await prepareStoryRequest(request)
-  const plan = planPresetRequest(prepared, prepared.preset ? await presets.loadActivePreset() : null)
-  const reply = await completeCloudStructured<T>(plan.request, signal, onDelta, undefined, plan.sampling)
-  for (const warning of finishPresetReply(reply, plan.applied)) console.warn(`[presets] ${warning}`)
-  return reply
+  return completeCloudStructured<T>(await prepareStoryRequest(request), signal, onDelta)
 }

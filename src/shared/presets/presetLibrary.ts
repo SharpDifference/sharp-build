@@ -1,4 +1,4 @@
-import { appError } from '../errors'
+import { appError } from '@vx/modkit/shared'
 import { nativeDefaultPreset } from './gameParts'
 import { importPreset, type ImportResult } from './detect'
 import { isSafePresetId, toPresetFile, validatePreset, type PresetFile } from './presetRules'

@@ -1,12 +1,12 @@
 import { mkdir } from 'fs/promises'
+import { readJsonFile, writeAtomicJson } from '@vx/modkit/main'
 import {
   EMPTY_STUDIO_PROMPTS,
   readStudioPrompts,
   studioPromptsToKeep,
   type StudioPrompts
-} from '@shared/presets/studioPrompts'
+} from '../../shared/presets/studioPrompts'
 import { getPromptStudioPath, getStudioPromptsPath } from '../paths'
-import { readJsonFile, writeAtomicJson } from './jsonFile'
 
 /** What Prompt Studio keeps for the game's own prompts: `data/prompt-studio/prompts.json`. */
 

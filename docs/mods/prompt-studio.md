@@ -64,9 +64,9 @@ text. An edit equal to the shipped text is stored as no edit.
 
 The cast scene persona is chosen in this order: the active preset's edit, then the persona
 set in Settings, then the shipped one. An edited persona is sent as written whatever the
-less-explicit-text setting says; an unedited one still follows it. With the mod off, Advanced's **Edit
-system prompt** works as before, and the studio hides it while the mod is on. The summary
-instructions stay locked.
+less-explicit-text setting says; an unedited one still follows it. Advanced's **Edit system
+prompt** sets that Settings persona, and stays there with the mod on. The summary instructions
+stay locked.
 
 ## New Game
 
@@ -104,16 +104,23 @@ as written.
 
 Each scene reply may also carry a `vars` list of `set`, `add` and `append` changes, which the
 preset's blocks can ask the model to use. Replies change at most 50 at a time, a save holds
-200 variables, and long names and values are cut. The result is saved with the game in its
-`presetVars`, carried into the next semester, and edited or reset from the Variables tab.
-Interjecting or rewinding to an earlier line takes back what the cut replies changed.
-Loading an older save brings back its variables.
+200 variables, and long names and values are cut. The result is saved with the game, in the
+mod's own part of the save, carried into the next semester, and edited or reset from the
+Variables tab wherever Save Game is open. Interjecting or rewinding to an earlier line takes
+back what the cut replies changed. Loading an older save brings back its variables, and its
+next save writes them in the mod's part.
 
 ## Samplers
 
 An imported preset may carry temperature, top-p, top-k and a repetition penalty. They are sent
 with that preset's scene calls to a custom endpoint, over the same values on Settings'
 Advanced tab, and never to Gemini.
+
+## The browser build
+
+The browser build keeps and edits presets, and the text edits apply. It applies no preset to a
+request: that happens in the desktop app's main process, so the scenes go out as the game wrote
+them, with no samplers and no variables from the model.
 
 ## Importing
 
@@ -134,7 +141,8 @@ sections. Macros the game does not fill in are listed.
 - `data/presets/`: one file per preset and an index naming the one in force. The browser build
   keeps the same records in its database.
 - `data/prompt-studio/prompts.json`: the studio's own text edits and the catalog sizes.
-- `GameSave.presetVars`: the variables, inside each save.
+- `ex['prompt-studio']` in each save: the variables. The scene's marks for taking a cut's
+  changes back are in the saved scene, under `mods['prompt-studio']`.
 
 None of it but the variables is in the game's backup, and a restore of one leaves it as it is.
 A preset that is missing or unreadable costs only a console warning: the scene goes out as the
@@ -161,9 +169,9 @@ Game edits, which can be seen again from the main menu.
 
 ## Turning it off
 
-Off stops everything above. Every request is then the game's own, the Advanced tab's Edit
-system prompt returns, and the Prompt Studio button hides. Presets, edits and variables
-stay saved, so turning it on again finds them.
+Off stops everything above. Every request is then the game's own, and the Prompt Studio button
+on the Advanced tab hides. Presets, edits and variables stay saved, so turning it on again
+finds them.
 
 ## Implementation map
 
@@ -174,17 +182,26 @@ stay saved, so turning it on again finds them.
   each merges.
 - `src/main/services/presetsService.ts`, `studioPromptsService.ts` and
   `studioBackupService.ts`, with their twins in `src/web/`: the folders and the browser's
-  database. `src/main/ipc.ts` and `src/web/bridge.ts` apply the preset where a structured
-  request is sent, and read a scene reply's `vars` back.
-- `src/renderer/prompts/promptBlocks.ts`: the text blocks and their shipped text, the New Game
-  calls' included.
+  database. `presetsService.ts` also registers the request hook that applies the preset to a
+  tagged scene call and reads the reply's `vars` back.
 - `src/renderer/stores/promptStudioStore.ts` and `src/renderer/views/PromptStudio*.tsx`: the
-  studio.
+  studio. `promptStudioVars.ts` holds the variables and the scene's marks; `PromptStudioEntry.tsx`
+  is the button on the Advanced tab.
+- `src/renderer/modEntries/prompt-studio.ts`: what the mod registers in the window.
 - `test/preset*.test.ts`: assembly, macros, variables, imports and the request path;
   `test/studioPrompts` and `studioBackup` the rest.
 
-## Registration on core 0.3.1
+## Registration on kit 0.7.0
 
-- `src/shared/modEntries/prompt-studio.ts` supplies its mod definition and the semester carry
-  for `presetVars`.
-- This mod has no renderer hook registration; its integration is switch-gated in place.
+- `src/shared/modEntries/prompt-studio.ts` supplies its mod definition.
+- `src/renderer/modEntries/prompt-studio.ts` registers `promptText` (the scene text and the
+  global text edits, and the catalog sizes), `sceneCall` (tags a scene call for the preset and
+  keeps the request for the preview), `sceneReplyLanded` (keeps the variables main handed
+  back), `sceneCut` (takes a cut's changes back) and `advancedSettingsEntry` (the button).
+- `promptStudioVars.ts` declares a `saveField` for the variables, which reads the old
+  top-level `presetVars` and carries the whole record into the next semester, and a
+  `sceneField` for the marks. A scene saved before this change keeps no marks, so a cut in
+  that one scene cannot take its replies' variables back.
+- `presetsService.ts` calls `registerFinalRequest` in main.
+- The one piece in core is `App.tsx`, which reads the studio at boot when the mod is on and
+  when it is switched on, so the first request that reads the text edits finds them.

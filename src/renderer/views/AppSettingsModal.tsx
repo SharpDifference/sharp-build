@@ -51,12 +51,9 @@ import {
   normalizeComfyUrl
 } from '@shared/comfyModels'
 import { CustomBackgroundsModal } from './CustomBackgroundsModal'
-import { useModOn } from '../stores/modsStore'
 import { ModSlot } from '../mods/ModSlot'
 import { SettingsAdvancedTab } from './SettingsAdvancedTab'
 import { SettingsComfyTab } from './SettingsComfyTab'
-import { PROMPT_STUDIO_MOD } from '@shared/presets/types'
-import { PromptStudioModal } from './PromptStudioModal'
 import { SystemPromptModal } from './SystemPromptModal'
 import { GamepadIcon, ImageIcon, SlidersIcon, SparklesIcon } from './screenIcons'
 import { useSettingsStore } from '../stores/settingsStore'
@@ -247,9 +244,6 @@ export function AppSettingsModal({ theme, onClose }: AppSettingsModalProps): JSX
   const commitComfy = useRef<(() => Promise<void>) | null>(null)
   // Whether the system prompt editor or the player's own backgrounds stand over this panel.
   const [editing, setEditing] = useState(false)
-  // Prompt Studio's own panel, over this one while the mod is on.
-  const [studio, setStudio] = useState(false)
-  const promptStudio = useModOn(PROMPT_STUDIO_MOD)
   const [backgrounds, setBackgrounds] = useState(false)
   // Holds off a second click while Save's write is in flight.
   const saving = useRef(false)
@@ -1110,8 +1104,9 @@ export function AppSettingsModal({ theme, onClose }: AppSettingsModalProps): JSX
                 onProblemChange={setAdvancedProblem}
                 commitRef={commitAdvanced}
                 onEditPrompt={() => setEditing(true)}
-                onPromptStudio={() => setStudio(true)}
                 onBackgrounds={() => setBackgrounds(true)}
+                theme={theme}
+                busy={backingUp || restoring}
               />
             )}
           </div>
@@ -1207,11 +1202,6 @@ export function AppSettingsModal({ theme, onClose }: AppSettingsModalProps): JSX
       <AnimatePresence propagate>
         {editing && (
           <SystemPromptModal key="system-prompt" theme={theme} onClose={() => setEditing(false)} />
-        )}
-      </AnimatePresence>
-      <AnimatePresence propagate>
-        {studio && promptStudio && (
-          <PromptStudioModal key="prompt-studio" theme={theme} onClose={() => setStudio(false)} />
         )}
       </AnimatePresence>
       <AnimatePresence propagate>

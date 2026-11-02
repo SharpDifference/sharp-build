@@ -16,10 +16,10 @@ import {
   type SamplingField,
   type SamplingKey
 } from '@shared/settingsRules'
-import { PROMPT_STUDIO_MOD } from '@shared/presets/types'
 import type { MemoryBudgets, SettingsPatch } from '@shared/types'
 import { TextField } from '../components/TextField'
-import { useModOn } from '../stores/modsStore'
+import { ModSlot } from '../mods/ModSlot'
+import type { ScreenTheme } from './clockTheme'
 import { useSettingsStore } from '../stores/settingsStore'
 import { gestures, quietLift, quietPress } from './motion'
 
@@ -30,10 +30,12 @@ export interface SettingsAdvancedTabProps {
   commitRef: MutableRefObject<(() => Promise<void>) | null>
   /** Raises the cast-scene persona editor over Settings. */
   onEditPrompt: () => void
-  /** Raises Prompt Studio over Settings, in the editor's place while the mod is on. */
-  onPromptStudio: () => void
   /** Raises the player's own backgrounds over Settings. */
   onBackgrounds: () => void
+  /** The half of the day Settings wears, which the mods' entries wear too. */
+  theme: ScreenTheme
+  /** A backup or a restore is running. */
+  busy: boolean
 }
 
 /** The three memory fields, in the order the column shows them. */
@@ -61,12 +63,12 @@ export function SettingsAdvancedTab({
   onProblemChange,
   commitRef,
   onEditPrompt,
-  onPromptStudio,
-  onBackgrounds
+  onBackgrounds,
+  theme,
+  busy
 }: SettingsAdvancedTabProps): JSX.Element | null {
   const settings = useSettingsStore((s) => s.settings)
   const update = useSettingsStore((s) => s.update)
-  const promptStudio = useModOn(PROMPT_STUDIO_MOD)
 
   // Seeded once from the store; a stored cap the file cannot mean opens blank, the ceiling.
   const [capText, setCapText] = useState(() =>
@@ -247,27 +249,15 @@ export function SettingsAdvancedTab({
             >
               Upload custom BG
             </motion.button>
-            {promptStudio ? (
-              <motion.button
-                id="advanced-prompt-studio"
-                className="vu-pill vu-settings-pill"
-                type="button"
-                {...gestures(false, quietLift, quietPress)}
-                onClick={onPromptStudio}
-              >
-                Prompt Studio
-              </motion.button>
-            ) : (
-              <motion.button
-                id="advanced-edit-prompt"
-                className="vu-pill vu-settings-pill"
-                type="button"
-                {...gestures(false, quietLift, quietPress)}
-                onClick={onEditPrompt}
-              >
-                Edit system prompt
-              </motion.button>
-            )}
+            <motion.button
+              id="advanced-edit-prompt"
+              className="vu-pill vu-settings-pill"
+              type="button"
+              {...gestures(false, quietLift, quietPress)}
+              onClick={onEditPrompt}
+            >
+              Edit system prompt
+            </motion.button>
             <span className="vu-settings-heading">Context</span>
             {MEMORY_FIELDS.map((field) => (
               <TextField
@@ -290,6 +280,7 @@ export function SettingsAdvancedTab({
               maxLength={3}
               onBlur={() => void commitSecrets()}
             />
+            <ModSlot slot="advancedSettingsEntry" props={{ theme, busy }} />
           </div>
           <div className="vu-scroll-fade" />
         </div>
