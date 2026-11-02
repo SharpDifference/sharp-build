@@ -7,21 +7,29 @@
 import { useState, type JSX, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { motion } from 'motion/react'
-import { countMatches, presetWithReplacement } from '@shared/presets/glossary'
+import { countMatches, presetWithReplacement } from '../../shared/presets/glossary'
 import {
   CLASS_CATALOG_RANGES,
   DEFAULT_CLASS_CATALOG,
   studioPromptsToKeep,
   type ClassCatalogEdits,
   type ClassCatalogKey
-} from '@shared/presets/studioPrompts'
-import type { Preset, PresetBlock } from '@shared/presets/types'
-import { SelectField } from '../components/SelectField'
-import { TextField } from '../components/TextField'
-import { TitleTab } from '../components/TitleTab'
-import { useModalShell } from '../components/useModalShell'
-import type { ScreenTheme } from './clockTheme'
-import { gestures, lift, panelUnderTab, press, quietLift, quietPress, veilIn } from './motion'
+} from '../../shared/presets/studioPrompts'
+import type { Preset, PresetBlock } from '../../shared/presets/types'
+import {
+  gestures,
+  lift,
+  panelUnderTab,
+  press,
+  quietLift,
+  quietPress,
+  SelectField,
+  TextField,
+  TitleTab,
+  useModalShell,
+  veilIn,
+  type ScreenTheme
+} from '@vx/modkit/renderer'
 import '../vu_styles/PromptStudio.css'
 
 /** The deepest a depth block may stand, and the longest XML tag one may wear. */

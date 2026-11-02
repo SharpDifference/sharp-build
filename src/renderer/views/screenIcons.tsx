@@ -152,20 +152,6 @@ export function PlusIcon({ size }: { size: number }): JSX.Element {
   )
 }
 
-/** The two columns of dots a row is dragged by. */
-export function GripIcon(): JSX.Element {
-  return (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-      {[5, 12, 19].map((y) => (
-        <g key={y}>
-          <circle cx="9" cy={y} r="1.9" />
-          <circle cx="15" cy={y} r="1.9" />
-        </g>
-      ))}
-    </svg>
-  )
-}
-
 /** The eye's outline, open around whatever the pupil or the strike-through says. */
 const EYE_OUTLINE = 'M2 12s4-7 10-7 10 7 10 7-4 7-10 7-10-7-10-7Z'
 
@@ -487,15 +473,8 @@ export function CalendarIcon(): JSX.Element {
   )
 }
 
-/** A resonating spark: Echo's mark shares the other app tabs' size, weight and tint. */
-export function EchoIcon(): JSX.Element {
-  return (
-    <svg {...APP_MARK}>
-      <path d="m12 6 2 4 3 2-3 2-2 4-2-4-3-2 3-2Z" />
-      <path d="M5 5a10 10 0 0 0 0 14M19 5a10 10 0 0 1 0 14" />
-    </svg>
-  )
-}
+// Kept for existing consumers such as Campus Talents' Echoes tree.
+export { EchoIcon } from './EchoIcon'
 
 /** BunnyShop's own mark: a shopping bag. */
 export function ShopIcon(): JSX.Element {
@@ -682,3 +661,46 @@ const TWO: [number, number][] = [
   [8.5, 8.5],
   [15.5, 15.5]
 ]
+
+/** A bound book: the lorebook, on the Bunnyboard's rail and on New Game's Setting screen. */
+export function LorebookIcon(): JSX.Element {
+  return (
+    <svg {...APP_MARK}>
+      <path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H19a1 1 0 0 1 1 1v18a1 1 0 0 1-1 1H6.5a1 1 0 0 1 0-5H20" />
+    </svg>
+  )
+}
+
+/** Two people: the roster, New Game's Finalize screen's tab for its characters. */
+export function PeopleIcon(): JSX.Element {
+  return (
+    <svg {...APP_MARK}>
+      <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
+      <circle cx="9" cy="7" r="4" />
+      <path d="M22 21v-2a4 4 0 0 0-3-3.87" />
+      <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+    </svg>
+  )
+}
+
+/** A mortarboard: the class catalog, New Game's Finalize screen's tab for its classes. */
+export function CapIcon(): JSX.Element {
+  return (
+    <svg {...APP_MARK}>
+      <path d="M21.4 10.9a1 1 0 0 0 0-1.8L12.8 5.2a2 2 0 0 0-1.6 0L2.6 9.1a1 1 0 0 0 0 1.8l8.6 3.9a2 2 0 0 0 1.6 0Z" />
+      <path d="M22 10v6" />
+      <path d="M6 12.5V16a6 3 0 0 0 12 0v-3.5" />
+    </svg>
+  )
+}
+
+/** A globe: the world a playthrough is set in, the New Game Setting screen's first tab. */
+export function GlobeIcon(): JSX.Element {
+  return (
+    <svg {...APP_MARK}>
+      <circle cx="12" cy="12" r="9.5" />
+      <path d="M2.5 12h19" />
+      <path d="M12 2.5a14.5 14.5 0 0 1 0 19 14.5 14.5 0 0 1 0-19Z" />
+    </svg>
+  )
+}

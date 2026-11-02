@@ -1,3 +1,4 @@
+import './fixtures/maestroModelKit'
 import { createElement, type ReactNode } from 'react'
 import { PassThrough } from 'node:stream'
 import { renderToPipeableStream } from 'react-dom/server'
@@ -9,10 +10,6 @@ import { screenSlot, subscribeHookRules } from '../src/renderer/mods/hooks'
 import { useModsStore } from '../src/renderer/stores/modsStore'
 import { useSoundtrackStore } from '../src/renderer/stores/soundtrackStore'
 import '../src/renderer/modEntries/custom-soundtracks'
-
-// This server render has no Electron host. Use the real motion presets without
-// starting the renderer bridge's stores; the kit contract tests check identity.
-vi.mock('@vx/modkit/renderer', () => import('../src/renderer/views/motion'))
 
 function draw(busy = false): Promise<string> {
   const element: ReactNode = createElement(MotionConfig, { isStatic: true },

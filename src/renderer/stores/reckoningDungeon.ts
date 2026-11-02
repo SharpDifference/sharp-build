@@ -6,7 +6,7 @@ import type { ReckoningDungeon } from '../../shared/reckoningDungeonState'
 import { dungeonConversationPrompt,dungeonInsightPrompt,parseDungeonText,withDungeonReply } from '@shared/dungeonConversation'
 import { preparedReckoningThoughts } from './reckoning'
 import { useGameStore } from './gameStore'
-import { modIsOn } from './modsStore'
+import { modIsOn } from '@vx/modkit/renderer'
 import { manualSaveOffer, writeReckoningChange } from './loop/saves'
 import { unspokenNightAvailable } from './reckoningCalendar'
 

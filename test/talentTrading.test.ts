@@ -1,3 +1,4 @@
+import './fixtures/maestroModelKit'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { buyTalent, normalizeTalents, setTalentRules, type TalentState } from '@shared/campusTalents'
 import { buyTraining, PERSONAL_GROWTH, quoteTraining, readTalentTraining, reconcileTraining, trainingAfterBreak } from '@shared/talentTrading'

@@ -1,3 +1,4 @@
+import './fixtures/maestroModelKit'
 import { describe, expect, it } from 'vitest'
 import { slotOf } from '@shared/classes'
 import { newJobState } from '@shared/jobs'
@@ -8,7 +9,7 @@ import { useGameStore } from '../src/renderer/stores/gameStore'
 import { useGrabBagStore } from '../src/renderer/stores/grabBagStore'
 import { calendarEvent, classEntry } from './fixtures'
 
-const SPRING = calendarOf('spring', [])
+const SPRING = calendarOf('spring', [], {})
 
 /**
  * The buttons a slot opens with: everything the reader already committed this half-day to is

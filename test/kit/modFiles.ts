@@ -77,6 +77,8 @@ export const MOD_FILES: Record<string, ModSet> = {
       'src/renderer/echoCutout.html',
       'src/renderer/stores/echoAssignments.ts',
       'src/renderer/views/EchoPanel.tsx',
+      'src/renderer/views/EchoEntry.tsx',
+      'src/renderer/views/EchoIcon.tsx',
       'src/renderer/vu_styles/Echo.css',
       'assets/echo-public/**',
       'assets/workflows/echoCutout.py',
@@ -198,9 +200,9 @@ export const MOD_FILES: Record<string, ModSet> = {
       'src/main/services/presetsService.ts',
       'src/main/services/studioBackupService.ts',
       'src/main/services/studioPromptsService.ts',
-      'src/renderer/prompts/promptBlocks.ts',
-      'src/renderer/stores/promptStudioStore.ts',
-      'src/renderer/views/PromptStudio*'
+      'src/renderer/stores/promptStudio*',
+      'src/renderer/views/PromptStudio*',
+      'src/renderer/vu_styles/PromptStudio.css'
     ]
   },
   reckoning: {

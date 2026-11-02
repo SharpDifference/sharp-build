@@ -1,9 +1,9 @@
 import { unspokenSceneBoundary } from '@shared/unspokenVoice'
 import { CHARACTER_DYNAMICS_MOD } from '@shared/characterDynamics'
 import { createElement, lazy, Suspense } from 'react'
-import { registerHooks, type ScreenSlotProps } from '../mods/hooks'
+import { registerHooks, type ScreenSlotProps } from '@vx/modkit/renderer'
 import { earnedGrowthLines } from '../prompts/characterDynamics'
-import { modIsOn } from '../stores/modsStore'
+import { modIsOn } from '@vx/modkit/renderer'
 import { loopState } from '../stores/loop/state'
 
 const dynamicsOn = (): boolean => modIsOn(CHARACTER_DYNAMICS_MOD, loopState.record)

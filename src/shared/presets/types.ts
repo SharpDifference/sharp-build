@@ -1,12 +1,25 @@
+import {
+  GLOBAL_TEXT_IDS,
+  SCENE_TEXT_IDS,
+  type PromptPart,
+  type PromptPartId,
+  type SceneSpot,
+  type SceneTextId,
+  type TextEdits
+} from '@vx/modkit/shared'
+
 /**
- * Prompt Studio presets: the shapes of an imported or native preset, the game's own coarse prompt
- * parts it arranges, and the ids of the text blocks a preset or the settings may rewrite.
+ * Prompt Studio presets: the shapes of an imported or native preset and the game's own coarse
+ * prompt parts it arranges. The ids of the text blocks and the scene spots are the game's own.
  */
+
+export { GLOBAL_TEXT_IDS, SCENE_TEXT_IDS }
+export type { GlobalTextId, SceneSpot, SceneSpotTag, SceneTextId, TextBlockId, TextEdits } from '@vx/modkit/shared'
 
 /** The Prompt Studio mod's id. */
 export const PROMPT_STUDIO_MOD = 'prompt-studio'
 
-/** The game's coarse prompt parts a preset may reorder or disable, in the order a scene call builds them. */
+/** The parts a preset may reorder or disable, in the order a scene call builds them: the game's own, and the story recall main adds. */
 export const GAME_MARKERS = [
   'persona',
   'jsonRules',
@@ -21,7 +34,7 @@ export const GAME_MARKERS = [
   'storySoFar',
   'sceneSoFar',
   'yourTurn'
-] as const
+] as const satisfies readonly (PromptPartId | 'storyRecall')[]
 export type GameMarker = (typeof GAME_MARKERS)[number]
 
 /** Parts a preset can neither disable nor move out of `system`: the reply contract. */
@@ -31,66 +44,9 @@ export const PROTECTED_MARKERS: readonly GameMarker[] = ['jsonRules']
 export const SYSTEM_MARKERS: readonly GameMarker[] = ['persona', 'jsonRules', 'setting']
 
 /** One game part as a scene builder emits it, its text already carrying any edits. */
-export interface GamePart {
+export interface GamePart extends PromptPart {
   id: GameMarker
-  role: 'system' | 'user'
-  text: string
 }
-
-/** The scene calls a preset is applied to. */
-export type SceneSpot = 'opening' | 'continue' | 'closing' | 'solo'
-
-/** The text blocks a preset owns: the cast scene's persona and its instructions. */
-export const SCENE_TEXT_IDS = [
-  'persona.scene',
-  'scene.opening',
-  'scene.continue',
-  'scene.continue.first-line',
-  'scene.continue.going',
-  'scene.continue.ending',
-  'scene.closing',
-  'scene.solo'
-] as const
-export type SceneTextId = (typeof SCENE_TEXT_IDS)[number]
-
-/** The text blocks the studio owns outside any preset: the personas, then the New Game calls' prose. */
-export const GLOBAL_TEXT_IDS = [
-  'persona.solo',
-  'persona.texting',
-  'persona.narration',
-  'persona.designer',
-  'newgame.classes.system',
-  'newgame.classes.additions',
-  'newgame.classes.instructions',
-  'newgame.profiles.system',
-  'newgame.profiles.additions',
-  'newgame.profiles.instructions',
-  'newgame.profiles.housing',
-  'newgame.profiles.freeTime',
-  'newgame.profiles.handle',
-  'newgame.profiles.springBreak',
-  'newgame.profiles.next.newcomers',
-  'newgame.profiles.next.housing',
-  'newgame.profiles.next.graduates',
-  'newgame.occasions.system',
-  'newgame.occasions.additions',
-  'newgame.occasions.instructions',
-  'newgame.occasions.fillers',
-  'newgame.occasions.gala',
-  'newgame.occasions.dance',
-  'newgame.occasions.careerFair',
-  'newgame.occasions.concert',
-  'newgame.secrets.system',
-  'newgame.secrets.additions',
-  'newgame.secrets.instructions',
-  'newgame.secrets.tiers'
-] as const
-export type GlobalTextId = (typeof GLOBAL_TEXT_IDS)[number]
-
-export type TextBlockId = SceneTextId | GlobalTextId
-
-/** Edits to text blocks, by id; an absent id sends the shipped text. */
-export type TextEdits<Id extends string = TextBlockId> = Partial<Record<Id, string>>
 
 export type PresetSource = 'sillytavern' | 'marinara' | 'native'
 
@@ -141,13 +97,6 @@ export interface Preset {
   notes?: string
 }
 
-/** Which scene call a builder made and who is in it, as the builder knows it; stamped on the request and read by `streamScene`. */
-export interface SceneSpotTag {
-  spot: SceneSpot
-  /** The cast's given names in order; empty for a solo scene. */
-  cast: string[]
-}
-
 /** The names a preset's `{{user}}`, `{{char}}` and `{{group}}` macros fill in. */
 export interface PresetNames {
   user: string
@@ -157,7 +106,7 @@ export interface PresetNames {
   group: string
 }
 
-/** What a scene request carries for main to apply the active preset with. */
+/** What the window tags a scene call with, for main to apply the active preset by. */
 export interface PresetRequest {
   spot: SceneSpot
   playthroughId: string

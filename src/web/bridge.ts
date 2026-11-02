@@ -72,7 +72,6 @@ import * as replays from './db/replays'
 import * as saves from './db/saves'
 import * as scenes from './db/scenes'
 import { readGrabBags, writeGrabBags } from './db/grabbags'
-import { planPresetRequest, finishPresetReply } from '@shared/presets/request'
 import * as presets from './presets'
 import { readStudioPrompts, writeStudioPrompts } from './studioPrompts'
 import { pickStudioBackup, saveStudioBackup } from './studioBackup'
@@ -85,6 +84,7 @@ import { emitter } from './emitter'
 import { convertLegacyImages } from './legacyImages'
 import { exportWorldInfo, importWorldInfo } from './lorebook'
 import { exportLog, writeLogLine } from './log'
+import { exportOccasionsFile, importOccasionsFile } from './occasions'
 import { currentSettings, patchSettings, rendererSettings, setUnversionedSeen } from './settings'
 import { duplicateCharacter, exportCharacter, importCharacter, ZIP_TYPE } from './transfer'
 import { storedBlob } from './webp'
@@ -214,6 +214,9 @@ export function buildApi(): VenusUniversityApi {
       import: () => result('import the preset', presets.importPreset)
     },
     mods: {
+      invokeStart: () => desktopOnly('mod.invoke'),
+      invokeResult: () => desktopOnly('mod.invoke'),
+      invokeCancel: () => desktopOnly('mod.invokeCancel'),
       get: () => result('read the mod switches', readModSwitches),
       set: (switches) => result('save the mod switches', () => writeModSwitches(switches)),
       // The browser build installs nothing: no table, no host, no developer folders.
@@ -415,6 +418,10 @@ export function buildApi(): VenusUniversityApi {
         result('save the class registration', () => saves.writeEnrollment(draft, playthroughId)),
       enrollment: (playthroughId) =>
         result('read the class registration', () => saves.readEnrollment(playthroughId)),
+      apply: (draft, playthroughId) =>
+        result('save the new game in progress', () => saves.writeApplication(draft, playthroughId)),
+      application: (playthroughId) =>
+        result('read the new game in progress', () => saves.readApplication(playthroughId)),
       create: (playthrough, draft, playthroughId) =>
         result('start the playthrough', () =>
           saves.createPlaythrough(playthrough, draft, playthroughId)
@@ -545,6 +552,11 @@ export function buildApi(): VenusUniversityApi {
       import: () => result('import the lorebook', importWorldInfo),
       export: (world) => result('save the lorebook', () => exportWorldInfo(world))
     },
+    occasions: {
+      // The picker opens synchronously inside the click: `result` calls this before any await.
+      import: () => result('import the occasions', importOccasionsFile),
+      export: (file) => result('save the occasions', () => exportOccasionsFile(file))
+    },
     // Local image generation is the desktop's; no control in the browser reaches any of these.
     comfy: {
       start: () => desktopOnly('comfy.start'),
@@ -613,14 +625,9 @@ export function buildApi(): VenusUniversityApi {
 }
 
 /**
- * Sends one structured request: the story recall is prepended, the active Prompt Studio preset is
- * applied where the request asks for one, and the fields only this app reads never reach the
- * provider. A preset that cannot be loaded costs nothing but a warning.
+ * Sends one structured request with the story recall prepended; the fields only this app reads
+ * never reach the provider, and no mod reshapes the call in the browser build.
  */
 async function completeStructured<T>(request: StructuredRequest, signal?: AbortSignal, onDelta?: (delta: string) => void): Promise<T> {
-  const prepared = await prepareStoryRequest(request)
-  const plan = planPresetRequest(prepared, prepared.preset ? await presets.loadActivePreset() : null)
-  const reply = await completeCloudStructured<T>(plan.request, signal, onDelta, undefined, plan.sampling)
-  for (const warning of finishPresetReply(reply, plan.applied)) console.warn(`[presets] ${warning}`)
-  return reply
+  return completeCloudStructured<T>(await prepareStoryRequest(request), signal, onDelta)
 }

@@ -1,3 +1,4 @@
+import './fixtures/maestroModelKit'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { assignEchoes, editEchoCreature, editEchoSettings, editEchoStage, normalizeEcho, renameEcho, withEchoArtwork } from '@shared/echo'
 import { echoStageOpacity, echoStageStyle, normalizeEchoStage, resolveEchoStage } from '@shared/echoStage'

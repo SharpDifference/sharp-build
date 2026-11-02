@@ -74,17 +74,6 @@ export async function setActivePreset(id: string): Promise<void> {
   await writePresetRow(id, library.presets)
 }
 
-/** The preset in force, or null (with a warning) where there is none to read, so a scene goes on without one. */
-export async function loadActivePreset(): Promise<Preset | null> {
-  try {
-    const library = await readLibrary()
-    return library.presets.find((p) => p.id === library.active) ?? null
-  } catch (err) {
-    console.warn('[presets] The presets could not be read; sending the scene without one.', err)
-    return null
-  }
-}
-
 /** `presets.import` — reads the SillyTavern, Marinara or exported Prompt Studio file the player picks into a preset under a fresh id; nothing is kept, and null where nothing was picked. */
 export async function importPreset(): Promise<PresetImport | null> {
   const file = await pickFile('.json,.marinara,application/json')

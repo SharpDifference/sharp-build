@@ -21,9 +21,10 @@ import { SETTING } from '../prompts/setting'
 import { useUiStore } from './uiStore'
 
 /**
- * The lorebook of the playthrough being played: read on the way into a game, dropped on the way
- * out, and written whole after every change the player makes. Its writes run one at a time and
- * outlive the stay that queued them, an edit being the player's rather than a decision point's.
+ * The lorebook of the playthrough being played or set up: read on the way into a game or a New
+ * Game in progress, begun on the shipped book for a fresh New Game, dropped on the way out, and
+ * written whole after every change the player makes. Its writes run one at a time and outlive the
+ * stay that queued them, an edit being the player's rather than a decision point's.
  */
 
 /** Where the playthrough's lorebook stands: none outside one, then read, or refused on reading. */
@@ -57,8 +58,22 @@ interface LorebookState {
    */
   revision: number
 
-  /** Reads the playthrough's lorebook; `null` is the shipped book with nothing to write. */
-  load: (playthroughId: string | null) => Promise<void>
+  /**
+   * Reads the playthrough's lorebook; `null` is the shipped book with nothing to write. Where
+   * `folder` is given, each write asks it for the playthrough instead — which writes an
+   * application kept beside it where nothing has been yet.
+   */
+  load: (playthroughId: string | null, folder?: () => Promise<string | null>) => Promise<void>
+  /**
+   * A fresh New Game's lorebook: the shipped book, ready to edit, each write asking `folder` for
+   * the playthrough it goes beside — which writes the application where nothing has been yet.
+   */
+  beginNewGame: (folder: () => Promise<string | null>) => void
+  /**
+   * The New Game `folder` stood for has its playthrough now: writes go there from here, and a
+   * record left unwritten for want of one is written.
+   */
+  homeMinted: (folder: () => Promise<string | null>, playthroughId: string) => void
   /** Back to the shipped book, on the way out of a game; queued writes still land. */
   drop: () => void
   /** Lays `patch` over a shipped entry; false where the editor's revision is stale. */
@@ -75,7 +90,7 @@ interface LorebookState {
   ) => boolean
   deleteCustom: (id: string) => void
   /** Rewrites the setting, the shipped one kept as absent; false where nothing could be kept. */
-  editSetting: (text: string) => boolean
+  editSetting: (text: string, revision: number) => boolean
   /**
    * Has the player pick a SillyTavern lorebook and lays it in, replacing the lorebook or adding
    * its own entries to it; null where nothing came in. Calls the bridge before anything is
@@ -86,22 +101,62 @@ interface LorebookState {
   exportWorld: () => Promise<void>
 }
 
+/** Where a stay's writes go: its playthrough, or a New Game's way of asking for one. */
+type Home = string | (() => Promise<string | null>)
+
 /** The writes still to land, one after another. */
 let queue: Promise<void> = Promise.resolve()
+/** How many of them have not landed yet. */
+let writesOut = 0
 /** The read the stay's first prompts wait on. */
 let loaded: Promise<void> = Promise.resolve()
 /** Whether this stay has already said a write failed; once is enough. */
 let warned = false
+/** Where this stay's writes go; none outside a playthrough or a New Game. */
+let home: Home | null = null
+/** Minted by every load, begin and drop, so a picker opened in one stay lands nothing in the next. */
+let stay: object = {}
+/** Whether a write of this stay was dropped for want of a playthrough to put it beside. */
+let unwritten = false
 
-/** Queues one whole-record write behind every earlier one. */
-function enqueue(playthroughId: string, record: LorebookRecord): void {
-  queue = queue.then(async () => {
-    const written = await window.api.lorebook.write(playthroughId, record)
-    if (!written.ok && !warned) {
-      warned = true
-      useUiStore.getState().showError(written.error)
-    }
-  })
+/** The queued write that has not taken its record yet, and the stay and home it was queued in. */
+let waiting: { record: LorebookRecord; stay: object; home: Home } | null = null
+
+/**
+ * Queues one whole-record write behind every earlier one; a write of the same stay and home that
+ * has not taken its record yet takes this one instead, so only the newest waits. A New Game is
+ * asked for its playthrough at once, so the change counts as one to the application; a record
+ * with nowhere to go yet is left for `homeMinted` to write.
+ */
+function enqueue(record: LorebookRecord): void {
+  if (home === null) return
+  const target = typeof home === 'string' ? Promise.resolve(home) : home()
+  if (waiting && waiting.stay === stay && waiting.home === home) {
+    waiting.record = record
+    return
+  }
+  const mine = { record, stay, home }
+  waiting = mine
+  writesOut += 1
+  queue = queue
+    .then(async () => {
+      const playthroughId = await target
+      if (waiting === mine) waiting = null
+      if (!playthroughId) {
+        if (stay === mine.stay) unwritten = true
+        return
+      }
+      const written = await window.api.lorebook.write(playthroughId, mine.record)
+      if (!written.ok && !warned) {
+        warned = true
+        useUiStore.getState().showError(written.error)
+      }
+    })
+    .catch((err: unknown) => console.error('[lorebook] a write failed', err))
+    .finally(() => {
+      if (waiting === mine) waiting = null
+      writesOut -= 1
+    })
 }
 
 /** What the record's rules read of the build. */
@@ -124,13 +179,11 @@ export const useLorebookStore = create<LorebookState>((set, get) => {
    */
   const commit = (revision: number, change: (record: LorebookRecord) => LorebookRecord): boolean => {
     const state = get()
-    if (state.status !== 'ready' || state.revision !== revision || !state.playthroughId) {
-      return false
-    }
+    if (state.status !== 'ready' || state.revision !== revision || home === null) return false
     const record = change(state.record)
     if (JSON.stringify(record) === JSON.stringify(state.record)) return true
     set({ record, ...readOf(record) })
-    enqueue(state.playthroughId, record)
+    enqueue(record)
     return true
   }
 
@@ -142,9 +195,12 @@ export const useLorebookStore = create<LorebookState>((set, get) => {
     setting: SETTING,
     revision: 0,
 
-    load: (playthroughId) => {
+    load: (playthroughId, folder) => {
       const revision = get().revision + 1
       warned = false
+      home = playthroughId === null ? null : (folder ?? playthroughId)
+      stay = {}
+      unwritten = false
       set({
         playthroughId,
         status: playthroughId ? 'loading' : 'none',
@@ -173,7 +229,35 @@ export const useLorebookStore = create<LorebookState>((set, get) => {
       return loaded
     },
 
-    drop: () =>
+    beginNewGame: (folder) => {
+      warned = false
+      home = folder
+      stay = {}
+      unwritten = false
+      loaded = Promise.resolve()
+      set((state) => ({
+        playthroughId: null,
+        status: 'ready',
+        record: emptyLorebook(),
+        book: SHIPPED_BOOK,
+        setting: SETTING,
+        revision: state.revision + 1
+      }))
+    },
+
+    homeMinted: (folder, playthroughId) => {
+      if (home !== folder) return
+      home = playthroughId
+      set({ playthroughId })
+      if (!unwritten) return
+      unwritten = false
+      enqueue(get().record)
+    },
+
+    drop: () => {
+      home = null
+      stay = {}
+      unwritten = false
       set((state) => ({
         playthroughId: null,
         status: 'none',
@@ -181,7 +265,8 @@ export const useLorebookStore = create<LorebookState>((set, get) => {
         book: SHIPPED_BOOK,
         setting: SETTING,
         revision: state.revision + 1
-      })),
+      }))
+    },
 
     editShipped: (ref, patch, revision) => {
       const shipped = shippedOf(ref)
@@ -213,22 +298,22 @@ export const useLorebookStore = create<LorebookState>((set, get) => {
       }
     },
 
-    editSetting: (text) => {
+    editSetting: (text, revision) => {
       if (!settingKeepable(text)) return false
-      return commit(get().revision, (record) => withSetting(record, text, SETTING))
+      return commit(revision, (record) => withSetting(record, text, SETTING))
     },
 
     importWorld: async (replace) => {
       const before = get()
-      const playthroughId = before.playthroughId
-      if (!playthroughId || (before.status !== 'ready' && before.status !== 'refused')) return null
+      const mine = stay
+      if (home === null || (before.status !== 'ready' && before.status !== 'refused')) return null
       const picked = await window.api.lorebook.import()
       if (!picked.ok) {
         useUiStore.getState().showError(picked.error)
         return null
       }
       const now = get()
-      if (!picked.data || now.playthroughId !== playthroughId) return null
+      if (!picked.data || stay !== mine) return null
       // A lorebook that could not be read is only ever replaced.
       const readable = now.status === 'ready'
       try {
@@ -244,7 +329,7 @@ export const useLorebookStore = create<LorebookState>((set, get) => {
           ...readOf(applied.record),
           revision: now.revision + 1
         })
-        enqueue(playthroughId, applied.record)
+        enqueue(applied.record)
         return { imported: applied.imported, leftOut: applied.leftOut }
       } catch (err) {
         useUiStore.getState().showError(toAppError(err, 'LOREBOOK_IMPORT_INVALID'))
@@ -277,4 +362,9 @@ export function lorebookLoaded(): Promise<void> {
 /** Resolves once every write already queued has landed or failed. */
 export function lorebookSettled(): Promise<void> {
   return queue
+}
+
+/** Whether a write is still to land, which a browser tab closing would lose. */
+export function lorebookWritesPending(): boolean {
+  return writesOut > 0
 }

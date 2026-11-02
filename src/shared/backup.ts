@@ -1,3 +1,4 @@
+import type { Application } from './application'
 import { isCharFileRel } from './characterFiles'
 import { ECHO_ART_DIR, echoArtIdOf } from './echoArtwork'
 import { readCharacterRecord, SAFE_CHAR_ID } from './characterRules'
@@ -17,7 +18,7 @@ import { validateRecord, type ValidateRecordOptions } from './jsonValidate'
 import { readLorebookRecord, type LorebookRecord } from './lorebookRecord'
 import { PHOTO_META_READ, type PhotoMeta } from './photos'
 import { REPLAY_ID, replayIdsOf, validateReplay, type SlotReplay } from './replays'
-import { classifySaveId, ENROLLMENT_READ, RECORD_READ, SAVE_READ, SAFE_NUMERIC_ID } from './saveRules'
+import { classifySaveId, readApplicationRecord, ENROLLMENT_READ, RECORD_READ, SAVE_READ, SAFE_NUMERIC_ID } from './saveRules'
 import { validateSavedScene, type SavedScene } from './sceneCreator'
 import { recordReplayIds } from './semesters'
 import type {
@@ -139,6 +140,8 @@ export interface BackupFile {
   lorebooks?: Record<string, LorebookRecord>
   /** Each mod's own share, by mod id, in the order the parts wrote them; absent where none did. */
   mods?: Record<string, BackupModPart>
+  /** Each New Game in progress, by playthrough id; absent in backups from before them. */
+  applications?: Record<string, Application>
   characters: Character[]
 }
 
@@ -159,6 +162,7 @@ const BACKUP_KEYS: Record<Exclude<keyof BackupFile, 'exMusic'>, true> = {
   replays: true,
   lorebooks: true,
   mods: true,
+  applications: true,
   characters: true,
   // The in-repo mods' own fields, written and read back by their code here.
   exEchoArt: true,
@@ -533,4 +537,27 @@ export function lorebooksFromBackup(record: BackupFile): Record<string, Lorebook
     )
   }
   return lorebooks
+}
+
+/**
+ * The New Games in progress a backup carries, each checked as its own file is under a
+ * playthrough id that can name a path; refuses the backup before anything is written.
+ */
+export function applicationsFromBackup(record: BackupFile): Record<string, Application> {
+  const carried: unknown = record.applications ?? {}
+  if (typeof carried !== 'object' || carried === null || Array.isArray(carried)) {
+    throw appError(BACKUP_READ.malformed.code, BACKUP_READ.malformed.message, 'applications')
+  }
+  const kept: Record<string, Application> = {}
+  for (const [playthroughId, value] of Object.entries(carried)) {
+    if (!SAFE_NUMERIC_ID.test(playthroughId)) {
+      throw appError(BACKUP_READ.malformed.code, BACKUP_READ.malformed.message, playthroughId)
+    }
+    kept[playthroughId] = readApplicationRecord(
+      value,
+      `applications.${playthroughId}`,
+      BACKUP_READ.malformed
+    )
+  }
+  return kept
 }

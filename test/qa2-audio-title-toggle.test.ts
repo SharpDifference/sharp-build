@@ -46,6 +46,8 @@ let soundtracks: typeof import('../src/renderer/stores/soundtrackStore')
 async function settle() { for (let i = 0; i < 120; i++) await Promise.resolve() }
 beforeEach(async () => {
   vi.resetModules(); vi.useFakeTimers(); Source.made = []
+  // Reset the forwarding mock with the stores; a cached factory would keep the previous test's switches.
+  vi.doMock('@vx/modkit/renderer', () => import('../src/renderer/stores/modsStore'))
   vi.stubGlobal('AudioContext', Context); vi.stubGlobal('AudioBufferSourceNode', Source)
   vi.stubGlobal('window', { addEventListener() {}, removeEventListener() {}, api: {
     assets: { readAudio: vi.fn(async () => ({ ok: true, data: new Uint8Array([1]) })) },

@@ -270,3 +270,29 @@ export const STORM_HALF_FACTOR: Record<TimeSlot, number> = { 0: 0.67, 1: 1.33 }
 
 /** Odds the first happy face of a turn throws sparkles off her; rolled as it is shown. */
 export const HAPPY_SPARKLE_CHANCE = 0.5
+
+// ─── New Game's skipped profiles ───────────────────────────────────────────────
+
+/** Odds a skipped profile holds a part-time job; rolled once per girl as it is filled. */
+export const SKIP_JOB_CHANCE = 0.6
+
+/** Odds a skipped profile's job is two shifts a week rather than one; rolled with the job. */
+export const SKIP_TWO_SHIFTS_CHANCE = 0.5
+
+/** Odds a skipped profile studies somewhere other than her room; rolled once per girl. */
+export const SKIP_STUDY_CHANCE = 0.8
+
+/** Odds a skipped profile eats out once a week; rolled once per girl. */
+export const SKIP_MEAL_CHANCE = 0.75
+
+/** Odds a skipped profile pursues a weekly interest somewhere; rolled once per girl. */
+export const SKIP_ACTIVITY_CHANCE = 0.5
+
+/** Odds a skipped profile's junior or senior lives in Elysium Village; rolled once per such girl. */
+export const SKIP_ELYSIUM_CHANCE = 0.5
+
+/** The weights of a skipped profile going out for fun to 0, 1 or 2 places; rolled once per girl. */
+export const SKIP_FUN_WEIGHTS: readonly number[] = [0.15, 0.45, 0.4]
+
+/** The weights of a skipped profile staying in 1, 2 or 3 evenings a week; rolled once per girl. */
+export const SKIP_HOME_SLOTS_WEIGHTS: readonly number[] = [0.2, 0.5, 0.3]

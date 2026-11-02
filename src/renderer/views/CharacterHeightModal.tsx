@@ -10,9 +10,11 @@ import {
 import { shuffle } from '@shared/shuffle'
 import { hairColorOf } from '@shared/tags'
 import { fullNameOf, type Character } from '@shared/types'
+import { MaskedFace, SpoilerName } from '../components/Spoiler'
 import { useModalShell } from '../components/useModalShell'
 import { TitleTab } from '../components/TitleTab'
 import { profileUrl, spriteUrl, useCharacterStore } from '../stores/characterStore'
+import { UNKNOWN_NAME } from '../stores/gameStore'
 import { gestures, lift, panelUnderTab, press, quietLift, quietPress, veilIn } from './motion'
 import '../vu_styles/CharacterHeight.css'
 
@@ -21,6 +23,9 @@ const PCT_MIN = Math.round(SPRITE_SCALE_MIN * 100)
 const PCT_MAX = Math.round(SPRITE_SCALE_MAX * 100)
 const PCT_STEP = Math.round(SPRITE_SCALE_STEP * 100)
 
+/** No girl masked. */
+const NONE_MASKED: ReadonlySet<string> = new Set()
+
 /**
  * One end of a height: the square that shortens her or heightens her by a step. A roster
  * cluster wears both side by side and the focus row wears them either side of its slider, so
@@ -28,11 +33,14 @@ const PCT_STEP = Math.round(SPRITE_SCALE_STEP * 100)
  */
 function Stepper({
   character,
+  name,
   scale,
   step,
   onSet
 }: {
   character: Character
+  /** Her full name as the lineup may say it. */
+  name: string
   scale: number
   /** -1 shortens her, +1 heightens her. */
   step: -1 | 1
@@ -44,7 +52,7 @@ function Stepper({
       className="vu-square vu-square--step"
       type="button"
       disabled={dead}
-      aria-label={`${step < 0 ? 'Shorten' : 'Heighten'} ${fullNameOf(character)}`}
+      aria-label={`${step < 0 ? 'Shorten' : 'Heighten'} ${name}`}
       {...gestures(dead, quietLift, quietPress)}
       onClick={() => onSet(character, scale + step * SPRITE_SCALE_STEP)}
     >
@@ -68,6 +76,12 @@ export interface CharacterHeightModalProps {
   anchorIds?: string[]
   /** Hands Shuffle to the caller; without it Shuffle re-orders the roster it was given. */
   onShuffle?: () => void
+  /** What the answer reaches beyond this lineup, said on its own line over the foot. */
+  note?: string
+  /** New Game's random picks still masked: a silhouette on the floor and a mask in the cluster. */
+  masked?: ReadonlySet<string>
+  /** Lifts one girl's mask. */
+  onReveal?: (charId: string) => void
   onConfirm: (scales: Record<string, number>) => void
 }
 
@@ -83,6 +97,9 @@ export function CharacterHeightModal({
   focus,
   anchorIds,
   onShuffle,
+  note,
+  masked = NONE_MASKED,
+  onReveal,
   onConfirm
 }: CharacterHeightModalProps): JSX.Element | null {
   /* Only the heights the player has touched, resolved against her stored height
@@ -112,7 +129,15 @@ export function CharacterHeightModal({
   /* Her label's colour, and a roster's alone: a focus lineup is about one girl among a ruler,
      and the accent chip at her feet is already saying which one she is. */
   const hairOf = (character: Character): string | undefined =>
-    focus === undefined ? (hairColorOf(character.baseAppearance) ?? undefined) : undefined
+    focus === undefined && !masked.has(character.charId)
+      ? (hairColorOf(character.baseAppearance) ?? undefined)
+      : undefined
+
+  /** Her given name and her full name as the lineup may say them. */
+  const givenOf = (character: Character): string =>
+    masked.has(character.charId) ? UNKNOWN_NAME : character.firstName || 'Unnamed'
+  const nameOf = (character: Character): string =>
+    masked.has(character.charId) ? UNKNOWN_NAME : fullNameOf(character)
 
   /** Her height as the lineup stands: what was set here, else what she carries. */
   const scaleOf = (character: Character): number => scales[character.charId] ?? character.height
@@ -175,6 +200,17 @@ export function CharacterHeightModal({
       >
         <TitleTab>{focus === undefined ? 'Adjust Heights' : 'Set height'}</TitleTab>
 
+        {/* A masked girl's shape filled with a colour role: the flood takes the sprite's own
+            alpha, read off this panel's theme. */}
+        {masked.size > 0 && (
+          <svg className="vu-heights-mask-defs" aria-hidden="true" focusable="false">
+            <filter id="vu-heights-mask" colorInterpolationFilters="sRGB">
+              <feFlood className="vu-heights-mask-ink" />
+              <feComposite in2="SourceAlpha" operator="in" />
+            </filter>
+          </svg>
+        )}
+
         <div
           className={`vu-heights-strip${focus === undefined ? ' vu-heights-strip--roster' : ''}`}
         >
@@ -189,12 +225,12 @@ export function CharacterHeightModal({
                 style={{ '--char-scale': scaleOf(character) } as CSSProperties}
               >
                 <img
-                  className="vu-heights-sprite"
+                  className={`vu-heights-sprite${masked.has(character.charId) ? ' vu-heights-sprite--masked' : ''}`}
                   src={spriteUrl(character.charId, 'neutral', spriteVersion[character.charId] ?? 0)}
-                  alt={fullNameOf(character)}
+                  alt={nameOf(character)}
                 />
                 <span className={`vu-heights-name${isFocus ? ' vu-heights-name--focus' : ''}`}>
-                  <span className="vu-heights-given">{character.firstName || 'Unnamed'}</span>
+                  <span className="vu-heights-given">{givenOf(character)}</span>
                   {ruler && <span className="vu-heights-ruler">{ruler}</span>}
                 </span>
               </div>
@@ -214,30 +250,40 @@ export function CharacterHeightModal({
                 data-hair={hairOf(character)}
               >
                 <span className="vu-arch vu-paper vu-heights-arch">
-                  <span className="vu-crop">
-                    <img
-                      className="vu-crop-img"
-                      src={profileUrl(character.charId, spriteVersion[character.charId] ?? 0)}
-                      alt=""
-                    />
-                  </span>
+                  {masked.has(character.charId) ? (
+                    <MaskedFace />
+                  ) : (
+                    <span className="vu-crop">
+                      <img
+                        className="vu-crop-img"
+                        src={profileUrl(character.charId, spriteVersion[character.charId] ?? 0)}
+                        alt=""
+                      />
+                    </span>
+                  )}
                 </span>
                 <span className="vu-heights-side">
-                  <span className="vu-heights-name">
-                    <span className="vu-heights-given">{character.firstName || 'Unnamed'}</span>
-                  </span>
+                  {masked.has(character.charId) && onReveal ? (
+                    <SpoilerName onReveal={() => onReveal(character.charId)} />
+                  ) : (
+                    <span className="vu-heights-name">
+                      <span className="vu-heights-given">{givenOf(character)}</span>
+                    </span>
+                  )}
                   {/* Hers is not the player's to change, so the steps are not there at
                       all rather than dead on every shipped cluster. */}
                   {!locked.has(character.charId) && (
                     <span className="vu-heights-steps">
                       <Stepper
                         character={character}
+                        name={nameOf(character)}
                         scale={scaleOf(character)}
                         step={-1}
                         onSet={setScale}
                       />
                       <Stepper
                         character={character}
+                        name={nameOf(character)}
                         scale={scaleOf(character)}
                         step={1}
                         onSet={setScale}
@@ -262,7 +308,13 @@ export function CharacterHeightModal({
                 return (
                   <div className="vu-heights-row" key={character.charId}>
                     <span className="vu-heights-label">{name}</span>
-                    <Stepper character={character} scale={scale} step={-1} onSet={setScale} />
+                    <Stepper
+                      character={character}
+                      name={name}
+                      scale={scale}
+                      step={-1}
+                      onSet={setScale}
+                    />
                     <input
                       className="vu-range"
                       type="range"
@@ -279,13 +331,21 @@ export function CharacterHeightModal({
                       }
                       onChange={(event) => setScale(character, Number(event.target.value) / 100)}
                     />
-                    <Stepper character={character} scale={scale} step={1} onSet={setScale} />
+                    <Stepper
+                      character={character}
+                      name={name}
+                      scale={scale}
+                      step={1}
+                      onSet={setScale}
+                    />
                     <span className="vu-heights-value">{pct}%</span>
                   </div>
                 )
               })}
           </div>
         )}
+
+        {note && <p className="vu-heights-note">{note}</p>}
 
         <div className="vu-foot">
           <motion.button

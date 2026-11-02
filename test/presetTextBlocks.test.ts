@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { blockText } from '../src/shared/presets/textBlocks'
+import { blockText } from '../src/shared/promptText'
 
 /** A text block is sent as edited only while a non-blank string is stored for it. */
 

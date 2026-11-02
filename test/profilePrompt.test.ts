@@ -24,7 +24,9 @@ function profile(over: Record<string, unknown> = {}): ProfileGenReply {
       {
         key: 'sarah_rose',
         year: 2,
+        major: 'Biology',
         classesTaken: 4,
+        majorClassesTaken: 2,
         dorm: 'lowrise_3',
         job: 'cutetea',
         jobShifts: 2,
@@ -43,13 +45,12 @@ function profile(over: Record<string, unknown> = {}): ProfileGenReply {
   } as ProfileGenReply
 }
 
-/** The catalog half, as `validateClassDraft` leaves it. */
-function classReply(majorClassesTaken = 2): ClassGenReply {
+/** The catalog half, as `validateClassDraft` leaves it where loads are the profile's. */
+function classReply(): ClassGenReply {
   return {
     characters: {
       sarah_rose: {
         major: 'Biology',
-        majorClassesTaken,
         interestClass: { code: 'ART 101', name: 'Pots', description: 'Pots.' }
       }
     },
@@ -140,17 +141,42 @@ describe('validateProfileDraft', () => {
   })
 })
 
-describe('mergeProfiles', () => {
-  it('clamps major classes to the course load — the bound neither call could apply', () => {
+describe('validateProfileDraft — majors', () => {
+  // The class call files classes under each major's exact name, so two spellings of one major
+  // would leave the second girl with none of hers.
+  it('spells a major as the decided one wherever it differs only in case, and refuses a blank', () => {
     vi.spyOn(console, 'warn').mockImplementation(() => {})
-    const merged = mergeProfiles(classReply(3), validateProfileDraft(profile({ classesTaken: 3 }), ROSTER))
+    const mia = character({ charId: 'char-2', firstName: 'Mia', lastName: 'Park' })
+    const [sarah] = profile().characters
+    const reply = {
+      characters: [sarah, { ...sarah, key: 'mia_park', major: '  biology ' }]
+    } as ProfileGenReply
+    const out = validateProfileDraft(reply, [...ROSTER, mia], { sarah_rose: { major: 'BIOLOGY' } })
+    expect(out.characters.sarah_rose.major).toBe('BIOLOGY')
+    expect(out.characters.mia_park.major).toBe('BIOLOGY')
+
+    expect(() => validateProfileDraft(profile({ major: ' ' }), ROSTER)).toThrow(
+      expect.objectContaining({ code: 'PROFILE_GEN_INVALID' })
+    )
+    vi.restoreAllMocks()
+  })
+})
+
+describe('mergeProfiles', () => {
+  it('takes her major and its load from the profile, the load held to her course load', () => {
+    vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const merged = mergeProfiles(
+      classReply(),
+      validateProfileDraft(profile({ classesTaken: 3, majorClassesTaken: 3 }), ROSTER)
+    )
     expect(merged.characters.sarah_rose.majorClassesTaken).toBe(3)
+    expect(merged.characters.sarah_rose.major).toBe('Biology')
 
     const tighter = mergeProfiles(
-      classReply(3),
-      validateProfileDraft(profile({ classesTaken: 3, year: 1 }), ROSTER)
+      classReply(),
+      validateProfileDraft(profile({ classesTaken: 3, majorClassesTaken: 9 }), ROSTER)
     )
-    expect(tighter.characters.sarah_rose.classesTaken).toBe(3)
+    expect(tighter.characters.sarah_rose.majorClassesTaken).toBe(3)
     vi.restoreAllMocks()
   })
 })

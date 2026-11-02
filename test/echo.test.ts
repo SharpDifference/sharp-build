@@ -1,3 +1,4 @@
+import './fixtures/maestroModelKit'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { ECHO_ASPECTS, ECHO_MOTIFS, aspectOf, assignEchoes, changePlayerEcho, echoAffinity, echoCreatureOf, echoImagePrompt, echoMultiplier, editEchoCreature, matchingEcho, normalizeEcho, profileAspect, renameEcho, setEchoBonusEnabled, settleEchoMemories, uniqueEchoName, withEchoArtwork } from '@shared/echo'
 import { explainEchoAspect } from '@shared/echoReasons'

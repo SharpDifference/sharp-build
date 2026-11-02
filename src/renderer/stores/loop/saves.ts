@@ -260,9 +260,6 @@ export function queuedScene(
   if (game.sceneSummaries.length > 0) {
     scene.summaries = game.sceneSummaries.map((mark) => ({ ...mark }))
   } else delete scene.summaries
-  if (game.scenePresetVars.length > 0) {
-    scene.presetVarMarks = game.scenePresetVars.map((mark) => ({ at: mark.at, before: { ...mark.before } }))
-  } else delete scene.presetVarMarks
   const mods = savedModScene(game.sceneMods)
   if (mods) scene.mods = mods
   else delete scene.mods

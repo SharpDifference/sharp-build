@@ -280,6 +280,22 @@ export function npcRelationshipsOf(
   return map
 }
 
+/**
+ * A rolled pair map with every pair the player set laid over it: strangers have no entry, and
+ * the rest stand at their relation's affinity.
+ */
+export function pairsOver(
+  rolled: Readonly<NpcRelationshipMap>,
+  pairs: Readonly<Record<string, SceneRelation>>
+): NpcRelationshipMap {
+  const map: NpcRelationshipMap = { ...rolled }
+  for (const [key, relation] of Object.entries(pairs)) {
+    if (relation === 'strangers') delete map[key]
+    else map[key] = { affinity: RELATION_AFFINITY[relation] }
+  }
+  return map
+}
+
 /** The pairs kept for a cast: only those whose two girls are both still in it. */
 export function pairsWithin(
   cast: readonly string[],

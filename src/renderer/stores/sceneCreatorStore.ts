@@ -21,7 +21,7 @@ import {
 } from '@shared/types'
 import type { Weather } from '@shared/weather'
 import { useCharacterStore } from './characterStore'
-import { isEnrollment, newestPlaythrough, useSaveStore } from './saveStore'
+import { newestPlaythrough, useSaveStore } from './saveStore'
 import { useUiStore } from './uiStore'
 
 /**
@@ -76,9 +76,9 @@ function blankDraft(reader: SceneReader): SceneDraft {
 }
 
 /**
- * The reader as the newest save has him — the playthrough Continue would open, its newest file
- * or its enrollment — or null where there is none or it could not be read. Reads only: the Load
- * Game list is left as it was.
+ * The reader as the newest save has him — the playthrough Continue would open, its newest file,
+ * its enrollment or its New Game once he is named — or null where there is none or it could not
+ * be read. Reads only: the Load Game list is left as it was.
  */
 async function newestReader(): Promise<SceneReader | null> {
   const saves = useSaveStore.getState()
@@ -90,9 +90,19 @@ async function newestReader(): Promise<SceneReader | null> {
     for (const key of STAT_KEYS) tiers[key] = displayedTierOf(stats[key])
     return tiers
   }
+  if (newest.applying) {
+    const reader = (await useSaveStore.getState().resolveApplication(newest))?.application.reader
+    if (!reader) return null
+    return {
+      firstName: reader.firstName,
+      lastName: reader.lastName,
+      tiers: tiersOf(reader.stats),
+      bio: reader.bio ?? ''
+    }
+  }
   if (newest.enrolling) {
     const enrolled = await useSaveStore.getState().resolveEnrollment(newest)
-    if (!enrolled || !isEnrollment(enrolled)) return null
+    if (!enrolled) return null
     const { enrollment } = enrolled
     return {
       firstName: enrollment.playerFirstName,

@@ -72,7 +72,7 @@ function ordinaryPrompt(): StructuredRequest {
   const state = game()
   return buildTextingPrompt(girl, state.charInfo.a, undefined, 'How is your day?', {
     lorebook: SHIPPED_BOOK, date: state.date, time: state.time, memoryBudget: 10, charInfo: state.charInfo,
-    npcRelationships: {}, roster: [girl], classes: {}, playerSchedule: {}, classRosters: {}, calendar: calendarOf('spring', []), history: {}, playerJob: null,
+    npcRelationships: {}, roster: [girl], classes: {}, playerSchedule: {}, classRosters: {}, calendar: calendarOf('spring', [], {}), history: {}, playerJob: null,
     exCharacterDynamics: state.exCharacterDynamics
   }, 'READER')
 }

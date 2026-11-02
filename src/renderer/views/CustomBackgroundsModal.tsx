@@ -149,7 +149,7 @@ export function CustomBackgroundsModal({
             id="bgcustom-delete-confirm"
             theme={theme}
             title={`Delete ${deleting}?`}
-            message="The background is permanently deleted. A scene set there shows the dorm room instead."
+            message="This custom BG will be permanently deleted. Scenes currently using it will fall back to a default background."
             confirmText="Delete background"
             onCancel={() => setDeleting(null)}
             onConfirm={() => {

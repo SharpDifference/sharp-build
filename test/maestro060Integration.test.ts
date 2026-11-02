@@ -1,3 +1,4 @@
+import './fixtures/maestroModelKit'
 import { afterEach, describe, expect, it } from 'vitest'
 import { calendarOf } from '@shared/semesters'
 import { projectProgress } from '@shared/academics'
@@ -14,7 +15,7 @@ afterEach(() => { useGameStore.getState().reset(); useModsStore.setState({ switc
 
 describe('Campus Talents with native 0.6.0 grade checks', () => {
   it.each([undefined, 1.5, 2, 3])('reports earned project credit consistently (%s units)', units => {
-    const calendar = calendarOf('spring', []), entry = classEntry({ kind: 'project', slot: 0 })
+    const calendar = calendarOf('spring', [], {}), entry = classEntry({ kind: 'project', slot: 0 })
     const period = projectPeriodOf(entry, 7, calendar)!
     const record: ClassRecord = {
       meetings: [{ date: period.assignmentDate, attended: true }],

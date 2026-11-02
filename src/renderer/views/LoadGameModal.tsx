@@ -1,7 +1,7 @@
 import { useEffect, useLayoutEffect, useRef, useState, type JSX } from 'react'
 import { createPortal } from 'react-dom'
 import { AnimatePresence, motion, type AnimationPlaybackControls } from 'motion/react'
-import { toAppError } from '@shared/errors'
+import { appError, toAppError } from '@shared/errors'
 import { classifySaveId, manualSlotOf } from '@shared/saveRules'
 import { seasonOf, semesterName, semesterOf, type SemesterView } from '@shared/semesters'
 import {
@@ -22,6 +22,7 @@ import {
   type SaveGridCard,
   type SaveGridEntry
 } from '../components/SavePagesGrid'
+import { MaskedFace } from '../components/Spoiler'
 import { typingIn, useWindowKeydown } from '../components/useWindowKeydown'
 import { useModalShell } from '../components/useModalShell'
 import { TitleTab } from '../components/TitleTab'
@@ -38,9 +39,11 @@ import {
 } from '../stores/gameLoop'
 import { useGameStore } from '../stores/gameStore'
 import { runningReplayIds } from '../stores/loop/replay'
+import { applicationSettled, stageApplication } from '../stores/applicationStore'
 import { stageEnrollment } from '../stores/newGame'
 import {
   castOf,
+  isApplication,
   unloadableReason,
   useSaveStore,
   type ResolvedSave
@@ -107,6 +110,17 @@ function writtenAtShort(savedAt: number): string {
 function hasSaves(playthrough: PlaythroughSummary): boolean {
   return playthrough.saveCount + playthrough.manualCount > 0 || playthrough.hasAutosave
 }
+
+/**
+ * Whether a playthrough's row reopens a screen rather than listing saves: a New Game still being
+ * set up, or a registration, with no save beside it.
+ */
+function reopensScreen(playthrough: PlaythroughSummary): boolean {
+  return Boolean((playthrough.applying || playthrough.enrolling) && !hasSaves(playthrough))
+}
+
+/** Which screen a resume reopens: New Game on its application, or the registrar. */
+type ResumeKind = 'application' | 'registration'
 
 /** A count and the noun it counts, singular for one. */
 function countOf(count: number, noun: string): string {
@@ -213,6 +227,7 @@ export function LoadGameModal({ theme, onClose }: LoadGameModalProps): JSX.Eleme
   const removeSave = useSaveStore((s) => s.removeSave)
   const removePlaythrough = useSaveStore((s) => s.removePlaythrough)
   const resolveEnrollment = useSaveStore((s) => s.resolveEnrollment)
+  const resolveApplication = useSaveStore((s) => s.resolveApplication)
   const readSave = useSaveStore((s) => s.readSave)
   const closeModal = useUiStore((s) => s.closeModal)
   const setView = useUiStore((s) => s.setView)
@@ -230,8 +245,11 @@ export function LoadGameModal({ theme, onClose }: LoadGameModalProps): JSX.Eleme
   const [deletingPlaythrough, setDeletingPlaythrough] = useState<PlaythroughSummary | null>(null)
   // The save waiting on the player's yes, when a game is already running.
   const [confirmingLoad, setConfirmingLoad] = useState<ResolvedSave | null>(null)
-  // And the semester waiting on it, which is the same question about a registrar.
-  const [confirmingResume, setConfirmingResume] = useState<PlaythroughSummary | null>(null)
+  // And the semester waiting on it, which is the same question about a registrar or a New Game.
+  const [confirmingResume, setConfirmingResume] = useState<{
+    playthrough: PlaythroughSummary
+    kind: ResumeKind
+  } | null>(null)
   // The open playthrough's name being asked for.
   const [renaming, setRenaming] = useState<PlaythroughSummary | null>(null)
   // A save a mod has something to offer for, and its offer, waiting on the player's choice.
@@ -349,10 +367,13 @@ export function LoadGameModal({ theme, onClose }: LoadGameModalProps): JSX.Eleme
 
   const close = (): void => (onClose ? onClose() : closeModal('loadGame'))
 
-  /** Reopens a playthrough's registrar, asking first over a running game as a load does. */
-  function resume(playthrough: PlaythroughSummary): void {
-    if (onClose) setConfirmingResume(playthrough)
-    else void beginResume(playthrough)
+  /**
+   * Reopens a playthrough's registrar, or New Game on one still being set up, asking first over a
+   * running game as a load does.
+   */
+  function resume(playthrough: PlaythroughSummary, kind: ResumeKind): void {
+    if (onClose) setConfirmingResume({ playthrough, kind })
+    else void beginResume(playthrough, kind)
   }
 
   /**
@@ -397,21 +418,47 @@ export function LoadGameModal({ theme, onClose }: LoadGameModalProps): JSX.Eleme
   }
 
   /**
-   * Reopens the registrar on a playthrough that never got a timetable. From the Main Menu it's a
-   * plain cut; from the Game menu the running game says its last word and is torn down first,
-   * under the one curtain, handing on the hour it was left in exactly as leaving to the menu does.
+   * Reopens the registrar on a semester that never got a timetable, or New Game on one still
+   * being set up. From the Main Menu it's a plain cut; from the Game menu the running game says
+   * its last word and is torn down first, under the one curtain, handing on the hour it was left
+   * in exactly as leaving to the menu does.
    */
-  async function beginResume(playthrough: PlaythroughSummary): Promise<void> {
-    const resolved = await resolveEnrollment(playthrough)
-    // A refused file has reported itself; a roster it cannot be played with is on its own row.
-    if (!resolved || resolved.unloadable) return
+  async function beginResume(playthrough: PlaythroughSummary, kind: ResumeKind): Promise<void> {
+    const resolved =
+      kind === 'application'
+        ? await resolveApplication(playthrough)
+        : await resolveEnrollment(playthrough)
+    // A refused file has reported itself.
+    if (!resolved) return
+    // A roster it cannot be played with is said here, the foot's buttons having no row to say it.
+    if (resolved.unloadable) {
+      showError(
+        appError(
+          'RESUME_UNLOADABLE',
+          kind === 'application'
+            ? "That New Game+ can't be reopened."
+            : "That class registration can't be reopened.",
+          resolved.unloadable
+        )
+      )
+      return
+    }
+    /** Stages what was read and raises the screen that reopens on it. */
+    const reopen = (): void => {
+      if (isApplication(resolved)) {
+        stageApplication(resolved)
+        setView('newGame')
+      } else {
+        stageEnrollment(resolved)
+        setView('classSelect')
+      }
+    }
 
     if (!onClose) {
       const cut = beginCrossing(
         () => {
-          stageEnrollment(resolved)
           close()
-          setView('classSelect')
+          reopen()
         },
         { from: theme }
       )
@@ -424,8 +471,7 @@ export function LoadGameModal({ theme, onClose }: LoadGameModalProps): JSX.Eleme
       void (async () => {
         await leaveToMenu({ keepCrossing: true })
         setMenuTheme(theme)
-        stageEnrollment(resolved)
-        setView('classSelect')
+        reopen()
         onClose()
         endCrossing()
       })()
@@ -636,11 +682,11 @@ export function LoadGameModal({ theme, onClose }: LoadGameModalProps): JSX.Eleme
                         key={playthrough.playthroughId}
                         playthrough={playthrough}
                         cast={castOf(playthrough.chars, characters)}
-                        // A registration with no saves beside it has no second level to explain
-                        // a roster it can no longer be played with, so its gate is on this row.
+                        // A row that reopens a screen has no second level to explain a roster it
+                        // can no longer be played with, so its gate is on this row.
                         unloadable={
                           playthrough.unloadable ??
-                          (playthrough.enrolling && !hasSaves(playthrough)
+                          (reopensScreen(playthrough)
                             ? unloadableReason(playthrough.chars, characters)
                             : null)
                         }
@@ -648,11 +694,11 @@ export function LoadGameModal({ theme, onClose }: LoadGameModalProps): JSX.Eleme
                         onHover={(on) => setHovered(on ? playthrough.playthroughId : null)}
                         onDelete={() => setDeletingPlaythrough(playthrough)}
                         onClick={() => {
-                          // A folder with nothing in it but a semester at the registrar has a
-                          // registrar to reopen rather than saves to list; over a running game
-                          // that asks first, exactly as loading a save does.
-                          if (playthrough.enrolling && !hasSaves(playthrough)) {
-                            resume(playthrough)
+                          // A folder with nothing in it but a semester at the registrar or a New
+                          // Game being set up has a screen to reopen rather than saves to list;
+                          // over a running game that asks first, exactly as loading a save does.
+                          if (reopensScreen(playthrough)) {
+                            resume(playthrough, playthrough.applying ? 'application' : 'registration')
                             return
                           }
                           leave()
@@ -689,9 +735,21 @@ export function LoadGameModal({ theme, onClose }: LoadGameModalProps): JSX.Eleme
                 className="vu-btn vu-btn--quiet"
                 type="button"
                 {...gestures(false, quietLift, quietPress)}
-                onClick={() => resume(selected)}
+                onClick={() => resume(selected, 'registration')}
               >
                 Resume registration
+              </motion.button>
+            )}
+            {/* A later semester's New Game being set up beside the saves listed. */}
+            {selected?.application && (
+              <motion.button
+                id="load-game-resume-application"
+                className="vu-btn vu-btn--quiet"
+                type="button"
+                {...gestures(false, quietLift, quietPress)}
+                onClick={() => resume(selected, 'application')}
+              >
+                Resume New Game+
               </motion.button>
             )}
             {selected && renamable && (
@@ -749,9 +807,11 @@ export function LoadGameModal({ theme, onClose }: LoadGameModalProps): JSX.Eleme
             message={
               deletingInProgress
                 ? `${deletingPlaythrough.label} is the playthrough in progress. All ${deletingSaveCount} saves will be permanently deleted, and you will return to the main menu.`
-                : deletingPlaythrough.enrolling
-                  ? 'All save will be deleted.'
-                  : `All ${deletingSaveCount} saves will be permanently deleted.`
+                : deletingPlaythrough.applying && !hasSaves(deletingPlaythrough)
+                  ? 'This New Game will be permanently deleted.'
+                  : deletingPlaythrough.enrolling && !hasSaves(deletingPlaythrough)
+                    ? 'All saves will be deleted.'
+                    : `All ${deletingSaveCount} saves will be permanently deleted.`
             }
             confirmText={deletingInProgress ? 'Delete and return to menu' : 'Delete playthrough'}
             onCancel={() => setDeletingPlaythrough(null)}
@@ -762,10 +822,12 @@ export function LoadGameModal({ theme, onClose }: LoadGameModalProps): JSX.Eleme
                 deleteInProgress(playthroughId)
                 return
               }
-              // A photo still being drawn for it is stopped and settled first, so none lands after.
+              // A photo still being drawn for it is stopped and a New Game still being written
+              // settled first, so none lands after.
               void usePhotoStore
                 .getState()
                 .cancelFor(playthroughId)
+                .then(() => applicationSettled())
                 .then(() => removePlaythrough(playthroughId))
             }}
           />
@@ -832,7 +894,7 @@ export function LoadGameModal({ theme, onClose }: LoadGameModalProps): JSX.Eleme
             key="resume-enrollment"
             id="resume-enrollment"
             theme={theme}
-            title={`Resume ${confirmingResume.label}?`}
+            title={`Resume ${confirmingResume.playthrough.label}?`}
             message={
               hasDecisionPoint()
                 ? 'Progress since the last action will be lost.'
@@ -841,9 +903,9 @@ export function LoadGameModal({ theme, onClose }: LoadGameModalProps): JSX.Eleme
             confirmText="Resume"
             onCancel={() => setConfirmingResume(null)}
             onConfirm={() => {
-              const playthrough = confirmingResume
+              const { playthrough, kind } = confirmingResume
               setConfirmingResume(null)
-              void beginResume(playthrough)
+              void beginResume(playthrough, kind)
             }}
           />
         )}
@@ -863,7 +925,8 @@ interface RowProps {
 /**
  * One playthrough on the first level, read off its newest readable save. Unreadable saves are
  * marked but the row still opens, so its files can be deleted — except an unloadable
- * **enrollment**, which has nothing to open onto and is marked dead instead of a button.
+ * **enrollment** or **application**, which has nothing to open onto and is marked dead instead of
+ * a button.
  */
 function PlaythroughRow({
   playthrough,
@@ -881,7 +944,9 @@ function PlaythroughRow({
   const label = `Delete ${playthrough.label} and all of its saves`
   // Reframing a portrait re-cuts the file behind its URL, so the strip reads the version.
   const versions = useCharacterStore((state) => state.spriteVersion)
-  const dead = Boolean(playthrough.enrolling && !hasSaves(playthrough) && unloadable)
+  const dead = Boolean(reopensScreen(playthrough) && unloadable)
+  // The girls New Game drew at random and never revealed stay behind its mask until met.
+  const masked = new Set(playthrough.masked ?? [])
   // The scene autosave counts among the autosaves where there is one.
   const autosaves = playthrough.saveCount + (playthrough.hasAutosave ? 1 : 0)
 
@@ -892,26 +957,34 @@ function PlaythroughRow({
       <span className="vu-load-headline">
         {unloadable
           ? 'Unreadable'
-          : playthrough.enrolling
-            ? 'Class registration'
-            : formatDateBanner(
-              playthrough.date,
-              playthrough.time,
-              seasonOf(playthrough.semesterIndex ?? 0)
-            )}
+          : playthrough.applying
+            ? (playthrough.semesterIndex ?? 0) > 0
+              ? 'New Game+'
+              : 'New Game'
+            : playthrough.enrolling
+              ? 'Class registration'
+              : formatDateBanner(
+                playthrough.date,
+                playthrough.time,
+                seasonOf(playthrough.semesterIndex ?? 0)
+              )}
       </span>
 
       {/* The faces stand where a list of their names would: recognised, not read. */}
       <span className="vu-load-cast">
         {cast.map((character) => (
           <span className="vu-arch vu-load-arch" key={character.charId}>
-            <span className="vu-crop">
-              <img
-                className="vu-crop-img"
-                src={profileUrl(character.charId, versions[character.charId] ?? 0)}
-                alt={fullNameOf(character)}
-              />
-            </span>
+            {masked.has(character.charId) ? (
+              <MaskedFace />
+            ) : (
+              <span className="vu-crop">
+                <img
+                  className="vu-crop-img"
+                  src={profileUrl(character.charId, versions[character.charId] ?? 0)}
+                  alt={fullNameOf(character)}
+                />
+              </span>
+            )}
           </span>
         ))}
         {/* An archway with nobody in it: every character this playthrough was started
@@ -920,9 +993,11 @@ function PlaythroughRow({
       </span>
 
       <span className="vu-load-meta">
-        {playthrough.enrolling
-          ? `Registered ${writtenAt(playthrough.savedAt)}`
-          : `${countOf(playthrough.manualCount, 'save')} · ${countOf(autosaves, 'autosave')} · Played ${writtenAt(playthrough.savedAt)}`}
+        {playthrough.applying
+          ? `Saved ${writtenAt(playthrough.savedAt)}`
+          : playthrough.enrolling
+            ? `Registered ${writtenAt(playthrough.savedAt)}`
+            : `${countOf(playthrough.manualCount, 'save')} · ${countOf(autosaves, 'autosave')} · Played ${writtenAt(playthrough.savedAt)}`}
       </span>
       {unloadable && <span className="vu-load-reason">Cannot load — {unloadable}</span>}
     </>

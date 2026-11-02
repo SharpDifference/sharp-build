@@ -1,3 +1,4 @@
+import './fixtures/maestroModelKit'
 import { afterEach, expect, it, vi } from 'vitest'
 import type { ChatMessage, Result } from '@shared/types'
 import { setPhotoSwitches } from '@shared/photoSwitches'

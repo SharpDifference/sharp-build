@@ -37,7 +37,7 @@ import {
   spaced
 } from './scenePrompt'
 import { springBreakLines } from './springBreak'
-import type { GlobalTextId, TextEdits } from '@shared/presets/types'
+import type { GlobalTextId, TextEdits } from '@shared/promptText'
 import { narrationPersonaFor } from './promptBlocks'
 import { weatherLines } from './weather'
 
@@ -221,7 +221,7 @@ export interface SlotIntroInput {
   time: TimeSlot
   /** The player's `lessNsfwText` setting; picks which persona heads this call's prefix. */
   lessNsfwText: boolean
-  /** Prompt Studio's edits to the global text blocks; absent with the mod off. */
+  /** The edits a mod hands the global text blocks; absent when none is supplied. */
   globalTextEdits?: TextEdits<GlobalTextId>
   /** How many of her told secrets each girl's entry carries; absent is the default. */
   secretBudget?: number

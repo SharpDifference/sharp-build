@@ -42,7 +42,7 @@ it('keeps Maestro save data through all eight native semesters and older branch 
       title: 'An old issue', body: 'A public claim.', subjects: ['a'], comments: [], answered: [] }] })
   useGameStore.setState({ playthroughId: '123', playthroughMods: mods, chars: ['a', 'b'], characters: cast,
     charInfo: { a: charInfo({ ...record.profiles.a, nameKnown: true }), b: charInfo({ ...record.profiles.b, nameKnown: true }) },
-    date: 123, time: 0, calendar: calendarOf('spring', []),
+    date: 123, time: 0, calendar: calendarOf('spring', [], {}),
     exEcho: echo, exCharacterDynamics: dynamics,
     exBreakthrough: normalizeBreakthrough({ meters: { a: 65, b: 80 }, moments: { a: [{ id: 'moment', date: 9, time: 0, outcome: 'They reached an understanding.' }] } }),
     exStoryMemory: normalizeStoryMemory({ facts: [{ id: 'manual:promise', text: 'A remembered promise.', subject: 'a',

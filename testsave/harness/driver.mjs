@@ -136,11 +136,11 @@ export async function firstRun(page, endpointUrl, modelId) {
 
 /**
  * The registrar: for each `[label, code]`, the empty slot's `+` and then the picker row whose
- * course code is `code`, then Finalize. A slot with no `+` (already taken) is reported, not fatal:
- * Finalize and the schedule check after it are what decide.
+ * course code is `code`, then Enroll. A slot with no `+` (already taken) is reported, not fatal:
+ * Enroll and the schedule check after it are what decide.
  */
 export async function enrol(page, enrolment = ENROLMENT) {
-  await page.waitForSelector('#class-select-finalize')
+  await page.waitForSelector('#class-select-enroll')
   const missing = []
   for (const [label, code] of enrolment) {
     const slot = `[aria-label="Enroll in a course on ${label}"]`
@@ -166,13 +166,13 @@ export async function enrol(page, enrolment = ENROLMENT) {
     if (!picked) throw new Error(`registrar: no ${code} row in the ${label} picker`)
     await page.waitForSelector('#course-picker', { state: 'detached', timeout: 10_000 }).catch(() => {})
   }
-  await clickWhenLive(page, '#class-select-finalize', 10_000)
+  await clickWhenLive(page, '#class-select-enroll', 10_000)
   return { missing }
 }
 
 /**
  * Quickstart → the name modal (first and last name typed) → the registrar with the exact
- * enrolment → Finalize. With `wait`, clicks on until the first live action well as well.
+ * enrolment → Enroll. With `wait`, clicks on until the first live action well as well.
  */
 export async function quickstartToLanding(page, { name = 'Theo Marsh', enrolment = ENROLMENT, wait = true } = {}) {
   await clickWhenLive(page, '#menu-quickstart')

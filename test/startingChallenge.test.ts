@@ -1,3 +1,4 @@
+import './fixtures/maestroModelKit'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { challengeStatFloor, challengeForStartingStats, challengeStartingStats, readStartingChallenge, startingChallengeForSetup, type StartingChallenge } from '@shared/startingChallenge'
 import { applyStatDeltas, breakDecayedStats, describePlayer, displayedTierOf, nextTierPoints, statsForStartingTiers, tierName, tierOf, tierUps } from '@shared/playerStats'

@@ -1,3 +1,4 @@
+import './fixtures/maestroModelKit'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import type { Result } from '@shared/types'
 import type { SoundtrackMap } from '@shared/soundtracks'

@@ -1,14 +1,15 @@
 {
   "donors": [
     "ElPapaDon",
+    "thatmaestroguy",
     "Elitetaco",
     "sav",
-    "thatmaestroguy",
     "Seviy",
     "Supahslm",
     "Stridley",
     "Evigan",
     "Elric",
+    "Donka",
     "0hrichi",
     "NihilBaxter",
     "MedeirosBR",
@@ -36,6 +37,10 @@
     {
       "name": "dfshawke",
       "marbles": 2
+    },
+    {
+      "name": "Donka",
+      "marbles": 4
     },
     {
       "name": "Elitetaco",
@@ -99,7 +104,7 @@
     },
     {
       "name": "thatmaestroguy",
-      "marbles": 5
+      "marbles": 6
     }
   ]
 }

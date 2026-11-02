@@ -1,17 +1,25 @@
 import { seedTalents, settleSavings, settleTalentPoints } from '../../shared/campusTalents'
-import { affectionFor } from '@shared/relationship'
+import { affectionFor } from '@vx/modkit/shared'
 import { settleTalentMemories } from '../../shared/talentMemories'
 import { abilityRank, anticipationReady, completeSilverLining, dancerCapability, farewellEnded, settleTalentSceneAbilities, silverLiningReady, TALENT_ABILITIES } from '../../shared/talentAbilities'
-import { fullNameOf } from '@shared/types'
-import { registerHooks } from '../mods/hooks'
-import { modIsOn } from '../stores/modsStore'
+import { fullNameOf } from '@vx/modkit/shared'
+import { registerHooks } from '@vx/modkit/renderer'
+import { modIsOn } from '@vx/modkit/renderer'
 import { useGameStore } from '../stores/gameStore'
 import { reconcileTraining } from '../../shared/talentTrading'
 import { talentStatGains } from '../../shared/talentPerks'
 import { sickInSlot } from '@shared/colds'
-import { globalSlotOf } from '@shared/jobs'
+import { globalSlotOf } from '@vx/modkit/shared'
 import { showUpHeartForScene } from '../stores/loop/talentShowUp'
 import { loopState } from '../stores/loop/state'
+import { createElement, lazy, Suspense } from 'react'
+import type { GameModalProps, ScreenSlotProps } from '@vx/modkit/renderer'
+
+// The gameplay hooks register at boot; screen code loads only when its slot is mounted.
+const screens = () => import('../views/TalentEntry')
+const Rail = lazy(() => screens().then(module => ({ default: module.TalentRailButton })))
+const Landing = lazy(() => screens().then(module => ({ default: module.TalentLandingTool })))
+const Panel = lazy(() => screens().then(module => ({ default: module.TalentGamePanel })))
 
 export function ensureTalents(): void {
   const g=useGameStore.getState()
@@ -20,6 +28,11 @@ export function ensureTalents(): void {
   useGameStore.setState({exTalents:seedTalents(g.exTalents,total,g.semesterIndex,g.date)})
 }
 registerHooks('campus-talents', {
+  railButton: (props: ScreenSlotProps['railButton']) => createElement(Suspense, { fallback: null }, createElement(Rail, props)),
+  landingTool: (props: ScreenSlotProps['landingTool']) => createElement(Suspense, { fallback: null }, createElement(Landing, props)),
+  gameModals: {
+    'campus-talents': (props: GameModalProps) => createElement(Suspense, { fallback: null }, createElement(Panel, props))
+  },
   gameEntered:ensureTalents,
   settleSceneStats:(resolved,{ctx})=>{
     const g=useGameStore.getState()

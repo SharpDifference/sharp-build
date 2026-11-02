@@ -1,3 +1,4 @@
+import './fixtures/maestroModelKit'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { activePlotTwist, PLOT_TWIST_LIMIT, PLOT_TWIST_MOD, savedPlotTwist, validatePlotTwist } from '@shared/plotTwists'
 import { NO_SWITCHES } from '@shared/mods'

@@ -1,16 +1,16 @@
 import { completeStructured } from '@vx/modkit/renderer'
-import { postVisible } from '../mods/hooks'
+import { postVisible } from '@vx/modkit/renderer'
 import { whisperTerm } from '../../shared/venusWhisper'
 import {
   VENUS_WHISPER_MOD, WHISPER_COMMENTS, WHISPER_TEXT, ensureWhisperAuthor, whisperAddressees, whisperCommenters,
   whisperWednesday, whisperWeekOccupied, whisperDiscussionOpen, whisperSpotlight, whisperIssueId, whisperMentions, whisperPeople, whisperPlayerHandle, whisperSources, validateWhisperComments,
   validateWhisperDraft, withWhisperIssue, type VenusWhisper, type WhisperComment, type WhisperIssue
 } from '../../shared/venusWhisper'
-import { fullNameOf } from '@shared/types'
+import { fullNameOf } from '@vx/modkit/shared'
 import { create } from 'zustand'
 import { anonymousVoice, buildWhisperIssue, buildWhisperReplies } from '../prompts/venusWhisperPrompt'
 import { useGameStore } from './gameStore'
-import { modIsOn } from './modsStore'
+import { modIsOn } from '@vx/modkit/renderer'
 import { manualSaveOffer, writeWhisper } from './loop/saves'
 
 /** A reopened viewer observes an older request finishing or cancelling. */

@@ -19,6 +19,7 @@ export type {
   PostFiling,
   PostPictureProps,
   PromptAddition,
+  PromptTextSpot,
   PromptSpot,
   PromptSpots,
   RailSeatProps,
@@ -26,7 +27,9 @@ export type {
   SaveChoice,
   ScenePanelProps,
   ScenePlay,
+  SceneCall,
   SceneReplied,
+  SceneReplyLanded,
   SceneSeatProps,
   SceneStats,
   SceneStatSettlement,
@@ -40,13 +43,18 @@ export type {
 } from './hooks'
 export { openPanel, ownsPostComments, postVisible, promptFields, promptLines, promptRequired, registerHooks } from './hooks'
 export { recordField, safePoint, saveField, useSafePoint, writeModField, writeModFields } from './saveField'
+export { sceneField } from './sceneField'
+export type { SceneFieldHandle, SceneFieldSpec } from './sceneField'
 export { modState } from './modState'
 export type { ModStateHandle, ModStateSpec } from './modState'
 export type { ModDataRecord, RecordFieldHandle, RecordFieldSpec, SaveFieldHandle, SaveFieldSpec } from './saveField'
 export type {
+  CheckFieldProps,
+  ConfirmModalProps,
   DividerWord,
   ManualSaveOffer,
   ModalShell,
+  PromptBlock,
   PromptState,
   ResolvedSave,
   SceneDividerProps,
@@ -56,6 +64,7 @@ export type {
   SelectFieldProps,
   SilentRetryOptions,
   SlotIntroInput,
+  TextEditModalProps,
   TextFieldProps,
   TextingPromptState,
   TitleTabProps,
@@ -67,15 +76,20 @@ export {
   bunnyHop,
   cancelCalls,
   Card,
+  CheckField,
   completeStructured,
+  ConfirmModal,
   currentRun,
   dealt,
+  defaultBlockText,
   EmojiTool,
   fadeIn,
   fileLatePost,
   finishSlotActivity,
+  gameFacts,
   gestures,
   isGraduationSlot,
+  isNewGameBlock,
   isOrientationSlot,
   lessNsfwText,
   lift,
@@ -89,6 +103,7 @@ export {
   PostCommentsView,
   PostPicture,
   press,
+  PROMPT_BLOCKS,
   quietLift,
   quietPress,
   retrySilently,
@@ -98,9 +113,11 @@ export {
   SceneDivider,
   SelectField,
   SentText,
+  showError,
   slideInQuick,
   submitAction,
   takeTurnFromReply,
+  TextEditModal,
   TextField,
   TitleTab,
   toggleLift,
@@ -109,21 +126,25 @@ export {
   useBareMessage,
   useDismissLayer,
   useEmojiTool,
+  useGameFacts,
   useLessNsfwText,
   useModalShell,
   useModOn,
   useModOption,
   useSceneInput,
+  useScenePersona,
   useSfxGain,
   veilIn
 } from '../bridge/renderer'
 
 export {
+  ChevronIcon,
   CloseIcon,
   HeartIcon,
   BunnyMark,
   EyeIcon,
   EyeOffIcon,
+  PlusIcon,
   formatNumericGameDate,
   formatShortGameDate,
   slotHalf,
@@ -139,3 +160,4 @@ export {
 } from '../bridge/renderer'
 
 export { bunnybotSays } from '../bridge/renderer'
+export { invoke } from '../bridge/renderer'

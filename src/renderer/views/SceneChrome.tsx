@@ -1,4 +1,3 @@
-import { TalentIcon } from './TalentIcon'
 /**
  * The scene view's chrome: what the Game View wears while a scene is on screen. Reads no
  * store — everything it draws is handed to it; the Game View owns the gates, this owns the
@@ -19,7 +18,6 @@ import type { ScreenTheme } from './clockTheme'
 import {
   BunnyIcon,
   CalendarIcon,
-  EchoIcon,
   EyeIcon,
   HalfMarkIcon,
   halfMarkKindOf,
@@ -93,8 +91,6 @@ export interface SceneChromeProps {
   /** Bumped by a click during that arrival: the box lands at once rather than losing a line. */
   skips: number
   rowShown: boolean
-  /** A running scene activity owns input; its own row replaces the scene action row. */
-  inputOwned?: boolean
   /**
    * A mod's panel holds the scene's input (`useSceneInput`): the row is put away and dead, and the
    * box stands clear of the panel's own input instead. Null while the row has it.
@@ -135,6 +131,11 @@ export interface SceneChromeProps {
   /** The dead reason a hover names — a gift already given, or nobody here — or null. */
   giftNote: string | null
   onGift: () => void
+  /** End scene stands beside the Gift, on the same terms, wherever the scene may be ended by hand. */
+  endSceneShown: boolean
+  /** Nothing to end yet, or the scene's own ending is already under way. */
+  endSceneDead: boolean
+  onEndScene: () => void
   calendarBadge: number
   bunnyboardBadge: number
   railDead: boolean
@@ -142,9 +143,6 @@ export interface SceneChromeProps {
   modButtons: boolean
   onCalendar: () => void
   onBunnyboard: () => void
-  /** Absent when Echo is disabled or this screen has no ordinary playthrough. */
-  onEchoes?: () => void
-  onTalents?: () => void
   onSettings: () => void
   /** Opens the panel of the mod whose seat on the rail was pressed. */
   onModPanel: (modId: string) => void
@@ -173,7 +171,7 @@ export function SceneChrome(props: SceneChromeProps): JSX.Element {
   const owned = props.inputLayout
 
   /** The row is up and answering: what every hover in it is dropped against. */
-  const rowLive = rowShown && !dark && !owned && !props.inputOwned
+  const rowLive = rowShown && !dark && !owned
 
   /**
    * The pointer has moved over the divider's strip, or is on the well's box or Go's seat once the
@@ -223,6 +221,9 @@ export function SceneChrome(props: SceneChromeProps): JSX.Element {
    * the scene will not be interrupted yet.
    */
   const giftOff = props.sending || props.giftDead || props.inputDead
+
+  /** End scene takes no click while the scene cannot be ended by hand. */
+  const endOff = props.endSceneDead
 
   /** Which word the divider last said, held while it fades so it does not change on the way out. */
   const dividerWord = useRef<DividerWord>('hover')
@@ -292,12 +293,12 @@ export function SceneChrome(props: SceneChromeProps): JSX.Element {
   // A panel taking the input finds the row put down the same way, the caret out of it.
   const held = owned !== null
   useLayoutEffect(() => {
-    if (!held && !props.inputOwned) return
+    if (!held) return
     setHover(false)
     setPinned(false)
     const active = document.activeElement
     if (active instanceof HTMLElement && row.current?.contains(active)) active.blur()
-  }, [held, props.inputOwned])
+  }, [held])
 
   const ownedHeight = owned?.height ?? null
   useEffect(() => {
@@ -408,25 +409,6 @@ export function SceneChrome(props: SceneChromeProps): JSX.Element {
         >
           <CalendarIcon />
         </RailSeat>
-        {props.onEchoes && (
-          <RailSeat
-            label="Echoes"
-            state={seatState(!dark && shown.has('settings'), props.railDead)}
-            onClick={props.onEchoes}
-          >
-            <EchoIcon />
-          </RailSeat>
-        )}
-
-        {props.onTalents && (
-          <RailSeat
-            label="Skill trees"
-            state={seatState(!dark && shown.has('settings'), props.railDead)}
-            onClick={props.onTalents}
-          >
-            <TalentIcon />
-          </RailSeat>
-        )}
         {/* The mods' buttons, revealed with Settings, the rail's last seat. */}
         {props.modButtons && (
           <ModSlot
@@ -510,8 +492,8 @@ export function SceneChrome(props: SceneChromeProps): JSX.Element {
       <motion.div
         ref={row}
         className="vu-turn vu-scene-row"
-        style={held || props.inputOwned ? { visibility: 'hidden' } : undefined}
-        aria-hidden={held || props.inputOwned || undefined}
+        style={held ? { visibility: 'hidden' } : undefined}
+        aria-hidden={held || undefined}
         data-well={wellOut ? 'out' : rowInterject === 'locked' ? 'locked' : 'away'}
         variants={sceneRow}
         initial="hidden"
@@ -544,7 +526,7 @@ export function SceneChrome(props: SceneChromeProps): JSX.Element {
               sending={props.sending}
               cg={props.cg}
               submitDead={props.submitDead}
-              inputDead={props.inputDead || held || Boolean(props.inputOwned)}
+              inputDead={props.inputDead || held}
               focus={rowLive && props.inputFocus}
               placeholder="What do you do?"
               multiline
@@ -579,7 +561,6 @@ export function SceneChrome(props: SceneChromeProps): JSX.Element {
                 >
                   {/* The Gift stays silent, so what a dead one is short of is said beside it. */}
                   <DeadNote note={props.giftNote}>
-                    <span className="vu-scene-rule" />
                     <motion.button
                       id="game-gift"
                       className="vu-scene-giftbtn"
@@ -591,6 +572,35 @@ export function SceneChrome(props: SceneChromeProps): JSX.Element {
                       <GiftIcon />
                     </motion.button>
                   </DeadNote>
+                </motion.div>
+              </motion.div>
+            )}
+            {/* End scene stands with the Gift and on its terms, hard against its far side. */}
+            {props.endSceneShown && (
+              <motion.div
+                className="vu-scene-end"
+                variants={wellMark}
+                initial={false}
+                animate={wellOut ? 'shown' : 'hidden'}
+                onPointerMove={() => setHover(true)}
+                onPointerLeave={() => setHover(false)}
+              >
+                <motion.div
+                  className="vu-scene-endseat"
+                  variants={seat}
+                  initial={false}
+                  animate={seatState(true, endOff)}
+                >
+                  <motion.button
+                    id="game-end-scene"
+                    className="vu-scene-endbtn"
+                    aria-label="End scene"
+                    disabled={endOff}
+                    {...gestures(endOff, quietLift, quietPress)}
+                    onClick={props.onEndScene}
+                  >
+                    <ClapperboardIcon />
+                  </motion.button>
                 </motion.div>
               </motion.div>
             )}
@@ -801,6 +811,27 @@ function CastIcon(): JSX.Element {
       <circle cx="9" cy="7" r="4" />
       <path d="M22 21v-2a4 4 0 0 0-3-3.87" />
       <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+    </svg>
+  )
+}
+
+function ClapperboardIcon(): JSX.Element {
+  return (
+    <svg
+      width="20"
+      height="20"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2.75"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <path d="M20.2 6 3 11l-.9-2.4c-.3-1.1.3-2.2 1.3-2.5l13.5-4c1.1-.3 2.2.3 2.5 1.3Z" />
+      <path d="m6.2 5.3 3.1 3.9" />
+      <path d="m12.4 3.4 3.1 4" />
+      <path d="M3 11h18v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2Z" />
     </svg>
   )
 }

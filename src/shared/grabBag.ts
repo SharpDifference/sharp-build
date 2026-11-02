@@ -57,19 +57,31 @@ export function drawFromBag<T>(
 
 /**
  * Draws `count` distinct items in a row. A draw already made by this call is skipped even when
- * the bag refills part-way through; `count` is clamped to the pool.
+ * the bag refills part-way through; `count` is clamped to the pool. Where `accept` is given, the
+ * items it passes are drawn first, and any shortfall is made up from the rest.
  */
 export function drawManyFromBag<T>(
   items: readonly T[],
   drawn: readonly string[],
   keyOf: (item: T) => string,
   count: number,
-  rand: () => number = Math.random
+  rand: () => number = Math.random,
+  accept?: (item: T) => boolean
 ): { items: T[]; drawn: string[] } {
   const wanted = Math.min(count, items.length)
   const picked: T[] = []
   const pickedKeys = new Set<string>()
   let aside = drawn
+  if (accept) {
+    const fresh = (item: T): boolean => accept(item) && !pickedKeys.has(keyOf(item))
+    const acceptable = Math.min(wanted, items.filter(accept).length)
+    while (picked.length < acceptable) {
+      const draw = drawFromBag(items, aside, keyOf, rand, fresh)
+      aside = draw.drawn
+      pickedKeys.add(keyOf(draw.item))
+      picked.push(draw.item)
+    }
+  }
   while (picked.length < wanted) {
     const draw = drawFromBag(items, aside, keyOf, rand)
     aside = draw.drawn

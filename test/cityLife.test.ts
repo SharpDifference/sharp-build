@@ -1,3 +1,4 @@
+import './fixtures/maestroModelKit'
 import { afterEach, describe, expect, it } from 'vitest'
 import { CITY_LIFE_JOBS_MOD, CITY_LIFE_LOCATIONS_MOD, availableLocationMenu, cityLifeBackgrounds, cityLifeJobsOn, cityLifeLocationsOn, setCityLifeEnabled } from '@shared/cityLife'
 import { availableJobs, jobDefOf, newJobState, payOf, meetsRequirements, rollJobClosures } from '@shared/jobs'

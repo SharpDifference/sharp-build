@@ -7,6 +7,7 @@ import {
   flagsOfEntry,
   lockedMilestones,
   npcRelationshipsOf,
+  pairsOver,
   SCENE_DISPOSITIONS,
   statsOfReader,
   validateSavedScene,
@@ -80,6 +81,14 @@ describe('scene creator setup projects onto what the game reads', () => {
       }).a
       expect(dispositionOf(affection)).toBe(disposition)
     }
+  })
+
+  it("the player's pairs replace the roll, strangers taking the pair off it", () => {
+    const rolled = { 'a|b': { affinity: -6 }, 'a|c': { affinity: 2 }, 'b|c': { affinity: 6 } }
+    const map = pairsOver(rolled, { 'a|b': 'friends', 'a|c': 'strangers' })
+    expect(zoneOf(map['a|b'].affinity)).toBe('friends')
+    expect(map['a|c']).toBeUndefined()
+    expect(map['b|c']).toEqual({ affinity: 6 })
   })
 
   it('pairs land in their zones, strangers with no entry and friends by default', () => {

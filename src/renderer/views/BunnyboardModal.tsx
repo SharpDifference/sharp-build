@@ -116,7 +116,15 @@ import {
   typingDot,
   veilIn
 } from './motion'
-import { BackIcon, BunnyMark, CloseIcon, HeartIcon, MapIcon, PlusIcon } from './screenIcons'
+import {
+  BackIcon,
+  BunnyMark,
+  CloseIcon,
+  HeartIcon,
+  LorebookIcon,
+  MapIcon,
+  PlusIcon
+} from './screenIcons'
 import { LettersFilter, lettersUrl } from '../components/LettersMark'
 import '../vu_styles/Bunnyboard.css'
 
@@ -251,14 +259,6 @@ function PhotosIcon(): JSX.Element {
     <svg {...RAIL_MARK}>
       <path d="M4 8h3l1.6-2.5h6.8L17 8h3a1.5 1.5 0 0 1 1.5 1.5V19A1.5 1.5 0 0 1 20 20.5H4A1.5 1.5 0 0 1 2.5 19V9.5A1.5 1.5 0 0 1 4 8Z" />
       <circle cx="12" cy="14" r="4" />
-    </svg>
-  )
-}
-
-function LorebookIcon(): JSX.Element {
-  return (
-    <svg {...RAIL_MARK}>
-      <path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H19a1 1 0 0 1 1 1v18a1 1 0 0 1-1 1H6.5a1 1 0 0 1 0-5H20" />
     </svg>
   )
 }

@@ -7,6 +7,7 @@ import {
   animate,
   stagger,
   type AnimationPlaybackControls,
+  type MotionStyle,
   type TargetAndTransition,
   type Transition,
   type Variants
@@ -380,16 +381,10 @@ export const typedChar: Variants = {
 export const bubbleFaces: Variants = dealt(BUBBLE_TYPE + BUBBLE_GO, 0.05)
 
 /**
- * A size that is a *state*: New Game's Start doubles when there is a roster to start with and
- * folds back when the last name leaves it — a spring, since the player caused it. It sits on a
- * **wrapper**, since `scale` is what {@link lift} and {@link press} also animate on the button.
+ * New Game's Next, standing at twice its size and tilted. It sits on a **wrapper**, since `scale`
+ * is what {@link lift} and {@link press} also animate on the button.
  */
-const DOUBLE: Transition = { type: 'spring', stiffness: 260, damping: 22 }
-
-export const doubled: Variants = {
-  single: { scale: 1, rotate: 0, transition: DOUBLE },
-  double: { scale: 2, rotate: -4, transition: DOUBLE }
-}
+export const doubled: MotionStyle = { scale: 2, rotate: -4 }
 
 /**
  * The doorway opening: a stiff spring with a kick, so it clears the spot the ripple starts from

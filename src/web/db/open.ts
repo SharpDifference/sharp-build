@@ -1,5 +1,6 @@
 import { openDB, type DBSchema, type IDBPDatabase } from 'idb'
 import { APP_ID } from '@shared/appId'
+import type { Application } from '@shared/application'
 import type { BackupPlaythrough } from '@shared/backup'
 import type { BgVariant, CustomBackground } from '@shared/customBackgrounds'
 import { appError, messageOf } from '@shared/errors'
@@ -69,6 +70,7 @@ export interface VenusUniversityDb extends DBSchema {
   presets: { key: 'presets'; value: StoredPresets }
   studioPrompts: { key: 'studioPrompts'; value: StudioPrompts }
   lorebooks: { key: string; value: LorebookRecord }
+  applications: { key: string; value: Application }
 }
 
 /**
@@ -96,12 +98,12 @@ const STORES = [
   'replays',
   'presets',
   'studioPrompts',
-  'lorebooks'
+  'lorebooks',
+  'applications'
 ] as const
 
-// 12: the build's 11 (Prompt Studio's stores) meeting Venus University 0.6.0's 10 (the lorebooks
-// store), so a database at either gains what the other added.
-const DB_VERSION = 12
+// 13 adds unfinished New Game applications while preserving every existing mod store.
+const DB_VERSION = 13
 
 let opened: Promise<IDBPDatabase<VenusUniversityDb>> | null = null
 

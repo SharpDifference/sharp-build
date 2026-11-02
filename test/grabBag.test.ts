@@ -84,4 +84,13 @@ describe('drawManyFromBag', () => {
     expect(result.items).toHaveLength(8)
     expect(new Set(result.items).size).toBe(8)
   })
+
+  it('draws the accepted items first and makes up the shortfall from the rest', () => {
+    const pool = Array.from({ length: 10 }, (_, i) => `k${i}`)
+    const accepted = new Set(['k3', 'k7'])
+    const result = drawManyFromBag(pool, [], identity, 5, lcg(9), (item) => accepted.has(item))
+    expect(new Set(result.items.slice(0, 2))).toEqual(accepted)
+    expect(result.items).toHaveLength(5)
+    expect(new Set(result.items).size).toBe(5)
+  })
 })

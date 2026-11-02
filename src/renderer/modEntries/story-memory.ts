@@ -4,7 +4,7 @@ import { useModsStore } from '../stores/modsStore'
 import { withNativeStoryRecall, withStoryExtraction } from '../prompts/storyMemoryPrompt'
 import { currentStorySnapshot } from '../stores/storyMemory'
 import { useGameStore } from '../stores/gameStore'
-import { registerHooks } from '../mods/hooks'
+import { registerHooks } from '@vx/modkit/renderer'
 import { createElement, lazy, Suspense } from 'react'
 import type { GameModalProps, ScreenSlotProps } from '@vx/modkit/renderer'
 
