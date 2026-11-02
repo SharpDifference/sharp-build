@@ -34,7 +34,7 @@ its supported Venus University version.
   It defaults off and works independently of Campus Talents.
 - **Godlike Standards** adds an optional gold **Godlike** character trait. Tagged characters
   require Godly Brain, Body and Heart before a new romance. Existing relationships continue
-  normally. The mod defaults on, but no character receives the tag automatically.
+  normally. The mod defaults off, and no character receives the tag automatically.
 - **City Life** includes the **Dance Studio**, open to visitors at any skill rank.
   The **Dance Instructor** job pays **$300 base per shift**, matching Barback, and requires
   Dancer III, Good Body and Good Heart. Campus Talents remains usable without City Life.
