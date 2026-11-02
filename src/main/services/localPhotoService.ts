@@ -259,7 +259,6 @@ export function validatePhotoOverrides(
     if (typeof prompts[key] !== 'string' || prompts[key].length > PHOTO_PROMPT_LIMIT) invalid()
   }
   if (!(prompts.positive as string).trim()) invalid()
-  if (!duo && ('left' in prompts || 'right' in prompts)) invalid()
 }
 
 /**
@@ -526,6 +525,11 @@ export async function dropPhoto(
   } catch {
     return
   }
+  await removePhotoFiles(playthroughId, charId, file)
+}
+
+/** Removes the image formats and sidecar after saved references have been checked. */
+async function removePhotoFiles(playthroughId: string, charId: string, file: string): Promise<void> {
   const png = pngPhotoOf(file)
   for (const name of [png, png.replace(/\.png$/, '.webp'), photoSidecarOf(file)]) {
     await rm(getPhotoPath(playthroughId, charId, name), { force: true })
@@ -540,6 +544,7 @@ interface RetiredPhoto {
 interface PhotoCleanup {
   pending: Map<string, RetiredPhoto>
   watcher: FSWatcher
+  revision: number
   running?: Promise<void>
   timer?: ReturnType<typeof setTimeout>
 }
@@ -585,16 +590,19 @@ export async function flushRetiredPhotos(playthroughId: string): Promise<void> {
   const cleanup = photoCleanups.get(playthroughId)
   if (!cleanup) return
   if (cleanup.running) return cleanup.running
+  const revision = cleanup.revision
   cleanup.running = (async () => {
     try {
       const refs = await photoReferences(playthroughId)
       for (const [key, photo] of cleanup.pending) {
+        if (cleanup.revision !== revision) break
         if (
           !refs.saved.has(pngPhotoOf(photo.newFile)) ||
           refs.all.has(pngPhotoOf(photo.oldFile))
         ) continue
         if (!(await photoLanded(playthroughId, photo.charId, photo.newFile))) continue
-        await dropPhoto(playthroughId, photo.charId, photo.oldFile)
+        if (cleanup.revision !== revision) break
+        await removePhotoFiles(playthroughId, photo.charId, photo.oldFile)
         cleanup.pending.delete(key)
       }
     } catch {
@@ -610,7 +618,25 @@ export async function flushRetiredPhotos(playthroughId: string): Promise<void> {
     await cleanup.running
   } finally {
     cleanup.running = undefined
+    if (cleanup.pending.size > 0 && cleanup.revision !== revision) schedulePhotoCleanup(playthroughId)
   }
+}
+
+/** Debounces checkpoint changes, including those that overtake a running reference scan. */
+function schedulePhotoCleanup(playthroughId: string): void {
+  const cleanup = photoCleanups.get(playthroughId)
+  if (!cleanup) return
+  clearTimeout(cleanup.timer)
+  cleanup.timer = setTimeout(() => void flushRetiredPhotos(playthroughId), 100)
+  cleanup.timer.unref()
+}
+
+/** Save files, replay files and replay-folder changes can change a picture's saved references. */
+function photoCheckpointChanged(file: string | null): boolean {
+  if (file === null) return true
+  const parts = file.replaceAll('\\', '/').split('/')
+  if (parts.length === 1) return parts[0] === 'replays' || parts[0].endsWith('.json')
+  return parts.length === 2 && parts[0] === 'replays' && parts[1].endsWith('.json')
 }
 
 /** Watches this playthrough's atomic save writes, retaining originals across skipped saves. */
@@ -631,19 +657,19 @@ export async function retirePhoto(
       const watcher = watch(
         join(getPhotosRoot(playthroughId), '..'),
         { recursive: true, persistent: false },
-        () => {
+        (_event, file) => {
+          if (!photoCheckpointChanged(file)) return
           const current = photoCleanups.get(playthroughId)
           if (!current) return
-          clearTimeout(current.timer)
-          current.timer = setTimeout(() => void flushRetiredPhotos(playthroughId), 100)
-          current.timer.unref()
+          current.revision += 1
+          schedulePhotoCleanup(playthroughId)
         }
       )
       watcher.on('error', () => {
         watcher.close()
         photoCleanups.delete(playthroughId)
       })
-      cleanup = { watcher, pending: new Map() }
+      cleanup = { watcher, pending: new Map(), revision: 0 }
       photoCleanups.set(playthroughId, cleanup)
     } catch {
       // Without a reliable save notification, retaining the original costs only disk space.
