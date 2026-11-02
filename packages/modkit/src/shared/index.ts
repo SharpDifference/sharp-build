@@ -6,10 +6,13 @@ export type {
   CharacterTrait,
   CharacterTraitDefinition,
   CharInfo,
+  ClassCatalogEdits,
+  ClassCatalogKey,
   CharMemory,
   ChatMessage,
   GameOverReason,
   GameSave,
+  GlobalTextId,
   NativeGameSave,
   ImagePromptDraft,
   ImagePromptKind,
@@ -31,8 +34,13 @@ export type {
   PostComment,
   ProjectSession,
   PromptEdit,
+  PromptPart,
+  PromptPartId,
   Result,
   SceneLine,
+  SceneSpot,
+  SceneSpotTag,
+  SceneTextId,
   SlotActivity,
   SlotActivityOffer,
   SocialPost,
@@ -41,11 +49,20 @@ export type {
   StatTier,
   StatusText,
   StructuredRequest,
+  TextBlockId,
+  TextEdits,
+  TextEditSet,
   TextingResponse,
-  TimeSlot
+  TimeSlot,
+  ValidateRecordOptions
 } from '../bridge/shared'
 export {
+  assertSafeId,
+  blockText,
   charKeyOf,
+  CLASS_CATALOG_RANGES,
+  DEFAULT_CLASS_CATALOG,
+  GLOBAL_TEXT_IDS,
   globalSlotOf,
   hasTrait,
   MAX_TIER,
@@ -56,10 +73,13 @@ export {
   optionKey,
   optionOn,
   pointsForTier,
+  PROMPT_PARTS,
   READER_SPEAKER,
   registerCharacterTrait,
   registerImagePromptDraft,
-  registerRomanceRequirement
+  registerRomanceRequirement,
+  SCENE_TEXT_IDS,
+  validateRecord
 } from '../bridge/shared'
 export { sharedModOn } from './modRules'
 export { carryModFiles, registerPostCarry, registerTermCarry, registerTermFiles } from './modCarry'

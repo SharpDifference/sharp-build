@@ -1,3 +1,4 @@
+import type { ClassCatalogEdits, GlobalTextId, TextEdits } from '@shared/promptText'
 import {
   charStartOf,
   CLASSES_PER_MAJOR,
@@ -90,6 +91,10 @@ import { buildSchedules } from './classScheduler'
 
 /** What every New Game request reads of the playthrough's setting and lorebook. */
 export interface RequestWorld {
+  /** The edits a mod hands the global text blocks; absent when none is supplied. */
+  textEdits?: TextEdits<GlobalTextId>
+  /** The class pool sizes a mod hands the call; absent when none is supplied. */
+  classCatalog?: ClassCatalogEdits
   setting: string
   book: readonly { text: string }[]
   /**
@@ -241,7 +246,7 @@ function occasionInput(draft: ApplicationDraft, world: RequestWorld): OccasionPr
 function occasionNeed(draft: ApplicationDraft, world: RequestWorld): CallNeed {
   const input = occasionInput(draft, world)
   if (input.asked.length === 0) return 'none'
-  const request = buildOccasionPrompt(input)
+  const request = buildOccasionPrompt(input, world.textEdits)
   return {
     request,
     key: keyOf(request),
@@ -301,7 +306,7 @@ function profileNeed(
     otherMajors: input.otherMajors,
     ...(next ? { next } : {}),
     setting: world.setting
-  })
+  }, world.textEdits)
   if (!request) return 'none'
   const validation = validationOf(draft, roster)
   return {
@@ -357,7 +362,7 @@ function secretNeed(
 ): CallNeed {
   const entries = secretEntries(draft, roster)
   if (entries.length === 0) return 'none'
-  const request = buildSecretsPrompt(entries, world.setting)
+  const request = buildSecretsPrompt(entries, world.setting, world.textEdits)
   return {
     request,
     key: keyOf(request),
@@ -482,6 +487,7 @@ export function classInput(
     )
   }
   return {
+    catalog: world.classCatalog,
     students: roster.map((character) => {
       const interest = draft.catalog.interest[character.charId]
       return {
@@ -505,7 +511,7 @@ function classNeed(
   const majors = majorsOf(draft, roster, world)
   if (!majors) return 'waiting'
   const input = classInput(draft, roster, world, majors)
-  const request = buildClassPrompt(input)
+  const request = buildClassPrompt(input, world.textEdits)
   if (!request) return 'none'
   return {
     request,

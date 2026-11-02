@@ -1,5 +1,5 @@
 /** `@vx/modkit/main`: what a mod's main-process code may import. */
-export { backupPart, requiredBackupPart, characterTransferPart, modDataPath, registerComfyLaunchEnvironment } from '../bridge/main'
+export { backupPart, requiredBackupPart, characterTransferPart, modDataPath, registerComfyLaunchEnvironment, registerFinalRequest } from '../bridge/main'
 export type {
   BackupPart,
   BackupPartContext,
@@ -7,9 +7,13 @@ export type {
   BackupPartLegacy,
   BackupPartRestore,
   CharacterTransferPart,
-  ComfyLaunchContext
+  ComfyLaunchContext,
+  FinalRequestHook,
+  FinalRequestPlan,
+  ReadJsonOptions,
+  ReadJsonResult
 } from '../bridge/main'
 
-export { extractZip, sniffImageFile, modOptionOn } from '../bridge/main'
+export { extractZip, modOptionOn, readJsonFile, sniffImageFile, writeAtomicBytes, writeAtomicJson } from '../bridge/main'
 
 export type { InvokeContext, InvokeHandler } from '../bridge/main'

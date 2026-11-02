@@ -24,6 +24,7 @@ const hooksShim = await import('../../src/renderer/mods/hooks')
 const slotShim = await import('../../src/renderer/mods/ModSlot')
 const saveFieldKit = await import('../../packages/modkit/src/renderer/saveField')
 const modStateKit = await import('../../packages/modkit/src/renderer/modState')
+const sceneFieldKit = await import('../../packages/modkit/src/renderer/sceneField')
 
 const ROOT = resolve(__dirname, '../..')
 
@@ -108,8 +109,8 @@ describe('the entry points', () => {
     expect(rendererKit.objectSchema).toBe(schema.objectSchema)
   })
 
-  it('split every runtime export of hooks.ts, ModSlot, saveField.ts and modState.ts between the host and the mod', () => {
-    const moved = [...runtime(hooksShim), ...runtime(slotShim), ...runtime(saveFieldKit), ...runtime(modStateKit)].sort()
+  it('split every runtime export of hooks.ts, ModSlot, saveField.ts, sceneField.ts and modState.ts between the host and the mod', () => {
+    const moved = [...runtime(hooksShim), ...runtime(slotShim), ...runtime(saveFieldKit), ...runtime(sceneFieldKit), ...runtime(modStateKit)].sort()
     const host = runtime(hostRenderer)
     const mod = runtime(rendererKit).filter((name) => moved.includes(name))
     expect([...host, ...mod].sort()).toEqual(moved)
@@ -307,8 +308,32 @@ const PROBES: Record<RendererHook, (id: string) => Probe> = {
   'requests.ledger': request('ledger'),
   'requests.slot-intro': request('slot-intro'),
   dmHistoryNote: fn('dmHistoryNote', ' note', (host) => host.dmHistoryNotes(never)),
+  promptText: () => {
+    const f = flag()
+    return {
+      hooks: { promptText: { edits: () => (f.hit(), {}), classCatalog: () => ({}) } },
+      // One mod owns the text at a time, so the probe is the only one asked.
+      ask: (host) => {
+        const edits = host.promptTextEdits()
+        const catalog = host.classCatalogEdits()
+        return f.take() && edits !== undefined && catalog !== undefined
+      }
+    }
+  },
+  sceneCall: (id) => {
+    const f = flag()
+    return {
+      hooks: { sceneCall: () => (f.hit(), { tagged: true }) },
+      ask: (host) => {
+        const tags = host.sceneCallTags({ request: never, spot: { spot: 'opening', cast: [] }, playthroughId: null, readerName: 'R' })
+        return f.take() && JSON.stringify(tags[id]) === '{"tagged":true}'
+      }
+    }
+  },
   characterFromDraft: fn('characterFromDraft', {}, (host) => host.characterFromDraft({}, { baseAppearance: [] }, {})),
   afterDmReply: fn('afterDmReply', undefined, (host) => host.afterDmReply({ charId: 'c', character: never, reply: never })),
+  sceneReplyLanded: fn('sceneReplyLanded', undefined, (host) => host.sceneReplyLanded({ reply: {}, modReply: {}, spot: { spot: 'opening', cast: [] }, at: 0 })),
+  sceneCut: fn('sceneCut', undefined, (host) => host.sceneCut({ length: 0 })),
   afterSceneReply: fn('afterSceneReply', undefined, (host) => host.afterSceneReply({ reply: {}, cast: [], solo: true, ending: false })),
   afterReachOut: fn('afterReachOut', undefined, (host) => host.afterReachOut({ charId: 'c', character: never, reply: {} })),
   playerActs: fn('playerActs', undefined, (host) => host.playerActs()),
@@ -376,7 +401,8 @@ const PROBES: Record<RendererHook, (id: string) => Probe> = {
   contactPostExtra: slot('contactPostExtra'),
   railButton: slot('railButton'),
   landingTool: slot('landingTool'),
-  gameMenuEntry: slot('gameMenuEntry')
+  gameMenuEntry: slot('gameMenuEntry'),
+  advancedSettingsEntry: slot('advancedSettingsEntry')
 }
 
 describe('every hook in the table', () => {

@@ -76,6 +76,7 @@ import { unloadableReason } from './saveStore'
 import { continuationOf } from './semesterCarry'
 import { retrySilently } from './silentRetry'
 import { useUiStore } from './uiStore'
+import { classCatalogEdits, promptTextEdits } from '../mods/hooks'
 
 /**
  * The application being filled in — a New Game in progress — and the calls that generate what
@@ -271,7 +272,12 @@ export function rosterOf(draft: Pick<ApplicationDraft, 'chars'>): Character[] {
  * character store holds them, a deleted one left out.
  */
 function requestWorld(): RequestWorld {
-  const world: RequestWorld = { setting: settingNow(), book: lorebookNow() }
+  const world: RequestWorld = {
+    setting: settingNow(),
+    book: lorebookNow(),
+    textEdits: promptTextEdits()?.global,
+    classCatalog: classCatalogEdits()
+  }
   const continued = useApplicationStore.getState().application?.continued
   if (!continued) return world
   const { characters } = useCharacterStore.getState()

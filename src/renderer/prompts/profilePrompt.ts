@@ -36,7 +36,9 @@ import {
   type ClassGenReply
 } from './classPrompt'
 import { keyPattern, loreEntryById } from './lorebook'
+import { newGameText, withAdditions } from './promptBlocks'
 import { objectSchema } from './schema'
+import type { GlobalTextId, TextEdits } from '@shared/promptText'
 
 /**
  * Builds and validates the one-shot student-profile request; pure, no IO.
@@ -139,23 +141,18 @@ function invalid(detail: string): never {
 }
 
 /** Who the profile calls are written by, and the world the students live in. */
-function profileSystem(setting: string): string {
+function profileSystem(setting: string, textEdits?: TextEdits<GlobalTextId>): string {
   return [
-    [
-      'You are a university student affairs office profiling enrolled students.',
-      'You return a single JSON object matching the provided schema exactly.'
-    ].join(' '),
+    withAdditions(
+      newGameText(textEdits, 'newgame.profiles.system'),
+      textEdits,
+      'newgame.profiles.additions'
+    ),
     '',
     'SETTING',
     setting
   ].join('\n')
 }
-
-/** How many classes she takes, asked of every student the call profiles in full. */
-const CLASSES_TAKEN_LINES = [
-  'classesTaken: how many classes she takes. The vast majority of students take 4.',
-  'Give 3 only to a genuine slacker, and 5 or 6 only to a genuine overachiever.'
-]
 
 /** Her job, and the employers she may hold one at. */
 function workLines(): string[] {
@@ -173,16 +170,14 @@ function workLines(): string[] {
 }
 
 /** Where she habitually goes, and the menus each habit is picked from. */
-function hauntLines(): string[] {
+function hauntLines(textEdits?: TextEdits<GlobalTextId>): string[] {
   return [
     'WHERE SHE SPENDS HER FREE TIME',
     'Decide some places where she goes by habit. Answer with the keys below, exactly as written:',
     `homeSlots: how many times a week she stays in her own room, ${MIN_HOME_SLOTS} to ${MAX_HOME_SLOTS}.`,
     'study: where she goes to study, or an empty string if she studies in her own room.',
     `fun: 0 to ${MAX_FUN_LOCATIONS} places she goes out to enjoy herself. Leave it empty for somebody who does not go out.`,
-    'activity: a specific interest of hers that she pursues somewhere every week, as one short lowercase phrase starting with an -ing verb that names both what she does and where she does it: "sketching at the Whitman Greenhouse", "jogging at Green Hill Park", "practicing cello in the practice rooms under Thorne Auditorium". It has to be something she does over and over, not a one-off, and it must happen at one of the ACTIVITY LOCATIONS. An empty string for a student with no such interest, which is most of them.',
-    'activityLocation: the key of the place activity names, exactly as written below. An empty string when activity is empty.',
-    'meal: one place she eats out at, about once a week. An empty string for somebody who cooks for herself or eats in the dorm kitchens.',
+    newGameText(textEdits, 'newgame.profiles.freeTime'),
     '',
     'STUDY LOCATIONS',
     ...locationMenuLines(STUDY_LOCATIONS),
@@ -199,21 +194,10 @@ function hauntLines(): string[] {
   ]
 }
 
-/** How her handle is asked for. */
-const HANDLE_LINE =
-  'handle: the username she posts under. some examples: "GinaHayes", "gina.hayes", "ginahayes12", "gina_says_hay", "gina_hayes", "ghayes", "gina.h".'
-
 /** How the posts she made over a break are asked for, `field` being the field that holds them. */
 function breakPostsLine(field: string, breakName: string): string {
   return `${field}: nought to ${MAX_WINTER_POSTS} short status updates she posted over the ${breakName}, oldest first. Keep these casual, using lowercase and/or emoji if it suits her. Don't address them to anyone, like other students or the reader.`
 }
-
-/** How her spring break plans are asked for. */
-const SPRING_BREAK_LINES = [
-  'SPRING BREAK',
-  'springBreakPlans: what she does with the week off in March, as one short phrase in the infinitive, ending in a full stop: "Go home to Russia to see her parents.", "Drive down to her aunt\'s place on the coast with her roommate."',
-  'All plans must include leaving campus and don\'t include other students or the reader.'
-]
 
 /** One student the profile call writes for, with whatever of her profile is already decided. */
 export interface ProfileStudent {
@@ -255,24 +239,32 @@ function decidedLine(decided: Readonly<Record<string, unknown>>): string | null 
 
 /**
  * What each new student is asked, under `heading`: her winter break posts only where `posts`, her
- * spring break plans only where `plans`.
+ * spring break plans only where `plans`. A later semester's `next` swaps in its own housing text
+ * and adds its new-student line.
  */
-function newStudentLines(heading: string, posts: boolean, plans: boolean): string[] {
+function newStudentLines(
+  heading: string,
+  posts: boolean,
+  plans: boolean,
+  textEdits?: TextEdits<GlobalTextId>,
+  next = false
+): string[] {
+  const newcomers = newGameText(textEdits, 'newgame.profiles.next.newcomers')
   return [
     heading,
     'year: 1 = Freshman, 2 = Sophomore, 3 = Junior, 4 = Senior.',
     'major: the field she studies. Pick one that fits her personality. Collapse similar majors like Business Studies and Business Science into a single major like Business Administration.',
-    ...CLASSES_TAKEN_LINES,
+    newGameText(textEdits, 'newgame.profiles.instructions'),
+    ...(next && newcomers.trim() !== '' ? [newcomers] : []),
     'majorClassesTaken: how many of those classes are in her major, from 1 to 3.',
     '',
     ...workLines(),
     'HOUSING',
-    'dorm: where she lives on campus. lowrise_1 through lowrise_5 are the ordinary apartment-style dorms that house the bulk of students; elysium is Elysium Village, the coveted upperclassman townhouses claimed through a housing lottery.',
-    'Spread the rest across the five Lowrises rather than piling everyone into one building.',
+    newGameText(textEdits, next ? 'newgame.profiles.next.housing' : 'newgame.profiles.housing'),
     '',
-    ...hauntLines(),
+    ...hauntLines(textEdits),
     'SOCIAL MEDIA',
-    HANDLE_LINE,
+    newGameText(textEdits, 'newgame.profiles.handle'),
     ...(posts
       ? [
           breakPostsLine('winterPosts', 'winter break'),
@@ -280,7 +272,7 @@ function newStudentLines(heading: string, posts: boolean, plans: boolean): strin
         ]
       : []),
     '',
-    ...(plans ? [...SPRING_BREAK_LINES, ''] : []),
+    ...(plans ? ['SPRING BREAK', newGameText(textEdits, 'newgame.profiles.springBreak'), ''] : []),
     'DECIDED FIELDS',
     'Some of a student\'s fields may already be decided, written under her name. Answer those exactly as written, and fit the rest of her profile around them.'
   ]
@@ -330,12 +322,15 @@ function newStudentProperties(posts: boolean, plans: boolean): Record<string, un
 }
 
 /** Builds the student-profile request, or null when nobody is left to ask anything. */
-export function buildProfilePrompt(input: ProfilePromptInput): StructuredRequest | null {
-  if (input.next) return buildNextProfilePrompt(input, input.next)
+export function buildProfilePrompt(
+  input: ProfilePromptInput,
+  textEdits?: TextEdits<GlobalTextId>
+): StructuredRequest | null {
+  if (input.next) return buildNextProfilePrompt(input, input.next, textEdits)
   if (input.students.length === 0) return null
   const { keys, cast } = rosterCastLines(input.students.map((student) => student.character))
 
-  const preamble = [...newStudentLines('FOR EACH STUDENT', true, true), '---', ''].join('\n')
+  const preamble = [...newStudentLines('FOR EACH STUDENT', true, true, textEdits), '---', ''].join('\n')
 
   // Below the '---' divider: the roster is all that varies, and the console log starts here.
   const rest = [
@@ -361,7 +356,7 @@ export function buildProfilePrompt(input: ProfilePromptInput): StructuredRequest
 
   // The roster is in the prompt, so this caches only across retries of the same New Game.
   return {
-    system: profileSystem(input.setting),
+    system: profileSystem(input.setting, textEdits),
     user: `${preamble}\n${rest}`,
     schema,
     cacheKey: 'venus-university-profile-generation',
@@ -375,7 +370,8 @@ export function buildProfilePrompt(input: ProfilePromptInput): StructuredRequest
  */
 function buildNextProfilePrompt(
   input: ProfilePromptInput,
-  next: NextProfileInput
+  next: NextProfileInput,
+  textEdits?: TextEdits<GlobalTextId>
 ): StructuredRequest | null {
   const { students } = input
   const { returning, graduates } = next
@@ -388,7 +384,7 @@ function buildNextProfilePrompt(
   const groups: { group: string; heading: string; lines: string[]; schema: unknown }[] = []
 
   if (students.length > 0) {
-    sections.push(newStudentLines('FOR EACH NEW STUDENT', false, spring))
+    sections.push(newStudentLines('FOR EACH NEW STUDENT', false, spring, textEdits, true))
     const { keys, cast } = rosterCastLines(students.map((student) => student.character))
     groups.push({
       group: 'characters',
@@ -403,7 +399,7 @@ function buildNextProfilePrompt(
       'FOR EACH RETURNING STUDENT',
       breakPostsLine('breakPosts', breakName),
       'Everyone gets at least one.',
-      ...(spring ? [SPRING_BREAK_LINES[1], SPRING_BREAK_LINES[2]] : [])
+      ...(spring ? [newGameText(textEdits, 'newgame.profiles.springBreak')] : [])
     ])
     const { keys, cast } = rosterCastLines(returning)
     groups.push({
@@ -420,7 +416,7 @@ function buildNextProfilePrompt(
   if (graduates.length > 0) {
     sections.push([
       'FOR EACH GRADUATE',
-      ...GRADUATE_LINES,
+      newGameText(textEdits, 'newgame.profiles.next.graduates'),
       breakPostsLine('breakPosts', breakName),
       'Everyone gets at least one.',
       ...(graduates.some((graduate) => graduate.decided)
@@ -475,7 +471,7 @@ function buildNextProfilePrompt(
   ].join('\n')
 
   return {
-    system: profileSystem(input.setting),
+    system: profileSystem(input.setting, textEdits),
     user: `${preamble}\n${rest}`,
     schema: objectSchema(
       'student_profiles',
@@ -763,12 +759,6 @@ export interface ContinuedProfileReply {
 function breakNameOf(season: Season): string {
   return season === 'fall' ? 'summer vacation' : 'winter break'
 }
-
-/** What a graduate is, and how her life since is asked for. */
-const GRADUATE_LINES = [
-  'She has graduated from Venus University and moved away from Veridan.',
-  'pursuing: what she is doing with her life now, as one short lowercase phrase starting with an -ing verb, somewhere other than Veridan: "teaching English in Seoul", "interning at a law firm in Chicago", "backpacking through Patagonia". Where she had one last semester, write where it has led her since rather than repeating it.'
-]
 
 /** What a graduate is doing when the model gave nothing usable: last semester's, or a placeholder. */
 export function fallbackPursuit(previous: string | undefined): string {

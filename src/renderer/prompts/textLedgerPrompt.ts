@@ -7,7 +7,9 @@ import {
 } from '@shared/types'
 import { promptLines } from '../mods/hooks'
 import { objectSchema } from './schema'
-import { LEDGER_PERSONA, milestoneCastLines } from './scenePrompt'
+import type { GlobalTextId, TextEdits } from '@shared/promptText'
+import { milestoneCastLines } from './scenePrompt'
+import { textLedgerPersonaFor } from './promptBlocks'
 import {
   messagesBlock,
   plansSchema,
@@ -83,7 +85,8 @@ function textLedgerSchema(
 /** Builds the texting ledger request. */
 export function buildTextLedgerPrompt(
   schedule: SchedulePromptInput,
-  charInfo: Record<string, CharInfo>
+  charInfo: Record<string, CharInfo>,
+  textEdits?: TextEdits<GlobalTextId>
 ): StructuredRequest {
   const textedKeys = textLedgerCharKeys(schedule)
   const rosterKeys = scheduleCharKeys(schedule.characters)
@@ -127,7 +130,7 @@ export function buildTextLedgerPrompt(
   ].join('\n')
 
   return {
-    system: LEDGER_PERSONA,
+    system: textLedgerPersonaFor(textEdits),
     user: `${preamble}\n${rest}`,
     schema: textLedgerSchema(textedKeys, rosterKeys),
     // Constant: everything save-varying sits below the seam.

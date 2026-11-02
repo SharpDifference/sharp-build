@@ -135,6 +135,7 @@ import {
 import { classifyCloud } from '@shared/llm/cloudClassifier'
 import { generatePhoto } from '@shared/llm/cloudImage'
 import { completeStructured, type StructuredRequest } from '@shared/llm/cloudLlm'
+import { completeWithFinalRequest } from './services/finalRequest'
 import { cancelModCalls, completeModRequest } from '@shared/llm/modCall'
 import {
   listImageModels,
@@ -408,7 +409,7 @@ export function registerIpcHandlers(): void {
     'llm:completeScene',
     (event, request: StructuredRequest, group: string, stream: string) =>
       runAbortable(group, (signal) =>
-        completeStructured<SceneResponse>(request, signal, (delta) =>
+        completeWithFinalRequest<SceneResponse>(request, signal, (delta) =>
           event.sender.send('llm:sceneDelta', stream, delta)
         )
       )
@@ -416,24 +417,24 @@ export function registerIpcHandlers(): void {
 
   // The end-of-scene bookkeeping call: no deltas, its own schema.
   handle('llm:completeLedger', (_event, request: StructuredRequest, group: string) =>
-    runAbortable(group, (signal) => completeStructured<LedgerResponse>(request, signal))
+    runAbortable(group, (signal) => completeWithFinalRequest<LedgerResponse>(request, signal))
   )
 
   // The slot-opening narration: no deltas, its own schema.
   handle('llm:completeIntro', (_event, request: StructuredRequest, group: string) =>
-    runAbortable(group, (signal) => completeStructured<SlotIntroResponse>(request, signal))
+    runAbortable(group, (signal) => completeWithFinalRequest<SlotIntroResponse>(request, signal))
   )
 
   // The epilogue's status updates: one call for the whole week after graduation.
   handle('llm:completeEndingPosts', (_event, request: StructuredRequest, group: string) =>
-    runAbortable(group, (signal) => completeStructured<EndingPostsResponse>(request, signal))
+    runAbortable(group, (signal) => completeWithFinalRequest<EndingPostsResponse>(request, signal))
   )
 
   // A Bunnyboard texting turn, streamed. Several can stream at once, so every
   // delta carries its `group` to say whose text it is.
   handle('llm:completeTexting', (event, request: StructuredRequest, group: string) =>
     runAbortable(group, (signal) =>
-      completeStructured<TextingResponse>(request, signal, (delta) =>
+      completeWithFinalRequest<TextingResponse>(request, signal, (delta) =>
         event.sender.send('llm:textingDelta', group, delta)
       )
     )
@@ -441,7 +442,7 @@ export function registerIpcHandlers(): void {
 
   // The hangout classifier, run on the reply the texting call just wrote.
   handle('llm:classifyHangout', (_event, request: StructuredRequest) =>
-    completeStructured<HangoutClassifierResponse>(request)
+    completeWithFinalRequest<HangoutClassifierResponse>(request)
   )
 
   // A mod's own structured call: one channel for every mod, sent the way every call here is and
@@ -759,7 +760,7 @@ export function registerIpcHandlers(): void {
 
   // Unqueued; `group` lets character deletion abort it.
   handle('llm:generateCharacter', (_event, request: StructuredRequest, group: string) =>
-    runAbortable(group, (signal) => completeStructured(request, signal))
+    runAbortable(group, (signal) => completeWithFinalRequest(request, signal))
   )
 
   // The scene classifier call: structured, unstreamed.
@@ -771,26 +772,26 @@ export function registerIpcHandlers(): void {
 
   // The one-shot class-catalog call; `group` is the New Game start's.
   handle('llm:generateClasses', (_event, request: StructuredRequest, group: string) =>
-    runAbortable(group, (signal) => completeStructured(request, signal))
+    runAbortable(group, (signal) => completeWithFinalRequest(request, signal))
   )
 
   // The student-profile call, the second of New Game's one-shots, on the same terms.
   handle('llm:generateProfiles', (_event, request: StructuredRequest, group: string) =>
-    runAbortable(group, (signal) => completeStructured(request, signal))
+    runAbortable(group, (signal) => completeWithFinalRequest(request, signal))
   )
 
   // The third one-shot New Game call, on the same terms.
   handle('llm:generateOccasions', (_event, request: StructuredRequest, group: string) =>
-    runAbortable(group, (signal) => completeStructured(request, signal))
+    runAbortable(group, (signal) => completeWithFinalRequest(request, signal))
   )
 
   // The roster's secrets, the fourth one-shot, on the same terms.
   handle('llm:generateSecrets', (_event, request: StructuredRequest, group: string) =>
-    runAbortable(group, (signal) => completeStructured(request, signal))
+    runAbortable(group, (signal) => completeWithFinalRequest(request, signal))
   )
 
   // The exam-question call: structured, unstreamed, no group.
-  handle('llm:generateQuiz', (_event, request: StructuredRequest) => completeStructured(request))
+  handle('llm:generateQuiz', (_event, request: StructuredRequest) => completeWithFinalRequest(request))
 
   // The model ids a custom endpoint lists, falling back to the stored key for that origin.
   handle('llm:listModels', async (_event, endpointUrl: string, apiKey?: string) => {

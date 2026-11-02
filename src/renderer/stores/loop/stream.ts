@@ -1,5 +1,7 @@
 import { appError } from '@shared/errors'
+import type { SceneSpotTag } from '@shared/promptText'
 import type { AppError, SceneLine, SceneResponse, StructuredRequest } from '@shared/types'
+import { sceneCallTags, sceneReplyLanded } from '../../mods/hooks'
 import { useGameStore } from '../gameStore'
 import {
   createSceneSanitizer,
@@ -93,6 +95,8 @@ export type SceneCall = Promise<
         end: boolean
         applied: boolean
         reply: SceneResponse
+        /** Which scene call this was, where its builder named one. */
+        spot?: SceneSpotTag
       }
     }
   | { ok: false; error: AppError }
@@ -114,6 +118,20 @@ export function queueLines(lines: readonly (string | SceneLine)[]): void {
 export function sceneInProgress(): boolean {
   const game = useGameStore.getState()
   return game.currentSceneTranscript.length > 0 || game.sceneSummary !== null
+}
+
+/**
+ * Tells the mods a scene reply has landed, its lines on the transcript. Only a call a builder
+ * named a spot for is told, and the reply's `modReply` is handed over frozen.
+ */
+export function landScene(reply: SceneResponse, spot: SceneSpotTag | undefined, lineCount: number): void {
+  if (!spot) return
+  sceneReplyLanded({
+    reply: { ...reply } as unknown as Readonly<Record<string, unknown>>,
+    modReply: Object.freeze({ ...reply.modReply }),
+    spot,
+    at: useGameStore.getState().currentSceneTranscript.length - lineCount
+  })
 }
 
 /** How many scene calls this session has made, which names each one's deltas. */
@@ -147,6 +165,19 @@ export async function streamScene(
     loopState.promptOverride = null
   }
   loopState.lastScenePrompt = request.user
+
+  // What each mod that is on tags the call with, for its request hook in the main process.
+  const spot = request.sceneSpot
+  if (spot) {
+    const game = useGameStore.getState()
+    const tags = sceneCallTags({
+      request,
+      spot,
+      playthroughId: game.playthroughId,
+      readerName: game.playerFirstName
+    })
+    if (Object.keys(tags).length > 0) request = { ...request, modTags: { ...tags } }
+  }
 
   if (!sink || sink.live) useGameStore.getState().setStreaming(true)
 
@@ -246,7 +277,9 @@ export async function streamScene(
   const { lines, summary, end } = sanitizeScene(result.data, options)
 
   // A prefetch still holding its lines has nothing to reconcile; Begin appends the reply whole.
-  if (sink && !sink.live) return { ok: true, data: { lines, summary, end, applied: false, reply: result.data } }
+  if (sink && !sink.live) {
+    return { ok: true, data: { lines, summary, end, applied: false, reply: result.data, spot } }
+  }
 
   const game = useGameStore.getState()
 
@@ -272,7 +305,10 @@ export async function streamScene(
   // that read the store here would find a scene that has not arrived yet.
   await delivered
 
-  return { ok: true, data: { lines, summary, end, applied: true, reply: result.data } }
+  // The lines are on the transcript now, and the autosave that pays for the reply is still to come.
+  if (!abandoned()) landScene(result.data, spot, lines.length)
+
+  return { ok: true, data: { lines, summary, end, applied: true, reply: result.data, spot } }
 }
 
 /** Hands playback back to a player parked on the spinner at the end of the queue. */

@@ -32,11 +32,12 @@ import {
   memoryLines,
   secretLines,
   notesLines,
-  personaFor,
   profileLines,
   spaced
 } from './scenePrompt'
 import { springBreakLines } from './springBreak'
+import type { GlobalTextId, TextEdits } from '@shared/promptText'
+import { narrationPersonaFor } from './promptBlocks'
 import { weatherLines } from './weather'
 
 /** The slot-opening narration prompt. */
@@ -217,6 +218,8 @@ export interface SlotIntroInput {
   time: TimeSlot
   /** The player's `lessNsfwText` setting; picks which persona heads this call's prefix. */
   lessNsfwText: boolean
+  /** The edits a mod hands the global text blocks; absent when none is supplied. */
+  globalTextEdits?: TextEdits<GlobalTextId>
   /** How many of her told secrets each girl's entry carries; absent is the default. */
   secretBudget?: number
   /** The app-written first line the narration continues from. */
@@ -748,7 +751,7 @@ export function buildSlotIntroPrompt(
 
   return modRequest('slot-intro', { input }, {
     system: [
-      personaFor(input.lessNsfwText),
+      narrationPersonaFor(input.lessNsfwText, input.globalTextEdits),
       '',
       'SETTING',
       setting,

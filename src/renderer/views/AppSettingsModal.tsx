@@ -1105,6 +1105,8 @@ export function AppSettingsModal({ theme, onClose }: AppSettingsModalProps): JSX
                 commitRef={commitAdvanced}
                 onEditPrompt={() => setEditing(true)}
                 onBackgrounds={() => setBackgrounds(true)}
+                theme={theme}
+                busy={backingUp || restoring}
               />
             )}
           </div>
