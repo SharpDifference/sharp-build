@@ -1,11 +1,7 @@
 import { useEffect, useId, useState, type CSSProperties, type JSX } from 'react'
 import { AnimatePresence, motion } from 'motion/react'
 import { hashString, shownComments } from '@vx/modkit/shared'
-import {
-  type PostCommentsProps,
-  type PostPictureProps,
-  noteIn
-} from '@vx/modkit/renderer'
+import { type PostCommentsProps, type PostPictureProps, noteIn } from '@vx/modkit/renderer'
 import { photoFriendHandle } from '../../shared/photoDuo'
 import { useGameStore } from '../stores/gameStore'
 import { usePhotosVisible } from '../stores/photoSwitchHooks'
