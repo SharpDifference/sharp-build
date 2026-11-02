@@ -56,11 +56,6 @@ const HOOKS: readonly {
     why: 'the CSP names every scheme an image may load from; without it every photo is blocked'
   },
   {
-    file: 'src/main/services/comfyService.ts',
-    needs: ['export async function runGenerationJob'],
-    why: 'localPhotoService renders on this pipeline'
-  },
-  {
     file: 'src/renderer/stores/loop/feed.ts',
     needs: ['pickTeaser(featured.length > 0 ? featured : fresh)'],
     why: "a stranger's photo post is never the slot's teaser, and her picture is drawn for nobody"

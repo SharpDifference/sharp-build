@@ -1,8 +1,6 @@
 import type { IpcMainInvokeEvent } from 'electron'
-import { cancelKeys, enqueue } from '@shared/jobQueue'
 import type { PhotoRenderOptions } from '../shared/photoTypes'
-import type { Character } from '@vx/modkit/shared'
-import { start as startComfy } from './services/comfyService'
+import { appError, type Character } from '@vx/modkit/shared'
 import {
   carryPhotos,
   retirePhoto,
@@ -23,30 +21,70 @@ import {
  * hook it carries is an import and a call.
  */
 
-/**
- * A render queued under her charId, without the `assertEditableChar` gate every sprite channel
- * runs first.
- *
- * That gate is there because a sprite is written **into the character's folder**, and a shipped
- * character's folder is read-only. A photo is written into the playthrough's folder instead, so
- * the gate would refuse — with `CHARACTER_READ_ONLY` — every picture the shipped cast might ever
- * send, which is most of the cast in most playthroughs. Photographing her edits nothing of hers.
- */
-function queuePhoto<T>(
-  character: Character,
-  key: string,
-  run: (options: { signal: AbortSignal; onProgress: (step: string) => void }) => Promise<T>
-): Promise<T> {
-  return enqueue({
-    group: character.charId,
-    key,
-    run: async ({ signal, report }) => {
-      // The job starts ComfyUI itself; the queue is serial, so only the first pays the boot.
-      report('Waiting for ComfyUI')
-      await startComfy(undefined, (step) => report(step))
-      return run({ signal, onProgress: (step) => report(step) })
+interface PhotoRender {
+  controller: AbortController
+  settled: Promise<string>
+}
+const renders = new Map<string, PhotoRender>()
+
+/** Identifies a reserved picture within its playthrough and character folder. */
+function renderKey(playthroughId: string, charId: string, file: string): string {
+  return `${playthroughId}/${charId}/${file}`
+}
+
+/** Aborts one reserved picture's render and waits for its file cleanup. */
+async function cancelPhoto(playthroughId: string, charId: string, file: string): Promise<void> {
+  const render = renders.get(renderKey(playthroughId, charId, file))
+  if (!render) return
+  render.controller.abort()
+  await render.settled.catch(() => {})
+}
+
+/** Calls the kit directly; each reserved picture owns its signal and window progress. */
+function runPhoto(
+  event: IpcMainInvokeEvent,
+  playthroughId: string,
+  charId: string,
+  file: string,
+  run: (options: { signal: AbortSignal; onProgress: (step: string) => void }) => Promise<string>
+): Promise<string> {
+  const key = renderKey(playthroughId, charId, file)
+  const previous = renders.get(key)
+  previous?.controller.abort()
+  const controller = new AbortController()
+  const jobId = `photo:${key}`
+  const report = (status: 'running' | 'done' | 'error', step: string): void => {
+    try {
+      if (!event.sender.isDestroyed()) {
+        event.sender.send('jobs:progress', {
+          jobId, group: charId, key: `photo:${playthroughId}:${file}`, status, step
+        })
+      }
+    } catch (error) {
+      console.warn('[photo] could not report render progress:', error)
     }
-  })
+  }
+  const render: PhotoRender = { controller, settled: Promise.resolve('') }
+  renders.set(key, render)
+  render.settled = (async () => {
+    try {
+      // A repeated request for this file cannot outpace the cancelled writer's cleanup.
+      await previous?.settled.catch(() => {})
+      if (controller.signal.aborted) throw appError('CANCELLED', 'Generation was cancelled.')
+      const result = await run({
+        signal: controller.signal,
+        onProgress: (step) => report('running', step)
+      })
+      report('done', 'Done')
+      return result
+    } catch (error) {
+      report('error', controller.signal.aborted ? 'Cancelled' : 'Failed')
+      throw error
+    } finally {
+      if (renders.get(key) === render) renders.delete(key)
+    }
+  })()
+  return render.settled
 }
 
 /** How `ipc.ts` wraps a listener into its own `Result` envelope. */
@@ -113,7 +151,8 @@ export function registerPhotoIpc(handle: Handle): void {
       file: string,
       options?: { cancelOnly?: boolean; replacement?: string }
     ) => {
-      if (options?.cancelOnly) return cancelKeys(charId, [`photo:${playthroughId}:${file}`])
+      await cancelPhoto(playthroughId, charId, file)
+      if (options?.cancelOnly) return
       if (options?.replacement) return retirePhoto(playthroughId, charId, file, options.replacement)
       return dropPhoto(playthroughId, charId, file)
     }
@@ -123,7 +162,7 @@ export function registerPhotoIpc(handle: Handle): void {
   handle(
     'comfy:generatePhoto',
     (
-      _event,
+      event,
       playthroughId: string,
       character: Character,
       tier: string,
@@ -132,7 +171,7 @@ export function registerPhotoIpc(handle: Handle): void {
       overrides: PhotoRenderOptions = {}
     ) => {
       validatePhotoOverrides(overrides, false)
-      return queuePhoto(character, `photo:${playthroughId}:${file}`, (options) =>
+      return runPhoto(event, playthroughId, character.charId, file, (options) =>
         generatePhoto(playthroughId, character, tier, photoPrompt, file, options, overrides)
       )
     }
@@ -142,7 +181,7 @@ export function registerPhotoIpc(handle: Handle): void {
   handle(
     'comfy:generateDuoPhoto',
     (
-      _event,
+      event,
       playthroughId: string,
       character: Character,
       friend: Character,
@@ -152,7 +191,7 @@ export function registerPhotoIpc(handle: Handle): void {
       overrides: PhotoRenderOptions = {}
     ) => {
       validatePhotoOverrides(overrides, true)
-      return queuePhoto(character, `photo:${playthroughId}:${file}`, (options) =>
+      return runPhoto(event, playthroughId, character.charId, file, (options) =>
         generateDuoPhoto(
           playthroughId,
           character,
