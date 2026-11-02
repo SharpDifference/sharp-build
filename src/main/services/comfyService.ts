@@ -1387,6 +1387,7 @@ export async function renderComfyImage(
     owned = structuredClone(request)
     if (!owned || !owned.workflow || typeof owned.workflow !== 'object' || Array.isArray(owned.workflow) ||
         !owned.nodes || typeof owned.nodes.saveImage !== 'string' ||
+        !Object.hasOwn(owned.workflow, owned.nodes.saveImage) ||
         !Object.keys(owned.workflow).length || Object.values(owned.workflow).some(node =>
           !node || typeof node.class_type !== 'string' || !node.inputs || typeof node.inputs !== 'object' || Array.isArray(node.inputs))) {
       throw new Error('An API-format graph and its output node are required.')

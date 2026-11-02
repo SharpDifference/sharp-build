@@ -143,6 +143,8 @@ describe('mod-owned ComfyUI renders', () => {
       .rejects.toMatchObject({ code: 'MOD_ID_INVALID' })
     await expect(renderComfyImage('photo-feature', { ...request, workflow: 'path.json' as never },
       { signal: new AbortController().signal })).rejects.toMatchObject({ code: 'RENDER_REQUEST_INVALID' })
+    await expect(renderComfyImage('photo-feature', { ...request, nodes: { saveImage: 'missing' } },
+      { signal: new AbortController().signal })).rejects.toMatchObject({ code: 'RENDER_REQUEST_INVALID' })
     expect(fixture.settings).not.toHaveBeenCalled()
     expect(submitted).toEqual([])
   })

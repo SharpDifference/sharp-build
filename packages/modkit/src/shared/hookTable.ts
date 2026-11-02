@@ -213,6 +213,7 @@ export const KIT_APIS = [
   'main:sniffImageFile',
   'main:modOptionOn',
   'main:renderComfyImage',
+  'main:runForCharacter',
   'shared:carryModFiles',
   'shared:charKeyOf',
   'shared:DEPRECATED_HOOKS',
