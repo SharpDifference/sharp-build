@@ -121,7 +121,6 @@ If a photo stays PNG while WebP is on, look in `data/app.log` for a `[photo] kep
 
 ## 1.7.0
 
-- A redraw during a scene keeps the old picture until the new one is saved.
 - **More than selfies**: her photos can be from earlier or taken by a friend, closer or wider,
   from different angles, in what she wore that day, and with her hands on what she's doing —
   a guitar, a book, a game.
@@ -131,8 +130,9 @@ If a photo stays PNG while WebP is on, look in `data/app.log` for a `[photo] kep
 - **See what drew a photo**: hover it and open the info icon for its prompt, negative, seed and
   LoRA. Photos taken before 1.7.0 show a rebuilt prompt and no seed.
 - **Redraw a photo**: edit its prompts, or **Rebuild** them from her current tags first, and draw
-  it again with the same seed or a new one. The new picture replaces it once it lands; if it
-  fails, the old one stays and says so for a few seconds. Nothing she said changes.
+  it again with the same seed or a new one. The new picture replaces it once it lands, and the old
+  one is kept until a save has the new one. If it fails, the old one stays and says so for a few
+  seconds. Nothing she said changes.
 - **A head start on her photo**: it starts drawing as soon as she decides to send it, while she's
   still typing. It arrives on her last text as before.
 
