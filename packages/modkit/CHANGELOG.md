@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+- `lead` on a `dm` prompt addition puts its fields ahead of the reply's own, and `dmReplyLead`
+  hands them over the moment they have streamed in, before her first text lands. Once per reply,
+  never for an abandoned one. Its signal aborts when the reply does not land; the finished
+  reply, and `afterDmReply`, stay authoritative.
+
+- Main’s `renderComfyImage` queues a mod-owned ComfyUI graph and returns checked image bytes, capped at 32 MiB, with per-call cancellation and an optional `onProgress` for its steps.
+
 - The scene's lines, for a mod that speaks in the scene outside its replies: `sayInScene` puts
   narration or a girl's line, in her face and outfit, on the transcript and the box;
   `boxParts` is the box's split alone; `readerSaysInScene` files the reader's words with nobody
