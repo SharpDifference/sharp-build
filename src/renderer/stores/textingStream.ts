@@ -13,7 +13,7 @@ export interface TextExtractor {
 
 /** Creates a {@link TextExtractor} — the `messages` array of strings (see `jsonStream.ts`). */
 export function createTextExtractor(): TextExtractor {
-  return createArrayExtractor<string>('messages', stringElement, '[texting]')
+  return createArrayExtractor<string>('messages', stringElement, '[texting]', { topLevel: true })
 }
 
 /** Reads the top-level prefix ahead of messages, once, without reading a partial message. */

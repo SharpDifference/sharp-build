@@ -29,6 +29,7 @@ interface QueuedJob<T = unknown> {
   key?: string
   run: (context: JobContext) => Promise<T>
   controller: AbortController
+  ownsSignal: boolean
   resolve: (value: T) => void
   reject: (error: unknown) => void
 }
@@ -93,6 +94,7 @@ export function enqueue<T>(spec: JobSpec<T>): Promise<T> {
       key: spec.key,
       run: spec.run,
       controller: new AbortController(),
+      ownsSignal: spec.signal !== undefined,
       resolve,
       reject
     }
@@ -145,7 +147,8 @@ async function pump(): Promise<void> {
           }
         )
 
-        if (job.controller.signal.aborted) throw cancelledError()
+        // Per-job cancellation wins a late finish; legacy group jobs keep their result.
+        if (job.ownsSignal && job.controller.signal.aborted) throw cancelledError()
         emit(job, { status: 'done', step: 'Done' })
         job.resolve(result)
       } catch (err) {

@@ -1391,6 +1391,11 @@ export async function renderComfyImage(
           !node || typeof node.class_type !== 'string' || !node.inputs || typeof node.inputs !== 'object' || Array.isArray(node.inputs))) {
       throw new Error('An API-format graph and its output node are required.')
     }
+    for (const id of [...Object.values(owned.nodes), ...Object.keys(owned.texts ?? {})]) {
+      if (id !== undefined && (typeof id !== 'string' || !Object.hasOwn(owned.workflow, id))) {
+        throw new Error('Every named node must be present in the workflow.')
+      }
+    }
   } catch (err) {
     throw appError('RENDER_REQUEST_INVALID', 'The render request is not a parsed ComfyUI graph.', messageOf(err))
   }

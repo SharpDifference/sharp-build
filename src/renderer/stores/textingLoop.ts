@@ -90,12 +90,11 @@ import {
 } from '@shared/types'
 import { useBunnyboardStore } from './bunnyboardStore'
 import { useGameStore } from './gameStore'
-import { afterDmReply, afterReachOut, promptTextEdits } from '../mods/hooks'
+import { afterDmReply, afterReachOut, dmReplyLead, promptTextEdits } from '../mods/hooks'
 import { lorebookNow } from './lorebookStore'
 import { prefetchHangoutScene, startHangoutScene } from './loop/hooks'
 import { createRetryGate } from './retryGate'
 import { createDmLeadReader, createTextExtractor } from './textingStream'
-import { dmReplyLead } from '../mods/hooks'
 import { BOT_REPLY_MS, createTypingPacer, typingDelayFor, type TypingPacer } from './textingPace'
 import {
   charAwayNow,
@@ -156,7 +155,7 @@ function companionsOf(charId: string): NpcCompanions {
 }
 
 /** One in-flight texting turn per conversation, keyed by charId. */
-type TextFlight = { abandoned: boolean; pacer: TypingPacer }
+type TextFlight = { abandoned: boolean; pacer: TypingPacer; abortLead: () => void }
 const inFlight = new Map<string, TextFlight>()
 
 /**
@@ -638,96 +637,104 @@ async function runReply(
     released += 1
     deliver(charId, chatMessage('contact', text))
   })
-  const entry = { abandoned: false, pacer }
+  const leadController = new AbortController()
+  let landed = false
+  const abortLead = (): void => { if (!landed) leadController.abort() }
+  const entry = { abandoned: false, pacer, abortLead }
   inFlight.set(charId, entry)
 
-  // Streamed texts are queued as their JSON string closes; the resolved reply
-  // stays authoritative for anything the preview missed.
-  const extractor = createTextExtractor()
-  const leadReader = createDmLeadReader()
-  let seen = 0
-  // Every in-flight reply hears every other one's deltas: only this turn's group feeds the
-  // extractor, or a foreign chunk splices two JSON documents into one buffer.
-  const group = `texting:${charId}`
-  const unsubscribe = window.api.llm.onTextingDelta((deltaGroup, delta) => {
-    if (deltaGroup !== group) return
-    if (entry.abandoned) return
-    const lead = leadReader.feed(delta)
-    if (lead) dmReplyLead({ charId, character, lead })
-    for (const message of extractor.feed(delta)) {
-      const clean = message.trim()
-      if (!clean) continue
-      seen += 1
-      if (seen > skip) pacer.push(clean)
-    }
-  })
-
-  let result: Awaited<ReturnType<typeof window.api.llm.completeTexting>>
   try {
-    result = await window.api.llm.completeTexting(request, group)
-  } finally {
-    unsubscribe()
-  }
-
-  // Abandoned: a scene with her started while this was out, so the reply never happened.
-  if (entry.abandoned) return
-
-  if (!result.ok) {
-    if (result.error.code === 'CANCELLED') return
-    console.warn('[texting] the reply failed:', result.error)
-    // Whatever the stream queued is dropped; anything already released stays.
-    pacer.cancel()
-    // The failure is said in the thread at once, under whatever did land.
-    const bubble = chatMessage('system', `Failed to receive ${character.firstName}'s message.`, true)
-    deliver(charId, bubble)
-    // The turn parks on the thread's Retry, which re-sends this identical request.
-    failedTurns.set(charId, {
-      request,
-      sent,
-      conversation,
-      released,
-      invited,
-      bubbleId: bubble.id,
-      code: result.error.code
+    // Streamed texts are queued as their JSON string closes; the resolved reply
+    // stays authoritative for anything the preview missed.
+    const extractor = createTextExtractor()
+    const leadReader = createDmLeadReader()
+    let seen = 0
+    // Every in-flight reply hears every other one's deltas: only this turn's group feeds the
+    // extractor, or a foreign chunk splices two JSON documents into one buffer.
+    const group = `texting:${charId}`
+    const unsubscribe = window.api.llm.onTextingDelta((deltaGroup, delta) => {
+      if (deltaGroup !== group) return
+      if (entry.abandoned) return
+      const lead = leadReader.feed(delta)
+      if (lead) dmReplyLead({ charId, character, lead, signal: leadController.signal })
+      for (const message of extractor.feed(delta)) {
+        const clean = message.trim()
+        if (!clean) continue
+        seen += 1
+        if (seen > skip) pacer.push(clean)
+      }
     })
-    useBunnyboardStore.getState().setTextFailed(charId, true)
-    return
+
+    let result: Awaited<ReturnType<typeof window.api.llm.completeTexting>>
+    try {
+      result = await window.api.llm.completeTexting(request, group)
+    } finally {
+      unsubscribe()
+    }
+
+    // Abandoned: a scene with her started while this was out, so the reply never happened.
+    if (entry.abandoned) return
+
+    if (!result.ok) {
+      if (result.error.code === 'CANCELLED') return
+      console.warn('[texting] the reply failed:', result.error)
+      // Whatever the stream queued is dropped; anything already released stays.
+      pacer.cancel()
+      // The failure is said in the thread at once, under whatever did land.
+      const bubble = chatMessage('system', `Failed to receive ${character.firstName}'s message.`, true)
+      deliver(charId, bubble)
+      // The turn parks on the thread's Retry, which re-sends this identical request.
+      failedTurns.set(charId, {
+        request,
+        sent,
+        conversation,
+        released,
+        invited,
+        bubbleId: bubble.id,
+        code: result.error.code
+      })
+      useBunnyboardStore.getState().setTextFailed(charId, true)
+      return
+    }
+
+    const data: TextingResponse = result.data
+    const messages = (data.messages ?? []).map((text) => text.trim()).filter(Boolean)
+    // Anything the preview did not already queue — nor an earlier attempt release.
+    for (const text of messages.slice(Math.max(seen, skip))) {
+      pacer.push(text)
+    }
+
+    const summary = data.summary?.trim()
+    if (summary) useGameStore.getState().setConversationSummary(charId, summary)
+
+    const blocked = data.blocked === true
+
+    // The verdict can arm a hangout and force the thread open, so it waits for her last text.
+    await pacer.drain()
+    if (entry.abandoned) return
+
+    // The block lands under her last text, ahead of the scene check: a scene with somebody
+    // *else* does not unmake a reply that landed. Nothing is left to classify, so the turn ends.
+    if (blocked) {
+      const game = useGameStore.getState()
+      game.setBlocked(charId, true)
+      // Whatever she had asked him to do, she is no longer asking.
+      game.setPendingHangout(charId, null)
+      deliver(charId, chatMessage('system', `${character.firstName} blocked you.`))
+      return
+    }
+
+    landed = true
+    afterDmReply({ charId, character, reply: data })
+
+    // A scene already owns the screen: the verdict could only be discarded.
+    if (sceneActiveOf(useGameStore.getState())) return
+
+    handleHangout(charId, await classifyHangout(character, conversation, sent, messages))
+    if (invited) settleAnsweredInvitation(charId, invited.occasionId)
+  } finally {
+    abortLead()
   }
-
-  const data: TextingResponse = result.data
-  const messages = (data.messages ?? []).map((text) => text.trim()).filter(Boolean)
-  // Anything the preview did not already queue — nor an earlier attempt release.
-  for (const text of messages.slice(Math.max(seen, skip))) {
-    pacer.push(text)
-  }
-
-  const summary = data.summary?.trim()
-  if (summary) useGameStore.getState().setConversationSummary(charId, summary)
-
-  const blocked = data.blocked === true
-
-  // The verdict can arm a hangout and force the thread open, so it waits for her last text.
-  await pacer.drain()
-  if (entry.abandoned) return
-
-  // The block lands under her last text, ahead of the scene check: a scene with somebody
-  // *else* does not unmake a reply that landed. Nothing is left to classify, so the turn ends.
-  if (blocked) {
-    const game = useGameStore.getState()
-    game.setBlocked(charId, true)
-    // Whatever she had asked him to do, she is no longer asking.
-    game.setPendingHangout(charId, null)
-    deliver(charId, chatMessage('system', `${character.firstName} blocked you.`))
-    return
-  }
-
-  afterDmReply({ charId, character, reply: data })
-
-  // A scene already owns the screen: the verdict could only be discarded.
-  if (sceneActiveOf(useGameStore.getState())) return
-
-  handleHangout(charId, await classifyHangout(character, conversation, sent, messages))
-  if (invited) settleAnsweredInvitation(charId, invited.occasionId)
 }
 
 /**
@@ -1066,6 +1073,7 @@ export function acceptFriendRequest(charId: string): void {
 export function resetTextingLoop(): void {
   for (const entry of inFlight.values()) {
     entry.abandoned = true
+    entry.abortLead()
     entry.pacer.cancel()
   }
   inFlight.clear()
@@ -1088,6 +1096,7 @@ export function cancelAllTexts(): void {
   failedTurns.clear()
   for (const [charId, entry] of inFlight) {
     entry.abandoned = true
+    entry.abortLead()
     // Texts still waiting out their delay never arrive.
     entry.pacer.cancel()
     void window.api.jobs.cancelGroup(`texting:${charId}`)

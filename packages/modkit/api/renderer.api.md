@@ -385,6 +385,7 @@ export interface ModHooks {
         charId: string;
         character: Character;
         lead: Readonly<Record<string, unknown>>;
+        signal: AbortSignal;
     }) => void;
     editCharacterImages?: ComponentType<ScreenSlotProps['editCharacterImages']>;
     editorField?: EditorField;

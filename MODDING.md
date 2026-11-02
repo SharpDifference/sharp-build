@@ -469,7 +469,8 @@ exports.invoke = {
 
 `ComfyRenderRequest` also accepts `texts`, a map of extra text-node ids to their text, and
 `lora: { name, weight } | null` for `nodes.characterLora`. Core copies the graph before filling
-its inputs. The mod owns its prompts, graph and node map; core chooses the server and models,
+its inputs. Every set id in `nodes` and every key in `texts` must name a node in `workflow`;
+a missing node is refused as `RENDER_REQUEST_INVALID` before target resolution or queueing. The mod owns its prompts, graph and node map; core chooses the server and models,
 starts ComfyUI if needed, and uses its normal model checks, timeout and prompt cancellation.
 It accepts no destination, server address, installation root or caller-chosen queue group.
 Main code is trusted; accepting a graph does not sandbox its custom nodes.
@@ -925,7 +926,7 @@ else names it.
 | `prompts.character` | `characterPrompt.ts` | Add lines and fields to character generation |
 | `dmHistoryNote` | `textingPrompt.ts` | Add a note after a DM in the history the prompt quotes |
 | `characterFromDraft` | `characterPrompt.ts` | Fill fields of a generated character from the reply |
-| `dmReplyLead` | `textingLoop.ts` | Read the `lead` fields of her DM reply the moment they have streamed in, before her first text lands. Once per reply, never for one already abandoned; her finished reply stays the one to act on |
+| `dmReplyLead` | `textingLoop.ts` | Read the `lead` fields of her DM reply the moment they have streamed in, before her first text lands. Once per reply, never for one already abandoned. Context includes `signal`: a lead's work ends at `afterDmReply` or at this signal, whichever comes first. Failure, cancellation, blocking, abandonment, load, leaving or scene takeover aborts it; a landed reply does not. Her finished reply stays authoritative |
 | `afterDmReply` | `textingLoop.ts` | Act after her reply in a DM has landed |
 | `afterSceneReply` | `loop/turn.ts` | Read a landed scene reply as the model wrote it, fields a mod asked for included. A turn's reply only: a scene's closing reply is not handed over |
 | `scenePlay` | `SceneChrome.tsx`, `GameView.tsx` | Stand a seat on the scene's rail, and open a panel of its own over the scene |

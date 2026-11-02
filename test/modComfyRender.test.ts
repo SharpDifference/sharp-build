@@ -147,3 +147,15 @@ describe('mod-owned ComfyUI renders', () => {
     expect(submitted).toEqual([])
   })
 })
+
+it.each(['saveImage', 'positivePrompt', 'negativePrompt', 'seed', 'characterLora', 'texts'] as const)(
+  'refuses a missing %s node before resolving a server or queueing', async key => {
+    const invalid = key === 'texts'
+      ? { ...request, texts: { missing: 'hello' } }
+      : { ...request, nodes: { ...request.nodes, [key]: 'missing' } }
+    await expect(renderComfyImage('photo-feature', invalid, { signal: new AbortController().signal }))
+      .rejects.toMatchObject({ code: 'RENDER_REQUEST_INVALID' })
+    expect(fixture.settings).not.toHaveBeenCalled()
+    expect(fixture.fetch).not.toHaveBeenCalled()
+  }
+)
