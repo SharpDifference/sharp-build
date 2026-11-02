@@ -2,6 +2,10 @@
 
 ## 0.7.0
 
+- Startup readers have a ten-second wait limit per mod. A timeout names the mod in a warning
+  and lets startup continue. It does not cancel the reader; mods must still handle their own
+  asynchronous work. Later switch-on notifications use the same limit.
+
 What a mod built outside the repo needs to rewrite the game's prompts and reshape its scene calls,
 and the readers, components and record helpers its screens and main code use.
 
