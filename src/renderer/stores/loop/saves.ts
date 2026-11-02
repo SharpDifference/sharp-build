@@ -13,7 +13,7 @@ import { reconcileTalentBreakthrough } from '@shared/talentAbilities'
 import { withMeanwhile, type MeanwhileScene } from '@shared/meanwhile'
 import type { Conversation } from '@shared/types'
 import { modById } from '@shared/mods'
-import { savedModScene } from '@shared/modScene'
+import { modSceneWith, savedModScene } from '@shared/modScene'
 import { gameOverReasonOf, type GameOverReason } from '@shared/gameOver'
 import { isGameOver, spentOf } from '@shared/money'
 import { replayIdOf, type SlotReplay } from '@shared/replays'
@@ -25,7 +25,7 @@ import {
   type SceneLine,
   type SceneState
 } from '@shared/types'
-import { bindModWrites, saveFields, writeModSlices as slicesWith } from '@vx/modkit/host/renderer'
+import { bindModWrites, bindSceneFieldSaves, saveFields, writeModSlices as slicesWith } from '@vx/modkit/host/renderer'
 import { isGraduationSlot } from '../../prompts/graduation'
 import { useBunnyboardStore } from '../bunnyboardStore'
 import { PORTRAIT_SLOTS, useGameStore } from '../gameStore'
@@ -125,9 +125,10 @@ export async function writesSettled(): Promise<void> {
 
 /**
  * Overwrites the autosave, recording `scene` in place of what is on screen now. The save is taken
- * as the write's turn comes, and the stage picture is drawn off `scene` after it.
+ * as the write's turn comes, and the stage picture is drawn off `scene` after it. `onWritten` is
+ * told how the write went, and not at all where it was skipped.
  */
-export function writeAutosave(scene: SceneState | null): Promise<void> {
+export function writeAutosave(scene: SceneState | null, onWritten?: (result: Result<null>) => void): Promise<void> {
   return queueWrite(async () => {
     const game = useGameStore.getState()
     const playthroughId = game.playthroughId
@@ -144,6 +145,7 @@ export function writeAutosave(scene: SceneState | null): Promise<void> {
       thumbnail ? { ...draft, thumbnail } : draft
     )
     if (!result.ok) reportWriteFailure(result.error)
+    onWritten?.(result.ok ? { ok: true, data: null } : { ok: false, error: result.error })
   })
 }
 
@@ -798,6 +800,45 @@ export async function writeModSlices(
     return { ok: false, error: toAppError(err, 'SAVE_WRITE_FAILED') }
   }
 }
+
+/**
+ * A scene field's `save`: refused, changing nothing, where there is no game, the mod is off, or
+ * there is no scene to save into (none, or its ending being written, which writes its own save).
+ * Otherwise the value goes on the store, and the field's keys are copied into the decision point,
+ * the save a reload lands on, which is written behind every write queued before it. Core's later
+ * writes of that point then carry the value too. Before the scene's first decision point, the
+ * scene is written as it stands. Never throws.
+ */
+async function saveSceneField(modId: string, keys: readonly string[], apply: () => void): Promise<Result<null>> {
+  try {
+    const game = useGameStore.getState()
+    if (!game.playthroughId) return refused('MOD_WRITE_NO_GAME', 'There is no game to save into.')
+    if (!modIsOn(modId, loopState.record)) return refused('MOD_WRITE_OFF', 'That mod is off.')
+    const ended = game.activeGameOver !== null || game.sceneEnding || game.endingInFlight
+    if (ended || !sceneInProgress()) return refused('MOD_WRITE_NO_SCENE', 'There is no scene to save into.')
+    apply()
+    const point = loopState.decisionSave
+    let scene: SceneState | null
+    if (point) {
+      const mods = modSceneWith(point.mods, keys, useGameStore.getState().sceneMods)
+      const { mods: _old, ...rest } = point
+      scene = mods ? { ...rest, mods } : rest
+      loopState.decisionSave = scene
+    } else scene = useGameStore.getState().captureScene()
+    // Never null with a scene in progress; a null here would write the scene out of the save.
+    if (!scene) return refused('MOD_WRITE_NO_SCENE', 'There is no scene to save into.')
+    // Left as the answer where the write is skipped: the game was left before its turn.
+    let outcome: Result<null> = refused('MOD_WRITE_STALE', STALE_MESSAGE)
+    await writeAutosave(scene, (result) => {
+      outcome = result
+    })
+    return outcome
+  } catch (err) {
+    return { ok: false, error: toAppError(err, 'SAVE_WRITE_FAILED') }
+  }
+}
+
+bindSceneFieldSaves({ save: saveSceneField })
 
 // What a mod's `writeModField` and `safePoint` reach.
 bindModWrites({

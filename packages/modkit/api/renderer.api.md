@@ -859,6 +859,7 @@ export function sceneField<T>(modId: string, spec: SceneFieldSpec<T>): SceneFiel
 // @public
 export interface SceneFieldHandle<T> {
     read(): T;
+    save(next: T): Promise<Result<null>>;
     set(next: T): void;
     use(): T;
 }
@@ -867,6 +868,8 @@ export interface SceneFieldHandle<T> {
 export interface SceneFieldSpec<T> {
     // (undocumented)
     empty: T;
+    legacy?: string;
+    normalize?: (stored: unknown) => T;
 }
 
 // @public
