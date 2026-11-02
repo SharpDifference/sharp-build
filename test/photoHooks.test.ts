@@ -180,8 +180,10 @@ const HOOKS: readonly {
     file: 'src/renderer/prompts/textingPrompt.ts',
     needs: [
       "promptLines('dm',",
-      "promptFields('dm')",
-      "promptRequired('dm')",
+      "promptFields('dm', 'lead')",
+      "promptFields('dm', 'trailing')",
+      "promptRequired('dm', 'lead')",
+      "promptRequired('dm', 'trailing')",
       'dmHistoryNotes(message)'
     ],
     why: 'she is not told she may send one, and has no field to answer in'

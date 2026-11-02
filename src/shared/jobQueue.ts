@@ -14,6 +14,8 @@ interface JobContext {
 }
 
 export interface JobSpec<T> {
+  /** Cancels only this job, whether queued or running. */
+  signal?: AbortSignal
   /** Cancellation group — `cancelGroup(group)` drops every job sharing it. */
   group: string
   /** Sub-identifier within the group, surfaced in progress events. */
@@ -27,6 +29,7 @@ interface QueuedJob<T = unknown> {
   key?: string
   run: (context: JobContext) => Promise<T>
   controller: AbortController
+  ownsSignal: boolean
   resolve: (value: T) => void
   reject: (error: unknown) => void
 }
@@ -82,21 +85,28 @@ function emit(job: QueuedJob, progress: Omit<JobProgress, 'jobId' | 'group' | 'k
 
 /** Queues a job and resolves with its result once it has run serially. */
 export function enqueue<T>(spec: JobSpec<T>): Promise<T> {
-  return new Promise<T>((resolve, reject) => {
+  if (spec.signal?.aborted) return Promise.reject(cancelledError())
+  let detach = (): void => {}
+  const result = new Promise<T>((resolve, reject) => {
     const job: QueuedJob<T> = {
       jobId: randomId(),
       group: spec.group,
       key: spec.key,
       run: spec.run,
       controller: new AbortController(),
+      ownsSignal: spec.signal !== undefined,
       resolve,
       reject
     }
 
+    const abort = (): void => { void cancelMatching((candidate) => candidate === job) }
+    spec.signal?.addEventListener('abort', abort, { once: true })
+    detach = () => spec.signal?.removeEventListener('abort', abort)
     queue.push(job as QueuedJob)
     emit(job as QueuedJob, { status: 'queued', step: 'Queued' })
     void pump()
   })
+  return result.finally(() => detach())
 }
 
 /** Runs queued jobs one at a time until the queue drains. */
@@ -137,6 +147,8 @@ async function pump(): Promise<void> {
           }
         )
 
+        // Per-job cancellation wins a late finish; legacy group jobs keep their result.
+        if (job.ownsSignal && job.controller.signal.aborted) throw cancelledError()
         emit(job, { status: 'done', step: 'Done' })
         job.resolve(result)
       } catch (err) {
