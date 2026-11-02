@@ -6,43 +6,51 @@
 import { useEffect, useMemo, useRef, useState, type JSX, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { AnimatePresence, motion, Reorder, useDragControls } from 'motion/react'
-import { atSectionEnd, BLOCK_SECTIONS, bySection, sectionOf, type BlockSection } from '@shared/presets/gameParts'
-import { presetMacros, type MacroUse } from '@shared/presets/glossary'
-import { hasDynamicMacros } from '@shared/presets/macros'
-import { planPresetRequest } from '@shared/presets/request'
-import { studioPromptsToKeep, withBlockText, type ClassCatalogEdits } from '@shared/presets/studioPrompts'
+import {
+  CheckField,
+  ChevronIcon,
+  ConfirmModal,
+  defaultBlockText,
+  gestures,
+  isNewGameBlock,
+  lift,
+  panelUnderTab,
+  PlusIcon,
+  press,
+  PROMPT_BLOCKS,
+  quietLift,
+  quietPress,
+  rowPress,
+  TextEditModal,
+  TitleTab,
+  toggleLift,
+  useGameFacts,
+  useLessNsfwText,
+  useModalShell,
+  useSafePoint,
+  useScenePersona,
+  veilIn,
+  type PromptBlock,
+  type ScreenTheme
+} from '@vx/modkit/renderer'
+import { atSectionEnd, BLOCK_SECTIONS, bySection, sectionOf, type BlockSection } from '../../shared/presets/gameParts'
+import { presetMacros, type MacroUse } from '../../shared/presets/glossary'
+import { hasDynamicMacros } from '../../shared/presets/macros'
+import { planPresetRequest, presetRequestOf } from '../../shared/presets/request'
+import { studioPromptsToKeep, withBlockText, type ClassCatalogEdits } from '../../shared/presets/studioPrompts'
 import {
   PROTECTED_MARKERS,
   type GameMarker,
   type GlobalTextId,
   type Preset,
   type PresetBlock,
-  type PresetRequest,
   type PresetSource,
   type PresetSummary,
   type SceneTextId
-} from '@shared/presets/types'
-import { CheckField } from '../components/CheckField'
-import { ConfirmModal } from '../components/ConfirmModal'
-import { TitleTab } from '../components/TitleTab'
-import { useModalShell } from '../components/useModalShell'
-import { defaultBlockText, isNewGameBlock, PROMPT_BLOCKS, type PromptBlock } from '../prompts/promptBlocks'
-import { useGameStore } from '../stores/gameStore'
+} from '../../shared/presets/types'
+import { presetVars as presetVarsField } from '../stores/promptStudioVars'
 import { usePromptStudioStore } from '../stores/promptStudioStore'
-import { useSettingsStore } from '../stores/settingsStore'
-import type { ScreenTheme } from './clockTheme'
-import {
-  gestures,
-  lift,
-  panelUnderTab,
-  press,
-  quietLift,
-  quietPress,
-  rowReorder,
-  toggleLift,
-  veilIn
-} from './motion'
-import { ChevronIcon, GripIcon, PlusIcon } from './screenIcons'
+import { GripIcon } from './PromptStudioIcons'
 import {
   CatalogSizesModal,
   PresetBlockModal,
@@ -54,8 +62,6 @@ import {
   StudioPill
 } from './PromptStudioModals'
 import { useStudioBackup } from './PromptStudioBackup'
-import { TextEditModal } from './TextEditModal'
-import '../vu_styles/Settings.css'
 import '../vu_styles/PromptStudio.css'
 
 type TabId = 'presets' | 'blocks' | 'glossary' | 'scene' | 'other' | 'newgame' | 'variables' | 'preview'
@@ -258,7 +264,7 @@ function BlockItem({ id, className, onDrop, children }: BlockItemProps): JSX.Ele
       layout="position"
       dragListener={false}
       dragControls={controls}
-      transition={rowReorder}
+      transition={rowPress.transition}
       onDragEnd={onDrop}
     >
       <span className="vu-studio-grip" data-cursor="move" aria-hidden="true" onPointerDown={(event) => controls.start(event)}>
@@ -295,12 +301,12 @@ export function PromptStudioModal({ theme, onClose }: PromptStudioModalProps): J
   const active = usePromptStudioStore((s) => s.active)
   const prompts = usePromptStudioStore((s) => s.prompts)
   const lastSceneRequest = usePromptStudioStore((s) => s.lastSceneRequest)
-  const settings = useSettingsStore((s) => s.settings)
-  const playthroughId = useGameStore((s) => s.playthroughId)
-  const presetVars = useGameStore((s) => s.presetVars)
-  const playerFirstName = useGameStore((s) => s.playerFirstName)
-  // A decision point: the reader's turn, with no call in flight.
-  const atDecision = useGameStore((s) => s.awaitingInput && !s.busy && !s.streaming)
+  const lessNsfwText = useLessNsfwText()
+  const scenePersona = useScenePersona()
+  const { playthroughId, readerName } = useGameFacts()
+  const presetVars = presetVarsField.use()
+  // A safe point: no call in flight and nothing waiting to be filed, so an edit is not overwritten by a reply.
+  const atDecision = useSafePoint() === 'open'
 
   const [tab, setTab] = useState<TabId>('presets')
   const [textEdit, setTextEdit] = useState<PromptBlock | null>(null)
@@ -333,9 +339,6 @@ export function PromptStudioModal({ theme, onClose }: PromptStudioModalProps): J
   const hasGame = playthroughId !== null
   const tabs = TABS.filter((entry) => (entry.id !== 'variables' || hasGame) && (entry.id !== 'newgame' || !hasGame))
   const shown = tabs.find((entry) => entry.id === tab) ?? tabs[0]
-
-  const lessNsfwText = settings?.lessNsfwText ?? false
-  const scenePersona = settings?.scenePersona
 
   /** Writes the active preset as `change` leaves it. */
   async function commit(change: (preset: Preset) => Preset): Promise<void> {
@@ -397,7 +400,7 @@ export function PromptStudioModal({ theme, onClose }: PromptStudioModalProps): J
 
   /** Writes one text block's edit to where its owner keeps it. */
   async function saveText(block: PromptBlock, value: string | undefined): Promise<boolean> {
-    if (block.owner === 'preset') {
+    if (block.owner === 'scene') {
       const current = usePromptStudioStore.getState().active
       if (!current) return false
       return usePromptStudioStore.getState().save(withSceneText(current, block.id as SceneTextId, value))
@@ -414,7 +417,7 @@ export function PromptStudioModal({ theme, onClose }: PromptStudioModalProps): J
 
   /** The stored edit of a text block, where there is one. */
   function editOf(block: PromptBlock): string | undefined {
-    return block.owner === 'preset'
+    return block.owner === 'scene'
       ? active?.overrides?.[block.id as SceneTextId]
       : prompts.blocks?.[block.id as GlobalTextId]
   }
@@ -423,21 +426,15 @@ export function PromptStudioModal({ theme, onClose }: PromptStudioModalProps): J
   const preview = useMemo(() => {
     if (!lastSceneRequest) return null
     const tag = lastSceneRequest.sceneSpot
-    const request: PresetRequest | undefined = tag
-      ? {
-          spot: tag.spot,
-          playthroughId: playthroughId ?? 'unsaved',
-          vars: { ...presetVars },
-          names: { user: playerFirstName, char: tag.cast[0] ?? '', group: tag.cast.join(', ') }
-        }
-      : undefined
-    const plan = planPresetRequest(
-      request ? { ...lastSceneRequest, preset: request } : lastSceneRequest,
-      active ?? null,
+    if (!tag || !active) return { system: lastSceneRequest.system, user: lastSceneRequest.user }
+    const { request } = planPresetRequest(
+      lastSceneRequest,
+      presetRequestOf(tag, playthroughId, presetVars, readerName),
+      active,
       () => 0.5
     )
-    return { system: plan.request.system, user: plan.request.user }
-  }, [lastSceneRequest, active, playthroughId, presetVars, playerFirstName])
+    return { system: request.system, user: request.user }
+  }, [lastSceneRequest, active, playthroughId, presetVars, readerName])
 
   if (!host) return null
 
@@ -773,8 +770,8 @@ export function PromptStudioModal({ theme, onClose }: PromptStudioModalProps): J
                   <span className="vu-studio-tools">
                     {pill(`studio-var-edit-${name}`, 'Edit', () => setVarEdit(name))}
                     {pill(`studio-var-delete-${name}`, 'Delete', () => {
-                      const { [name]: _gone, ...rest } = useGameStore.getState().presetVars
-                      useGameStore.getState().setPresetVars(rest)
+                      const { [name]: _gone, ...rest } = presetVarsField.read()
+                      presetVarsField.set(rest)
                     })}
                   </span>
                 )}
@@ -860,7 +857,7 @@ export function PromptStudioModal({ theme, onClose }: PromptStudioModalProps): J
             {shown.id === 'presets' && presetsPage()}
             {shown.id === 'blocks' && blocksPage()}
             {shown.id === 'glossary' && glossaryPage()}
-            {shown.id === 'scene' && textPage('preset')}
+            {shown.id === 'scene' && textPage('scene')}
             {shown.id === 'other' && textPage('global')}
             {shown.id === 'newgame' && newGamePage()}
             {shown.id === 'variables' && variablesPage()}
@@ -1015,9 +1012,7 @@ export function PromptStudioModal({ theme, onClose }: PromptStudioModalProps): J
             theme={theme}
             name={varName}
             value={presetVars[varName] ?? ''}
-            onSave={(value) =>
-              useGameStore.getState().setPresetVars({ ...useGameStore.getState().presetVars, [varName]: value })
-            }
+            onSave={(value) => presetVarsField.set({ ...presetVarsField.read(), [varName]: value })}
             onClose={() => setVarEdit(null)}
           />
         )}
@@ -1058,7 +1053,7 @@ export function PromptStudioModal({ theme, onClose }: PromptStudioModalProps): J
             cancelText="Keep them"
             onConfirm={() => {
               setVarsReset(false)
-              useGameStore.getState().setPresetVars({})
+              presetVarsField.set({})
             }}
             onCancel={() => setVarsReset(false)}
           />

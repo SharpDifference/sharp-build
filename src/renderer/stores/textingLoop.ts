@@ -95,7 +95,7 @@ import {
 } from '@shared/types'
 import { useBunnyboardStore } from './bunnyboardStore'
 import { useGameStore } from './gameStore'
-import { afterDmReply, afterReachOut } from '../mods/hooks'
+import { afterDmReply, afterReachOut, promptTextEdits } from '../mods/hooks'
 import { INCOMING_TEXTS } from '@shared/modEntries/incoming-texts'
 import { lorebookNow } from './lorebookStore'
 import { prefetchHangoutScene, startHangoutScene } from './loop/hooks'
@@ -116,7 +116,6 @@ import {
   shiftNow
 } from './timetable'
 import { isMoodLustful } from '../prompts/moods'
-import { textEditsNow } from './promptStudioStore'
 import { sendsSpringBreakNotice } from '../prompts/springBreak'
 import { outingOccasionAt, placeClosedOn } from '../prompts/occasions'
 import type { HangoutInvite } from '../prompts/slotIntroPrompt'
@@ -782,7 +781,7 @@ function textingState(game: ReturnType<typeof useGameStore.getState>, charId: st
     memoryBudget: memoryBudgetsOf(useSettingsStore.getState().settings ?? {}).one,
     secretBudget: secretBudgetOf(useSettingsStore.getState().settings ?? {}),
     history: game.history,
-    globalTextEdits: textEditsNow()?.global
+    globalTextEdits: promptTextEdits()?.global
   }
 }
 

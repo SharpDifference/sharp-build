@@ -1,9 +1,8 @@
 import { appError } from '@shared/errors'
-import { PROMPT_STUDIO_MOD, type PresetRequest, type SceneSpotTag } from '@shared/presets/types'
+import type { SceneSpotTag } from '@shared/promptText'
 import type { AppError, SceneLine, SceneResponse, StructuredRequest } from '@shared/types'
+import { sceneCallTags, sceneReplyLanded } from '../../mods/hooks'
 import { useGameStore } from '../gameStore'
-import { modIsOn } from '../modsStore'
-import { usePromptStudioStore } from '../promptStudioStore'
 import {
   createSceneSanitizer,
   sanitizeScene,
@@ -98,6 +97,8 @@ export type SceneCall = Promise<
         applied: boolean
         at: number
         reply: SceneResponse
+        /** Which scene call this was, where its builder named one. */
+        spot?: SceneSpotTag
       }
     }
   | { ok: false; error: AppError }
@@ -122,26 +123,17 @@ export function sceneInProgress(): boolean {
 }
 
 /**
- * What main applies the active preset with for this scene call: the save's variables as they
- * stand now, and the names its macros fill in. A scene with no save carries none.
+ * Tells the mods a scene reply has landed, its lines on the transcript. Only a call a builder
+ * named a spot for is told, and the reply's `modReply` is handed over frozen.
  */
-function presetRequestOf(tag: SceneSpotTag): PresetRequest {
-  const game = useGameStore.getState()
-  return {
-    spot: tag.spot,
-    playthroughId: game.playthroughId ?? 'unsaved',
-    vars: { ...game.presetVars },
-    names: { user: game.playerFirstName, char: tag.cast[0] ?? '', group: tag.cast.join(', ') }
-  }
-}
-
-/**
- * Keeps the variables a resolved scene reply left, noting `at`, the transcript length its lines
- * start at, so a cut can take them back. A reply that came back with none was sent with no
- * preset applied, and changes nothing.
- */
-export function commitPresetVars(vars: Record<string, string> | undefined, at: number): void {
-  if (vars !== undefined) useGameStore.getState().commitPresetVars(vars, at)
+export function landScene(reply: SceneResponse, spot: SceneSpotTag | undefined, lineCount: number): void {
+  if (!spot) return
+  sceneReplyLanded({
+    reply: { ...reply } as unknown as Readonly<Record<string, unknown>>,
+    modReply: Object.freeze({ ...reply.modReply }),
+    spot,
+    at: useGameStore.getState().currentSceneTranscript.length - lineCount
+  })
 }
 
 /** How many scene calls this session has made, which names each one's deltas. */
@@ -178,11 +170,17 @@ export async function streamScene(
   }
   loopState.lastScenePrompt = request.user
 
-  // With Prompt Studio on, the call goes to main tagged for the active preset, and the studio's
-  // preview keeps it as the builder made it.
-  if (request.sceneSpot && modIsOn(PROMPT_STUDIO_MOD)) {
-    usePromptStudioStore.getState().noteSceneRequest(request)
-    request = { ...request, preset: presetRequestOf(request.sceneSpot) }
+  // What each mod that is on tags the call with, for its request hook in the main process.
+  const spot = request.sceneSpot
+  if (spot) {
+    const game = useGameStore.getState()
+    const tags = sceneCallTags({
+      request,
+      spot,
+      playthroughId: game.playthroughId,
+      readerName: game.playerFirstName
+    })
+    if (Object.keys(tags).length > 0) request = { ...request, modTags: { ...tags } }
   }
 
   if (!sink || sink.live) useGameStore.getState().setStreaming(true)
@@ -282,9 +280,8 @@ export async function streamScene(
   // The same options the preview ran under, or the two passes disagree.
   const { lines, summary, end } = sanitizeScene(result.data, options)
 
-  // A prefetch still holding its lines has nothing to reconcile; Begin appends the reply whole,
-  // and keeps its variables then.
-  if (sink && !sink.live) return { ok: true, data: { lines, summary, end, applied: false, at, reply: result.data } }
+  // A prefetch still holding its lines has nothing to reconcile; Begin appends the reply whole.
+  if (sink && !sink.live) return { ok: true, data: { lines, summary, end, applied: false, at, reply: result.data, spot } }
 
   const game = useGameStore.getState()
 
@@ -310,16 +307,10 @@ export async function streamScene(
   // that read the store here would find a scene that has not arrived yet.
   await delivered
 
-  // Read off the reply as it came, before the sanitizer dropped the keys it does not know; the
-  // lines are on the transcript now, so the reply starts that many back from its end.
-  if (!abandoned()) {
-    commitPresetVars(
-      result.data.presetVars,
-      useGameStore.getState().currentSceneTranscript.length - lines.length
-    )
-  }
+  // The lines are on the transcript now, and the autosave that pays for the reply is still to come.
+  if (!abandoned()) landScene(result.data, spot, lines.length)
 
-  return { ok: true, data: { lines, summary, end, applied: true, at, reply: result.data } }
+  return { ok: true, data: { lines, summary, end, applied: true, at, reply: result.data, spot } }
 }
 
 /** Hands playback back to a player parked on the spinner at the end of the queue. */

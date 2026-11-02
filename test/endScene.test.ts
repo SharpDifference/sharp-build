@@ -49,17 +49,14 @@ describe('manual scene ending gates', () => {
 })
 
 describe('manual cut keeps only earned scene state', () => {
-  it('drops unread dialogue and the summary and preset changes belonging to it', () => {
+  it('drops unread dialogue and the summary belonging to it', () => {
     const game = useGameStore.getState()
     game.setSceneSummary('Read recap', 2)
     game.setSceneSummary('Unread recap', 3)
-    game.setPresetVars({ trust: '0' })
-    game.commitPresetVars({ trust: '1' }, 1)
-    game.commitPresetVars({ trust: '2' }, 2)
     game.cutToRead()
     expect(useGameStore.getState()).toMatchObject({
       currentSceneTranscript: [reader('I say hello.'), line('A friendly reply.')],
-      pendingLines: [], sceneSummary: 'Read recap', presetVars: { trust: '1' }
+      pendingLines: [], sceneSummary: 'Read recap'
     })
   })
 
@@ -79,11 +76,9 @@ describe('manual cut keeps only earned scene state', () => {
     useGameStore.setState({ currentSceneTranscript: all, sceneLog: all, pendingLines: [], inventory: [],
       sceneGifts: [{ charId: 'a', itemId: 'rose', repeat: false, reaction: 'neutral', at: 2 }] })
     const game = useGameStore.getState()
-    game.setPresetVars({ gift: 'not given' })
-    game.commitPresetVars({ gift: 'given' }, 2)
     game.cutToRead()
     game.cutToRead()
     expect(useGameStore.getState()).toMatchObject({ currentSceneTranscript: read, sceneLog: read,
-      sceneGifts: [], inventory: [{ itemId: 'rose', count: 1 }], presetVars: { gift: 'not given' } })
+      sceneGifts: [], inventory: [{ itemId: 'rose', count: 1 }] })
   })
 })

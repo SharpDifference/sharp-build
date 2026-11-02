@@ -2,13 +2,11 @@ import { resetReflectionPortrait, uploadReflectionPortrait, generateReflectionPo
 import { writeFile } from 'fs/promises'
 import type { EchoArtRequest } from '@shared/echo'
 import { prepareStoryRequest, inspectStoryMemory } from './services/storyMemoryService'
-import { planPresetRequest, finishPresetReply } from '@shared/presets/request'
 import {
   deletePreset,
   getPreset,
   importPresetFromFile,
   listPresets,
-  loadActivePreset,
   savePreset,
   setActivePreset
 } from './services/presetsService'
@@ -155,7 +153,8 @@ import {
 } from './services/comfyService'
 import { classifyCloud } from '@shared/llm/cloudClassifier'
 import { generatePhoto } from '@shared/llm/cloudImage'
-import { completeStructured as completeCloudStructured, type StructuredRequest } from '@shared/llm/cloudLlm'
+import type { StructuredRequest } from '@shared/llm/cloudLlm'
+import { completeWithFinalRequest } from './services/finalRequest'
 import type { FeedThreadsResponse } from '@shared/bunnyfeeds'
 import { cancelModCalls, completeModRequest } from '@shared/llm/modCall'
 import {
@@ -1177,14 +1176,9 @@ async function openFolder(path: string, message: string): Promise<void> {
 }
 
 /**
- * Sends one structured request: the story recall is prepended, the active Prompt Studio preset is
- * applied where the request asks for one, and the fields only this app reads never reach the
- * provider. A preset that cannot be loaded costs nothing but a warning.
+ * Sends one structured request: the story recall is prepended, and a mod's final request hook
+ * then has its say. The fields only this app reads never reach the provider.
  */
 async function completeStructured<T>(request: StructuredRequest, signal?: AbortSignal, onDelta?: (delta: string) => void): Promise<T> {
-  const prepared = await prepareStoryRequest(request)
-  const plan = planPresetRequest(prepared, prepared.preset ? await loadActivePreset() : null)
-  const reply = await completeCloudStructured<T>(plan.request, signal, onDelta, undefined, plan.sampling)
-  for (const warning of finishPresetReply(reply, plan.applied)) console.warn(`[presets] ${warning}`)
-  return reply
+  return completeWithFinalRequest<T>(await prepareStoryRequest(request), signal, onDelta)
 }

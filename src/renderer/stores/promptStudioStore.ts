@@ -1,16 +1,9 @@
 import { create } from 'zustand'
-import { modOn } from '@shared/mods'
-import { PROMPT_STUDIO_MOD, type Preset, type PresetImport, type PresetSummary } from '@shared/presets/types'
-import {
-  EMPTY_STUDIO_PROMPTS,
-  type ClassCatalogEdits,
-  type StudioPrompts
-} from '@shared/presets/studioPrompts'
-import { mergePrompts, type PresetsMerge } from '@shared/presets/studioBackup'
-import type { AppError, StructuredRequest } from '@shared/types'
-import type { PromptState } from '../prompts/scenePrompt'
-import { modIsOn, useModsStore } from './modsStore'
-import { useUiStore } from './uiStore'
+import { showError } from '@vx/modkit/renderer'
+import type { AppError, StructuredRequest } from '@vx/modkit/shared'
+import type { Preset, PresetImport, PresetSummary } from '../../shared/presets/types'
+import { EMPTY_STUDIO_PROMPTS, type StudioPrompts } from '../../shared/presets/studioPrompts'
+import { mergePrompts, type PresetsMerge } from '../../shared/presets/studioBackup'
 
 /** The Prompt Studio presets: the list, the one in force and what the studio previews. */
 interface PromptStudioState {
@@ -23,7 +16,7 @@ interface PromptStudioState {
   /** The game's own prompt edits, as last read; empty until the first load or where the read failed. */
   prompts: StudioPrompts
   /** The last scene call as its builder made it, before any preset was applied; what the studio's preview shows. */
-  lastSceneRequest?: StructuredRequest
+  lastSceneRequest?: Readonly<StructuredRequest>
 
   /** Reads the list and the active preset. A failure is logged and leaves what was loaded. */
   load: () => Promise<void>
@@ -46,7 +39,7 @@ interface PromptStudioState {
   /** Reads a file the player picks into a preset that is not yet kept; null where nothing was picked or it failed. */
   importFile: () => Promise<PresetImport | null>
   /** Remembers the last scene request a builder made. */
-  noteSceneRequest: (request: StructuredRequest) => void
+  noteSceneRequest: (request: Readonly<StructuredRequest>) => void
 }
 
 /** The tail of the work lane: each action sees the store as the one before it left it. */
@@ -60,11 +53,6 @@ function inLane<T>(work: () => Promise<T>): Promise<T> {
   const next = tail.then(work, work)
   tail = next.catch(() => undefined)
   return next
-}
-
-/** Tells the player a request failed. */
-function report(error: AppError): void {
-  useUiStore.getState().showError(error)
 }
 
 export const usePromptStudioStore = create<PromptStudioState>((set, get) => {
@@ -102,7 +90,7 @@ export const usePromptStudioStore = create<PromptStudioState>((set, get) => {
   async function write(call: () => Promise<{ ok: true } | { ok: false; error: AppError }>): Promise<boolean> {
     const result = await call()
     if (!result.ok) {
-      report(result.error)
+      showError(result.error)
       await refresh()
       return false
     }
@@ -132,12 +120,12 @@ export const usePromptStudioStore = create<PromptStudioState>((set, get) => {
       inLane(async () => {
         // A record that could not be read is not written over: the file may be one a newer build kept.
         if (!(await refreshPrompts())) {
-          report({ code: 'STUDIO_PROMPTS_UNREADABLE', message: 'The stored prompt edits could not be read, so nothing was saved.' })
+          showError({ code: 'STUDIO_PROMPTS_UNREADABLE', message: 'The stored prompt edits could not be read, so nothing was saved.' })
           return false
         }
         const saved = await window.api.studioPrompts.set(record)
         if (!saved.ok) {
-          report(saved.error)
+          showError(saved.error)
           return false
         }
         set({ prompts: saved.data })
@@ -160,12 +148,12 @@ export const usePromptStudioStore = create<PromptStudioState>((set, get) => {
     restorePrompts: (file) =>
       inLane(async () => {
         if (!(await refreshPrompts())) {
-          report({ code: 'STUDIO_PROMPTS_UNREADABLE', message: 'The stored prompt edits could not be read, so nothing was restored.' })
+          showError({ code: 'STUDIO_PROMPTS_UNREADABLE', message: 'The stored prompt edits could not be read, so nothing was restored.' })
           return false
         }
         const saved = await window.api.studioPrompts.set(mergePrompts(get().prompts, file))
         if (!saved.ok) {
-          report(saved.error)
+          showError(saved.error)
           return false
         }
         set({ prompts: saved.data })
@@ -180,7 +168,7 @@ export const usePromptStudioStore = create<PromptStudioState>((set, get) => {
       inLane(async () => {
         const read = await window.api.presets.get(id)
         if (!read.ok) {
-          report(read.error)
+          showError(read.error)
           return null
         }
         const copy: Preset = { ...read.data, id: crypto.randomUUID(), name: `${read.data.name} copy` }
@@ -191,7 +179,7 @@ export const usePromptStudioStore = create<PromptStudioState>((set, get) => {
       inLane(async () => {
         const read = await window.api.presets.get(id)
         if (!read.ok) {
-          report(read.error)
+          showError(read.error)
           return false
         }
         return write(() => window.api.presets.save({ ...read.data, name }))
@@ -200,7 +188,7 @@ export const usePromptStudioStore = create<PromptStudioState>((set, get) => {
     importFile: async () => {
       const result = await window.api.presets.import()
       if (!result.ok) {
-        report(result.error)
+        showError(result.error)
         return null
       }
       return result.data
@@ -209,31 +197,3 @@ export const usePromptStudioStore = create<PromptStudioState>((set, get) => {
     noteSceneRequest: (request) => set({ lastSceneRequest: request })
   }
 })
-
-// The presets are read when the mod is switched on; the boot reads them when it already is.
-useModsStore.subscribe((state, previous) => {
-  if (modOn(state.switches, PROMPT_STUDIO_MOD) && !modOn(previous.switches, PROMPT_STUDIO_MOD)) {
-    void usePromptStudioStore.getState().load()
-  }
-})
-
-/**
- * Prompt Studio's edits to the fixed text blocks — the active preset's scene text and the
- * studio's global text — or absent while the mod is off.
- */
-export function textEditsNow(): PromptState['textEdits'] {
-  if (!modIsOn(PROMPT_STUDIO_MOD)) return undefined
-  return {
-    scene: usePromptStudioStore.getState().active?.overrides,
-    global: usePromptStudioStore.getState().prompts.blocks
-  }
-}
-
-/**
- * The player's class call pool sizes, or absent while the mod is off. With it on, a size the
- * player has not changed is left undefined for the builder to fill with its shipped one.
- */
-export function classCatalogNow(): ClassCatalogEdits | undefined {
-  if (!modIsOn(PROMPT_STUDIO_MOD)) return undefined
-  return usePromptStudioStore.getState().prompts.classCatalog ?? {}
-}

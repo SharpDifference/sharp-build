@@ -52,6 +52,31 @@ export function Card(input: {
     children: ReactNode;
 }): JSX.Element;
 
+// @public
+export function CheckField(input: CheckFieldProps): JSX.Element;
+
+// @public (undocumented)
+export interface CheckFieldProps {
+    // (undocumented)
+    checked: boolean;
+    // (undocumented)
+    disabled?: boolean;
+    // (undocumented)
+    id: string;
+    // (undocumented)
+    label: string;
+    meta?: string;
+    note?: string;
+    // (undocumented)
+    onChange: (checked: boolean) => void;
+}
+
+// @public
+export function ChevronIcon(input?: {
+    back?: boolean;
+    down?: boolean;
+}): JSX.Element;
+
 // @public (undocumented)
 export function CloseIcon(): JSX.Element;
 
@@ -59,6 +84,37 @@ export function CloseIcon(): JSX.Element;
 export function completeStructured<T>(modId: string, request: StructuredRequest, options?: {
     group?: string;
 }): Promise<Result<T>>;
+
+// @public
+export function ConfirmModal(input: ConfirmModalProps): JSX.Element | null;
+
+// @public (undocumented)
+export interface ConfirmModalProps {
+    aside?: ReactNode;
+    busy?: boolean;
+    busyText?: string;
+    cancelText?: string;
+    confirmDisabled?: boolean;
+    // (undocumented)
+    confirmText?: string;
+    enterConfirms?: boolean;
+    extraDisabled?: boolean;
+    extraFirst?: boolean;
+    extraText?: string;
+    // (undocumented)
+    id: string;
+    lockOut?: boolean;
+    message: ReactNode | readonly string[];
+    onCancel?: () => void;
+    // (undocumented)
+    onConfirm: () => void;
+    onDismiss?: () => void;
+    // (undocumented)
+    onExtra?: () => void;
+    theme: 'day' | 'night';
+    // (undocumented)
+    title: string;
+}
 
 // @public
 export interface ContactTab {
@@ -89,6 +145,12 @@ export function currentRun(): object;
 
 // @public
 export const dealt: (startDelay: number, each?: number) => Variants;
+
+// @public
+export function defaultBlockText(id: TextBlockId, settings: {
+    lessNsfwText: boolean;
+    scenePersona?: string;
+}): string;
 
 // @public
 export type DividerWord = 'hover' | 'locked' | 'unavailable' | 'ending';
@@ -169,6 +231,12 @@ export function formatNumericGameDate(date: number, season: Season): string;
 export function formatShortGameDate(date: number, season: Season): string;
 
 // @public
+export function gameFacts(): {
+    playthroughId: string | null;
+    readerName: string;
+};
+
+// @public
 export interface GameMenuItemProps {
     // (undocumented)
     children: ReactNode;
@@ -212,6 +280,9 @@ export function isFeedContact(info: CharInfo | undefined): boolean;
 
 // @public
 export function isGraduationSlot(date: number, time: TimeSlot): boolean;
+
+// @public
+export function isNewGameBlock(block: PromptBlock): boolean;
 
 // @public
 export function isOrientationSlot(date: number, time: TimeSlot, semesterIndex: number): boolean;
@@ -289,6 +360,7 @@ export interface ModDetailProps {
 
 // @public (undocumented)
 export interface ModHooks {
+    advancedSettingsEntry?: ComponentType<ScreenSlotProps['advancedSettingsEntry']>;
     afterDmReply?: (ctx: {
         charId: string;
         character: Character;
@@ -346,6 +418,7 @@ export interface ModHooks {
     promptState?: {
         scene?: () => unknown;
     };
+    promptText?: PromptTextSpot;
     railButton?: ComponentType<ScreenSlotProps['railButton']>;
     requests?: {
         [S in keyof RequestSpots]?: (request: StructuredRequest, ctx: RequestSpots[S]) => StructuredRequest;
@@ -357,7 +430,12 @@ export interface ModHooks {
         };
     }) => SaveChoice | undefined;
     saveNote?: (scene: Readonly<ModSceneFields>) => string | null;
+    sceneCall?: (ctx: SceneCall) => unknown;
+    sceneCut?: (ctx: {
+        length: number;
+    }) => void;
     scenePlay?: ScenePlay;
+    sceneReplyLanded?: (ctx: SceneReplyLanded) => void;
     sentText?: SentTextSpot;
     settingsSection?: ComponentType<ScreenSlotProps['settingsSection']>;
     settleSceneStats?: (resolved: SceneStats, settlement: SceneStatSettlement) => SceneStats;
@@ -369,6 +447,9 @@ export interface ModHooks {
     stageLayer?: ComponentType<ScreenSlotProps['stageLayer']>;
     statActivities?: (stat: StatKey) => readonly SlotActivityOffer[];
     statFloor?: (key: StatKey) => number | undefined;
+    switchedOn?: (ctx: {
+        atBoot: boolean;
+    }) => void | Promise<void>;
     updatesTab?: UpdatesTab;
 }
 
@@ -426,6 +507,11 @@ export function ownsPostComments(modId: string): boolean;
 export const panelUnderTab: Variants;
 
 // @public
+export function PlusIcon(input: {
+    size: number;
+}): JSX.Element;
+
+// @public
 export function PostCommentAction(props: PostCommentsProps): JSX.Element | null;
 
 // @public
@@ -476,11 +562,30 @@ export function postVisible(post: SocialPost): boolean;
 export const press: TargetAndTransition;
 
 // @public
+export const PROMPT_BLOCKS: readonly PromptBlock[];
+
+// @public
 export interface PromptAddition<C> {
     fields?: () => Record<string, unknown>;
     // (undocumented)
     lines?: (ctx: C) => readonly string[];
     required?: () => readonly string[];
+}
+
+// @public
+export interface PromptBlock {
+    // (undocumented)
+    group: 'persona' | 'scene' | 'newgame.classes' | 'newgame.profiles' | 'newgame.occasions' | 'newgame.secrets';
+    // (undocumented)
+    hint: string;
+    // (undocumented)
+    id: TextBlockId;
+    // (undocumented)
+    label: string;
+    // (undocumented)
+    owner: 'scene' | 'global';
+    // (undocumented)
+    text: string;
 }
 
 // @public
@@ -591,10 +696,7 @@ export interface PromptState {
     stats?: PlayerStats;
     // (undocumented)
     storyMemory?: StorySnapshot;
-    textEdits?: {
-        scene?: TextEdits<SceneTextId>;
-        global?: TextEdits<GlobalTextId>;
-    };
+    textEdits?: TextEditSet;
     textedWith?: readonly string[];
     textingSummaries?: Record<string, string[]>;
     // (undocumented)
@@ -602,6 +704,12 @@ export interface PromptState {
     upcomingPlans?: Record<string, string[]>;
     visitJobId: string | null;
     weather?: readonly Weather[];
+}
+
+// @public
+export interface PromptTextSpot {
+    classCatalog?: () => ClassCatalogEdits | undefined;
+    edits?: () => TextEditSet | undefined;
 }
 
 // @public
@@ -716,6 +824,16 @@ export interface SaveFieldSpec<T> {
     normalize?: (stored: unknown, legacy: Readonly<Record<string, unknown>>, from: string | null) => T;
 }
 
+// @public
+export interface SceneCall {
+    // (undocumented)
+    playthroughId: string | null;
+    readerName: string;
+    request: Readonly<StructuredRequest>;
+    // (undocumented)
+    spot: SceneSpotTag;
+}
+
 // @public (undocumented)
 export function SceneDivider(input: SceneDividerProps): JSX.Element;
 
@@ -726,6 +844,22 @@ export interface SceneDividerProps {
     state: 'shown' | 'dim' | 'hidden';
     // (undocumented)
     word: DividerWord;
+}
+
+// @public
+export function sceneField<T>(modId: string, spec: SceneFieldSpec<T>): SceneFieldHandle<T>;
+
+// @public
+export interface SceneFieldHandle<T> {
+    read(): T;
+    set(next: T): void;
+    use(): T;
+}
+
+// @public
+export interface SceneFieldSpec<T> {
+    // (undocumented)
+    empty: T;
 }
 
 // @public
@@ -759,6 +893,15 @@ export interface SceneReplied {
 }
 
 // @public
+export interface SceneReplyLanded {
+    at: number;
+    modReply: Readonly<Record<string, unknown>>;
+    reply: Readonly<Record<string, unknown>>;
+    // (undocumented)
+    spot: SceneSpotTag;
+}
+
+// @public
 export interface SceneSeatProps {
     open: () => void;
     Seat: ComponentType<RailSeatProps>;
@@ -785,6 +928,11 @@ export type ScreenSlot = keyof ScreenSlotProps;
 
 // @public
 export interface ScreenSlotProps {
+    // (undocumented)
+    advancedSettingsEntry: {
+        theme: ScreenTheme;
+        busy: boolean;
+    };
     // (undocumented)
     contactPostExtra: {
         charId: string;
@@ -914,6 +1062,9 @@ export interface SentTextSpot {
 export const SETTING = "VENUS UNIVERSITY (VU)\nMotto: Concordia et Prosperitas | Founded 2014 by Frederic Thorne | 6k Student Population.\n\nVenus University is a private megacampus built to maximize social connection. It admits students by a controversial lottery draw and funds a robust financial aid program off a seemingly bottomless endowment. The campus blends classical and ultra-modern architecture and walls itself off from the noisy city with lush gardens. Towering statues of Roman gods mark it: Venus in the quad, Jupiter at the North Entrance, Pluto at the South. Roads are paved with colored stone for navigation and purpose-built to be long and winding. The two major roads are the Gold Road, which links Jupiter and Pluto, and the Rose Road, which passes Venus and links the academic and residential areas. \"Meet me where Gold crosses Rose\" was cemented in national lingo by a romance film shot here called \"Love Between Gods\".\n\nCampus: Venus Quad (Concord Fountain), Agora (food court, study pods), Pino-Cola Lounge (games, study desks), Kendall Library, Whitman Greenhouse, Thorne Auditorium (concert hall, practice rooms, recording studios), Palaestra Stadium (gym, pool, turf, track).\nHousing: Elysium Village (upperclassmen townhouses), Lowrises 1 to 5 (anyone). All rooms are single-occupancy with shared facilities: no roommates.\nStudent government: VSA, split into CAPC (decor, plants) and SEB (events, mixers).\nSocial App: Bunnyboard.\n\nVERIDAN, USA\nRiver City (the Silk River) | Always Spring | 300k Population | Transit: The Loop electric tram.\n\nNineteenth-century textile money built Veridan, but its mills died in the 1970s and it coasted downhill until Thorne planted VU here in 2014, triggering an investment boom that delighted some longtime residents and enraged others. Sheltered by the river valley, it sits in a near-perpetual spring that meteorologists still can't explain properly.\n\nDistricts: Stanchion Street ($), Downtown ($$), Promenade ($$$).\nStanchion: BTB Arcade, Stalestein Bar (and stage), Hotel DREAMS (love hotel), Freights Books & Records, Pastel Palace (sweets), CuteTea, Eastern Buffet.\nDowntown: Green Hill Park, Lotterdale Market, Reserve Bank Cafe, Bobby's Diner, SpringMart, Fast Eats, Pier 44 Amusement Park.\nPromenade: Riverside Mall, Aquarium at Riverside, Future Cinema, Selkie Beach, Club Apogee, Lumiere Fusion (fine dining), Veridan Museum of Art.";
 
 // @public
+export function showError(error: AppError): void;
+
+// @public
 export interface SilentRetryOptions {
     onSleep?: (cancel: () => void) => void;
     retryable?: (code: string) => boolean;
@@ -979,6 +1130,28 @@ answeredReminder?: string, activity?: SlotActivityOffer): Promise<void>;
 
 // @public
 export function takeTurnFromReply(): boolean;
+
+// @public
+export function TextEditModal(input: TextEditModalProps): JSX.Element | null;
+
+// @public (undocumented)
+export interface TextEditModalProps {
+    allowEmpty?: boolean;
+    discardMessage: string;
+    id: string;
+    // (undocumented)
+    idPrefix: string;
+    // (undocumented)
+    label: string;
+    // (undocumented)
+    onClose: () => void;
+    save: (value: string) => boolean | Promise<boolean>;
+    shipped: string;
+    stored: string;
+    theme: ScreenTheme;
+    // (undocumented)
+    title: string;
+}
 
 // @public
 export function TextField(input: TextFieldProps): JSX.Element;
@@ -1111,6 +1284,12 @@ export function useDismissLayer(onDismiss: () => void, active: boolean): void;
 export function useEmojiTool(): boolean;
 
 // @public
+export function useGameFacts(): {
+    playthroughId: string | null;
+    readerName: string;
+};
+
+// @public
 export function useLessNsfwText(): boolean;
 
 // @public
@@ -1127,6 +1306,9 @@ export function useSafePoint(): ManualSaveOffer;
 
 // @public
 export function useSceneInput(layout: SceneInputLayout | null): void;
+
+// @public
+export function useScenePersona(): string | undefined;
 
 // @public
 export function useSfxGain(): number;

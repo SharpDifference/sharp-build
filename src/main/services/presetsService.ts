@@ -1,7 +1,8 @@
 import { mkdir, readdir, readFile, rm, stat } from 'fs/promises'
 import { basename } from 'path'
 import { randomUUID } from 'crypto'
-import { appError, messageOf } from '@shared/errors'
+import { readJsonFile, registerFinalRequest, writeAtomicJson } from '@vx/modkit/main'
+import { appError, messageOf } from '@vx/modkit/shared'
 import {
   importPresetText,
   listingOf,
@@ -11,16 +12,16 @@ import {
   repairedLibrary,
   withoutPreset,
   type PresetLibrary
-} from '@shared/presets/presetLibrary'
+} from '../../shared/presets/presetLibrary'
 import {
   assertSafePresetId,
   PRESET_SCHEMA_VERSION,
   validatePresetIndex,
   type PresetFile
-} from '@shared/presets/presetRules'
-import type { Preset, PresetImport, PresetListing } from '@shared/presets/types'
+} from '../../shared/presets/presetRules'
+import { planPresetRequest } from '../../shared/presets/request'
+import { PROMPT_STUDIO_MOD, type Preset, type PresetImport, type PresetListing, type PresetRequest } from '../../shared/presets/types'
 import { getPresetFilePath, getPresetIndexPath, getPresetsPath } from '../paths'
-import { readJsonFile, writeAtomicJson } from './jsonFile'
 
 /** The presets Prompt Studio keeps: one `{id}.json` each under `data/presets`, and `index.json` naming the one in force. */
 
@@ -159,7 +160,7 @@ export async function setActivePreset(id: string): Promise<void> {
  * The preset in force, read without repairing anything: null, with a warning, where there is none
  * or it is damaged, so a scene call goes on without a preset instead of failing.
  */
-export async function loadActivePreset(): Promise<Preset | null> {
+async function loadActivePreset(): Promise<Preset | null> {
   const active = await readActiveId()
   if (active === null) {
     console.warn('[presets] No active preset is named; sending the scene without one.')
@@ -169,6 +170,13 @@ export async function loadActivePreset(): Promise<Preset | null> {
   if (!preset) console.warn('[presets] The active preset could not be read; sending the scene without one.')
   return preset
 }
+
+// A scene call the window tagged is rearranged by the active preset, and its reply's `vars` ops
+// are read back into the variables the window keeps.
+registerFinalRequest(PROMPT_STUDIO_MOD, async (request, { tag }) => {
+  const preset = await loadActivePreset()
+  return preset ? planPresetRequest(request, tag as PresetRequest, preset) : null
+})
 
 /** `presets:import` — reads the SillyTavern, Marinara or exported Prompt Studio file at `path` into a preset under a fresh id; nothing is kept. */
 export async function importPresetFromFile(path: string): Promise<PresetImport> {

@@ -1,6 +1,30 @@
 # @vx/modkit
 
-## Unreleased
+## 0.7.0
+
+What a mod built outside the repo needs to rewrite the game's prompts and reshape its scene calls,
+and the readers, components and record helpers its screens and main code use.
+
+- The game's prompt text is core's: the text blocks' ids and shipped text, read by every builder
+  through `blockText`. `promptText` lets one mod at a time rewrite them and the class call's pool
+  sizes. With no mod answering, every request is byte-identical to before.
+- Scene builders hand back `parts` and `sceneSpot` beside their strings; neither, nor a mod's tag,
+  ever reaches the provider.
+- `sceneCall` tags a scene call in the window; `registerFinalRequest` in `main` reshapes the tagged
+  call at the one place structured calls go out, with sampler values for that call alone on a
+  custom endpoint, and reads its reply back. One mod per call, the first by id; a failure sends
+  the call as built.
+- `sceneReplyLanded` is told of every scene call's reply, the closing's included, and `sceneCut` of
+  a cut in the transcript. `sceneField` keeps a mod's value on the scene being played.
+- `advancedSettingsEntry`: a place on the Advanced tab of app settings, beside its own buttons.
+- `switchedOn`: a mod is told as it comes on, at boot before the first screen (waited for) and
+  whenever its switch or the game's record turns it on later, so it can read what it keeps.
+- Re-exported: `CheckField`, `ConfirmModal`, `TextEditModal`, `ChevronIcon`, `PlusIcon`,
+  `PROMPT_BLOCKS`, `defaultBlockText` and `isNewGameBlock` in `renderer`, with the new readers
+  `gameFacts`, `useGameFacts`, `useScenePersona` and `showError`; the text-block ids, `blockText`,
+  `PROMPT_PARTS`, the class pool sizes, `validateRecord` and `assertSafeId` in `shared`;
+  `readJsonFile`, `writeAtomicJson` and `writeAtomicBytes` in `main`. Each value is its own
+  capability. Nothing native changes.
 
 - A game started before mods recorded their versions is told so once, not once every session:
   the playthroughs told are kept in `settings.json`'s `modUnversionedSeen`, written by main. The

@@ -3,7 +3,6 @@ import { BREAKTHROUGH_MOD } from '@shared/breakthrough'
 import { cityLifeBackgrounds } from '@shared/cityLife'
 import { slotFullLabel, studentsOf } from '@shared/classes'
 import { modIsOn } from '../modsStore'
-import { textEditsNow } from '../promptStudioStore'
 import { kindOf } from '@shared/academics'
 import { globalSlotOf, jobDefOf, slotFromId } from '@shared/jobs'
 import type { PlayerStats } from '@shared/playerStats'
@@ -14,6 +13,7 @@ import { pendingSecretOf } from '@shared/secrets'
 import { memoryBudgetsOf, secretBudgetOf } from '@shared/settingsRules'
 import { affectionsOf } from '@shared/sceneCreator'
 import { promptStateParts } from '@vx/modkit/host/renderer'
+import { promptTextEdits } from '../../mods/hooks'
 import {
   charKeyOf,
   type CharInfo,
@@ -382,7 +382,7 @@ function withCancellation(
 export function promptState(): PromptState {
   const game = useGameStore.getState()
   const scenePersona = scenePersonaNow()
-  const textEdits = textEditsNow()
+  const textEdits = promptTextEdits()
 
   // The Bunnyboard recap each character carries into the scene.
   const textingSummaries: Record<string, string[]> = {}

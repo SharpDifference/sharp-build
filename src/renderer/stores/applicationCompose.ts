@@ -1,5 +1,4 @@
-import type { GlobalTextId, TextEdits } from '@shared/presets/types'
-import type { ClassCatalogEdits } from '@shared/presets/studioPrompts'
+import type { ClassCatalogEdits, GlobalTextId, TextEdits } from '@shared/promptText'
 import {
   charStartOf,
   CLASSES_PER_MAJOR,
@@ -92,7 +91,9 @@ import { buildSchedules } from './classScheduler'
 
 /** What every New Game request reads of the playthrough's setting and lorebook. */
 export interface RequestWorld {
+  /** The edits a mod hands the global text blocks; absent when none is supplied. */
   textEdits?: TextEdits<GlobalTextId>
+  /** The class pool sizes a mod hands the call; absent when none is supplied. */
   classCatalog?: ClassCatalogEdits
   setting: string
   book: readonly { text: string }[]

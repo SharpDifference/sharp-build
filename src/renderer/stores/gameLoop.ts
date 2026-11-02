@@ -1,4 +1,4 @@
-import { exercisedStats, projectSlotMemories, settleSceneStats, slotActivityAvailable, slotSettled, slotStatusLines, statFloor } from '../mods/hooks'
+import { promptTextEdits, exercisedStats, projectSlotMemories, settleSceneStats, slotActivityAvailable, slotSettled, slotStatusLines, statFloor } from '../mods/hooks'
 import { withSlotActivityPrompt } from '../prompts/slotActivity'
 import { talentProjectWork } from '@shared/talentPerks'
 import { canContinueReckoning, pendingReckoningAftermath } from './reckoning'
@@ -291,7 +291,6 @@ import {
   secretBudgetNow,
   stageCast
 } from './loop/promptState'
-import { textEditsNow } from './promptStudioStore'
 import {
   endSceneOpenOf,
   forwardOpenOf,
@@ -1116,7 +1115,7 @@ async function fetchSlotIntro(
         {
           storyMemory: currentStorySnapshot(),
           exCharacterDynamics: game.exCharacterDynamics,
-          globalTextEdits: textEditsNow()?.global,
+          globalTextEdits: promptTextEdits()?.global,
           playthroughId: game.playthroughId ?? 'unsaved',
           date,
           time,
@@ -2303,7 +2302,7 @@ function startTextLedger(
 
   return (async () => {
     const built = await buildOrAsk(
-      () => buildTextLedgerPrompt(schedule, useGameStore.getState().charInfo, textEditsNow()?.global),
+      () => buildTextLedgerPrompt(schedule, useGameStore.getState().charInfo, promptTextEdits()?.global),
       useGameStore.getState().setTextLedgerError,
       stale
     )

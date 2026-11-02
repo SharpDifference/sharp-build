@@ -1,23 +1,11 @@
-import { validateRecord } from '../jsonValidate'
+import { CLASS_CATALOG_RANGES, validateRecord, type ClassCatalogEdits, type ClassCatalogKey } from '@vx/modkit/shared'
 import type { GlobalTextId } from './types'
+
+export { CLASS_CATALOG_RANGES, DEFAULT_CLASS_CATALOG } from '@vx/modkit/shared'
+export type { ClassCatalogEdits, ClassCatalogKey } from '@vx/modkit/shared'
 
 /** The one version of the studio prompts record this build reads and writes. */
 export const STUDIO_PROMPTS_SCHEMA_VERSION = 1
-
-/** How many classes the class call is asked for in each pool when the player has not changed it. */
-export const DEFAULT_CLASS_CATALOG = { pe: 10, filler: 5, perMajor: 4 } as const
-
-/** The range each class pool size is kept to, both ends included. */
-export const CLASS_CATALOG_RANGES = {
-  pe: { min: 1, max: 20 },
-  filler: { min: 0, max: 15 },
-  perMajor: { min: 1, max: 8 }
-} as const
-
-export type ClassCatalogKey = keyof typeof CLASS_CATALOG_RANGES
-
-/** The player's pool sizes for the class call; an absent one is its shipped size. */
-export type ClassCatalogEdits = Partial<Record<ClassCatalogKey, number>>
 
 /** What Prompt Studio keeps for the game's own prompts: text blocks by id and the class call's pool sizes. */
 export interface StudioPrompts {

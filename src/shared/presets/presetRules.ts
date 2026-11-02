@@ -1,4 +1,4 @@
-import { assertSafeId } from '../jsonValidate'
+import { assertSafeId } from '@vx/modkit/shared'
 import { GAME_MARKERS, type GameMarker, type Preset } from './types'
 
 /** The one version of a preset file and of the presets index this build reads and writes. */

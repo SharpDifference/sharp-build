@@ -186,19 +186,27 @@ function modelToRun(settings: Settings, kind: PromptKind | undefined): ModelConf
   return modelFor(settings.apiProvider, routed ? secondary : writerModelOf(settings))
 }
 
+/** The request without the fields only this app reads: `parts`, `sceneSpot` and `modTags`. */
+export function withoutLocalFields(request: StructuredRequest): StructuredRequest {
+  const { parts: _parts, sceneSpot: _spot, modTags: _tags, ...clean } = request
+  return clean
+}
+
 /**
  * Sends one provider-enforced structured-output request and returns parsed JSON;
  * `onDelta` is preview-only and the full response stays authoritative, `override` sends the
  * call on candidate settings rather than the stored ones, and `samplingOverride` (wire keys) is
- * laid over the stored sampling values for this call alone.
+ * laid over the stored sampling values for this call alone, on a custom endpoint only.
  */
 export async function completeStructured<T>(
-  request: StructuredRequest,
+  asked: StructuredRequest,
   signal?: AbortSignal,
   onDelta?: (delta: string) => void,
   override?: Settings,
   samplingOverride?: Record<string, number>
 ): Promise<T> {
+  // Whatever else is true of the caller, the fields only this app reads stop here.
+  const request = withoutLocalFields(asked)
   const settings = await writerSettings('generate characters', override)
 
   const provider = providerToRun(settings)

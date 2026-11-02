@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { nativeDefaultPreset } from '@shared/presets/gameParts'
 import { listingOf, repairedLibrary, withoutPreset } from '@shared/presets/presetLibrary'
 import { toPresetFile } from '@shared/presets/presetRules'
-import { finishPresetReply, planPresetRequest } from '@shared/presets/request'
+import { planPresetRequest, presetRequestOf } from '@shared/presets/request'
 import type { StructuredRequest } from '@shared/types'
 
 const request = (): StructuredRequest => ({
@@ -16,38 +16,21 @@ const request = (): StructuredRequest => ({
     { id: 'yourTurn', role: 'user', text: 'YOUR TURN' }
   ],
   sceneSpot: { spot: 'opening', cast: ['Ada'] },
-  preset: { spot: 'opening', playthroughId: 'p', vars: { mood: 'wary' }, names: { user: 'Sam', char: 'Ada', group: 'Ada' } },
   logFrom: 3
 })
 
-describe('a scene request on its way to the provider', () => {
-  it('never carries the local-only fields, preset or not, and adds no vars without one', () => {
-    const plan = planPresetRequest(request(), null)
-    expect(plan.request).not.toHaveProperty('parts')
-    expect(plan.request).not.toHaveProperty('preset')
-    expect(plan.request).not.toHaveProperty('sceneSpot')
-    expect(plan.request.user).toBe('NOW\n\nYOUR TURN')
-    expect(plan.request.schema.schema.properties).not.toHaveProperty('vars')
-    expect(plan.applied).toBeNull()
-  })
+const tag = presetRequestOf({ spot: 'opening', cast: ['Ada'] }, 'p', { mood: 'wary' }, 'Sam')
 
-  it('applies the preset, then reads the model\'s variable ops back into presetVars', () => {
-    const plan = planPresetRequest(request(), nativeDefaultPreset('default'))
-    expect(plan.request).not.toHaveProperty('preset')
+describe('a scene request with a preset applied', () => {
+  it('applies the preset, then reads the model\'s variable ops back into the variables', () => {
+    const plan = planPresetRequest(request(), tag, nativeDefaultPreset('default'))
     expect(plan.request).not.toHaveProperty('logFrom')
     expect(Object.keys(plan.request.schema.schema.properties as object).at(-1)).toBe('vars')
     expect(plan.request.system).toBe('PERSONA\n\nRULES')
 
     const reply: Record<string, unknown> = { lines: [], vars: [{ name: 'trust', op: 'add', value: '2' }, { name: '', op: 'set', value: 'x' }] }
-    const warnings = finishPresetReply(reply, plan.applied)
+    expect(plan.finish(reply)).toEqual({ mood: 'wary', trust: '2' })
     expect(reply).not.toHaveProperty('vars')
-    expect(reply.presetVars).toEqual({ mood: 'wary', trust: '2' })
-    expect(warnings).toHaveLength(1)
-  })
-
-  it('sends the preset\'s samplers only as bounded wire values', () => {
-    const preset = { ...nativeDefaultPreset('default'), sampling: { temperature: 0.7, topK: 40, topP: 9 } }
-    expect(planPresetRequest(request(), preset).sampling).toEqual({ temperature: 0.7, top_k: 40 })
   })
 })
 

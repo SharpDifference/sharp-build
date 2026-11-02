@@ -1,7 +1,6 @@
 import type { ReckoningState } from './reckoning'
 import type { EchoState } from './echo'
 import type { StoryMemory, StoryRecallRequest } from './storyMemory'
-import type { GamePart, PresetRequest, SceneSpotTag } from './presets/types'
 import type { BreakthroughState } from './breakthrough'
 import type { MeanwhileStore } from './meanwhile'
 /** Shared on-disk schema and IPC result types. */
@@ -28,6 +27,7 @@ import type { Weather } from './weather'
 import type { ReaderTallies } from './tallies'
 import type { PromptEdit } from './imagePrompt'
 import type { SceneEventId } from './sceneEvents'
+import type { PromptPart, SceneSpotTag } from './promptText'
 
 /** Discriminated result envelope returned by every IPC handler. */
 export type Result<T> = { ok: true; data: T } | { ok: false; error: AppError }
@@ -60,12 +60,6 @@ export const MAX_LOG_RECORD_CHARS = 32 * 1024
 export interface StructuredRequest {
   /** Local-only recall snapshot; stripped before the provider request. */
   storyMemory?: StoryRecallRequest
-  /** Local-only: the game's coarse prompt parts a scene builder joined into `system` and `user`; stripped before the provider request. */
-  parts?: GamePart[]
-  /** Local-only: which scene call a builder made; `streamScene` turns it into `preset`, and it is stripped before the provider request. */
-  sceneSpot?: SceneSpotTag
-  /** Local-only: what main applies the active Prompt Studio preset with; stripped before the provider request. */
-  preset?: PresetRequest
   system: string
   user: string
   /** JSON Schema the reply is constrained to. */
@@ -90,6 +84,12 @@ export interface StructuredRequest {
    * before. Absent logs the whole message.
    */
   logFrom?: number
+  /** Local-only: the parts a scene builder emitted, each found verbatim in `system` or `user`. */
+  parts?: PromptPart[]
+  /** Local-only: which scene call a builder made and who is in it. */
+  sceneSpot?: SceneSpotTag
+  /** Local-only: each mod's tag for its main-process request hook, by mod id. */
+  modTags?: Record<string, unknown>
 }
 
 /** One inline image on a {@link StructuredRequest} — never written to disk. */
@@ -1298,8 +1298,6 @@ export interface SceneState {
    * the last is {@link summary}. Absent when none has landed.
    */
   summaries?: SceneSummaryMark[]
-  /** Prompt Studio: each reply that committed variables, with where its lines start and the variables before it. Absent when none has. */
-  presetVarMarks?: import('./presets/varOps').PresetVarsMark[]
   /** Background base name, without the `_day`/`_night` suffix. */
   bg: string | null
   /** charIds occupying the three portrait slots, left to right; null = empty. */
@@ -1759,8 +1757,6 @@ export interface GameSave extends NativeGameSave {
   exNpcWatch?: MeanwhileStore
   /** Character Dynamics: fixed setup choices retained by every save. */
   exCharacterDynamics?: import('./characterDynamics').CharacterDynamics
-  /** Prompt Studio's tracked variables, name to value; absent when there are none. */
-  presetVars?: Record<string, string>
 }
 
 /** One employer the reader has left: the raises he had taken, and how it ended. */
@@ -2649,8 +2645,8 @@ export interface SceneResponse {
   summary?: string
   /** "The scene is resolved." What it *meant* is the ledger call's job. */
   end_scene?: boolean | null
-  /** Set by main when a Prompt Studio preset was applied: the save's variables after this reply. Never on the wire. */
-  presetVars?: Record<string, string>
+  /** Set by main: what a main-process request hook handed back with the reply, by mod id. Never on the wire. */
+  modReply?: Record<string, unknown>
 }
 
 /**
