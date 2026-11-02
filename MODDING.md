@@ -928,6 +928,7 @@ else names it.
 | `sceneCall` | `loop/stream.ts` | Tag a scene call as it goes out, for the mod's request hook in main |
 | `sceneReplyLanded` | `loop/stream.ts`, `loop/turn.ts` | Read every scene call's reply once it has landed, the closing's included, with what main handed back |
 | `sceneCut` | `gameStore.ts` | Undo what the replies past a cut in the transcript changed |
+| `switchedOn` | `App.tsx` (`boot`), then as a switch or the game's record moves | Read what the mod keeps as it comes on: at boot, waited for before the first screen, and again each time it is switched on |
 
 The two ways on (`endingChoice`, `saveChoice`) share one shape, `WayOn`. Its `prepare` runs
 while nothing has been torn down, does whatever may fail and reports it, and returns `enter`,
