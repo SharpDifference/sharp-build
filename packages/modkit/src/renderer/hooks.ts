@@ -426,11 +426,16 @@ export interface ModHooks {
     draft: Readonly<Record<string, unknown>>,
     ctx: { baseAppearance: readonly string[] }
   ) => Partial<Character>
-  /** Top-level DM fields streamed ahead of the messages, before her bubbles finish. */
+  /**
+   * Top-level DM fields streamed before her messages. A lead's work ends at afterDmReply or
+   * this signal, whichever comes first. The signal aborts if the reply does not land; a landed
+   * reply does not abort it.
+   */
   dmReplyLead?: (ctx: {
     charId: string
     character: Character
     lead: Readonly<Record<string, unknown>>
+    signal: AbortSignal
   }) => void
   /** After her reply in a DM has landed. */
   afterDmReply?: (ctx: { charId: string; character: Character; reply: TextingResponse }) => void
@@ -853,6 +858,7 @@ export function dmReplyLead(ctx: {
   charId: string
   character: Character
   lead: Readonly<Record<string, unknown>>
+  signal: AbortSignal
 }): void {
   for (const hooks of active()) {
     try {

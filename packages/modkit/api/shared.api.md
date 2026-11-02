@@ -408,7 +408,7 @@ export const HOOKS: readonly [{
     readonly side: 'renderer';
     readonly kind: 'event';
     readonly dispatch: readonly ["dmReplyLead"];
-    readonly since: '0.7.0';
+    readonly since: '0.8.0';
 }, {
     readonly name: 'afterDmReply';
     readonly side: 'renderer';

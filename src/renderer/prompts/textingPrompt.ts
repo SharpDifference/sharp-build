@@ -565,13 +565,12 @@ function textingSchema(): {
   schema: Record<string, unknown>
 } {
   const leadFields = promptFields('dm', 'lead')
-  const trailingFields = { ...promptFields('dm') }
-  for (const key of Object.keys(leadFields)) delete trailingFields[key]
+  const trailingFields = promptFields('dm', 'trailing')
   const leadRequired = promptRequired('dm', 'lead')
-  const trailingRequired = promptRequired('dm').filter((key) => !leadRequired.includes(key))
-  return objectSchema('texting', [
+  const trailingRequired = promptRequired('dm', 'trailing')
+  return objectSchema('texting', [...new Set([
     ...leadRequired, 'messages', 'summary', 'blocked', ...trailingRequired
-  ], {
+  ])], {
     ...leadFields,
     messages: { type: 'array', items: { type: 'string' } },
     summary: { type: 'string' },

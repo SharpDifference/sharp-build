@@ -1386,7 +1386,7 @@ export interface ComfyRenderRequest {
 export async function renderComfyImage(
   modId: string,
   request: ComfyRenderRequest,
-  { signal }: { signal: AbortSignal }
+  { signal, onProgress }: { signal: AbortSignal; onProgress?: (step: string) => void }
 ): Promise<Uint8Array> {
   if (typeof modId !== 'string' || !MOD_ID_RULE.test(modId)) {
     throw appError('MOD_ID_INVALID', 'A render needs a valid mod id.')
@@ -1401,6 +1401,11 @@ export async function renderComfyImage(
           !node || typeof node.class_type !== 'string' || !node.inputs || typeof node.inputs !== 'object' || Array.isArray(node.inputs))) {
       throw new Error('An API-format graph and its output node are required.')
     }
+    for (const id of [...Object.values(owned.nodes), ...Object.keys(owned.texts ?? {})]) {
+      if (id !== undefined && (typeof id !== 'string' || !Object.hasOwn(owned.workflow, id))) {
+        throw new Error('Every named node must be present in the workflow.')
+      }
+    }
   } catch (err) {
     throw appError('RENDER_REQUEST_INVALID', 'The render request is not a parsed ComfyUI graph.', messageOf(err))
   }
@@ -1409,7 +1414,16 @@ export async function renderComfyImage(
   return enqueue({
     group: `mod:${modId}:render`,
     signal,
-    run: async ({ signal: jobSignal, report }) => {
+    run: async ({ signal: jobSignal, report: queueReport }) => {
+      // The mod hears each step the queue does; its callback throwing can't fail the render.
+      const report = (step: string): void => {
+        queueReport(step)
+        try {
+          onProgress?.(step)
+        } catch (err) {
+          console.warn(`[mods] ${modId} render progress failed`, err)
+        }
+      }
       let scratch: string | undefined
       try {
         throwIfCancelled(jobSignal)
