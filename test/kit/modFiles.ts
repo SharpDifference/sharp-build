@@ -173,6 +173,7 @@ export const MOD_FILES: Record<string, ModSet> = {
       'assets/workflows/characterPhoto.json',
       'assets/workflows/characterPhotoDuo.json',
       'src/preload/photoApi.ts',
+      'src/web/photoBridge.ts',
       'src/renderer/components/PhotoBubble.tsx',
       'src/renderer/components/PhotoInfo.tsx',
       'src/renderer/stores/photoRedraw.ts',

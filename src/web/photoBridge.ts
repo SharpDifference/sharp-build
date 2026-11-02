@@ -1,6 +1,5 @@
-import { appError } from '@shared/errors'
+import { appError, type Result } from '@vx/modkit/shared'
 import type { PhotoInfo } from '../shared/photoTypes'
-import type { Result } from '@shared/types'
 
 /**
  * The photo half of the browser bridge: refusals, since a photo is rendered on a local ComfyUI
