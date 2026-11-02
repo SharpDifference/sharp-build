@@ -17,6 +17,9 @@ import { UseBoundStore } from 'zustand';
 import { Variants } from 'motion/react';
 
 // @public
+export function boxParts(text: string): string[];
+
+// @public
 export function buildLabel(): string;
 
 // @public (undocumented)
@@ -154,6 +157,9 @@ export function defaultBlockText(id: TextBlockId, settings: {
 
 // @public
 export type DividerWord = 'hover' | 'locked' | 'unavailable' | 'ending';
+
+// @public
+export function dropTransientLines(modId: string): void;
 
 // @public
 export interface EditorField {
@@ -724,6 +730,12 @@ export interface RailSeatProps {
 }
 
 // @public
+export function reachTurn(): boolean;
+
+// @public
+export function readerSaysInScene(text: string): boolean;
+
+// @public
 export function recordField<T>(modId: string, spec: RecordFieldSpec<T>): RecordFieldHandle<T>;
 
 // @public
@@ -817,6 +829,9 @@ export interface SaveFieldSpec<T> {
 }
 
 // @public
+export function sayInScene(modId: string, text: string, options?: SceneLineOptions): boolean;
+
+// @public
 export interface SceneCall {
     // (undocumented)
     playthroughId: string | null;
@@ -858,6 +873,13 @@ export interface SceneFieldSpec<T> {
 export interface SceneInputLayout {
     height: number;
     open: boolean;
+}
+
+// @public
+export interface SceneLineOptions {
+    charId?: string;
+    expression?: Emotion;
+    transient?: boolean;
 }
 
 // @public

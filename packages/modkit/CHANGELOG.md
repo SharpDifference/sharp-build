@@ -1,5 +1,13 @@
 # @vx/modkit
 
+## Unreleased
+
+- The scene's lines, for a mod that speaks in the scene outside its replies: `sayInScene` puts
+  narration or a girl's line, in her face and outfit, on the transcript and the box;
+  `boxParts` is the box's split alone; `readerSaysInScene` files the reader's words with nobody
+  asked to answer; `reachTurn` brings the scene to his turn. A `transient` line is taken back by
+  its mod's `dropTransientLines` and left out of every capture of the scene, so of every save.
+
 ## 0.7.0
 
 - Startup readers have a ten-second wait limit per mod. A timeout names the mod in a warning

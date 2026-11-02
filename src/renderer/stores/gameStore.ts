@@ -30,6 +30,7 @@ import {
   type SemesterCalendar
 } from '@shared/semesters'
 import { displaySlotsOf, retireCgs } from './stageDisplay'
+import { transientOwner } from './transientLines'
 import {
   chargeAbsences,
   firstReaderIndexOf,
@@ -1405,6 +1406,45 @@ export function summariesWithin(
   return { sceneSummaries: kept, sceneSummary: kept[kept.length - 1]?.summary ?? null }
 }
 
+/** The scene's records of its lines, and what counts along them. */
+type SceneRecords = Pick<
+  GameStoreState,
+  'currentSceneTranscript' | 'sceneLog' | 'pendingLines' | 'sceneSummaries' | 'endingEditAt' | 'reread'
+>
+
+/**
+ * The scene's records without the lines `gone` accepts: off the transcript, the log and the
+ * queue alike. Every mark counted in transcript lines moves down past the lines taken out before
+ * it, and a rewind's count of lines to read again loses those it would have met. Null where no
+ * record holds such a line.
+ */
+export function sceneWithout(state: SceneRecords, gone: (line: SceneLine) => boolean): SceneRecords | null {
+  const { currentSceneTranscript: transcript, sceneLog, pendingLines } = state
+  if (!transcript.some(gone) && !sceneLog.some(gone) && !pendingLines.some(gone)) return null
+  const keep = (line: SceneLine): boolean => !gone(line)
+  const goneBefore = (at: number): number => transcript.slice(0, at).filter(gone).length
+  // The lines a rewind put back at the head of the queue, the reader's own not counted.
+  let reread = state.reread
+  let ahead = state.reread
+  for (const line of pendingLines) {
+    if (ahead <= 0) break
+    if (line.speaker === READER_SPEAKER) continue
+    ahead--
+    if (gone(line)) reread--
+  }
+  return {
+    currentSceneTranscript: transcript.filter(keep),
+    sceneLog: sceneLog.filter(keep),
+    pendingLines: pendingLines.filter(keep),
+    sceneSummaries: state.sceneSummaries.map((mark) => {
+      const at = mark.at - goneBefore(mark.at)
+      return at === mark.at ? mark : { ...mark, at }
+    }),
+    endingEditAt: state.endingEditAt === null ? null : state.endingEditAt - goneBefore(state.endingEditAt),
+    reread: Math.max(0, reread)
+  }
+}
+
 /** A blank stage with its own containers — `emptyStage`'s are shared module-scope objects. */
 function freshStage(): typeof emptyStage {
   return {
@@ -1938,6 +1978,15 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
       return null
     }
     const mods = savedModScene(state.sceneMods)
+    // A mod's lines for the moment only are left out, as if it had taken them back: a scene read
+    // back from the capture could never take them back itself. A box that shows one shows the
+    // last line kept instead.
+    const transient = (line: SceneLine): boolean => transientOwner(line) !== undefined
+    const records = sceneWithout(state, transient) ?? state
+    const shown =
+      state.currentLine && transient(state.currentLine)
+        ? (records.sceneLog[lastNonReaderIndexOf(records.sceneLog)] ?? null)
+        : state.currentLine
     return {
       // First, so a key core owns always wins.
       ...state.sceneRest,
@@ -1970,10 +2019,10 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
       ...(state.sceneQuiz
         ? { quiz: { ...state.sceneQuiz, questions: state.sceneQuiz.questions.map((q) => ({ ...q })) } }
         : {}),
-      transcript: [...state.currentSceneTranscript],
+      transcript: [...records.currentSceneTranscript],
       summary: state.sceneSummary,
-      ...(state.sceneSummaries.length > 0
-        ? { summaries: state.sceneSummaries.map((mark) => ({ ...mark })) }
+      ...(records.sceneSummaries.length > 0
+        ? { summaries: records.sceneSummaries.map((mark) => ({ ...mark })) }
         : {}),
       bg: state.bg,
       slots: [...state.slots],
@@ -1988,9 +2037,9 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
       ...(state.bgOverride ? { bgOverride: state.bgOverride } : {}),
       ...(Object.keys(state.outfitLock).length > 0 ? { outfitLock: { ...state.outfitLock } } : {}),
       ...(state.cgLock ? { cgLock: { ...state.cgLock } } : {}),
-      sceneLog: [...state.sceneLog],
-      currentLine: state.currentLine,
-      pendingLines: [...state.pendingLines]
+      sceneLog: [...records.sceneLog],
+      currentLine: shown,
+      pendingLines: [...records.pendingLines]
     }
   },
 
