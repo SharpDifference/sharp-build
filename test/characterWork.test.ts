@@ -66,22 +66,49 @@ it('can await a queued render inside character work without an outer queue job',
   )).resolves.toBe('bytes')
 })
 
-it('waits for existing unqueued cleanup even when the operation rejects', async () => {
+it('aborts existing runAbortable work without waiting for it to settle', async () => {
   const { runAbortable } = await import('../src/shared/jobQueue')
   const finish = gate()
   let signal!: AbortSignal
-  let stopped = false
+  let finished = false
   const work = runAbortable(girl, async current => {
     signal = current
     await finish.promise
+    finished = true
     throw Error('write stopped')
   })
   const rejected = expect(work).rejects.toThrow('write stopped')
-  const cancelling = cancelGroup(girl).then(() => { stopped = true })
+  await cancelGroup(girl)
   expect(signal.aborted).toBe(true)
-  await Promise.resolve()
-  expect(stopped).toBe(false)
+  expect(finished).toBe(false)
   finish.release()
-  await cancelling
   await rejected
+})
+
+it('waits only for character work when legacy work shares the same group', async () => {
+  const { runAbortable } = await import('../src/shared/jobQueue')
+  const legacyFinish = gate(), characterFinish = gate()
+  let legacySignal!: AbortSignal
+  let legacySettled = false
+  let cancelled = false
+  const legacy = runAbortable(girl, async signal => {
+    legacySignal = signal
+    await legacyFinish.promise
+    legacySettled = true
+  })
+  const character = runForCharacter('photo-feature', girl, async () => characterFinish.promise)
+  const rejected = expect(character).rejects.toMatchObject({ code: 'CANCELLED' })
+  const cancelling = cancelGroup(girl).then(() => { cancelled = true })
+  try {
+    await Promise.resolve()
+    expect(cancelled).toBe(false)
+    expect(legacySignal.aborted).toBe(true)
+    characterFinish.release()
+    await cancelling
+    expect(legacySettled).toBe(false)
+  } finally {
+    characterFinish.release()
+    legacyFinish.release()
+    await Promise.all([legacy, rejected, cancelling])
+  }
 })
