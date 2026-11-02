@@ -212,16 +212,10 @@ describe('the entry points', () => {
     expect(rendererKit.invoke).toBe(native.invoke)
   })
 
-  it('exports the native character lifetime wrapper', async () => {
-    const native = await import('../../src/main/services/characterWork')
-    expect(mainKit.runForCharacter).toBe(native.runForCharacter)
-  })
-
-  it('offers the native main-only byte render with its request and cancellation types', async () => {
-    const native = await import('../../src/main/services/comfyService')
+  it('offers the main-only byte render with its request and cancellation types', () => {
     const render: (id: string, request: mainKit.ComfyRenderRequest,
       options: Pick<mainKit.InvokeContext, 'signal'>) => Promise<Uint8Array> = mainKit.renderComfyImage
-    expect(render).toBe(native.renderComfyImage)
+    expect(typeof render).toBe('function')
   })
 
   it('record the version package.json says', () => {

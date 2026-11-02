@@ -167,9 +167,6 @@ export function renderComfyImage(modId: string, request: ComfyRenderRequest, inp
 export function requiredBackupPart(modId: string, part: BackupPart): void;
 
 // @public
-export function runForCharacter<T>(modId: string, charId: string, work: (signal: AbortSignal) => Promise<T>): Promise<T>;
-
-// @public
 export function sniffImageFile(path: string): Promise<ReturnType<typeof imageTypeOf>>;
 
 // @public

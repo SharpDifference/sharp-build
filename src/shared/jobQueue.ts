@@ -40,25 +40,21 @@ let runningSettled: Promise<void> | null = null
 let pumping = false
 
 /** Non-queued work by group, so `cancelGroup` can abort the pre-sprite LLM write too. */
-interface Abortable { controller: AbortController; settled: Promise<void> }
-const abortables = new Map<string, Set<Abortable>>()
+const abortables = new Map<string, Set<AbortController>>()
 
 /** Enrols a non-queued operation in `group`; callers must `release()` in `finally`. */
 function registerAbortable(group: string): { signal: AbortSignal; release: () => void } {
   const controller = new AbortController()
-  let settle!: () => void
-  const entry: Abortable = { controller, settled: new Promise<void>(resolve => { settle = resolve }) }
-  const set = abortables.get(group) ?? new Set<Abortable>()
-  set.add(entry)
+  const set = abortables.get(group) ?? new Set<AbortController>()
+  set.add(controller)
   abortables.set(group, set)
 
   return {
     signal: controller.signal,
     release: () => {
-      settle()
       const current = abortables.get(group)
       if (!current) return
-      current.delete(entry)
+      current.delete(controller)
       if (current.size === 0) abortables.delete(group)
     }
   }
@@ -191,18 +187,19 @@ async function cancelMatching(matches: (job: QueuedJob) => boolean): Promise<voi
 
 /**
  * Cancels queued, running and registered non-queued work in `group`, resolving
- * only after the running job and registered operations settle.
+ * only after the running job settles.
  */
 export async function cancelGroup(group: string): Promise<void> {
   const inGroup = (job: QueuedJob): boolean => job.group === group
 
   // Queued jobs go first so nothing new starts while the running one settles.
-  const work = [...(abortables.get(group) ?? [])]
   const settling = cancelMatching(inGroup)
 
-  for (const entry of work) entry.controller.abort()
+  for (const controller of abortables.get(group) ?? []) {
+    controller.abort()
+  }
 
-  await Promise.all([settling, ...work.map(entry => entry.settled)])
+  await settling
 }
 
 /** Cancels one *set* of a character's images rather than the whole character. */

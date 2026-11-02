@@ -27,5 +27,3 @@ export type { InvokeContext, InvokeHandler } from '../../../../src/main/mods/inv
 
 export { renderComfyImage } from '../../../../src/main/services/comfyService'
 export type { ComfyRenderRequest } from '../../../../src/main/services/comfyService'
-
-export { runForCharacter } from '../../../../src/main/services/characterWork'

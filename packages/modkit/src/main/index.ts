@@ -20,5 +20,3 @@ export type { InvokeContext, InvokeHandler } from '../bridge/main'
 
 export { renderComfyImage } from '../bridge/main'
 export type { ComfyRenderRequest } from '../bridge/main'
-
-export { runForCharacter } from '../bridge/main'

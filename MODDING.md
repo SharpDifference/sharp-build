@@ -487,38 +487,6 @@ folder if wanted. Oversized output answers `RENDER_TOO_LARGE`, unrecognized byte
 `RENDER_NOT_IMAGE`, a malformed graph `RENDER_REQUEST_INVALID`, and a bad owner id
 `MOD_ID_INVALID`. Invoke carries these through the ordinary redacted error wrapper.
 
-`runForCharacter(modId, charId, work)` in `@vx/modkit/main` (declared as
-`main:runForCharacter`) gives work a character's cancellation lifetime without queuing it.
-Deleting or resetting her aborts the supplied signal and waits until the work, including its
-writes and cleanup, settles. All mods working for her share this lifetime; another character
-is unaffected. Like queued work, a callback that ignores cancellation can hold deletion open
-indefinitely. Always observe the signal and finish cleanup before returning.
-This signal covers character cancellation, not an individual invoke or redraw. Combine it with
-the caller's signal using `AbortSignal.any` when either lifetime must stop the operation, and
-pass that combined signal through the render and persistence checks.
-
-Wrap both rendering and persistence, not just the render. Reserve a fresh destination for this
-attempt rather than overwriting an existing image. There is no outer queued job, so
-calling `renderComfyImage` inside does not deadlock:
-
-```ts
-import { rm } from 'fs/promises'
-import { renderComfyImage, runForCharacter, writeAtomicBytes } from '@vx/modkit/main'
-
-await runForCharacter(id, charId, async signal => {
-  const bytes = await renderComfyImage(id, request, { signal })
-  signal.throwIfAborted()
-  try {
-    await writeAtomicBytes(destination, bytes, { code: 'MOD_IMAGE_WRITE_FAILED', message: 'Could not save the image.' })
-    signal.throwIfAborted()
-  } catch (error) {
-    // Remove this attempt's new file if cancellation overtook its write.
-    await rm(destination, { force: true })
-    throw error
-  }
-})
-```
-
 ### The scene's input
 
 A mod's panel over a scene can put an input of its own in the place of the scene's action row,
