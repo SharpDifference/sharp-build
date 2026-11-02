@@ -1,6 +1,6 @@
 # Photo Feature
 
-An unofficial mod for Venus University by **naudh1r**. Version **1.7.0**, for the game's 0.6.0.
+An unofficial mod for Venus University by **naudh1r**. Version **1.7.0**, for the game's 0.7.0.
 
 The girls send you photos in their DMs and post them on their feeds, with comments from the rest
 of campus. Each contact gets a gallery, and characters can get optional body details. Photos are
@@ -121,6 +121,7 @@ If a photo stays PNG while WebP is on, look in `data/app.log` for a `[photo] kep
 
 ## 1.7.0
 
+- A redraw during a scene keeps the old picture until the new one is saved.
 - **More than selfies**: her photos can be from earlier or taken by a friend, closer or wider,
   from different angles, in what she wore that day, and with her hands on what she's doing —
   a guitar, a book, a game.

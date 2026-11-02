@@ -84,7 +84,7 @@ interface RedrawTarget {
   friend?: Character
   kind: PhotoKind
   read: () => ChatPhoto | null
-  write: (photo: ChatPhoto) => void
+  write: (photo: ChatPhoto) => Promise<void>
   live: () => boolean
   inSave: () => readonly string[]
 }
@@ -136,9 +136,11 @@ export async function redrawPhoto(
     if (!result.ok) throw new Error(`${result.error.code}: ${result.error.message}`)
     const now = read()
     const replace = live() && now?.file === oldFile
-    if (replace) write({ ...now, file: newFile })
+    if (replace) await write({ ...now, file: newFile })
     // A render overtaken by a load, replacement or deleted photo belongs to nothing.
-    const dropped = await window.api.photo.drop(playthroughId, charId, replace ? oldFile : newFile)
+    const dropped = replace
+      ? await window.api.photo.drop(playthroughId, charId, oldFile, { replacement: newFile })
+      : await window.api.photo.drop(playthroughId, charId, newFile)
     if (!dropped.ok) {
       console.warn(`[photo] could not drop ${replace ? oldFile : newFile}:`, dropped.error.message)
     }

@@ -107,6 +107,11 @@ export function setFeedPostPhoto(charId: string, postId: string, photo: ChatPhot
  * the store, which already has it. Manual saves need nothing here for the same reason.
  */
 export function savePhotoState(): void {
+  void savePhotoStateAwaitable()
+}
+
+/** Settles the queued autosave, or returns immediately when the scene owns the save point. */
+export async function savePhotoStateAwaitable(): Promise<void> {
   if (sceneInProgress() && !useGameStore.getState().awaitingInput) return
-  void writeAutosave(loopState.decisionSave)
+  await writeAutosave(loopState.decisionSave)
 }

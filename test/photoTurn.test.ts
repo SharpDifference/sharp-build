@@ -17,6 +17,7 @@ const girl = character({ charId: 'a' })
 const earlyFile = 'sarah_chat_001.png'
 const lead = { sendPhoto: true, photoPrompt: 'Coffee at the campus cafe', photoTier: 'everyday' }
 const reserve = vi.fn(), drop = vi.fn()
+let controller: AbortController
 let finish: (result: Result<string>) => void
 
 /** Appends the final reply, or the delivery failure the texting loop would file. */
@@ -34,6 +35,7 @@ function messages(): ChatMessage[] {
 }
 
 beforeEach(() => {
+  controller = new AbortController()
   useGameStore.getState().reset()
   setPhotoSwitches({ on: true, photos: true, explicit: true, webp: false })
   useSettingsStore.setState({ settings: { comfyDeferred: false } as never })
@@ -61,8 +63,12 @@ afterEach(() => {
 describe('an early DM photo while the reply is still being written', () => {
   it.each(['load', 'switched-off', 'blocked', 'failed', 'different-prompt', 'no-photo', 'different-tier'] as const)(
     'never attaches an abandoned render and drops it after settling: %s', async outcome => {
-      turn.startDmPhoto('a', girl, lead)
+      turn.startDmPhoto('a', girl, lead, controller.signal)
       await vi.waitFor(() => expect(mocks.render).toHaveBeenCalledOnce())
+      if (['load', 'blocked', 'failed'].includes(outcome)) {
+        controller.abort()
+        expect(drop).toHaveBeenCalledWith('1', 'a', earlyFile, { cancelOnly: true })
+      }
       if (outcome === 'load') useGameStore.setState(s => ({ loads: s.loads + 1 }))
       if (outcome === 'switched-off') setPhotoSwitches({ on: false })
       if (outcome === 'blocked') useGameStore.setState(s => ({ charInfo: {
@@ -79,19 +85,21 @@ describe('an early DM photo while the reply is still being written', () => {
         }, true)
       }
       expect(messages().some(message => message.photo?.file === earlyFile)).toBe(false)
-      expect(drop).not.toHaveBeenCalled()
+      expect(drop.mock.calls.every(call => call[3]?.cancelOnly)).toBe(true)
       finish({ ok: true, data: earlyFile })
-      await vi.waitFor(() => expect(drop).toHaveBeenCalledExactlyOnceWith('1', 'a', earlyFile))
+      await vi.waitFor(() => expect(drop).toHaveBeenCalledWith('1', 'a', earlyFile))
       expect(messages().some(message => message.photo?.file === earlyFile)).toBe(false)
     }
   )
 
   it('attaches the matching running render and settles the same file without rendering again', async () => {
-    turn.startDmPhoto('a', girl, lead)
+    turn.startDmPhoto('a', girl, lead, controller.signal)
     await vi.waitFor(() => expect(mocks.render).toHaveBeenCalledOnce())
     reply()
     await turn.sendPhoto('a', girl, lead, true)
     expect(messages().at(-1)?.photo).toMatchObject({ file: earlyFile, pending: true })
+    controller.abort()
+    expect(drop).not.toHaveBeenCalled()
     expect(reserve).toHaveBeenCalledOnce()
     expect(mocks.render).toHaveBeenCalledOnce()
     finish({ ok: true, data: earlyFile })
@@ -101,4 +109,26 @@ describe('an early DM photo while the reply is still being written', () => {
     expect(drop).not.toHaveBeenCalled()
     expect(mocks.render).toHaveBeenCalledOnce()
   })
+})
+
+it('does not queue a render for an already aborted lead', () => {
+  controller.abort()
+  turn.startDmPhoto('a', girl, lead, controller.signal)
+  expect(reserve).not.toHaveBeenCalled()
+  expect(mocks.render).not.toHaveBeenCalled()
+})
+
+it('cannot attach a lead aborted while its name reservation is pending', async () => {
+  let reserveName!: (value: Result<string>) => void
+  reserve.mockReset().mockImplementation(() => new Promise<Result<string>>(resolve => {
+    reserveName = resolve
+  }))
+  turn.startDmPhoto('a', girl, lead, controller.signal)
+  reply()
+  const sending = turn.sendPhoto('a', girl, lead, true)
+  controller.abort()
+  reserveName({ ok: true, data: earlyFile })
+  await sending
+  expect(messages().some(message => message.photo)).toBe(false)
+  expect(mocks.render).not.toHaveBeenCalled()
 })

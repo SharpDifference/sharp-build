@@ -1,10 +1,11 @@
 import type { IpcMainInvokeEvent } from 'electron'
-import { enqueue } from '@shared/jobQueue'
+import { cancelKeys, enqueue } from '@shared/jobQueue'
 import type { PhotoRenderOptions } from '../shared/photoTypes'
 import type { Character } from '@vx/modkit/shared'
 import { start as startComfy } from './services/comfyService'
 import {
   carryPhotos,
+  retirePhoto,
   photoInfo,
   dropPhoto,
   generateDuoPhoto,
@@ -102,9 +103,20 @@ export function registerPhotoIpc(handle: Handle): void {
     ) => photoInfo(playthroughId, character, friend, tier, scene, file, rebuild)
   )
 
-  // Removes both image formats and the sidecar after a replacement lands.
-  handle('comfy:dropPhoto', (_event, playthroughId: string, charId: string, file: string) =>
-    dropPhoto(playthroughId, charId, file)
+  // Cancels an abandoned render, or removes a file once saved references permit it.
+  handle(
+    'comfy:dropPhoto',
+    async (
+      _event,
+      playthroughId: string,
+      charId: string,
+      file: string,
+      options?: { cancelOnly?: boolean; replacement?: string }
+    ) => {
+      if (options?.cancelOnly) return cancelKeys(charId, [`photo:${playthroughId}:${file}`])
+      if (options?.replacement) return retirePhoto(playthroughId, charId, file, options.replacement)
+      return dropPhoto(playthroughId, charId, file)
+    }
   )
 
   // One picture she texted, rendered after her words have already landed on the thread.
@@ -120,7 +132,7 @@ export function registerPhotoIpc(handle: Handle): void {
       overrides: PhotoRenderOptions = {}
     ) => {
       validatePhotoOverrides(overrides, false)
-      return queuePhoto(character, `photo:${tier}`, (options) =>
+      return queuePhoto(character, `photo:${playthroughId}:${file}`, (options) =>
         generatePhoto(playthroughId, character, tier, photoPrompt, file, options, overrides)
       )
     }
@@ -140,7 +152,7 @@ export function registerPhotoIpc(handle: Handle): void {
       overrides: PhotoRenderOptions = {}
     ) => {
       validatePhotoOverrides(overrides, true)
-      return queuePhoto(character, `photo-duo:${tier}`, (options) =>
+      return queuePhoto(character, `photo:${playthroughId}:${file}`, (options) =>
         generateDuoPhoto(
           playthroughId,
           character,

@@ -7,6 +7,7 @@ import {
   canSendPhotos,
   photoNamesInSave,
   savePhotoState,
+  savePhotoStateAwaitable,
   setFeedPostPhoto
 } from './localPhotoStore'
 import { noNsfwImagesOf, useSettingsStore } from './settingsStore'
@@ -328,9 +329,9 @@ export async function redrawPostPhoto(
     friend: photo?.with ? game.characters[photo.with] : undefined,
     kind: 'bunnyboard',
     read: () => photoOf(charId, postId),
-    write: (next) => {
+    write: async (next) => {
       setFeedPostPhoto(charId, postId, next)
-      savePhotoState()
+      await savePhotoStateAwaitable()
     },
     live: () => {
       const now = useGameStore.getState()

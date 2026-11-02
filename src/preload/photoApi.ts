@@ -52,8 +52,12 @@ export const photoApi = {
         file,
         rebuild
       ),
-    drop: (playthroughId: string, charId: string, file: string) =>
-      ipcRenderer.invoke('comfy:dropPhoto', playthroughId, charId, file),
+    drop: (
+      playthroughId: string,
+      charId: string,
+      file: string,
+      options?: { cancelOnly?: boolean; replacement?: string }
+    ) => ipcRenderer.invoke('comfy:dropPhoto', playthroughId, charId, file, options),
     storeWebp: (playthroughId: string, charId: string, file: string, bytes: Uint8Array) =>
       ipcRenderer.invoke('comfy:storeWebpPhoto', playthroughId, charId, file, bytes),
     carry: (fromPlaythroughId: string, toPlaythroughId: string, charIds?: string[]) =>

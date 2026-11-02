@@ -8,6 +8,7 @@ import {
   noExplicitPhotos,
   photoNamesInSave,
   savePhotoState,
+  savePhotoStateAwaitable,
   setMessagePhoto
 } from './localPhotoStore'
 import { tellAboutDmPhotos } from './photoTipDelivery'
@@ -48,7 +49,7 @@ interface EarlyPhoto {
   result?: Result<string>
   attached: boolean
   discarded: boolean
-  lastMessageId?: string
+  release: () => void
 }
 const earlyPhotos = new Map<string, EarlyPhoto>()
 
@@ -62,6 +63,12 @@ function earlyIsLive(early: EarlyPhoto): boolean {
 function discardEarlyPhoto(early: EarlyPhoto): void {
   if (early.attached || early.discarded) return
   early.discarded = true
+  early.release()
+  if (early.file) {
+    void window.api.photo
+      .drop(early.playthroughId, early.charId, early.file, { cancelOnly: true })
+      .catch((error) => console.warn('[photo] could not cancel an early photo:', error))
+  }
   if (earlyPhotos.get(early.charId) === early) earlyPhotos.delete(early.charId)
   void early.render
     .then(async () => {
@@ -87,8 +94,10 @@ export function clearEarlyPhotos(): void {
 export function startDmPhoto(
   charId: string,
   character: Character,
-  lead: Readonly<Record<string, unknown>>
+  lead: Readonly<Record<string, unknown>>,
+  signal: AbortSignal
 ): void {
+  if (signal.aborted) return
   const previous = earlyPhotos.get(charId)
   if (previous) discardEarlyPhoto(previous)
   const data = {
@@ -112,12 +121,14 @@ export function startDmPhoto(
     scene: data.photoPrompt.trim(),
     playthroughId: game.playthroughId,
     loads: game.loads,
-    lastMessageId: game.bunnyboard.conversations[charId]?.messages.at(-1)?.id,
+    release: () => signal.removeEventListener('abort', abort),
     ready: Promise.resolve(cancelled),
     render: Promise.resolve(cancelled),
     attached: false,
     discarded: false
   }
+  const abort = (): void => discardEarlyPhoto(early)
+  signal.addEventListener('abort', abort, { once: true })
   earlyPhotos.set(charId, early)
   early.ready = window.api.photo
     .reserveName(early.playthroughId, character, 'chat', photoNamesInSave(charId))
@@ -146,22 +157,6 @@ export function startDmPhoto(
       return result
     })
 }
-
-/** Abandoned, blocked and failed replies cannot retain an unattached photo. */
-useGameStore.subscribe((game) => {
-  for (const early of earlyPhotos.values()) {
-    const last = game.bunnyboard.conversations[early.charId]?.messages.at(-1)
-    if (
-      !earlyIsLive(early) ||
-      game.charInfo[early.charId]?.flags.blocked ||
-      game.busy ||
-      game.currentSceneTranscript.length > 0 ||
-      game.sceneSummary !== null ||
-      (last?.error && last.id !== early.lastMessageId)
-    )
-      discardEarlyPhoto(early)
-  }
-})
 
 /**
  * The picture attached to one reply: settled against the save, hung on her last text as a
@@ -210,12 +205,13 @@ export async function sendPhoto(
     const named = await early.ready
     const now = useGameStore.getState()
     const message = now.bunnyboard.conversations[charId]?.messages.find((one) => one.id === last.id)
-    if (!earlyIsLive(early) || !message || message.photo || !canSendPhotos()) {
+    if (early.discarded || !earlyIsLive(early) || !message || message.photo || !canSendPhotos()) {
       discardEarlyPhoto(early)
       return
     }
     if (named.ok && early.file) {
       early.attached = true
+      early.release()
       setMessagePhoto(charId, last.id, {
         tier: early.tier,
         scene: early.scene,
@@ -385,9 +381,9 @@ export async function redrawMessagePhoto(
       friend: photo?.with ? game.characters[photo.with] : undefined,
       kind: 'chat',
       read: () => messagePhotoOf(charId, messageId),
-      write: (next) => {
+      write: async (next) => {
         setMessagePhoto(charId, messageId, next)
-        savePhotoState()
+        await savePhotoStateAwaitable()
       },
       live: () => {
         const now = useGameStore.getState()

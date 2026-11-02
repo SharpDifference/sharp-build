@@ -119,7 +119,8 @@ registerHooks(PHOTO_FEATURE, {
     writeBody(bodyOfDraft(draft.body as DraftBody | undefined, baseAppearance)),
 
   // Her streamed decision starts drawing; the completed reply claims that same render.
-  dmReplyLead: ({ charId, character, lead }) => startDmPhoto(charId, character, lead),
+  dmReplyLead: ({ charId, character, lead, signal }) =>
+    startDmPhoto(charId, character, lead, signal),
   afterDmReply: ({ charId, character, reply }) => void sendPhoto(charId, character, reply, true),
 
   // The same for a girl texting first, read off her entry in the slot's opening: a custom

@@ -1,4 +1,4 @@
-import { constants } from 'fs'
+import { constants, watch, type FSWatcher } from 'fs'
 import { copyFile, mkdir, readdir, readFile, rm } from 'fs/promises'
 import { join } from 'path'
 import {
@@ -521,8 +521,135 @@ export async function dropPhoto(
   assertSafePlaythroughId(playthroughId)
   assertSafeCharId(charId)
   assertPhotoFile(file)
+  try {
+    if ((await photoReferences(playthroughId)).all.has(pngPhotoOf(file))) return
+  } catch {
+    return
+  }
   const png = pngPhotoOf(file)
   for (const name of [png, png.replace(/\.png$/, '.webp'), photoSidecarOf(file)]) {
     await rm(getPhotoPath(playthroughId, charId, name), { force: true })
   }
+}
+
+interface RetiredPhoto {
+  charId: string
+  oldFile: string
+  newFile: string
+}
+interface PhotoCleanup {
+  pending: Map<string, RetiredPhoto>
+  watcher: FSWatcher
+  running?: Promise<void>
+  timer?: ReturnType<typeof setTimeout>
+}
+const photoCleanups = new Map<string, PhotoCleanup>()
+
+/** Reads every saved checkpoint and replay; an unreadable one refuses deletion. */
+async function photoReferences(playthroughId: string): Promise<{
+  saved: Set<string>
+  all: Set<string>
+}> {
+  const root = join(getPhotosRoot(playthroughId), '..')
+  const saved = new Set<string>()
+  const all = new Set<string>()
+  const collect = (value: unknown, target: Set<string>): void => {
+    if (!value || typeof value !== 'object') return
+    if ('file' in value && typeof value.file === 'string' && isPhotoFile(value.file)) {
+      target.add(pngPhotoOf(value.file))
+    }
+    for (const child of Object.values(value)) collect(child, target)
+  }
+  for (const name of await readdir(root)) {
+    if (!name.endsWith('.json')) continue
+    collect(JSON.parse(await readFile(join(root, name), 'utf8')), saved)
+  }
+  for (const file of saved) all.add(file)
+  let replays: string[]
+  try {
+    replays = await readdir(join(root, 'replays'))
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error
+    replays = []
+  }
+  for (const name of replays) {
+    if (name.endsWith('.json')) {
+      collect(JSON.parse(await readFile(join(root, 'replays', name), 'utf8')), all)
+    }
+  }
+  return { saved, all }
+}
+
+/** Retries after a completed save write; uncertainty always leaves both pictures on disk. */
+export async function flushRetiredPhotos(playthroughId: string): Promise<void> {
+  const cleanup = photoCleanups.get(playthroughId)
+  if (!cleanup) return
+  if (cleanup.running) return cleanup.running
+  cleanup.running = (async () => {
+    try {
+      const refs = await photoReferences(playthroughId)
+      for (const [key, photo] of cleanup.pending) {
+        if (
+          !refs.saved.has(pngPhotoOf(photo.newFile)) ||
+          refs.all.has(pngPhotoOf(photo.oldFile))
+        ) continue
+        if (!(await photoLanded(playthroughId, photo.charId, photo.newFile))) continue
+        await dropPhoto(playthroughId, photo.charId, photo.oldFile)
+        cleanup.pending.delete(key)
+      }
+    } catch {
+      // A missing, changing or unreadable checkpoint cannot prove a file is unreferenced.
+    }
+    if (cleanup.pending.size === 0) {
+      cleanup.watcher.close()
+      clearTimeout(cleanup.timer)
+      photoCleanups.delete(playthroughId)
+    }
+  })()
+  try {
+    await cleanup.running
+  } finally {
+    cleanup.running = undefined
+  }
+}
+
+/** Watches this playthrough's atomic save writes, retaining originals across skipped saves. */
+export async function retirePhoto(
+  playthroughId: string,
+  charId: string,
+  oldFile: string,
+  newFile: string
+): Promise<void> {
+  assertSafePlaythroughId(playthroughId)
+  assertSafeCharId(charId)
+  assertPhotoFile(oldFile)
+  assertPhotoFile(newFile)
+  if (pngPhotoOf(oldFile) === pngPhotoOf(newFile)) return
+  let cleanup = photoCleanups.get(playthroughId)
+  if (!cleanup) {
+    try {
+      const watcher = watch(
+        join(getPhotosRoot(playthroughId), '..'),
+        { recursive: true, persistent: false },
+        () => {
+          const current = photoCleanups.get(playthroughId)
+          if (!current) return
+          clearTimeout(current.timer)
+          current.timer = setTimeout(() => void flushRetiredPhotos(playthroughId), 100)
+          current.timer.unref()
+        }
+      )
+      watcher.on('error', () => {
+        watcher.close()
+        photoCleanups.delete(playthroughId)
+      })
+      cleanup = { watcher, pending: new Map() }
+      photoCleanups.set(playthroughId, cleanup)
+    } catch {
+      // Without a reliable save notification, retaining the original costs only disk space.
+      return
+    }
+  }
+  cleanup.pending.set(`${charId}/${oldFile}`, { charId, oldFile, newFile })
+  await flushRetiredPhotos(playthroughId)
 }

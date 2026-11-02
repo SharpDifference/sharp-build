@@ -139,8 +139,13 @@ declare module '../preload/api' {
         file: string,
         rebuild?: boolean
       ) => Promise<Result<PhotoInfo>>
-      /** Removes the picture's PNG, WebP and sidecar after a replacement has landed. */
-      drop: (playthroughId: string, charId: string, file: string) => Promise<Result<void>>
+      /** Cancels one render, retires a replacement, or removes an unused picture. */
+      drop: (
+        playthroughId: string,
+        charId: string,
+        file: string,
+        options?: { cancelOnly?: boolean; replacement?: string }
+      ) => Promise<Result<void>>
       /** Keeps the WebP encoded from a picture that landed as PNG, and drops the PNG. */
       storeWebp: (
         playthroughId: string,
