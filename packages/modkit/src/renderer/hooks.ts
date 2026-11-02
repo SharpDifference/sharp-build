@@ -905,7 +905,9 @@ export function sceneCut(ctx: { length: number }): void {
 /** The mods `switchedOn` has told, and not seen go off since. */
 const toldOn = new Set<string>()
 
-/** Tells each registered mod that is on and not yet told; a mod that throws costs a warning. */
+const SWITCHED_ON_TIMEOUT_MS = 10_000
+
+/** Tells each registered mod that is on and not yet told; failures cannot hold up boot. */
 async function tellSwitchedOn(atBoot: boolean): Promise<void> {
   const on = new Set(activeEntries().map((entry) => entry.modId))
   for (const modId of [...toldOn]) if (!on.has(modId)) toldOn.delete(modId)
@@ -914,7 +916,17 @@ async function tellSwitchedOn(atBoot: boolean): Promise<void> {
   await Promise.all(
     told.map(async ({ modId, hooks }) => {
       try {
-        await hooks.switchedOn?.({ atBoot })
+        let timer: ReturnType<typeof setTimeout> | undefined
+        try {
+          await Promise.race([
+            Promise.resolve(hooks.switchedOn?.({ atBoot })),
+            new Promise<never>((_, reject) => {
+              timer = setTimeout(() => reject(new Error('Startup reader timed out after 10 seconds; continuing without waiting')), SWITCHED_ON_TIMEOUT_MS)
+            }),
+          ])
+        } finally {
+          clearTimeout(timer)
+        }
       } catch (error) {
         console.warn(`[mods] ${modId}: switchedOn failed`, error)
       }
