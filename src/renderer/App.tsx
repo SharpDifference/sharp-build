@@ -2,6 +2,7 @@ import { useEffect, useState, type JSX } from 'react'
 import { AnimatePresence } from 'motion/react'
 import { writerReady } from '@shared/settingsRules'
 import { loadInstalledMods } from './mods'
+import { startSwitchedOn } from './mods/hooks'
 import { Crossing } from './components/Crossing'
 import { Cursor } from './components/Cursor'
 import { ModalHost } from './components/ModalHost'
@@ -34,9 +35,6 @@ import { useGrabBagStore } from './stores/grabBagStore'
 import { convertLegacyImages } from './stores/legacyImageStore'
 import { useSaveStore } from './stores/saveStore'
 import { modIsOn, useModsStore } from './stores/modsStore'
-import { modOn } from '@shared/mods'
-import { PROMPT_STUDIO_MOD } from '@shared/presets/types'
-import { usePromptStudioStore } from './stores/promptStudioStore'
 import { useModSessionStore } from './stores/modSessionStore'
 import { useSettingsStore } from './stores/settingsStore'
 import { comfySourceOf } from '@shared/comfyModels'
@@ -55,14 +53,6 @@ function bootView(firstRun: boolean, comfySettled: boolean, writerOk: boolean): 
   if (isWebBuild()) return writerOk ? 'mainMenu' : 'apiKey'
   return comfySettled ? 'mainMenu' : 'setup'
 }
-
-// Prompt Studio's presets are read when its mod is switched on; the boot reads them when it
-// already is, so the first request that reads the prompt edits finds them.
-useModsStore.subscribe((state, previous) => {
-  if (modOn(state.switches, PROMPT_STUDIO_MOD) && !modOn(previous.switches, PROMPT_STUDIO_MOD)) {
-    void usePromptStudioStore.getState().load()
-  }
-})
 
 /**
  * Bootstraps stores in dependency order, then opens the cover `main.tsx` raised onto whichever
@@ -105,8 +95,8 @@ async function boot(): Promise<void> {
   // draws. One that fails is off for the session, and the notice under the cover says so.
   await loadInstalledMods((id) => modIsOn(id))
 
-  // Non-fatal as well: Prompt Studio's presets are read only when its mod is on.
-  if (modIsOn(PROMPT_STUDIO_MOD)) await usePromptStudioStore.getState().load()
+  // Every mod that is on reads what it keeps before the first screen; a mod that fails only warns.
+  await startSwitchedOn()
 
   // The graph opens as soon as the sliders it mixes against are in.
   useAudioStore.getState().start()

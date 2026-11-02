@@ -197,11 +197,11 @@ finds them.
 - `src/renderer/modEntries/prompt-studio.ts` registers `promptText` (the scene text and the
   global text edits, and the catalog sizes), `sceneCall` (tags a scene call for the preset and
   keeps the request for the preview), `sceneReplyLanded` (keeps the variables main handed
-  back), `sceneCut` (takes a cut's changes back) and `advancedSettingsEntry` (the button).
+  back), `sceneCut` (takes a cut's changes back), `advancedSettingsEntry` (the button) and
+  `switchedOn` (reads the presets and the studio's prompts at boot when the mod is on, and as it
+  is switched on, so the first request that reads the text edits finds them).
 - `promptStudioVars.ts` declares a `saveField` for the variables, which reads the old
   top-level `presetVars` and carries the whole record into the next semester, and a
   `sceneField` for the marks. A scene saved before this change keeps no marks, so a cut in
   that one scene cannot take its replies' variables back.
 - `presetsService.ts` calls `registerFinalRequest` in main.
-- The one piece in core is `App.tsx`, which reads the studio at boot when the mod is on and
-  when it is switched on, so the first request that reads the text edits finds them.

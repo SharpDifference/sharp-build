@@ -24,5 +24,7 @@ registerHooks(PROMPT_STUDIO_MOD, {
   sceneReplyLanded: (ctx) => commitPresetVars(ctx.modReply[PROMPT_STUDIO_MOD], ctx.at),
   // Takes back the variables the cut replies changed.
   sceneCut: (ctx) => cutPresetVars(ctx.length),
-  advancedSettingsEntry: PromptStudioAdvancedEntry
+  advancedSettingsEntry: PromptStudioAdvancedEntry,
+  // Reads the presets and the studio's prompts as the mod comes on, before any request reads them.
+  switchedOn: () => usePromptStudioStore.getState().load()
 })

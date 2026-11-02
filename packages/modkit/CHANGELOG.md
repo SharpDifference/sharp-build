@@ -16,7 +16,9 @@ and the readers, components and record helpers its screens and main code use.
   the call as built.
 - `sceneReplyLanded` is told of every scene call's reply, the closing's included, and `sceneCut` of
   a cut in the transcript. `sceneField` keeps a mod's value on the scene being played.
-- `advancedSettingsEntry`: a place on the Advanced tab of app settings.
+- `advancedSettingsEntry`: a place on the Advanced tab of app settings, beside its own buttons.
+- `switchedOn`: a mod is told as it comes on, at boot before the first screen (waited for) and
+  whenever its switch or the game's record turns it on later, so it can read what it keeps.
 - Re-exported: `CheckField`, `ConfirmModal`, `TextEditModal`, `ChevronIcon`, `PlusIcon`,
   `PROMPT_BLOCKS`, `defaultBlockText` and `isNewGameBlock` in `renderer`, with the new readers
   `gameFacts`, `useGameFacts`, `useScenePersona` and `showError`; the text-block ids, `blockText`,

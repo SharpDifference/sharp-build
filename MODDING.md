@@ -923,11 +923,12 @@ else names it.
 | `messageAttachment` | `BunnyboardModal.tsx` | Draw a component after a phone message's text bubble, or alone where the message has no text. Props: `message` |
 | `contactPostExtra` | `ContactPage.tsx` | Draw a component beside a post's like, in the feed on her contact page. Props: `charId`, `post` |
 | `contactTab` | `ContactPage.tsx` | Add a reading of her beside Profile on her contact page: a tab, and a panel drawn in place of her cards |
-| `advancedSettingsEntry` | `SettingsAdvancedTab.tsx` | Draw a component on the Advanced tab of app settings, under its own controls. Props: `theme`, `busy` (a backup or restore is running) |
+| `advancedSettingsEntry` | `SettingsAdvancedTab.tsx` | Draw a component on the Advanced tab of app settings, after Upload custom BG and Edit system prompt. Props: `theme`, `busy` (a backup or restore is running) |
 | `promptText` | `loop/promptState.ts`, `textingLoop.ts`, `applicationStore.ts` and the other stores that build a request | Rewrite the game's own prompt text and the class call's pool sizes; one mod at a time |
 | `sceneCall` | `loop/stream.ts` | Tag a scene call as it goes out, for the mod's request hook in main |
 | `sceneReplyLanded` | `loop/stream.ts`, `loop/turn.ts` | Read every scene call's reply once it has landed, the closing's included, with what main handed back |
 | `sceneCut` | `gameStore.ts` | Undo what the replies past a cut in the transcript changed |
+| `switchedOn` | `App.tsx` (`boot`), then as a switch or the game's record moves | Read what the mod keeps as it comes on: at boot, waited for before the first screen, and again each time it is switched on |
 
 The two ways on (`endingChoice`, `saveChoice`) share one shape, `WayOn`. Its `prepare` runs
 while nothing has been torn down, does whatever may fail and reports it, and returns `enter`,

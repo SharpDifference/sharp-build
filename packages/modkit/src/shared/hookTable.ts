@@ -69,6 +69,7 @@ export const HOOKS = [
   { name: 'afterSceneReply', side: 'renderer', kind: 'event', dispatch: ['afterSceneReply'], since: '0.1.0' },
   { name: 'sceneReplyLanded', side: 'renderer', kind: 'event', dispatch: ['sceneReplyLanded'], since: '0.7.0' },
   { name: 'sceneCut', side: 'renderer', kind: 'event', dispatch: ['sceneCut'], since: '0.7.0' },
+  { name: 'switchedOn', side: 'renderer', kind: 'event', dispatch: ['startSwitchedOn'], since: '0.7.0' },
   { name: 'afterReachOut', side: 'renderer', kind: 'event', dispatch: ['afterReachOut'], since: '0.1.0' },
   { name: 'playerActs', side: 'renderer', kind: 'event', dispatch: ['playerActs'], since: '0.1.0' },
   { name: 'gameEntered', side: 'renderer', kind: 'event', dispatch: ['gameEntered'], since: '0.1.0' },

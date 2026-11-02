@@ -428,6 +428,12 @@ export const HOOKS: readonly [{
     readonly dispatch: readonly ["sceneCut"];
     readonly since: '0.7.0';
 }, {
+    readonly name: 'switchedOn';
+    readonly side: 'renderer';
+    readonly kind: 'event';
+    readonly dispatch: readonly ["startSwitchedOn"];
+    readonly since: '0.7.0';
+}, {
     readonly name: 'afterReachOut';
     readonly side: 'renderer';
     readonly kind: 'event';

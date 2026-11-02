@@ -42,6 +42,7 @@ export {
   scenePlays,
   sceneReplyLanded,
   screenSlot,
+  startSwitchedOn,
   sentText,
   setDeclaredHooks,
   setHookRules,

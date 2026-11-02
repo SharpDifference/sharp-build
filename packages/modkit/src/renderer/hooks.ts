@@ -515,7 +515,7 @@ export interface ModHooks {
   contactPostExtra?: ComponentType<ScreenSlotProps['contactPostExtra']>
   /** A reading of her of the mod's own on her contact page; see {@link ContactTab}. */
   contactTab?: ContactTab
-  /** Drawn on the Advanced tab of app settings, under its own controls. */
+  /** Drawn on the Advanced tab of app settings, after Upload custom BG and Edit system prompt. */
   advancedSettingsEntry?: ComponentType<ScreenSlotProps['advancedSettingsEntry']>
   /** The game's prompt text as the mod rewrites it; see {@link PromptTextSpot}. */
   promptText?: PromptTextSpot
@@ -528,6 +528,11 @@ export interface ModHooks {
   sceneReplyLanded?: (ctx: SceneReplyLanded) => void
   /** The scene's transcript was cut back to `length` lines, by an interjection or a rewind. */
   sceneCut?: (ctx: { length: number }) => void
+  /**
+   * The mod has come on: at boot, before the first screen and waited for, or later, as its switch
+   * or the game's record turns it on. Told once each time, never while it stays on.
+   */
+  switchedOn?: (ctx: { atBoot: boolean }) => void | Promise<void>
 }
 
 /**
@@ -895,6 +900,35 @@ export function sceneCut(ctx: { length: number }): void {
       console.warn(`[mods] ${modId}: sceneCut failed`, error)
     }
   }
+}
+
+/** The mods `switchedOn` has told, and not seen go off since. */
+const toldOn = new Set<string>()
+
+/** Tells each registered mod that is on and not yet told; a mod that throws costs a warning. */
+async function tellSwitchedOn(atBoot: boolean): Promise<void> {
+  const on = new Set(activeEntries().map((entry) => entry.modId))
+  for (const modId of [...toldOn]) if (!on.has(modId)) toldOn.delete(modId)
+  const told = activeEntries().filter((entry) => entry.hooks.switchedOn && !toldOn.has(entry.modId))
+  for (const { modId } of told) toldOn.add(modId)
+  await Promise.all(
+    told.map(async ({ modId, hooks }) => {
+      try {
+        await hooks.switchedOn?.({ atBoot })
+      } catch (error) {
+        console.warn(`[mods] ${modId}: switchedOn failed`, error)
+      }
+    })
+  )
+}
+
+/**
+ * Tells the mods that are on at boot and waits for them, then tells each mod as it comes on
+ * later. Called once, after every mod has registered.
+ */
+export async function startSwitchedOn(): Promise<void> {
+  await tellSwitchedOn(true)
+  subscribeHookRules(() => void tellSwitchedOn(false))
 }
 
 /** Every mod's place on the scene screen, each under its mod's id. */
