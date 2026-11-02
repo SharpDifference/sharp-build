@@ -12,7 +12,7 @@ import { formatGameDate } from './gameDate'
 import { GRADUATION_DATE } from './occasions'
 import { relationshipLines } from './relationship'
 import { objectSchema } from './schema'
-import type { GlobalTextId, TextEdits } from '@shared/presets/types'
+import type { TextEdits, GlobalTextId } from '@shared/promptText'
 import { narrationPersonaFor } from './promptBlocks'
 import {
   memoryLines,
@@ -48,7 +48,7 @@ export interface EndingPostsInput {
   stats?: PlayerStats
   /** The player's `lessNsfwText` setting; picks which persona heads this call's prefix. */
   lessNsfwText: boolean
-  /** Prompt Studio's edits to the global text blocks; absent with the mod off. */
+  /** The edits a mod hands the global text blocks; absent when none is supplied. */
   globalTextEdits?: TextEdits<GlobalTextId>
   /** How many of her told secrets each poster's entry carries; absent is the default. */
   secretBudget?: number

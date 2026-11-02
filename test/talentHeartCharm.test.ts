@@ -1,3 +1,4 @@
+import './fixtures/maestroModelKit'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { buyTalent, normalizeTalents, seedTalents, setTalentRules, talentBalance, talentEffect, TALENTS, TALENT_TREES } from '@shared/campusTalents'
 import { abilityRank, completeSilverLining, silverLiningReady, TALENT_ABILITIES as A } from '@shared/talentAbilities'

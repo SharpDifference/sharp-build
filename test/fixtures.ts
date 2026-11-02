@@ -1,4 +1,5 @@
 import { rollProfessor } from '@shared/academics'
+import { MIN_PLAYER_COURSES } from '@shared/classes'
 import { EMOTIONS } from '@shared/emotions'
 import { pairKeyOf, type NpcRelationshipMap } from '@shared/npcRelationships'
 import { allFollowMain } from '@shared/outfits'
@@ -10,6 +11,7 @@ import type {
   CharInfo,
   CharJob,
   Character,
+  ClassEntry,
   CourseEntry,
   Emotion,
   EnrollmentDraft,
@@ -246,4 +248,23 @@ export function stubApi(api: DeepPartial<VenusUniversityApi>): void {
 /** Removes the stubbed bridge. Call from `afterEach`, or the next suite inherits it. */
 export function restoreApi(): void {
   delete (globalThis as { window?: unknown }).window
+}
+
+/**
+ * A legal player pick built off the catalog itself: one PE class, then one non-PE course per
+ * distinct slot until the minimum is held. Feeding it to `scheduleComplaint` checks that the
+ * catalog admits a real schedule, rather than assuming it does.
+ */
+export function legalPick(classes: Record<string, ClassEntry>): Record<number, string> {
+  const entries = Object.values(classes)
+  const pe = entries.find((entry) => entry.category === 'pe')!
+  const pick: Record<number, string> = { [pe.slot]: pe.code }
+  let courses = 0
+  for (const entry of entries) {
+    if (courses >= MIN_PLAYER_COURSES) break
+    if (entry.category === 'pe' || entry.slot in pick) continue
+    pick[entry.slot] = entry.code
+    courses++
+  }
+  return pick
 }

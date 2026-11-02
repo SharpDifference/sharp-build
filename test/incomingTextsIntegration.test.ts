@@ -1,3 +1,4 @@
+import './fixtures/maestroModelKit'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { GameSave } from '@shared/types'
 import { NO_SWITCHES, withMod } from '@shared/mods'

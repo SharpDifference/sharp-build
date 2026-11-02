@@ -1,3 +1,4 @@
+import './fixtures/maestroModelKit'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { Conversation, TextingResponse, Result, GameSave, StructuredRequest } from '@shared/types'
 import { beforeTextReply, checkedTextReplacement, latestTextReply, replaceTextReply, TEXT_REGENERATION_MOD } from '@shared/textRegeneration'

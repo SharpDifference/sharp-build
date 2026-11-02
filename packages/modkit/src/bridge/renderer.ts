@@ -31,10 +31,28 @@ export type { TextFieldProps } from '../../../../src/renderer/components/TextFie
 export { TextField } from '../../../../src/renderer/components/TextField'
 export type { SelectFieldOption, SelectFieldProps } from '../../../../src/renderer/components/SelectField'
 export { SelectField } from '../../../../src/renderer/components/SelectField'
+export type { CheckFieldProps } from '../../../../src/renderer/components/CheckField'
+export { CheckField } from '../../../../src/renderer/components/CheckField'
+export type { ConfirmModalProps } from '../../../../src/renderer/components/ConfirmModal'
+export { ConfirmModal } from '../../../../src/renderer/components/ConfirmModal'
+export type { TextEditModalProps } from '../../../../src/renderer/views/TextEditModal'
+export { TextEditModal } from '../../../../src/renderer/views/TextEditModal'
+export type { PromptBlock } from '../../../../src/renderer/prompts/promptBlocks'
+export { defaultBlockText, isNewGameBlock, PROMPT_BLOCKS } from '../../../../src/renderer/prompts/promptBlocks'
 export { currentRun, runStale } from '../../../../src/renderer/stores/loop/state'
 export { isOrientationSlot } from '../../../../src/renderer/prompts/introScript'
 export { isGraduationSlot } from '../../../../src/renderer/prompts/graduation'
-export { buildLabel, lessNsfwText, modsOnLine, useLessNsfwText, useSfxGain } from '../../../../src/renderer/mods/readers'
+export {
+  buildLabel,
+  gameFacts,
+  lessNsfwText,
+  modsOnLine,
+  showError,
+  useGameFacts,
+  useLessNsfwText,
+  useScenePersona,
+  useSfxGain
+} from '../../../../src/renderer/mods/readers'
 export { cancelCalls, completeStructured } from '../../../../src/renderer/mods/llm'
 export type { SilentRetryOptions } from '../../../../src/renderer/stores/silentRetry'
 export { retrySilently } from '../../../../src/renderer/stores/silentRetry'
@@ -58,7 +76,7 @@ export {
   veilIn
 } from '../../../../src/renderer/views/motion'
 
-export { CloseIcon, HeartIcon, BunnyMark, EyeIcon, EyeOffIcon } from '../../../../src/renderer/views/screenIcons'
+export { ChevronIcon, CloseIcon, HeartIcon, BunnyMark, EyeIcon, EyeOffIcon, PlusIcon } from '../../../../src/renderer/views/screenIcons'
 export { formatNumericGameDate, formatShortGameDate, slotHalf } from '../../../../src/renderer/prompts/gameDate'
 export { SETTING } from '../../../../src/renderer/prompts/setting'
 export { hasTexted } from '../../../../src/renderer/prompts/textingPrompt'
@@ -67,3 +85,4 @@ export { newestFirst } from '../../../../src/renderer/stores/feedRolls'
 export { FEED_EMOJI, FEED_EMOJI_BAG, FEED_HANDLE_BAG, FEED_HANDLE_POOL } from '../../../../src/renderer/prompts/feedRandoms'
 
 export { bunnybotSays } from '../../../../src/renderer/mods/bunnybot'
+export { invoke } from '../../../../src/renderer/mods/invoke'

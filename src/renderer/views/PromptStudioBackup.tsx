@@ -15,11 +15,9 @@ import {
   studioBackupWord,
   type StudioBackupKind,
   type StudioBackupOf
-} from '@shared/presets/studioBackup'
-import { ConfirmModal } from '../components/ConfirmModal'
+} from '../../shared/presets/studioBackup'
+import { ConfirmModal, showError, type ScreenTheme } from '@vx/modkit/renderer'
 import { usePromptStudioStore } from '../stores/promptStudioStore'
-import { useUiStore } from '../stores/uiStore'
-import type { ScreenTheme } from './clockTheme'
 import { StudioPill } from './PromptStudioModals'
 
 /** A restore waiting for the player's yes: the checked file of one kind. */
@@ -32,7 +30,7 @@ function counted(n: number, one: string, many: string): string {
 
 /** Tells the player a backup could not be used. */
 function refuse(message: string): void {
-  useUiStore.getState().showError({ code: 'STUDIO_BACKUP_INVALID', message })
+  showError({ code: 'STUDIO_BACKUP_INVALID', message })
 }
 
 /** A section's backup file's text; presets are exported one at a time instead. */
@@ -103,7 +101,7 @@ export function useStudioBackup(
       const file = await compose()
       if (file === null) return
       const saved = await window.api.studioBackup.save(file.name, file.text)
-      if (!saved.ok) useUiStore.getState().showError(saved.error)
+      if (!saved.ok) showError(saved.error)
     } finally {
       working.current = false
     }
@@ -114,7 +112,7 @@ export function useStudioBackup(
     void saveFile(async () => {
       const read = await window.api.presets.get(id)
       if (!read.ok) {
-        useUiStore.getState().showError(read.error)
+        showError(read.error)
         return null
       }
       const text = JSON.stringify(buildPresetsBackup([read.data], read.data.id), null, 2)
@@ -129,7 +127,7 @@ export function useStudioBackup(
     try {
       const picked = await window.api.studioBackup.pick()
       if (!picked.ok) {
-        useUiStore.getState().showError(picked.error)
+        showError(picked.error)
         return
       }
       if (!picked.data) return

@@ -7,7 +7,7 @@ import {
 } from '@shared/types'
 import { promptLines } from '../mods/hooks'
 import { objectSchema } from './schema'
-import type { GlobalTextId, TextEdits } from '@shared/presets/types'
+import type { GlobalTextId, TextEdits } from '@shared/promptText'
 import { milestoneCastLines } from './scenePrompt'
 import { textLedgerPersonaFor } from './promptBlocks'
 import {

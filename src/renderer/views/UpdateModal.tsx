@@ -1,4 +1,5 @@
 import type { JSX } from 'react'
+import { BUILD } from '@shared/mods'
 import { ConfirmModal } from '../components/ConfirmModal'
 import { useUpdateStore } from '../stores/updateStore'
 
@@ -22,7 +23,8 @@ export function UpdateModal({
       id="update-offer"
       theme={theme}
       title="Update available"
-      message={`Upgrade to version ${version}? Your saves, characters, and settings will be maintained.`}
+      // The update is Venus Dev's own build, which replaces this one's code and the mods with it.
+      message={`Upgrade to version ${version}? Your saves, characters, and settings will be maintained. Updating removes ${BUILD.name}. Its mods come back once you install its release for ${version}.`}
       confirmText="Update"
       cancelText="Not now"
       onConfirm={() => answer('update')}

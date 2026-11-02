@@ -1,6 +1,7 @@
-import type { JSX } from 'react'
+import type { JSX, ReactNode } from 'react'
 import { MEMORY_TYPES, type MemoryType } from '@shared/types'
 import { profileUrl, useSpriteVersion } from '../stores/characterStore'
+import { MaskedFace } from './Spoiler'
 import '../vu_styles/MemoryEdit.css'
 
 export interface MemoryRowProps {
@@ -10,12 +11,16 @@ export interface MemoryRowProps {
   name: string
   /** Whose portrait opens the row; absent, the row opens on her name. */
   faceOf?: string
+  /** Her portrait is behind New Game's mask. */
+  masked?: boolean
   type: MemoryType
   desc: string
   onType: (type: MemoryType) => void
   onDesc: (desc: string) => void
   /** The field a form opens its focus on. */
   autoFocus?: boolean
+  /** What stands after the sentence, at the row's end. */
+  trailing?: ReactNode
 }
 
 /**
@@ -27,11 +32,13 @@ export function MemoryRow({
   id,
   name,
   faceOf,
+  masked = false,
   type,
   desc,
   onType,
   onDesc,
-  autoFocus
+  autoFocus,
+  trailing
 }: MemoryRowProps): JSX.Element {
   const version = useSpriteVersion(faceOf)
 
@@ -39,9 +46,13 @@ export function MemoryRow({
     <div className="vu-row vu-memrow">
       {faceOf ? (
         <span className="vu-arch vu-memrow-face">
-          <span className="vu-crop">
-            <img className="vu-crop-img" src={profileUrl(faceOf, version)} alt="" />
-          </span>
+          {masked ? (
+            <MaskedFace />
+          ) : (
+            <span className="vu-crop">
+              <img className="vu-crop-img" src={profileUrl(faceOf, version)} alt="" />
+            </span>
+          )}
         </span>
       ) : null}
       <span className="vu-memrow-name">{name}</span>
@@ -87,6 +98,7 @@ export function MemoryRow({
         // A pasted break lands as a space.
         onChange={(e) => onDesc(e.target.value.replace(/[\r\n]+/g, ' '))}
       />
+      {trailing}
     </div>
   )
 }

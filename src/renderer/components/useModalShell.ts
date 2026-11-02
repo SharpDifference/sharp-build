@@ -36,6 +36,14 @@ export interface ModalShell {
 const openShells: object[] = []
 
 /**
+ * Whether any shell or layer is open, one still fading out included, so a screen's own Escape
+ * can stand aside for the moment a leaving modal lets the key past.
+ */
+export function shellOpen(): boolean {
+  return openShells.length > 0
+}
+
+/**
  * Takes the top of that stack for as long as the caller holds the teardown, and hands Escape
  * and a right-click to `answer` only while nothing has been pushed over it. A right-click in a
  * field keeps its own menu; anywhere else the native one never opens. Enter and Space go to

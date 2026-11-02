@@ -1,8 +1,19 @@
 import 'fake-indexeddb/auto'
 import { IDBFactory } from 'fake-indexeddb'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import {
+  emptyCatalog,
+  type ApplicationContinuation,
+  type ApplicationDraft
+} from '@shared/application'
 import { replayIdOf, type SlotReplay } from '@shared/replays'
-import { AUTOSAVE_ID, MAX_SLOT_SAVES, type SaveDraft, type SemesterRecord } from '@shared/types'
+import {
+  AUTOSAVE_ID,
+  MAX_SLOT_SAVES,
+  type ContinuedSemester,
+  type SaveDraft,
+  type SemesterRecord
+} from '@shared/types'
 import { useGameStore } from '../src/renderer/stores/gameStore'
 import { enrollment, record } from './fixtures'
 
@@ -27,6 +38,22 @@ function photoMeta(): import('@shared/photos').PhotoMeta {
     rows: [],
     prompt: 'A photo.',
     options: { aspectRatio: '16:9' }
+  }
+}
+
+/** A New Game in progress with nothing generated yet, as the loading screen would hold it. */
+function applicationDraft(over: Partial<ApplicationDraft> = {}): ApplicationDraft {
+  return {
+    screen: 'loading',
+    season: 'spring',
+    chars: ['a', 'b'],
+    plan: [],
+    occasions: {},
+    catalog: emptyCatalog(),
+    girls: {},
+    pairs: {},
+    replies: {},
+    ...over
   }
 }
 
@@ -130,6 +157,45 @@ describe('starting a playthrough', () => {
   })
 })
 
+describe('the application', () => {
+  it('is minted by its first write, updated by a later one and refused once deleted', async () => {
+    const { playthroughId } = await saves.writeApplication(applicationDraft())
+    await saves.writeApplication(applicationDraft({ chars: ['c'] }), playthroughId)
+    await expect(saves.readApplication(playthroughId)).resolves.toMatchObject({ chars: ['c'] })
+    expect(await saves.listPlaythroughs()).toHaveLength(1)
+
+    await saves.deletePlaythrough(playthroughId)
+    await expect(
+      saves.writeApplication(applicationDraft(), playthroughId)
+    ).rejects.toMatchObject({ code: 'APPLICATION_PLAYTHROUGH_GONE' })
+    expect(await saves.listPlaythroughs()).toEqual([])
+    await expect(saves.readApplication(playthroughId)).rejects.toMatchObject({
+      code: 'APPLICATION_NOT_FOUND'
+    })
+  })
+
+  it('is replaced by the first semester composed from it, which ends it for good', async () => {
+    const { playthroughId } = await saves.writeApplication(applicationDraft())
+    expect((await saves.listPlaythroughs())[0]).toMatchObject({
+      applying: true,
+      chars: ['a', 'b']
+    })
+
+    await saves.writeEnrollment(enrollment(), playthroughId)
+
+    await expect(saves.readEnrollment(playthroughId)).resolves.toMatchObject({ chars: ['a'] })
+    await expect(saves.readApplication(playthroughId)).rejects.toMatchObject({
+      code: 'APPLICATION_NOT_FOUND'
+    })
+    const listed = (await saves.listPlaythroughs())[0]
+    expect(listed).toMatchObject({ enrolling: true, chars: ['a'] })
+    expect(listed.applying).toBeUndefined()
+    await expect(saves.writeApplication(applicationDraft(), playthroughId)).rejects.toMatchObject({
+      code: 'APPLICATION_SETTLED'
+    })
+  })
+})
+
 describe('renaming a playthrough', () => {
   it('changes the record by its name alone, and a blank one gives back its place', async () => {
     const { playthroughId } = await saves.writeEnrollment(enrollment())
@@ -178,6 +244,16 @@ describe('deleting a playthrough', () => {
     expect((await saves.listSaves(playthroughId)).saves).toEqual([])
     expect(await saves.readEndingArt(playthroughId)).toBeNull()
     expect(await saves.readProfilePicture(playthroughId)).toBeNull()
+  })
+
+  it('takes its application with it', async () => {
+    const { playthroughId } = await saves.writeApplication(applicationDraft())
+
+    await saves.deletePlaythrough(playthroughId)
+
+    await expect(saves.readApplication(playthroughId)).rejects.toMatchObject({
+      code: 'APPLICATION_NOT_FOUND'
+    })
   })
 
   it("takes its photos with it, and leaves another playthrough's alone", async () => {
@@ -320,6 +396,41 @@ describe('next semesters', () => {
     }
   }
 
+  /** What a registration for a next semester carries beyond a first one's. */
+  function continuing(id = '200'): ContinuedSemester {
+    return {
+      id,
+      index: 1,
+      alumni: ['a'],
+      priorProfiles: {},
+      pursuits: {},
+      carry: {}
+    } as unknown as ContinuedSemester
+  }
+
+  /** What the first semester's ending handed on, for the semester to be written under `id`. */
+  function continuation(id = '200'): ApplicationContinuation {
+    return {
+      id,
+      index: 1,
+      continuing: ['b'],
+      graduated: ['a'],
+      alumni: ['a'],
+      priorProfiles: {},
+      jobs: {},
+      haunts: {},
+      majorLoads: {},
+      carry: {},
+      taken: []
+    } as unknown as ApplicationContinuation
+  }
+
+  /** A playthrough with its first save written, to continue from. */
+  async function begun(): Promise<string> {
+    const { save } = await saves.createPlaythrough(record({ chars: ['a', 'b'] }), draft())
+    return save.playthroughId
+  }
+
   it('never writes a record over a playthrough that has already begun', async () => {
     const { save } = await saves.createPlaythrough(record(), draft())
     await expect(
@@ -332,7 +443,8 @@ describe('next semesters', () => {
     const { save } = await saves.createPlaythrough(record({ chars: ['a', 'b'] }), draft())
     const playthroughId = save.playthroughId
     await saves.renamePlaythrough(playthroughId, 'Mine')
-    await saves.writeEnrollment(enrollment({ chars: ['b'] }), playthroughId)
+    const next = enrollment({ chars: ['b'], continued: continuing() })
+    await saves.writeEnrollment(next, playthroughId)
     expect((await saves.listPlaythroughs())[0]).toMatchObject({ enrolling: true, chars: ['b'] })
 
     const begun = await saves.continueSemester(playthroughId, '200', semester(), draft({ semester: '200' }))
@@ -350,7 +462,7 @@ describe('next semesters', () => {
     const { save } = await saves.createPlaythrough(record(), draft())
     const playthroughId = save.playthroughId
     await saves.continueSemester(playthroughId, '200', semester(), draft({ semester: '200' }))
-    await saves.writeEnrollment(enrollment(), playthroughId)
+    await saves.writeEnrollment(enrollment({ continued: continuing() }), playthroughId)
 
     await expect(
       saves.continueSemester(playthroughId, '200', semester({ chars: ['z'] }), draft())
@@ -358,6 +470,74 @@ describe('next semesters', () => {
     expect((await saves.readPlaythroughRecord(playthroughId)).semesters?.['200'].chars).toEqual(['b'])
     await expect(saves.readEnrollment(playthroughId)).rejects.toMatchObject({
       code: 'ENROLLMENT_NOT_FOUND'
+    })
+  })
+
+  it('keeps a later semester’s New Game beside the record, and lists it over older saves', async () => {
+    const playthroughId = await begun()
+
+    const kept = await saves.writeApplication(
+      applicationDraft({ chars: ['b', 'c'], continued: continuation() }),
+      playthroughId
+    )
+
+    expect(kept.playthroughId).toBe(playthroughId)
+    await expect(saves.readApplication(playthroughId)).resolves.toMatchObject({
+      continued: { id: '200', index: 1 }
+    })
+    expect((await saves.listPlaythroughs())[0]).toMatchObject({
+      applying: true,
+      chars: ['b', 'c'],
+      semesterIndex: 1,
+      application: { savedAt: kept.application.savedAt, semesterIndex: 1 }
+    })
+  })
+
+  it('never writes a later semester’s New Game without its playthrough’s record', async () => {
+    await expect(
+      saves.writeApplication(applicationDraft({ continued: continuation() }))
+    ).rejects.toMatchObject({ code: 'APPLICATION_INVALID' })
+    expect(await saves.listPlaythroughs()).toEqual([])
+
+    const { playthroughId } = await saves.writeApplication(applicationDraft())
+    await expect(
+      saves.writeApplication(applicationDraft({ continued: continuation() }), playthroughId)
+    ).rejects.toMatchObject({ code: 'APPLICATION_PLAYTHROUGH_GONE' })
+    await expect(saves.readApplication(playthroughId)).resolves.not.toHaveProperty('continued')
+  })
+
+  it('refuses a later semester’s New Game once the record or a registration holds its semester', async () => {
+    const settled = await begun()
+    await saves.continueSemester(settled, '200', semester(), draft({ semester: '200' }))
+    await expect(
+      saves.writeApplication(applicationDraft({ continued: continuation() }), settled)
+    ).rejects.toMatchObject({ code: 'APPLICATION_SETTLED' })
+
+    const registered = await begun()
+    await saves.writeEnrollment(enrollment({ continued: continuing() }), registered)
+    await expect(
+      saves.writeApplication(applicationDraft({ continued: continuation() }), registered)
+    ).rejects.toMatchObject({ code: 'APPLICATION_SETTLED' })
+    await expect(
+      saves.writeApplication(applicationDraft({ continued: continuation('300') }), registered)
+    ).resolves.toMatchObject({ playthroughId: registered })
+  })
+
+  it('spends the New Game a registration was set up on, and keeps one for another semester', async () => {
+    const playthroughId = await begun()
+    await saves.writeApplication(applicationDraft({ continued: continuation() }), playthroughId)
+
+    await saves.writeEnrollment(enrollment({ continued: continuing('300') }), playthroughId)
+    await expect(saves.readApplication(playthroughId)).resolves.toMatchObject({
+      continued: { id: '200' }
+    })
+
+    await saves.writeEnrollment(enrollment({ continued: continuing() }), playthroughId)
+    await expect(saves.readApplication(playthroughId)).rejects.toMatchObject({
+      code: 'APPLICATION_NOT_FOUND'
+    })
+    await expect(saves.readEnrollment(playthroughId)).resolves.toMatchObject({
+      continued: { id: '200' }
     })
   })
 })

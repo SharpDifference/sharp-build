@@ -1,4 +1,4 @@
-import { appError } from '../errors'
+import { appError } from '@vx/modkit/shared'
 import { toPresetFile, validatePreset, type PresetFile } from './presetRules'
 import {
   CLASS_CATALOG_RANGES,

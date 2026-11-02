@@ -1,7 +1,7 @@
 import { MOD_ID_RULE } from '@vx/modkit/host/shared'
 import { appError } from '../errors'
 import { cancelGroup, runAbortable } from '../jobQueue'
-import type { StructuredRequest } from './cloudLlm'
+import { withoutLocalFields, type StructuredRequest } from './cloudLlm'
 
 /** The mod's id, checked here rather than trusted from the window. */
 function checkedModId(modId: unknown, what: string): string {
@@ -35,7 +35,9 @@ export function completeModRequest(
   const id = checkedModId(modId, 'A model call')
   const queued = group === undefined ? undefined : modCallGroup(id, group)
   console.log(`[llm] a call for ${id}: ${request.schema.name}`)
-  return queued ? runAbortable(queued, (signal) => complete(request, signal)) : complete(request)
+  // A mod's call carries no game-side tags or parts, whatever the window sent.
+  const sent = withoutLocalFields(request)
+  return queued ? runAbortable(queued, (signal) => complete(sent, signal)) : complete(sent)
 }
 
 /** Aborts the mod's calls still out under its `group`; its other groups, and the game's, run on. */

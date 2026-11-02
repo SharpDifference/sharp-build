@@ -2,7 +2,7 @@ import { completeStructured } from '@vx/modkit/renderer'
 import { MEANWHILE_MOD, meanwhileEvents, validateMeanwhile, type MeanwhileScene } from '../../shared/meanwhile'
 import { buildMeanwhilePrompt } from '../prompts/meanwhilePrompt'
 import { useGameStore } from './gameStore'
-import { modIsOn } from './modsStore'
+import { modIsOn } from '@vx/modkit/renderer'
 import { manualSaveOffer, persistMeanwhileScene } from './loop/saves'
 
 export function meanwhileReady(): boolean {

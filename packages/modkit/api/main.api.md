@@ -60,13 +60,89 @@ export interface ComfyLaunchContext {
 }
 
 // @public
+export function extractZip(archivePath: string, destDir: string, limits?: {
+    maxEntries: number;
+    maxTotalBytes: number;
+}): Promise<ZipEntry[]>;
+
+// @public
+export type FinalRequestHook = (request: StructuredRequest, ctx: {
+    tag: unknown;
+}) => FinalRequestPlan | null | Promise<FinalRequestPlan | null>;
+
+// @public
+export interface FinalRequestPlan {
+    finish?: (reply: Record<string, unknown>) => unknown;
+    // (undocumented)
+    request: StructuredRequest;
+    sampling?: Partial<Pick<Settings, SamplingKey>>;
+}
+
+// @public
+export interface InvokeContext {
+    // (undocumented)
+    readonly id: string;
+    // (undocumented)
+    readonly signal: AbortSignal;
+}
+
+// @public
+export type InvokeHandler = (context: InvokeContext, ...args: unknown[]) => unknown;
+
+// @public
 export function modDataPath(modId: string, playthroughId?: string): string;
+
+// @public
+export function modOptionOn(modId: string, optionId: string): boolean;
+
+// @public
+export function readJsonFile<T>(path: string, opts: ReadJsonOptions<T>): Promise<ReadJsonResult<T>>;
+
+// @public
+export interface ReadJsonOptions<T> {
+    malformed: {
+        code: string;
+        message: string;
+    };
+    onMissing: () => T;
+    unreadable: {
+        code: string;
+        message: string;
+    };
+}
+
+// @public
+export type ReadJsonResult<T> = {
+    kind: 'read';
+    parsed: unknown;
+} | {
+    kind: 'missing';
+    value: T;
+};
 
 // @public
 export function registerComfyLaunchEnvironment(modId: string, provider: EnvironmentProvider): () => void;
 
 // @public
+export function registerFinalRequest(modId: string, hook: FinalRequestHook): () => void;
+
+// @public
 export function requiredBackupPart(modId: string, part: BackupPart): void;
+
+// @public
+export function sniffImageFile(path: string): Promise<ReturnType<typeof imageTypeOf>>;
+
+// @public
+export function writeAtomicBytes(path: string, data: Uint8Array, opts: {
+    code: string;
+    message: string;
+}): Promise<void>;
+
+// @public
+export function writeAtomicJson(path: string, data: unknown, opts: {
+    code: string;
+    message: string;
+}): Promise<void>;
 
 // (No @packageDocumentation comment for this package)
 

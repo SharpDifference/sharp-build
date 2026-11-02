@@ -16,7 +16,7 @@ import { gestures, lift, panelUnderTab, press, veilIn } from './motion'
 import '../vu_styles/SceneCreator.css'
 
 /** Each relation as the picker names it. */
-const RELATION_LABELS: Record<SceneRelation, string> = {
+export const RELATION_LABELS: Record<SceneRelation, string> = {
   friends: 'Friends',
   acquaintances: 'Acquaintances',
   strangers: 'Strangers',

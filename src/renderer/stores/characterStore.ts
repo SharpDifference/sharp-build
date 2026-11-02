@@ -76,7 +76,7 @@ import { enqueueLlm } from './llmQueue'
 import { cutRoomPicture } from './roomPicture'
 import { composeCard, composeSpritePack } from './sillyTavernExport'
 import { noNsfwImagesOf, useSettingsStore } from './settingsStore'
-import { textEditsNow } from './promptStudioStore'
+import { promptTextEdits } from '../mods/hooks'
 import { useUiStore } from './uiStore'
 
 /** An error thrown composing a SillyTavern export, passed through as is or wrapped generically. */
@@ -284,6 +284,11 @@ interface CharacterStoreState {
    * returns the records as written.
    */
   saveHeights: (roster: Character[], heights: Record<string, number>) => Promise<Character[]>
+  /**
+   * Writes what a voice lineup answered, skipping unchanged voices, the centre kept as absent;
+   * returns the records as written.
+   */
+  saveVoices: (roster: Character[], pitches: Record<string, number>) => Promise<Character[]>
   /** Runs the whole Generate modal pipeline for a new character. */
   generate: (
     firstName: string,
@@ -512,8 +517,28 @@ export const useCharacterStore = create<CharacterStoreState>((set, get) => ({
       const height = heights[character.charId]
       // An unchanged height is not an edit.
       if (height === undefined || height === character.height) continue
-      const next = { ...character, height }
-      if (await get().save(next)) written.push(next)
+      // Her height alone, laid on her record as it stands at the write's turn.
+      if (!(await patchCharacter(character.charId, (current) => ({ ...current, height }), set, get))) {
+        continue
+      }
+      const saved = get().characters[character.charId]
+      if (saved) written.push(saved)
+    }
+    return written
+  },
+
+  saveVoices: async (roster, pitches) => {
+    const written: Character[] = []
+    for (const character of roster) {
+      const pitch = pitches[character.charId]
+      if (pitch === undefined || pitch === (character.voicePitch ?? 0)) continue
+      const voiced = (current: Character): Character => {
+        const { voicePitch: _old, ...rest } = current
+        return pitch === 0 ? rest : { ...rest, voicePitch: pitch }
+      }
+      if (!(await patchCharacter(character.charId, voiced, set, get))) continue
+      const saved = get().characters[character.charId]
+      if (saved) written.push(saved)
     }
     return written
   },
@@ -1893,8 +1918,8 @@ async function runWritePipeline(
     useGrabBagStore.getState().draw(SEED_WORD_BAG, SEED_WORDS),
     request.namesAreSuggestions,
     request.reference,
-    textEditsNow()?.global,
-    traits
+    traits,
+    promptTextEdits()?.global
   )
   // charId doubles as the cancellation group: `jobs:cancelGroup` aborts this request too.
   const drafted = await enqueueLlm(async () => {

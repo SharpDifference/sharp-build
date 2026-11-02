@@ -1,6 +1,8 @@
+import './fixtures/maestroModelKit'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { SlotIntroResponse, LedgerResponse, Result, StructuredRequest } from '@shared/types'
 import { useGameStore } from '../src/renderer/stores/gameStore'
+import { registerHooks } from '@vx/modkit/renderer'
 import { useModsStore } from '../src/renderer/stores/modsStore'
 import { currentStorySnapshot } from '../src/renderer/stores/storyMemory'
 import { resetLoopState } from '../src/renderer/stores/loop/state'
@@ -9,13 +11,14 @@ import * as introPrompt from '../src/renderer/prompts/slotIntroPrompt'
 import { character, charInfo, restoreApi, stubApi } from './fixtures'
 
 // Stand in only for the saved prompt edits; exercise the real ending and request builders.
-vi.mock('../src/renderer/stores/promptStudioStore', async (original) => ({
-  ...await original<typeof import('../src/renderer/stores/promptStudioStore')>(),
-  textEditsNow: () => ({ global: {
-    'persona.solo': 'Keep the player-authored bookkeeping instructions.',
-    'persona.narration': 'Keep the player-authored opening instructions.'
-  } })
-}))
+registerHooks('prompt-studio', {
+  promptText: {
+    edits: () => ({ global: {
+      'persona.solo': 'Keep the player-authored bookkeeping instructions.',
+      'persona.narration': 'Keep the player-authored opening instructions.'
+    } })
+  }
+})
 
 stubApi({ jobs: { onProgress: () => () => {} } })
 await import('../src/renderer/stores/gameLoop')
@@ -23,7 +26,7 @@ await import('../src/renderer/stores/gameLoop')
 beforeEach(() => {
   useGameStore.getState().reset()
   resetLoopState()
-  useModsStore.setState({ switches: { on: { 'story-memory': true }, options: {} } })
+  useModsStore.setState({ switches: { on: { 'story-memory': true, 'prompt-studio': true }, options: {} } })
   useGameStore.setState({
     playthroughId: '123456789', date: 7, time: 0,
     chars: ['a'], characters: { a: character({ charId: 'a' }) },

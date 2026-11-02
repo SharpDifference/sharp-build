@@ -1,5 +1,4 @@
 import { appError } from '@shared/errors'
-import type { GlobalTextId, TextEdits } from '@shared/presets/types'
 import { loveLifeBlurb } from '@shared/relationship'
 import { SECRET_TIERS, secretText } from '@shared/secrets'
 import {
@@ -10,9 +9,10 @@ import {
   type SecretTier,
   type StructuredRequest
 } from '@shared/types'
-import { newGameText, withAdditions } from './promptBlocks'
 import { keyedArray } from './profilePrompt'
 import { objectSchema } from './schema'
+import type { GlobalTextId, TextEdits } from '@shared/promptText'
+import { newGameText, withAdditions } from './promptBlocks'
 
 /**
  * Builds and validates the one-shot secrets request a semester's Start sends; pure, no IO.
@@ -21,9 +21,9 @@ import { objectSchema } from './schema'
 /** One girl the call writes secrets for. */
 export interface SecretsEntry {
   character: Character
-  /** The tiers she is asked for: all three, or `devoted` alone. */
+  /** The tiers she is asked for, any of the three. */
   tiers: readonly SecretTier[]
-  /** Every secret she already holds, told or untold, which the new one must not repeat. */
+  /** Every secret she already holds, told or untold, which the new ones must not repeat. */
   held: readonly string[]
   /** She has slept with the reader, which is all her love life's virgin line reads. */
   hadSex?: boolean
@@ -32,17 +32,14 @@ export interface SecretsEntry {
 /** One girl's secrets as the model returns them, by tier. */
 type SecretsDraftEntry = { key: string } & Partial<Record<SecretTier, unknown>>
 
-/** The raw reply: the girls asked for three, and the girls asked for one. */
-export interface SecretsReply {
-  characters?: unknown
-  returning?: unknown
-}
+/** The raw reply: one array per set of tiers asked, named as the prompt names it. */
+export type SecretsReply = Record<string, unknown>
 
 function invalid(detail: string): never {
   throw appError('SECRET_GEN_INVALID', "The generated students' secrets were not usable.", detail)
 }
 
-/** One girl's block: who she is, and for a returning girl the secrets she already has. */
+/** One girl's block: who she is, and the secrets she already has. */
 function entryLines(entry: SecretsEntry): string[] {
   const { character } = entry
   const loveLife = loveLifeBlurb(character, { hadSex: entry.hadSex ?? false })
@@ -60,70 +57,75 @@ function entryLines(entry: SecretsEntry): string[] {
   ]
 }
 
-/** Whether the girl is asked for the three tiers rather than `devoted` alone. */
-function wantsAll(entry: SecretsEntry): boolean {
-  return entry.tiers.length === SECRET_TIERS.length
+/** The girls asked for one set of tiers, and how the reply and the prompt name them. */
+interface SecretsGroup {
+  tiers: readonly SecretTier[]
+  /** The reply's property for them. */
+  property: string
+  heading: string
+  entries: SecretsEntry[]
 }
 
-/** Builds the secrets request for every girl `entries` names; `textEdits` are the player's edits to its text. */
+/** The entries split by the tiers each is asked for, lowest tiers' sets first. */
+function groupsOf(entries: readonly SecretsEntry[]): SecretsGroup[] {
+  const groups = new Map<string, SecretsGroup>()
+  for (const entry of entries) {
+    const tiers = SECRET_TIERS.filter((tier) => entry.tiers.includes(tier))
+    if (tiers.length === 0) continue
+    const all = tiers.length === SECRET_TIERS.length
+    const property = all ? 'characters' : tiers.join('_')
+    const group = groups.get(property) ?? {
+      tiers,
+      property,
+      heading: all ? 'STUDENTS' : `STUDENTS ASKED ONLY FOR ${tiers.join(' AND ')}`,
+      entries: []
+    }
+    group.entries.push(entry)
+    groups.set(property, group)
+  }
+  return [...groups.values()]
+}
+
+/** Builds the secrets request for every girl `entries` names, set in `setting`. */
 export function buildSecretsPrompt(
   entries: readonly SecretsEntry[],
+  setting: string,
   textEdits?: TextEdits<GlobalTextId>
 ): StructuredRequest {
   const preamble = [
     'FOR EACH STUDENT',
     newGameText(textEdits, 'newgame.secrets.instructions'),
     newGameText(textEdits, 'newgame.secrets.tiers'),
-    '',
-    'FOR EACH RETURNING STUDENT',
-    'devoted: one new secret on the same terms as the devoted secret above, unlike every secret listed under her.',
+    'Write only the tiers asked of the heading a student is listed under. Where her secrets so far are listed under her, every new one is unlike all of them.',
     '---',
     ''
   ].join('\n')
 
-  const blocks: string[] = []
-  const schemaGroups: Record<string, unknown> = {}
-  // Which array answers for which heading below.
-  const answers: string[] = []
+  const groups = groupsOf(entries)
   const tierFields = (tiers: readonly SecretTier[]): Record<string, unknown> =>
     Object.fromEntries(tiers.map((tier) => [tier, { type: 'string' }]))
-
-  const all = entries.filter(wantsAll)
-  if (all.length > 0) {
-    blocks.push('STUDENTS', ...all.flatMap(entryLines))
-    answers.push('characters holds one entry per student under STUDENTS')
-    schemaGroups.characters = keyedArray(
-      all.map(({ character }) => charKeyOf(character.firstName, character.lastName)),
-      tierFields(SECRET_TIERS)
-    )
-  }
-
-  const returning = entries.filter((entry) => !wantsAll(entry))
-  if (returning.length > 0) {
-    blocks.push('RETURNING STUDENTS', ...returning.flatMap(entryLines))
-    answers.push('returning one per student under RETURNING STUDENTS')
-    schemaGroups.returning = keyedArray(
-      returning.map(({ character }) => charKeyOf(character.firstName, character.lastName)),
-      tierFields(['devoted'])
-    )
-  }
+  const schemaGroups = Object.fromEntries(
+    groups.map((group) => [
+      group.property,
+      keyedArray(
+        group.entries.map(({ character }) => charKeyOf(character.firstName, character.lastName)),
+        tierFields(group.tiers)
+      )
+    ])
+  )
 
   // Below the '---' divider: the students are all that varies, and the console log starts here.
-  const groups = Object.keys(schemaGroups)
+  const answers = groups.map((group) => `${group.property} holds one entry per student under ${group.heading}`)
   const rest = [
     `${answers.join(', and ')}, each key exactly as written before her name, in the order listed.`,
     '',
-    ...blocks
+    ...groups.flatMap((group) => [group.heading, ...group.entries.flatMap(entryLines)])
   ].join('\n')
 
   return {
-    system: withAdditions(
-      newGameText(textEdits, 'newgame.secrets.system'),
-      textEdits,
-      'newgame.secrets.additions'
-    ),
+    system: `${withAdditions(newGameText(textEdits, 'newgame.secrets.system'), textEdits, 'newgame.secrets.additions')}\n\nSETTING\n${setting}`,
     user: `${preamble}\n${rest}`,
-    schema: objectSchema('character_secrets', groups, schemaGroups),
+    schema: objectSchema('character_secrets', Object.keys(schemaGroups), schemaGroups),
     cacheKey: 'venus-university-secret-generation',
     logFrom: preamble.length + 1
   }
@@ -154,11 +156,12 @@ export function validateSecretDraft(
   entries: readonly SecretsEntry[]
 ): Record<string, CharSecret[]> {
   const keyOf = (character: Character): string => charKeyOf(character.firstName, character.lastName)
-  const all = entries.filter(wantsAll)
-  const returning = entries.filter((entry) => !wantsAll(entry))
-  const folded = {
-    ...foldSecrets(reply?.characters, new Set(all.map(({ character }) => keyOf(character)))),
-    ...foldSecrets(reply?.returning, new Set(returning.map(({ character }) => keyOf(character))))
+  const folded: Record<string, SecretsDraftEntry> = {}
+  for (const group of groupsOf(entries)) {
+    Object.assign(
+      folded,
+      foldSecrets(reply?.[group.property], new Set(group.entries.map(({ character }) => keyOf(character))))
+    )
   }
 
   const secrets: Record<string, CharSecret[]> = {}
@@ -166,7 +169,7 @@ export function validateSecretDraft(
     const key = keyOf(entry.character)
     const raw = folded[key]
     const written: CharSecret[] = []
-    for (const tier of entry.tiers) {
+    for (const tier of SECRET_TIERS.filter((t) => entry.tiers.includes(t))) {
       const text = typeof raw?.[tier] === 'string' ? (raw[tier] as string).trim() : ''
       if (text === '') {
         console.warn(`[secrets] ${key} came back without a ${tier} secret; leaving it out.`)

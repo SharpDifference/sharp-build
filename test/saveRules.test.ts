@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import { emptyCatalog, type Application, type ApplicationContinuation } from '@shared/application'
 import {
   assertSafeSaveId,
   atLocation,
@@ -9,19 +10,24 @@ import {
   manualSlotOf,
   mintId,
   prunedSlotIds,
+  readApplicationRecord,
   RECORD_SCHEMA_VERSION,
   SAVE_SCHEMA_VERSION,
   sortSlotIds,
   stampEnrollment,
   stampRecord,
   stampSave,
-  summaryOf
+  summaryOf,
+  withApplication
 } from '@shared/saveRules'
 import {
   AUTOSAVE_ID,
   MANUAL_SAVE_SLOTS,
   MAX_SLOT_SAVES,
+  type AppError,
   type GameSave,
+  type PlaythroughRecord,
+  type PlaythroughSummary,
   type SaveDraft,
   type SceneState
 } from '@shared/types'
@@ -187,5 +193,126 @@ describe('the stamps', () => {
     const enrollment = stampEnrollment({ chars: ['a'] } as never, 1_700_000_000_500)
     expect(enrollment.schemaVersion).toBe(ENROLLMENT_SCHEMA_VERSION)
     expect(enrollment.savedAt).toBe(1_700_000_000_500)
+  })
+})
+
+describe('a later semester’s New Game', () => {
+  /** What the ending of the first semester handed on, with nothing in it but who stays. */
+  const continued = {
+    id: '200',
+    index: 1,
+    continuing: ['b'],
+    graduated: ['a'],
+    alumni: ['a'],
+    priorProfiles: {},
+    jobs: {},
+    haunts: {},
+    majorLoads: {},
+    carry: {},
+    taken: []
+  } as unknown as ApplicationContinuation
+
+  /** That New Game on its Characters screen, written at 2000. */
+  function application(over: Partial<Application> = {}): Application {
+    return {
+      schemaVersion: 1,
+      savedAt: 2_000,
+      screen: 'characters',
+      season: 'fall',
+      chars: ['b', 'c'],
+      plan: [],
+      occasions: {},
+      catalog: emptyCatalog(),
+      girls: {},
+      pairs: {},
+      replies: {},
+      continued,
+      ...over
+    }
+  }
+
+  /** The first semester's saves, the newest written at `savedAt`. */
+  function saves(savedAt: number): PlaythroughSummary {
+    return {
+      playthroughId: '1',
+      label: 'Playthrough 1',
+      position: 1,
+      chars: ['a', 'b'],
+      date: 120,
+      time: 1,
+      savedAt,
+      saveCount: 1,
+      manualCount: 0,
+      hasAutosave: true,
+      unloadable: null
+    }
+  }
+
+  it('is noted beside newer saves, which still stand for the playthrough', () => {
+    expect(withApplication(saves(3_000), application(), null, undefined)).toEqual({
+      ...saves(3_000),
+      application: { savedAt: 2_000, semesterIndex: 1 }
+    })
+  })
+
+  it('stands for the playthrough over older saves and an older registration, a tie included', () => {
+    const enrolling = { ...saves(2_000), enrolling: true as const }
+    const listed = withApplication(enrolling, application({ randomPicks: ['c'] }), null, undefined)
+
+    expect(listed).toMatchObject({
+      applying: true,
+      chars: ['b', 'c'],
+      masked: ['c'],
+      date: 0,
+      time: 0,
+      semesterIndex: 1,
+      savedAt: 2_000,
+      application: { savedAt: 2_000, semesterIndex: 1 }
+    })
+    expect(listed.enrolling).toBeUndefined()
+  })
+
+  it('is passed over once the record or the registration holds its semester, and when it continues nothing', () => {
+    const record = { semesters: { '200': {} } } as unknown as PlaythroughRecord
+    expect(withApplication(saves(1_000), application(), record, undefined)).toEqual(saves(1_000))
+    expect(withApplication(saves(1_000), application(), null, '200')).toEqual(saves(1_000))
+    expect(
+      withApplication(saves(1_000), application({ continued: undefined }), null, undefined)
+    ).toEqual(saves(1_000))
+  })
+
+  it('is refused on read where its continuation is not what a Finalize stands on', () => {
+    /** The refusal reading `body` raises, or null where it reads. */
+    function refusal(body: Application): AppError | null {
+      try {
+        readApplicationRecord(body, 'here')
+        return null
+      } catch (err) {
+        return err as AppError
+      }
+    }
+
+    expect(refusal(application({ pursuits: { a: 'Teaching in Kyoto.' } }))).toBeNull()
+    const faults: [string, unknown][] = [
+      ['continued', 'spring'],
+      ['continued.id', { ...continued, id: '../200' }],
+      ['continued.index', { ...continued, index: 0 }],
+      ['continued.parent', { ...continued, parent: 100 }],
+      ['continued.alumni', { ...continued, alumni: [1] }],
+      ['continued.majorLoads', { ...continued, majorLoads: [] }],
+      ['continued.taken', { ...continued, taken: {} }]
+    ]
+    for (const [field, bad] of faults) {
+      expect(refusal(application({ continued: bad as ApplicationContinuation }))).toMatchObject({
+        code: 'APPLICATION_MALFORMED',
+        detail: `here: ${field}`
+      })
+    }
+    expect(refusal(application({ pursuits: { a: 3 } as never }))).toMatchObject({
+      detail: 'here: pursuits'
+    })
+    expect(refusal(application({ catalog: {} as never }))).toMatchObject({
+      detail: 'here: catalog.pe'
+    })
   })
 })

@@ -1,3 +1,4 @@
+import './fixtures/maestroModelKit'
 import { createElement } from 'react'
 import { PassThrough } from 'node:stream'
 import { renderToPipeableStream } from 'react-dom/server'

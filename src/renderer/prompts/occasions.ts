@@ -2,8 +2,17 @@ import type { ExamPeriod } from '@shared/academics'
 import { FINAL_DATE, slotOf } from '@shared/classes'
 import { jobDefOf, slotFromId } from '@shared/jobs'
 import { locationDefOf } from '@shared/locations'
+import { OCCASION_FIRST_DAY, OCCASION_LAST_DAY } from '@shared/occasionsFile'
 import type { SemesterCalendar } from '@shared/semesters'
-import type { ClassSlot, HauntKind, Occasion, Season, TimeSlot } from '@shared/types'
+import type {
+  ClassSlot,
+  FixedOccasionEdit,
+  FixedOccasionEdits,
+  HauntKind,
+  Occasion,
+  Season,
+  TimeSlot
+} from '@shared/types'
 import { classWeekdayOf, formatGameDate, formatWeekday } from './gameDate'
 
 /**
@@ -493,22 +502,282 @@ const FALL_ACADEMIC: readonly Occasion[] = [
   }
 ]
 
-/** Every occasion that is the same in every semester of a season, in calendar order; never written into the save. */
+/**
+ * Every occasion that is the same in every semester of a season, in calendar order, as the build
+ * ships it; never written into the save, which keeps only a semester's changes to it.
+ */
 const STATIC_BY_SEASON: Record<Season, readonly Occasion[]> = {
   spring: [...SPRING_HOLIDAYS, ...SPRING_ACADEMIC].sort((a, b) => a.startDate - b.startDate),
   fall: [...FALL_HOLIDAYS, ...FALL_ACADEMIC].sort((a, b) => a.startDate - b.startDate)
 }
 
-/** The fixed occasions of a season's semester, in calendar order. */
+/** The fixed occasions of a season's semester as the build ships them, in calendar order. */
 export function staticOccasionsOf(season: Season): readonly Occasion[] {
   return STATIC_BY_SEASON[season]
 }
 
+/**
+ * The fixed occasions a New Game may move or take off the semester: the holidays and the single
+ * days off. The rest are the days the semester is built around, and one a later build adds stays
+ * put until listed here.
+ */
+const MOVABLE_OCCASION_IDS: ReadonlySet<string> = new Set([
+  'valentines',
+  'mardi-gras',
+  'presidents-day',
+  'st-patricks',
+  'lottery-day',
+  'april-fools',
+  'good-friday',
+  'easter',
+  'thorne-day',
+  'earth-day',
+  'selkie-beach-party',
+  'cinco-de-mayo',
+  'mothers-day',
+  'selkie-send-off',
+  'labor-day',
+  'oktoberfest',
+  'halloween',
+  'dia-de-los-muertos',
+  'friday-the-13th',
+  'thanksgiving',
+  'black-friday'
+])
+
+/** The fixed occasion `id` names in a season's table as the build ships it, or undefined. */
+function shippedOccasionOf(season: Season, id: string): Occasion | undefined {
+  return STATIC_BY_SEASON[season].find((occasion) => occasion.id === id)
+}
+
+/** Whether the season's fixed occasion `id` may be moved to another day, or taken off, at all. */
+export function fixedOccasionMovable(season: Season, id: string): boolean {
+  return MOVABLE_OCCASION_IDS.has(id) && shippedOccasionOf(season, id) !== undefined
+}
+
+/** Memo for {@link closureBarredDays}, by season. */
+const barredMemo = new Map<Season, ReadonlySet<number>>()
+
+/**
+ * The days a moved day off may not cover: those an unmoving occasion already closes, both exam
+ * weeks, and the first full teaching week after midterms, when they are handed back.
+ */
+function closureBarredDays(season: Season): ReadonlySet<number> {
+  const memo = barredMemo.get(season)
+  if (memo) return memo
+  const closedByPinned = (date: number): boolean =>
+    STATIC_BY_SEASON[season].some(
+      (occasion) =>
+        occasion.cancelsClasses &&
+        !MOVABLE_OCCASION_IDS.has(occasion.id) &&
+        date >= occasion.startDate &&
+        date <= occasion.endDate
+    )
+  const barred = new Set<number>()
+  const bar = (startDate: number, endDate: number): void => {
+    for (let date = startDate; date <= endDate; date++) barred.add(date)
+  }
+  for (let date = 0; date <= FINAL_DATE; date++) if (closedByPinned(date)) barred.add(date)
+  const midterms = midtermWeekOf(season)
+  bar(midterms.startDate, midterms.endDate)
+  bar(FINALS_WEEK.startDate, FINALS_WEEK.endDate)
+  // Day 0 is a Monday, so a week's Monday is a multiple of seven.
+  let monday = (weekOf(midterms.endDate) + 1) * 7
+  while (monday + 4 <= FINAL_DATE && [0, 1, 2, 3, 4].some((day) => closedByPinned(monday + day))) {
+    monday += 7
+  }
+  bar(monday, monday + 4)
+  barredMemo.set(season, barred)
+  return barred
+}
+
+/**
+ * Whether the season's fixed occasion `id` may start on `startDate`, its length kept: always on
+ * its own day; elsewhere only a movable one whose run stays inside the days an occasion may
+ * cover, and a day off only onto weekdays {@link closureBarredDays} leaves it.
+ */
+export function fixedOccasionMoves(season: Season, id: string, startDate: number): boolean {
+  const occasion = shippedOccasionOf(season, id)
+  if (!occasion) return false
+  if (startDate === occasion.startDate) return true
+  if (!MOVABLE_OCCASION_IDS.has(id) || !Number.isInteger(startDate)) return false
+  const endDate = startDate + occasion.endDate - occasion.startDate
+  if (startDate < OCCASION_FIRST_DAY || endDate > OCCASION_LAST_DAY) return false
+  if (!occasion.cancelsClasses) return true
+  const barred = closureBarredDays(season)
+  for (let date = startDate; date <= endDate; date++) {
+    if (classWeekdayOf(date) === null || barred.has(date)) return false
+  }
+  return true
+}
+
+/** Whether `value` is a plain object an edit can be read out of. */
+function isEditObject(value: unknown): value is FixedOccasionEdit {
+  return typeof value === 'object' && value !== null && !Array.isArray(value)
+}
+
+/** An edit's words for one field, trimmed, where they are text and not blank; else undefined. */
+function editedWords(value: unknown): string | undefined {
+  return typeof value === 'string' && value.trim() !== '' ? value.trim() : undefined
+}
+
+/** Whether `edit` takes the season's fixed occasion `id` off the semester, which only a movable one may be. */
+function removedBy(season: Season, id: string, edit: unknown): boolean {
+  return isEditObject(edit) && edit.removed === true && fixedOccasionMovable(season, id)
+}
+
+/**
+ * The season's fixed occasion `occasion` with `edit` laid over the build's: words that are text
+ * and not blank, and a start {@link fixedOccasionMoves} allows, the length kept. An edit that is
+ * no edit reads as nothing.
+ */
+function editedOccasion(season: Season, occasion: Occasion, edit: unknown): Occasion {
+  if (!isEditObject(edit)) return occasion
+  const { startDate } = edit
+  const moved = typeof startDate === 'number' && fixedOccasionMoves(season, occasion.id, startDate)
+  return {
+    ...occasion,
+    title: editedWords(edit.title) ?? occasion.title,
+    description: editedWords(edit.description) ?? occasion.description,
+    ...(moved ? { startDate, endDate: startDate + occasion.endDate - occasion.startDate } : {})
+  }
+}
+
+/**
+ * The season's fixed occasions with `edits` laid over the build's, in calendar order, less those
+ * the edits take off the semester. An edit of an occasion the build does not ship reads as
+ * nothing.
+ */
+export function fixedOccasionsOf(
+  season: Season,
+  edits: Readonly<FixedOccasionEdits>
+): readonly Occasion[] {
+  const table = STATIC_BY_SEASON[season]
+  if (Object.keys(edits).length === 0) return table
+  return table
+    .filter((occasion) => !removedBy(season, occasion.id, edits[occasion.id]))
+    .map((occasion) => editedOccasion(season, occasion, edits[occasion.id]))
+    .sort((a, b) => a.startDate - b.startDate)
+}
+
+/**
+ * The fixed occasions `edits` takes off the semester, each as it would stand were it put back, in
+ * calendar order.
+ */
+export function removedFixedOccasionsOf(
+  season: Season,
+  edits: Readonly<FixedOccasionEdits>
+): readonly Occasion[] {
+  return STATIC_BY_SEASON[season]
+    .filter((occasion) => removedBy(season, occasion.id, edits[occasion.id]))
+    .map((occasion) => editedOccasion(season, occasion, edits[occasion.id]))
+    .sort((a, b) => a.startDate - b.startDate)
+}
+
+/**
+ * `edits` as a semester keeps them, by id in order: words trimmed, and only what differs from the
+ * build and could be read back — no blank or unchanged field, no start the rules refuse, no
+ * removal of an occasion that may not be taken off, no occasion the build does not ship, no entry
+ * left empty.
+ */
+export function keptFixedEdits(
+  season: Season,
+  edits: Readonly<FixedOccasionEdits>
+): FixedOccasionEdits {
+  const kept: FixedOccasionEdits = {}
+  for (const id of Object.keys(edits).sort()) {
+    const occasion = shippedOccasionOf(season, id)
+    const edit: unknown = edits[id]
+    if (!occasion || !isEditObject(edit)) continue
+    const entry: FixedOccasionEdit = {}
+    const title = editedWords(edit.title)
+    if (title !== undefined && title !== occasion.title) entry.title = title
+    const description = editedWords(edit.description)
+    if (description !== undefined && description !== occasion.description) {
+      entry.description = description
+    }
+    const { startDate } = edit
+    if (
+      typeof startDate === 'number' &&
+      startDate !== occasion.startDate &&
+      fixedOccasionMoves(season, id, startDate)
+    ) {
+      entry.startDate = startDate
+    }
+    if (removedBy(season, id, edit)) entry.removed = true
+    if (Object.keys(entry).length > 0) kept[id] = entry
+  }
+  return kept
+}
+
+/** Whether the season's fixed occasion `id` stands changed under `edits`. */
+export function fixedOccasionEdited(
+  season: Season,
+  edits: Readonly<FixedOccasionEdits> | undefined,
+  id: string
+): boolean {
+  const edit = edits?.[id]
+  return edit !== undefined && keptFixedEdits(season, { [id]: edit })[id] !== undefined
+}
+
+/**
+ * `edits` with `patch` laid over occasion `id`'s, as the Occasions screen keeps them while they
+ * are typed: a field equal to the build's dropped, a blank one kept so its box stays empty, an
+ * entry left with nothing dropped. The same object where nothing changed; undefined once empty.
+ */
+export function withFixedEdit(
+  season: Season,
+  edits: FixedOccasionEdits | undefined,
+  id: string,
+  patch: FixedOccasionEdit
+): FixedOccasionEdits | undefined {
+  const occasion = shippedOccasionOf(season, id)
+  if (!occasion) return edits
+  const before = edits?.[id] ?? {}
+  const next: FixedOccasionEdit = { ...before, ...patch }
+  if (next.title === undefined || next.title === occasion.title) delete next.title
+  if (next.description === undefined || next.description === occasion.description) {
+    delete next.description
+  }
+  if (next.startDate === undefined || next.startDate === occasion.startDate) delete next.startDate
+  if (next.removed !== true) delete next.removed
+  const same =
+    before.title === next.title &&
+    before.description === next.description &&
+    before.startDate === next.startDate &&
+    before.removed === next.removed
+  if (same) return edits
+  const rest: FixedOccasionEdits = {}
+  for (const key of Object.keys({ ...edits, [id]: next }).sort()) {
+    const entry = key === id ? next : edits?.[key]
+    if (entry !== undefined && Object.keys(entry).length > 0) rest[key] = entry
+  }
+  return Object.keys(rest).length > 0 ? rest : undefined
+}
+
+/** Memo for {@link fixedOf}, keyed on the calendar's identity. */
+const fixedMemo = new WeakMap<SemesterCalendar, readonly Occasion[]>()
+
+/** A semester's fixed occasions as it changed them, in calendar order. */
+function fixedOf(calendar: SemesterCalendar): readonly Occasion[] {
+  let fixed = fixedMemo.get(calendar)
+  if (!fixed) {
+    fixed = fixedOccasionsOf(calendar.season, calendar.fixedEdits)
+    fixedMemo.set(calendar, fixed)
+  }
+  return fixed
+}
+
+/** The semester's fixed occasion `id` as it changed it; it must be one the season ships. */
+export function fixedOccasionIn(calendar: SemesterCalendar, id: string): Occasion {
+  const occasion = fixedOf(calendar).find((entry) => entry.id === id)
+  if (!occasion) throw new Error(`missing ${calendar.season} occasion: ${id}`)
+  return occasion
+}
+
 /** A semester's fixed occasions plus whatever it generated, in calendar order. */
 function allOccasions(calendar: SemesterCalendar): Occasion[] {
-  return [...STATIC_BY_SEASON[calendar.season], ...calendar.generated].sort(
-    (a, b) => a.startDate - b.startDate
-  )
+  return [...fixedOf(calendar), ...calendar.generated].sort((a, b) => a.startDate - b.startDate)
 }
 
 /** Everything happening on `date`, in either half of it — what the Calendar draws. */

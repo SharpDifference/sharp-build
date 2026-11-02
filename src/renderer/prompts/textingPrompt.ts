@@ -63,7 +63,7 @@ import { modRequest, dmHistoryNotes, promptFields, promptLines, promptRequired }
 import { relationshipLines } from './relationship'
 import { herColdLine } from './colds'
 import { weatherLines } from './weather'
-import type { GlobalTextId, TextEdits } from '@shared/presets/types'
+import type { GlobalTextId, TextEdits } from '@shared/promptText'
 import { textingPersonaFor } from './promptBlocks'
 
 /**
@@ -85,7 +85,7 @@ function historyLimitOf(requested: number | undefined): number {
 
 /** The prompt-facing slice of state a texting turn needs. */
 export interface TextingPromptState {
-  /** Prompt Studio's edits to the global text blocks; absent with the mod off. */
+  /** The edits a mod hands the global text blocks; absent when none is supplied. */
   globalTextEdits?: TextEdits<GlobalTextId>
   storyMemory?: StorySnapshot
   /** Supplied only while the standalone Breakthrough mod is enabled. */

@@ -1,6 +1,6 @@
 import { storySnapshot, type StorySnapshot, type StoryRecall } from '../../shared/storyMemory'
 import { useGameStore } from './gameStore'
-import { modIsOn } from './modsStore'
+import { modIsOn } from '@vx/modkit/renderer'
 
 /** Optional input shared by pure scene, text and opening builders. */
 export function currentStorySnapshot(): StorySnapshot | undefined {

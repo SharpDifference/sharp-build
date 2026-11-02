@@ -1,3 +1,4 @@
+import './fixtures/maestroModelKit'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { normalizeEcho, renameEcho } from '@shared/echo'
 import type { GameSave, Result, SaveDraft } from '@shared/types'

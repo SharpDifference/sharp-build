@@ -11,10 +11,12 @@ import {
   statsForStartingTiers,
   pointsForStartingTier,
   tierName,
+  displayedTierOf,
   type PlayerStats,
   type StatKey,
   type StartingStatTier
 } from '@shared/playerStats'
+import type { ApplicationReader } from '@shared/application'
 import { DEFAULT_PLAYER_FIRST_NAME, DEFAULT_PLAYER_LAST_NAME } from '@shared/types'
 import { useModalShell } from '../components/useModalShell'
 import { TextField } from '../components/TextField'
@@ -66,6 +68,13 @@ export interface PlayerNameModalProps {
   challenge?: StartingChallenge
   /** Drawn by the screen that opened this — a portal inherits neither palette nor state rules. */
   theme: 'day' | 'night'
+  /** The answers given before, which a New Game reopened on its wait asks again from. */
+  initial?: ApplicationReader
+}
+
+/** A name as its box shows it: the default is the placeholder, so it opens blank. */
+function shownName(name: string | undefined, fallback: string): string {
+  return name === undefined || name === fallback ? '' : name
 }
 
 /**
@@ -78,16 +87,25 @@ export function PlayerNameModal({
   onSubmit,
   askDetails = true,
   challenge,
-  theme
+  theme,
+  initial
 }: PlayerNameModalProps): JSX.Element | null {
-  const [firstName, setFirstName] = useState('')
-  const [lastName, setLastName] = useState('')
-  const [bio, setBio] = useState('')
-  const [tiers, setTiers] = useState<Record<StatKey, StartingStatTier>>({
-    brain: STARTING_TIER,
-    body: STARTING_TIER,
-    heart: STARTING_TIER
-  })
+  const [firstName, setFirstName] = useState(() =>
+    shownName(initial?.firstName, DEFAULT_PLAYER_FIRST_NAME)
+  )
+  const [lastName, setLastName] = useState(() =>
+    shownName(initial?.lastName, DEFAULT_PLAYER_LAST_NAME)
+  )
+  const [bio, setBio] = useState(initial?.bio ?? '')
+  const [tiers, setTiers] = useState<Record<StatKey, StartingStatTier>>(() =>
+    initial
+      ? {
+          brain: displayedTierOf(initial.stats.brain),
+          body: displayedTierOf(initial.stats.body),
+          heart: displayedTierOf(initial.stats.heart)
+        }
+      : { brain: STARTING_TIER, body: STARTING_TIER, heart: STARTING_TIER }
+  )
   const minimum: StartingStatTier = challenge ? MIN_CHALLENGE_TIER : MIN_TIER
 
   function step(key: StatKey, delta: 1 | -1): void {

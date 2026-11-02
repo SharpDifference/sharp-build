@@ -1,14 +1,14 @@
 import { describe, expect, it } from 'vitest'
-import { CLASS_SLOTS, MAX_CLASS_SIZE, MIN_PLAYER_COURSES, scheduleComplaint } from '@shared/classes'
+import { CLASS_SLOTS, MAX_CLASS_SIZE, scheduleComplaint } from '@shared/classes'
 import { shuffle } from '@shared/shuffle'
-import { charKeyOf, type Character, type ClassEntry } from '@shared/types'
+import { charKeyOf, type Character } from '@shared/types'
 import {
   decorateClasses,
   type ClassDraft,
   type ClassGenDraft
 } from '../src/renderer/prompts/classPrompt'
 import { buildSchedules, SWIM_CLASS } from '../src/renderer/stores/classScheduler'
-import { character } from './fixtures'
+import { character, legalPick } from './fixtures'
 
 /**
  * The scheduler runs once per playthrough and freezes into the save forever, so a double-booked
@@ -41,25 +41,6 @@ const NAMES: Array<[string, string]> = [
 ]
 
 const MAJORS = ['Biology', 'History']
-
-/**
- * A legal player pick built off the catalog itself: one PE class, then one non-PE course per
- * distinct slot until the minimum is held. Feeding it to `scheduleComplaint` checks that the
- * catalog admits a real schedule, rather than assuming it does.
- */
-function legalPick(classes: Record<string, ClassEntry>): Record<number, string> {
-  const entries = Object.values(classes)
-  const pe = entries.find((entry) => entry.category === 'pe')!
-  const pick: Record<number, string> = { [pe.slot]: pe.code }
-  let courses = 0
-  for (const entry of entries) {
-    if (courses >= MIN_PLAYER_COURSES) break
-    if (entry.category === 'pe' || entry.slot in pick) continue
-    pick[entry.slot] = entry.code
-    courses++
-  }
-  return pick
-}
 
 function roster(): Character[] {
   return NAMES.map(([firstName, lastName], i) =>
@@ -141,10 +122,15 @@ describe('buildSchedules invariants', () => {
     }
   })
 
-  it('never leaks the scheduling-only owner field into a saved class', () => {
-    const { classes } = schedule(draft(cast), cast)
+  it('never leaks the scheduling-only owner and written fields into a saved class', () => {
+    const generated = draft(cast)
+    generated.classes = generated.classes.map((entry, i) =>
+      i % 2 === 0 ? { ...entry, written: true } : entry
+    )
+    const { classes } = schedule(generated, cast)
     for (const entry of Object.values(classes)) {
       expect(entry).not.toHaveProperty('owner')
+      expect(entry).not.toHaveProperty('written')
       expect(entry.slot).toBeTypeOf('number')
     }
   })
@@ -239,6 +225,18 @@ describe('the pick order', () => {
     }
   })
 
+  it('seats girls in the player’s own classes first, still pairing them up', () => {
+    for (let run = 0; run < RUNS; run++) {
+      const { cast, generated } = twoPeClasses(3)
+      generated.classes[1].written = true
+      const { perChar } = schedule(generated, cast)
+      const inWritten = Object.values(perChar).filter(({ schedule }) =>
+        Object.values(schedule).includes('PE 102')
+      )
+      expect(inWritten).toHaveLength(2)
+    }
+  })
+
   it('takes a PE class and her major ahead of any filler', () => {
     const cast = [character({ charId: 'c0', firstName: 'Sarah', lastName: 'Rose' })]
     const key = charKeyOf('Sarah', 'Rose')
@@ -276,9 +274,9 @@ describe('the pick order', () => {
   })
 })
 
-// The one class the scheduler authors itself: the most-attended PE class becomes
-// the swim class, so the swimsuit wardrobes always have a class to be seen in.
-describe('the guaranteed swim class', () => {
+// The one class the scheduler authors itself: the most-attended PE class the player did not
+// write becomes the swim class, so the swimsuit wardrobes have a class to be seen in.
+describe('the swim class', () => {
   const cast = roster()
 
   function attendanceOf(perChar: Record<string, { schedule: Record<number, string> }>) {
@@ -302,6 +300,29 @@ describe('the guaranteed swim class', () => {
         if (entry.category !== 'pe') continue
         expect(counts.get(SWIM_CLASS.code)!).toBeGreaterThanOrEqual(counts.get(entry.code) ?? 0)
       }
+    }
+  })
+
+  it('replaces a PE class the player left blank over a fuller one the player wrote', () => {
+    for (let run = 0; run < RUNS; run++) {
+      const { cast, generated } = twoPeClasses(3)
+      generated.classes[1].written = true
+      const { classes, perChar } = schedule(generated, cast)
+      expect(classes['PE 102']).toMatchObject({ name: 'Course PE 102' })
+      expect(classes[SWIM_CLASS.code]).toMatchObject({ name: SWIM_CLASS.name, category: 'pe' })
+      expect(attendanceOf(perChar).get(SWIM_CLASS.code)).toBe(1)
+    }
+  })
+
+  it('makes no swim class where every PE class attended is the player’s', () => {
+    for (let run = 0; run < RUNS; run++) {
+      const generated = draft(cast)
+      generated.classes = generated.classes.map((entry) =>
+        entry.category === 'pe' ? { ...entry, written: true } : entry
+      )
+      const { classes } = schedule(generated, cast)
+      expect(Object.values(classes).some((entry) => entry.name === SWIM_CLASS.name)).toBe(false)
+      expect(Object.values(classes).some((entry) => entry.category === 'pe')).toBe(true)
     }
   })
 

@@ -1,7 +1,6 @@
 import type { ReckoningState } from './reckoning'
 import type { EchoState } from './echo'
 import type { StoryMemory, StoryRecallRequest } from './storyMemory'
-import type { GamePart, PresetRequest, SceneSpotTag } from './presets/types'
 import type { BreakthroughState } from './breakthrough'
 import type { MeanwhileStore } from './meanwhile'
 /** Shared on-disk schema and IPC result types. */
@@ -19,6 +18,7 @@ import type { NpcFriendship, NpcRelationshipMap, NpcSlotOverlay } from './npcRel
 import type { PromptKind } from './promptKinds'
 import type { RumorPassOutcome } from './rumors'
 import type { DormId } from './dorms'
+import type { SceneRelation } from './sceneCreator'
 import type { AudioGroup } from './audio'
 import type { GameReplays } from './replays'
 import type { ComfyGpu } from './setupManifest'
@@ -27,6 +27,7 @@ import type { Weather } from './weather'
 import type { ReaderTallies } from './tallies'
 import type { PromptEdit } from './imagePrompt'
 import type { SceneEventId } from './sceneEvents'
+import type { PromptPart, SceneSpotTag } from './promptText'
 
 /** Discriminated result envelope returned by every IPC handler. */
 export type Result<T> = { ok: true; data: T } | { ok: false; error: AppError }
@@ -59,12 +60,6 @@ export const MAX_LOG_RECORD_CHARS = 32 * 1024
 export interface StructuredRequest {
   /** Local-only recall snapshot; stripped before the provider request. */
   storyMemory?: StoryRecallRequest
-  /** Local-only: the game's coarse prompt parts a scene builder joined into `system` and `user`; stripped before the provider request. */
-  parts?: GamePart[]
-  /** Local-only: which scene call a builder made; `streamScene` turns it into `preset`, and it is stripped before the provider request. */
-  sceneSpot?: SceneSpotTag
-  /** Local-only: what main applies the active Prompt Studio preset with; stripped before the provider request. */
-  preset?: PresetRequest
   system: string
   user: string
   /** JSON Schema the reply is constrained to. */
@@ -89,6 +84,12 @@ export interface StructuredRequest {
    * before. Absent logs the whole message.
    */
   logFrom?: number
+  /** Local-only: the parts a scene builder emitted, each found verbatim in `system` or `user`. */
+  parts?: PromptPart[]
+  /** Local-only: which scene call a builder made and who is in it. */
+  sceneSpot?: SceneSpotTag
+  /** Local-only: each mod's tag for its main-process request hook, by mod id. */
+  modTags?: Record<string, unknown>
 }
 
 /** One inline image on a {@link StructuredRequest} — never written to disk. */
@@ -918,6 +919,9 @@ export interface CharState {
  */
 export type CharInfo = CharState & CharProfile
 
+/** Where one roster girl stands with the reader as a first semester's first save opens. */
+export type CharStart = Pick<CharState, 'memories' | 'flags' | 'nameKnown' | 'datingSince' | 'brokeUpOn'>
+
 /** One status update on the social feed; its likes are rolled once and stored. */
 export interface SocialPost {
   /**
@@ -1151,6 +1155,21 @@ export interface Occasion {
 }
 
 /**
+ * The player's changes to one fixed occasion, each field kept only while it differs from the
+ * build: its words, the day a movable one starts on, its length and half its own, and whether a
+ * movable one is taken off the semester, its other changes kept for when it is put back.
+ */
+export interface FixedOccasionEdit {
+  title?: string
+  description?: string
+  startDate?: number
+  removed?: true
+}
+
+/** A semester's changes to its fixed occasions, by fixed id; an occasion with no entry is the build's. */
+export type FixedOccasionEdits = Record<string, FixedOccasionEdit>
+
+/**
  * A character withdrawn from an event she cannot make, persisted inside
  * {@link SceneState.opening}.
  */
@@ -1279,8 +1298,6 @@ export interface SceneState {
    * the last is {@link summary}. Absent when none has landed.
    */
   summaries?: SceneSummaryMark[]
-  /** Prompt Studio: each reply that committed variables, with where its lines start and the variables before it. Absent when none has. */
-  presetVarMarks?: import('./presets/varOps').PresetVarsMark[]
   /** Background base name, without the `_day`/`_night` suffix. */
   bg: string | null
   /** charIds occupying the three portrait slots, left to right; null = empty. */
@@ -1740,8 +1757,6 @@ export interface GameSave extends NativeGameSave {
   exNpcWatch?: MeanwhileStore
   /** Character Dynamics: fixed setup choices retained by every save. */
   exCharacterDynamics?: import('./characterDynamics').CharacterDynamics
-  /** Prompt Studio's tracked variables, name to value; absent when there are none. */
-  presetVars?: Record<string, string>
 }
 
 /** One employer the reader has left: the raises he had taken, and how it ended. */
@@ -1885,10 +1900,25 @@ export interface PlaythroughSummary {
    */
   enrolling?: true
   /**
+   * The newest thing in the folder is a New Game still being set up: it reopens New Game rather
+   * than a save.
+   */
+  applying?: true
+  /**
+   * The random picks New Game left unrevealed that the row masks: every one on an application or
+   * a registration, and on a save each the reader has not yet met; absent where there are none.
+   */
+  masked?: string[]
+  /**
    * A next semester waiting at the registrar beside the saves, whether or not it is the
    * newest thing in the folder; absent when none waits.
    */
   registration?: { savedAt: number; semesterIndex: number }
+  /**
+   * A later semester's New Game waiting beside the saves, whether or not it is the newest thing
+   * in the folder; absent when none waits.
+   */
+  application?: { savedAt: number; semesterIndex: number }
   /**
    * Why nothing in the folder can be read — a refused record, or no readable save — or null
    * when the newest readable save stands for it.
@@ -1951,6 +1981,10 @@ export interface PlaythroughRecord extends ModPlaythroughFields {
   classes: Record<string, ClassEntry>
   /** The occasions this playthrough invented, oldest first — the generated half only. */
   occasions: Occasion[]
+  /** The first semester's changes to its fixed occasions; absent where it made none. */
+  fixedEdits?: FixedOccasionEdits
+  /** The random picks the first semester's New Game left masked, by charId; absent where none. */
+  masked?: string[]
   /**
    * The shift slots each all-hours employer is not offering this playthrough, keyed by job id
    * — two apiece, rolled at New Game.
@@ -1987,6 +2021,10 @@ export interface SemesterRecord {
   alumni: string[]
   classes: Record<string, ClassEntry>
   occasions: Occasion[]
+  /** Its changes to its fixed occasions; absent where it made none. */
+  fixedEdits?: FixedOccasionEdits
+  /** The random picks its New Game+ left masked, by charId; absent where none. */
+  masked?: string[]
   jobClosures: Record<string, ShiftSlot[]>
   weather: Weather[]
   /** The roster's and the graduates' settled halves, keyed by charId. */
@@ -2085,6 +2123,14 @@ export interface CharSchedule {
   schedule: Record<number, string>
 }
 
+/** The catalog as the timetable scheduler leaves it, and every character it seated. */
+export interface ScheduleResult {
+  /** Classes with at least one student, keyed by code. */
+  classes: Record<string, ClassEntry>
+  /** Keyed by charId. */
+  perChar: Record<string, CharSchedule>
+}
+
 /** What one character's job assignment resolves to, before any slot is picked. */
 export interface JobAssignment {
   jobId: string
@@ -2161,8 +2207,19 @@ export type EnrollmentDraft = QuickstartBundle & ModEnrollmentFields & {
   stats: PlayerStats
   /** The reader's own words about himself, as New Game took them down. */
   bio?: string
-  /** The output tokens New Game's own generation calls cost, carried onto the save at Finalize. */
+  /** The output tokens New Game's own generation calls cost, carried onto the save at Enroll. */
   tokensGenerated?: number
+  /**
+   * Keyed by charId: each girl the reader knows before the semester opens, as the Profiles screen
+   * set her; a girl with no entry is a stranger.
+   */
+  starts?: Record<string, CharStart>
+  /** Keyed by `pairKeyOf`: two roster girls as the Profiles screen set them; the rest are rolled. */
+  pairs?: Record<string, SceneRelation>
+  /** The semester's changes to its fixed occasions, as the Occasions screen kept them; absent where none. */
+  fixedEdits?: FixedOccasionEdits
+  /** The random picks New Game left masked, by charId; absent where none. */
+  masked?: string[]
   /** The semester Continue is starting, where this is not the playthrough's first. */
   continued?: ContinuedSemester
   /**
@@ -2173,7 +2230,7 @@ export type EnrollmentDraft = QuickstartBundle & ModEnrollmentFields & {
 }
 
 /**
- * Everything a next semester's Finalize needs beyond the semester itself, so a registration
+ * Everything a next semester's Enroll needs beyond the semester itself, so a registration
  * reopens from the file and the characters alone.
  */
 export interface ContinuedSemester {
@@ -2196,9 +2253,30 @@ export interface ContinuedSemester {
   carry: SemesterCarry
 }
 
+/** The next semester as the ending leaves it, before anybody new is picked. */
+export interface SemesterHandoff {
+  /** The next semester's index. */
+  index: number
+  /** Who stays on the roster, in roster order. */
+  continuing: string[]
+  /** Who graduated at this ending, in roster order. */
+  graduated: string[]
+  /** Every graduate by the next semester, oldest first. */
+  alumni: string[]
+  /** The continuing girls' and the graduates' settled halves, each year and intake moved on. */
+  priorProfiles: Record<string, CharProfile>
+  /** Each continuing girl's employer and how many shifts she works, kept for the next term. */
+  jobs: Record<string, JobAssignment>
+  /** Each continuing girl's habits, read off her week to be dealt again around her new timetable. */
+  haunts: Record<string, HiddenScheduleAssignment>
+  /** Each continuing girl's count of classes in her major on her last timetable, by charId. */
+  majorLoads: Record<string, number>
+  carry: SemesterCarry
+}
+
 /**
  * On-disk enrollment — `/data/saves/{playthroughId}/enrollment.json`: the semester waiting on
- * its timetable, replaced by the playthrough record at Finalize, or folded into it as a next
+ * its timetable, replaced by the playthrough record at Enroll, or folded into it as a next
  * semester.
  */
 export interface Enrollment extends EnrollmentDraft {
@@ -2351,6 +2429,12 @@ export interface Settings {
    * absent meaning it does.
    */
   warnEndingEdit?: boolean
+  /**
+   * Whether a fresh New Game opens on the New Game setup welcome. Its box turns it off, and
+   * nothing in the app turns it back on: only a hand edit does. Optional on disk, absent meaning
+   * it does.
+   */
+  newGameWelcome?: boolean
   /**
    * The version the update check pretends this build is. **Not a player setting** — hand-edited
    * like {@link streamResponses}, for exercising an update against a build already on itch.io.
@@ -2561,8 +2645,8 @@ export interface SceneResponse {
   summary?: string
   /** "The scene is resolved." What it *meant* is the ledger call's job. */
   end_scene?: boolean | null
-  /** Set by main when a Prompt Studio preset was applied: the save's variables after this reply. Never on the wire. */
-  presetVars?: Record<string, string>
+  /** Set by main: what a main-process request hook handed back with the reply, by mod id. Never on the wire. */
+  modReply?: Record<string, unknown>
 }
 
 /**
@@ -2612,6 +2696,11 @@ export interface LedgerResponse {
    * message the player reads, and the pool that class's exam questions are drawn from.
    */
   classFactoid?: string
+  /**
+   * The scene's recap, asked only of a scene ended by hand whose running summary falls short of
+   * it. Filed as the scene's summary and never banked.
+   */
+  summary?: string
 }
 
 /**

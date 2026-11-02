@@ -1,3 +1,4 @@
+import './fixtures/maestroModelKit'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import { slotOf } from '@shared/classes'
@@ -655,7 +656,7 @@ describe('askOccasionFor and pickOccasionAsker', () => {
 
   it('names what is on when the reader has the slot to himself', () => {
     seedLover()
-    useGameStore.setState({ calendar: calendarOf('spring', [gala]) })
+    useGameStore.setState({ calendar: calendarOf('spring', [gala], {}) })
 
     expect(askOccasionFor(7, 0, view())?.id).toBe('gala')
   })
@@ -664,21 +665,21 @@ describe('askOccasionFor and pickOccasionAsker', () => {
   // not asked about again on any of its other slots.
   it('says nothing about an occasion he has already turned down', () => {
     seedLover()
-    useGameStore.setState({ calendar: calendarOf('spring', [gala]), occasionsDeclined: ['gala'] })
+    useGameStore.setState({ calendar: calendarOf('spring', [gala], {}), occasionsDeclined: ['gala'] })
 
     expect(askOccasionFor(7, 0, view())).toBeNull()
   })
 
   it('says nothing on a slot he has already agreed to spend elsewhere', () => {
     seedPlan()
-    useGameStore.setState({ calendar: calendarOf('spring', [gala]) })
+    useGameStore.setState({ calendar: calendarOf('spring', [gala], {}) })
 
     expect(askOccasionFor(7, 0, view())).toBeNull()
   })
 
   it('picks the one contact free to ask him along', () => {
     seedLover()
-    useGameStore.setState({ calendar: calendarOf('spring', [gala]) })
+    useGameStore.setState({ calendar: calendarOf('spring', [gala], {}) })
 
     expect(pickOccasionAsker(7, 0, view(), null)).toBe('sarah_rose')
   })

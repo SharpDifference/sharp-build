@@ -1,12 +1,12 @@
 import { readFile, stat } from 'fs/promises'
 import { basename } from 'path'
-import { appError, messageOf } from '@shared/errors'
+import { writeAtomicBytes } from '@vx/modkit/main'
+import { appError, messageOf } from '@vx/modkit/shared'
 import {
   assertStudioBackupSize,
   assertStudioBackupText,
   type StudioBackupFile
-} from '@shared/presets/studioBackup'
-import { writeAtomicBytes } from './jsonFile'
+} from '../../shared/presets/studioBackup'
 
 /** Prompt Studio's section backups as files the player keeps: written where the save dialog points, read from where the open dialog does. */
 

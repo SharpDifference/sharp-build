@@ -43,6 +43,8 @@ export type { ImagePromptDraft, ImagePromptKind, ImagePromptParts } from '@share
 export type { PromptEdit } from '@shared/imagePrompt'
 export { globalSlotOf } from '@shared/jobs'
 export { messageOf } from '@shared/errors'
+export { assertSafeId, validateRecord } from '@shared/jsonValidate'
+export type { ValidateRecordOptions } from '@shared/jsonValidate'
 
 export { SAFE_CHAR_ID, assertSafeCharId } from '@shared/characterRules'
 export { SAFE_NUMERIC_ID, assertSafePlaythroughId } from '@shared/saveRules'
@@ -64,3 +66,24 @@ export { readerize } from '@shared/readerVoice'
 export { DEFAULT_PLAYER_STATS } from '@shared/playerStats'
 export type { CharFlags, CustomOutfitSlot, Season } from '@shared/types'
 export type { NpcRelationshipMap } from '@shared/npcRelationships'
+export type {
+  ClassCatalogEdits,
+  ClassCatalogKey,
+  GlobalTextId,
+  PromptPart,
+  PromptPartId,
+  SceneSpot,
+  SceneSpotTag,
+  SceneTextId,
+  TextBlockId,
+  TextEdits,
+  TextEditSet
+} from '@shared/promptText'
+export {
+  blockText,
+  CLASS_CATALOG_RANGES,
+  DEFAULT_CLASS_CATALOG,
+  GLOBAL_TEXT_IDS,
+  PROMPT_PARTS,
+  SCENE_TEXT_IDS
+} from '@shared/promptText'

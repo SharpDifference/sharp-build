@@ -43,7 +43,7 @@ import {
 import { poseKeysOf } from '../stores/assetStore'
 import { objectSchema } from './schema'
 import { seedWordBlock } from './seedWords'
-import type { GlobalTextId, TextEdits } from '@shared/presets/types'
+import type { GlobalTextId, TextEdits } from '@shared/promptText'
 import { designerPersonaFor } from './promptBlocks'
 
 /** Builds and parses the character-generation request; pure, no IO. */
@@ -154,8 +154,8 @@ export function buildCharacterPrompt(
   seedWord: string,
   namesAreSuggestions = false,
   reference?: ReferenceImage,
-  textEdits?: TextEdits<GlobalTextId>,
-  traits: readonly CharacterTraitDefinition[] = generatedCharacterTraits()
+  traits: readonly CharacterTraitDefinition[] = generatedCharacterTraits(),
+  textEdits?: TextEdits<GlobalTextId>
 ): StructuredRequest {
   const brief = userPrompt.trim() || 'A college girl.'
   // Sorted, so the prefix stays identical for prompt caching.

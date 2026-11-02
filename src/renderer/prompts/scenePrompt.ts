@@ -1,4 +1,5 @@
 import type { CharacterDynamics } from '@shared/characterDynamics'
+import type { PromptPart, PromptPartId, SceneSpot, SceneSpotTag, TextEditSet } from '@shared/promptText'
 import { modRequest, promptLines } from '../mods/hooks'
 import { SUBJECT_TAGS } from '@shared/characterRules'
 import { slotFullLabel, yearLabel } from '@shared/classes'
@@ -112,7 +113,6 @@ import {
   type SchedulePromptInput
 } from './schedulePrompt'
 import { objectSchema } from './schema'
-import type { GamePart, GameMarker, GlobalTextId, SceneSpot, SceneSpotTag, SceneTextId, TextEdits } from '@shared/presets/types'
 import { scenePersonaFor, sceneText, soloInstructionLines, soloPersonaFor } from './promptBlocks'
 import { weatherLines } from './weather'
 
@@ -372,8 +372,8 @@ export interface PromptState {
   lessNsfwText: boolean
   /** The player's own cast-scene persona; absent is the shipped one. */
   scenePersona?: string
-  /** Prompt Studio's edits to the fixed text blocks: the active preset's scene ones and the global ones; absent with the mod off. */
-  textEdits?: { scene?: TextEdits<SceneTextId>; global?: TextEdits<GlobalTextId> }
+  /** The edits a mod hands the text blocks: the scene ones and the global ones; absent when none is supplied. */
+  textEdits?: TextEditSet
   /** How many memories per character the cast block carries, by cast size. */
   memoryBudgets: Required<MemoryBudgets>
   /** How many of her told secrets each entry carries; absent is the default. */
@@ -1154,7 +1154,11 @@ function sceneSchema(
  * The system parts, shared by the three prose builders. They carry what never varies within a
  * playthrough: the persona, the JSON rules and the world.
  */
-function systemParts(cast: readonly Character[], state: PromptState, setting: string): GamePart[] {
+function systemParts(
+  cast: readonly Character[],
+  state: PromptState,
+  setting: string
+): PromptPart[] {
   return [
     {
       id: 'persona',
@@ -1177,17 +1181,22 @@ function systemParts(cast: readonly Character[], state: PromptState, setting: st
   ]
 }
 
-/** One game part from the lines it was built from, without the blank lines that only separate it from the next; none when empty. */
-function partOf(id: GameMarker, lines: readonly string[]): GamePart[] {
+/** The system message a request sends: its parts joined by blank lines. */
+function systemOf(parts: readonly PromptPart[]): string {
+  return parts.map((part) => part.text).join('\n\n')
+}
+
+/** One user part from the lines it was built from, without the blank lines that only separate it from the next; none when empty. */
+function partOf(id: PromptPartId, lines: readonly string[]): PromptPart[] {
   let end = lines.length
   while (end > 0 && lines[end - 1] === '') end--
   return end === 0 ? [] : [{ id, role: 'user', text: lines.slice(0, end).join('\n') }]
 }
 
-/** The user message and its parts from the blocks in order; the message is the blocks' lines joined, the parts their text. */
-function userOf(blocks: ReadonlyArray<readonly [GameMarker, readonly string[]]>): {
+/** The user message and its parts from the blocks in order: the message is the blocks' lines joined, the parts their text. */
+function userOf(blocks: ReadonlyArray<readonly [PromptPartId, readonly string[]]>): {
   user: string
-  parts: GamePart[]
+  parts: PromptPart[]
 } {
   return {
     user: blocks.flatMap(([, lines]) => lines).join('\n'),
@@ -1611,7 +1620,7 @@ function castScenePrompt(
   scan: string,
   /** Everything below the context blocks: `STORY`/`SCENE SO FAR`, `YOUR TURN`, the action. */
   tail: SceneTail,
-  /** Which of the three cast-scene calls this is, for the Prompt Studio preset. */
+  /** Which of the three cast-scene calls this is. */
   spot: Exclude<SceneSpot, 'solo'>,
   hasSummary: boolean,
   hasEndScene: boolean,
@@ -1650,7 +1659,7 @@ function castScenePrompt(
 
   return {
     ...modRequest('scene', { cast, state, query: scan }, {
-      system: system.map((part) => part.text).join('\n\n'),
+      system: systemOf(system),
       user,
       parts: [...system, ...parts],
       schema: sceneSchema(state.backgrounds, cast, state, hasSummary, hasEndScene),
@@ -1660,7 +1669,7 @@ function castScenePrompt(
   }
 }
 
-/** The scene call a builder made and the given names of who is in it, for the Prompt Studio preset. */
+/** The scene call a builder made and the given names of who is in it. */
 function sceneSpotOf(spot: SceneSpot, cast: readonly Character[]): SceneSpotTag {
   return { spot, cast: cast.map((character) => character.firstName) }
 }
@@ -1839,7 +1848,7 @@ export function buildSoloPrompt(
       ]
     ]
   ])
-  const system: GamePart[] = [
+  const system: PromptPart[] = [
     { id: 'persona', role: 'system', text: soloPersonaFor(state.lessNsfwText, state.textEdits?.global) },
     { id: 'jsonRules', role: 'system', text: soloJsonRules(state.backgrounds).join('\n') },
     { id: 'setting', role: 'system', text: ['SETTING', setting].join('\n') }
@@ -1847,7 +1856,7 @@ export function buildSoloPrompt(
 
   return {
     ...modRequest('scene', { cast: [], state, query: action }, {
-      system: system.map((part) => part.text).join('\n\n'),
+      system: systemOf(system),
       user,
       parts: [...system, ...parts],
       // No `end_scene`: the scene is over by construction.
@@ -1970,7 +1979,9 @@ function ledgerSchema(
   rosterKeys: readonly string[],
   // Null when the scene was not a class; `factoid` is for a lecture class only.
   classScene: { factoid: boolean } | null,
-  castStats: boolean
+  castStats: boolean,
+  // The scene's recap, asked for last of all when nothing else will write one.
+  recap: boolean
 ): { name: string; schema: Record<string, unknown> } {
   const charKey = { type: 'string', enum: [...charKeys] }
   // Dropped whole when no plans are asked for: an uninstructed field invites filling.
@@ -2000,15 +2011,23 @@ function ledgerSchema(
     : {}
   const classRequired = Object.keys(classProps)
 
+  const recapProps: Record<string, unknown> = recap ? { summary: { type: 'string' } } : {}
+  const recapRequired = Object.keys(recapProps)
+
   const memoryType = { type: 'string', enum: [...MEMORY_TYPES] }
 
   if (charKeys.length === 0) {
-    return objectSchema('ledger', ['stats', 'spent', 'expelled', ...classRequired], {
-      stats,
-      spent,
-      expelled,
-      ...classProps
-    })
+    return objectSchema(
+      'ledger',
+      ['stats', 'spent', 'expelled', ...classRequired, ...recapRequired],
+      {
+        stats,
+        spent,
+        expelled,
+        ...classProps,
+        ...recapProps
+      }
+    )
   }
 
   return objectSchema(
@@ -2021,7 +2040,8 @@ function ledgerSchema(
       'expelled',
       ...planRequired,
       ...(castStats ? ['stats'] : []),
-      ...classRequired
+      ...classRequired,
+      ...recapRequired
     ],
     {
       spent,
@@ -2066,7 +2086,8 @@ function ledgerSchema(
             chars: { type: 'array', items: charKey }
           }
         }
-      }
+      },
+      ...recapProps
     }
   )
 }
@@ -2103,7 +2124,9 @@ export function buildLedgerPrompt(
   scene: readonly SceneLine[],
   state: PromptState,
   reader: string,
-  schedule: SchedulePromptInput
+  schedule: SchedulePromptInput,
+  // A scene ended by hand whose running summary falls short of it has nobody else to recap it.
+  recap = false
 ): StructuredRequest {
   const charKeys = cast.map((c) => charKeyOf(c.firstName, c.lastName))
   const rosterKeys = scheduleCharKeys(schedule.characters)
@@ -2203,6 +2226,14 @@ export function buildLedgerPrompt(
             : []),
           ''
         ]
+      : []),
+    ...(recap
+      ? [
+          'SUMMARY',
+          'Then, for the "summary" field: condense the whole scene into a recap, third-person, referring to the MC as "the reader".',
+          'This version gets saved for posterity, so keep the important stuff the reader should remember. Leave out the mundane crap.',
+          ''
+        ]
       : [])
   ].join('\n')
 
@@ -2226,7 +2257,7 @@ export function buildLedgerPrompt(
   return modRequest('ledger', { state, charKeys }, {
     system: soloPersonaFor(state.lessNsfwText, state.textEdits?.global),
     user: `${preamble}\n${rest}`,
-    schema: ledgerSchema(charKeys, rosterKeys, classScene, castStats),
+    schema: ledgerSchema(charKeys, rosterKeys, classScene, castStats, recap),
     // Constant, not the playthrough: nothing above the seam varies by save.
     cacheKey: 'ledger',
     logFrom: preamble.length + 1,

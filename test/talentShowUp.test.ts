@@ -1,3 +1,4 @@
+import './fixtures/maestroModelKit'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { buyTalent, normalizeTalents, setTalentRules, TALENTS } from '@shared/campusTalents'
 import { showUpHeart, type ShowUpContext } from '@shared/talentShowUp'

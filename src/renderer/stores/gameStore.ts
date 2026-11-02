@@ -10,10 +10,9 @@ import { normalizeWhisper, type VenusWhisper } from '@shared/venusWhisper'
 import { normalizeBreakthrough, reconcileBreakthrough, type BreakthroughState } from '@shared/breakthrough'
 import { normalizeMeanwhile, type MeanwhileStore } from '@shared/meanwhile'
 import { readCharacterDynamics, type CharacterDynamics } from '@shared/characterDynamics'
-import { presetVarsWithin, readPresetVarMarks, readPresetVars, type PresetVarsMark } from '@shared/presets/varOps'
 import { savedModScene } from '@shared/modScene'
-import { statFloor } from '../mods/hooks'
-import { bindGameBoundary, bindSaveFieldStore, readModSlices, writeModSlices } from '@vx/modkit/host/renderer'
+import { sceneCut, statFloor } from '../mods/hooks'
+import { bindGameBoundary, bindSaveFieldStore, bindSceneFieldStore, readModSlices, writeModSlices } from '@vx/modkit/host/renderer'
 import { useModSessionStore } from './modSessionStore'
 import { create } from 'zustand'
 import { blocksNewRomance } from '@shared/romanceRequirements'
@@ -38,6 +37,7 @@ import {
   calendarOf,
   charStateOf,
   graduatesOf,
+  semesterCalendarOf,
   semesterOf,
   type SemesterCalendar
 } from '@shared/semesters'
@@ -329,8 +329,7 @@ const SAVE_KEYS: Record<keyof NativeGameSave, true> & Partial<Record<keyof GameS
   ex: true,
   // Fields the in-repo mods write only when set: owned here, so a cleared one is not brought back as read.
   exCharacterDynamics: true,
-  exStartingChallenge: true,
-  presetVars: true
+  exStartingChallenge: true
 }
 
 /**
@@ -379,9 +378,7 @@ const SCENE_KEYS: Record<keyof SceneState, true> = {
   resumeOnLine: true,
   endPending: true,
   ledger: true,
-  opening: true,
-  // Prompt Studio's own field on the scene, written and read back by its code here.
-  presetVarMarks: true
+  opening: true
 }
 
 /** What the Mods screen says of a mod whose data in the loaded save could not be read. */
@@ -496,10 +493,6 @@ interface GameStoreState {
    */
   bio: string
   exCharacterDynamics?: CharacterDynamics
-  /** Prompt Studio's tracked variables, by name. Persisted, and empty where there are none. */
-  presetVars: Record<string, string>
-  /** Each reply of this scene that committed variables, so a cut can take them back. Persisted with the scene. */
-  scenePresetVars: PresetVarsMark[]
   /**
    * Lifetime counts about the reader — money earned, kisses, nights, shifts worked, moved only
    * in boundary passes so a replay credits each of them once — and the output tokens the cloud
@@ -680,6 +673,11 @@ interface GameStoreState {
    * writes the ending onto a save itself.
    */
   sceneEnding: boolean
+  /**
+   * The ending under way is one the player asked for from End scene, which nothing interrupts.
+   * Transient, and lowered with {@link sceneEnding}.
+   */
+  sceneEndedByHand: boolean
   /**
    * True from a scene resolving until its ending is written: the drain parks on it rather than
    * crossing an ending still being paid for. **Transient**, never captured.
@@ -956,6 +954,12 @@ interface GameStoreState {
    */
   truncateUnread: () => void
   /**
+   * Cuts the scene to what the player has read: every line a rewind stepped back over read again,
+   * the unread lines cut as {@link truncateUnread} cuts them, and a last action no read line
+   * answers cut from the transcript and the log, its gift handed back.
+   */
+  cutToRead: () => void
+  /**
    * Steps playback back to the previous line that says something, across the reader's own lines
    * as far as the scene's first reply — in a replay as far as its first line — putting the lines
    * after it back on the queue and the stage back as it stood there. Returns false, changing
@@ -984,8 +988,11 @@ interface GameStoreState {
    * and clears it. Nothing when no rewrite was made.
    */
   dropEndingEdits: () => void
-  /** Leaving the ending also clears {@link endingEditAt}, keeping every mark it held back. */
-  setSceneEnding: (ending: boolean) => void
+  /**
+   * Leaving the ending also clears {@link endingEditAt}, keeping every mark it held back; `byHand`
+   * marks an ending End scene began.
+   */
+  setSceneEnding: (ending: boolean, byHand?: boolean) => void
   setEndingInFlight: (inFlight: boolean) => void
   setStatusShown: (shown: boolean) => void
   /** Files the running summary under the slot that just finished. */
@@ -1023,10 +1030,6 @@ interface GameStoreState {
   applyStatDeltas: (deltas: PlayerStats) => void
   /** Replaces what the reader says about himself: New Game's answer, and every later rewrite. */
   setBio: (bio: string) => void
-  /** Replaces Prompt Studio's tracked variables with the ones a scene reply left. */
-  setPresetVars: (vars: Record<string, string>) => void
-  /** Commits a scene reply's variables, noting the transcript length its lines start at and the variables before it. */
-  commitPresetVars: (vars: Record<string, string>, at: number) => void
   /** Counts a finished scene's kisses and nights into the lifetime tallies. */
   recordActs: (acts: readonly IntimateAct[]) => void
   /** Adds one cloud reply's output tokens to the lifetime tallies. */
@@ -1362,7 +1365,7 @@ function patchConversation(
 }
 
 /** The calendar a store holds before any semester is loaded: a spring with nothing invented. */
-const NO_CALENDAR: SemesterCalendar = calendarOf('spring', [])
+const NO_CALENDAR: SemesterCalendar = calendarOf('spring', [], {})
 
 /** The entry for a charId the save has none for; the writers must survive one. */
 export function blankCharInfo(): CharInfo {
@@ -1415,15 +1418,6 @@ export function stageContextOf(state: Omit<StageContext, 'noNsfwImages'>): Stage
     outfitReady: state.outfitReady,
     noNsfwImages: noNsfwImagesOf(useSettingsStore.getState())
   }
-}
-
-/** The variables and marks a cut of the transcript to `length` leaves; nothing when it takes no reply's. */
-function presetVarsCut(
-  marks: readonly PresetVarsMark[],
-  length: number
-): Partial<Pick<GameStoreState, 'presetVars' | 'scenePresetVars'>> {
-  const cut = presetVarsWithin(marks, length)
-  return cut ? { presetVars: cut.vars, scenePresetVars: cut.marks } : {}
 }
 
 /**
@@ -1645,8 +1639,6 @@ const initialState = {
   money: STARTING_MONEY,
   bio: '',
   exCharacterDynamics: undefined as CharacterDynamics | undefined,
-  presetVars: {} as Record<string, string>,
-  scenePresetVars: [] as PresetVarsMark[],
   tallies: emptyTallies(),
   charInfo: {} as Record<string, CharInfo>,
   classes: {} as Record<string, ClassEntry>,
@@ -1728,6 +1720,7 @@ const initialState = {
   sceneSummary: null as string | null,
   sceneSummaries: [] as SceneSummaryMark[],
   sceneEnding: false,
+  sceneEndedByHand: false,
   endingInFlight: false,
   statusShown: false,
   lineRewound: 0,
@@ -1799,7 +1792,6 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
       // and a save written before a tally loads that tally at zero.
       bio: save.bio ?? '',
       exCharacterDynamics: readCharacterDynamics(save),
-      presetVars: readPresetVars(save.presetVars),
       tallies: { ...emptyTallies(), ...save.tallies },
       // The two halves rejoined; a save entry with no profile falls back to the blank one,
       // which is what a charId the record never knew about would land on.
@@ -1822,7 +1814,7 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
       replays: save.replays ?? {},
       bunnyboard: save.bunnyboard,
       events: save.events,
-      calendar: calendarOf(semester.season, semester.occasions),
+      calendar: semesterCalendarOf(semester),
       occasionsDeclined: save.occasionsDeclined ?? [],
       job: save.job,
       jobsClosed: save.jobsClosed,
@@ -2034,9 +2026,6 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
       ...(state.sceneSummaries.length > 0
         ? { summaries: state.sceneSummaries.map((mark) => ({ ...mark })) }
         : {}),
-      ...(state.scenePresetVars.length > 0
-        ? { presetVarMarks: state.scenePresetVars.map((mark) => ({ at: mark.at, before: { ...mark.before } })) }
-        : {}),
       bg: state.bg,
       slots: [...state.slots],
       emotions: { ...state.emotions },
@@ -2075,7 +2064,6 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
       sceneSummaries:
         scene?.summaries?.map((mark) => ({ ...mark })) ??
         (scene?.summary ? [{ at: 0, summary: scene.summary }] : []),
-      scenePresetVars: readPresetVarMarks(scene?.presetVarMarks),
       bg: scene?.bg ?? null,
       slots: scene ? [...scene.slots] : Array<string | null>(PORTRAIT_SLOTS).fill(null),
       emotions: scene ? { ...scene.emotions } : {},
@@ -2167,7 +2155,7 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
     }),
 
   clearSceneTranscript: () =>
-    set({ currentSceneTranscript: [], sceneSummary: null, sceneSummaries: [], scenePresetVars: [] }),
+    set({ currentSceneTranscript: [], sceneSummary: null, sceneSummaries: [] }),
 
   setSceneSummary: (summary, at) =>
     set((state) => ({
@@ -2175,11 +2163,13 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
       sceneSummaries: [...state.sceneSummaries, { at, summary }]
     })),
 
-  truncateUnread: () =>
+  truncateUnread: () => {
+    let length = 0
     set((state) => {
       const kept = cutLengthOf(state)
       const reconciled = reconcileTalentBreakthrough(state, state.currentSceneTranscript.slice(0, kept),
         !state.replaying && !state.createdScene ? state.currentSceneTranscript : undefined)
+      length = kept
       return {
         ...reconciled,
         ...rewindReckoning({...state,...reconciled},kept),
@@ -2187,10 +2177,35 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
         pendingLines: [],
         reread: 0,
         ...summariesWithin(state.sceneSummaries, kept),
-        ...giftsWithin(state, kept),
-        ...presetVarsCut(state.scenePresetVars, kept)
+        ...giftsWithin(state, kept)
       }
-    }),
+    })
+    sceneCut({ length })
+  },
+
+  cutToRead: () => {
+    while (get().forwardLine()) continue
+    get().truncateUnread()
+    let length: number | null = null
+    set((state) => {
+      const transcript = state.currentSceneTranscript
+      const last = transcript.length - 1
+      if (last < 0 || transcript[last].speaker !== READER_SPEAKER) return {}
+      const kept = transcript.slice(0, last)
+      length = last
+      const reconciled = reconcileTalentBreakthrough(state, kept,
+        !state.replaying && !state.createdScene ? transcript : undefined)
+      return {
+        ...reconciled,
+        ...rewindReckoning({ ...state, ...reconciled }, last),
+        currentSceneTranscript: kept,
+        sceneLog: state.sceneLog.at(-1)?.speaker === READER_SPEAKER ? state.sceneLog.slice(0, -1) : state.sceneLog,
+        ...summariesWithin(state.sceneSummaries, last),
+        ...giftsWithin(state, last)
+      }
+    })
+    if (length !== null) sceneCut({ length })
+  },
 
   rewindLine: () => {
     const state = get()
@@ -2280,8 +2295,12 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
         : { endingEditAt: null, ...summariesWithin(state.sceneSummaries, state.endingEditAt) }
     ),
 
-  setSceneEnding: (ending) =>
-    set(ending ? { sceneEnding: true } : { sceneEnding: false, endingEditAt: null }),
+  setSceneEnding: (ending, byHand = false) =>
+    set(
+      ending
+        ? { sceneEnding: true, sceneEndedByHand: byHand }
+        : { sceneEnding: false, sceneEndedByHand: false, endingEditAt: null }
+    ),
 
   setEndingInFlight: (inFlight) => set({ endingInFlight: inFlight }),
 
@@ -2425,14 +2444,6 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
     set((state) => ({ stats: applyStatDeltas(state.stats, deltas, statFloor) })),
 
   setBio: (bio) => set({ bio }),
-
-  setPresetVars: (vars) => set({ presetVars: readPresetVars(vars) }),
-
-  commitPresetVars: (vars, at) =>
-    set((state) => ({
-      presetVars: readPresetVars(vars),
-      scenePresetVars: [...state.scenePresetVars, { at, before: { ...state.presetVars } }]
-    })),
 
   recordActs: (acts) => set((state) => ({ tallies: talliesAfterActs(state.tallies, acts) })),
 
@@ -3355,7 +3366,6 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
       money: state.money,
       bio: state.bio,
       ...(state.exCharacterDynamics ? { exCharacterDynamics: structuredClone(state.exCharacterDynamics) } : {}),
-      ...(Object.keys(state.presetVars).length > 0 ? { presetVars: { ...state.presetVars } } : {}),
       tallies: state.tallies,
       date: state.date,
       time: state.time,
@@ -3454,6 +3464,17 @@ bindSaveFieldStore({
   subscribe: (onChange) =>
     useGameStore.subscribe((state, before) => {
       if (state.modValues !== before.modValues) onChange()
+    })
+})
+
+// The mods' scene fields read and write their values here.
+bindSceneFieldStore({
+  values: () => useGameStore.getState().sceneMods as Readonly<Record<string, unknown>>,
+  set: (modId, value) =>
+    useGameStore.setState((state) => ({ sceneMods: { ...state.sceneMods, [modId]: value } })),
+  subscribe: (onChange) =>
+    useGameStore.subscribe((state, before) => {
+      if (state.sceneMods !== before.sceneMods) onChange()
     })
 })
 

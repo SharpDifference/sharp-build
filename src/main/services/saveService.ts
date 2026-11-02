@@ -1,4 +1,5 @@
 import { access, mkdir, readdir, rm, stat } from 'fs/promises'
+import type { Application, ApplicationDraft, KeptApplication } from '@shared/application'
 import { appError, messageOf, toAppError } from '@shared/errors'
 import {
   idsMissingFrom,
@@ -9,6 +10,13 @@ import {
 } from '@shared/replays'
 import { hasSemester, recordReplayIds, SEMESTER_NOT_FOUND, semesterOf } from '@shared/semesters'
 import {
+  APPLICATION_INVALID,
+  APPLICATION_NOT_FOUND,
+  APPLICATION_PLAYTHROUGH_GONE,
+  APPLICATION_READ,
+  APPLICATION_SETTLED,
+  APPLICATION_UNREADABLE,
+  applicationSummary,
   assertManualSlot,
   assertSafePlaythroughId,
   assertSafeSaveId,
@@ -20,9 +28,11 @@ import {
   groupSaveIds,
   listedSaveIds,
   manualSaveId,
+  maskedField,
   mintId,
   playthroughLabel,
   prunedSlotIds,
+  readApplicationRecord,
   RECORD_NOT_FOUND,
   RECORD_READ,
   RECORD_UNREADABLE,
@@ -31,10 +41,12 @@ import {
   SAVE_NOT_FOUND,
   SAVE_READ,
   SAVE_UNREADABLE,
+  stampApplication,
   stampEnrollment,
   stampRecord,
   stampSave,
   summaryOf,
+  withApplication,
   withPlaythroughName,
   withRegistration,
   type SaveIdGroups
@@ -58,6 +70,7 @@ import {
   type SemesterRecord
 } from '@shared/types'
 import {
+  getApplicationPath,
   getEnrollmentPath,
   getPlaythroughPath,
   getPlaythroughRecordPath,
@@ -67,7 +80,10 @@ import {
 import { readValidatedJson, writeAtomicJson } from './jsonFile'
 import { deleteReplay, listReplayIds, writeReplay } from './replayService'
 
-/** Saves, playthrough records and enrollments on disk; what each one must be is a shared rule. */
+/**
+ * Saves, playthrough records, enrollments and applications on disk; what each one must be is a
+ * shared rule.
+ */
 
 export { assertSafePlaythroughId }
 
@@ -108,6 +124,20 @@ export async function readEnrollment(playthroughId: string): Promise<Enrollment>
     unreadable: ENROLLMENT_UNREADABLE,
     onMissing: () => {
       throw appError(ENROLLMENT_NOT_FOUND.code, ENROLLMENT_NOT_FOUND.message, path)
+    }
+  })
+}
+
+/** Reads and validates one folder's application; a missing field is refused by name. */
+export async function readApplication(playthroughId: string): Promise<Application> {
+  assertSafePlaythroughId(playthroughId)
+  const path = getApplicationPath(playthroughId)
+
+  return readValidatedJson<Application>(path, {
+    ...APPLICATION_READ,
+    unreadable: APPLICATION_UNREADABLE,
+    onMissing: () => {
+      throw appError(APPLICATION_NOT_FOUND.code, APPLICATION_NOT_FOUND.message, path)
     }
   })
 }
@@ -291,7 +321,8 @@ export async function playthroughIds(): Promise<string[]> {
 /**
  * Lists every playthrough in creation order, each summarised from its newest readable save of
  * any kind; one with no readable save is listed with the reason instead, and one with no save
- * at all from the enrollment waiting in it. A folder holding neither is skipped.
+ * at all from the enrollment or the application waiting in it. A folder holding none of them
+ * is skipped.
  */
 export async function listPlaythroughs(): Promise<PlaythroughSummary[]> {
   const ids = await playthroughIds()
@@ -317,29 +348,42 @@ export async function listPlaythroughs(): Promise<PlaythroughSummary[]> {
       try {
         const enrollment = await readEnrollment(playthroughId)
         const semesterIndex = enrollment.continued?.index ?? 0
-        summaries.push({
-          ...base,
-          enrolling: true,
-          chars: enrollment.chars,
-          date: FIRST_SLOT.date,
-          time: FIRST_SLOT.time,
-          ...(semesterIndex > 0
-            ? { semesterIndex, registration: { savedAt: enrollment.savedAt, semesterIndex } }
-            : {}),
-          savedAt: enrollment.savedAt,
-          unloadable: null
-        })
+        // A later semester's New Game written after the registration stands over it.
+        summaries.push(
+          withApplication(
+            {
+              ...base,
+              enrolling: true,
+              chars: enrollment.chars,
+              ...maskedField(enrollment.chars, enrollment.masked),
+              date: FIRST_SLOT.date,
+              time: FIRST_SLOT.time,
+              ...(semesterIndex > 0
+                ? { semesterIndex, registration: { savedAt: enrollment.savedAt, semesterIndex } }
+                : {}),
+              savedAt: enrollment.savedAt,
+              unloadable: null
+            },
+            await applicationBeside(playthroughId),
+            await readPlaythroughRecord(playthroughId).catch(() => null),
+            enrollment.continued?.id
+          )
+        )
       } catch (err) {
-        if ((err as AppError).code === 'ENROLLMENT_NOT_FOUND') continue
-        summaries.push({
-          ...base,
-          enrolling: true,
-          chars: [],
-          date: FIRST_SLOT.date,
-          time: FIRST_SLOT.time,
-          savedAt: await mtimeOf(getPlaythroughPath(playthroughId)),
-          unloadable: (err as AppError).message
-        })
+        if ((err as AppError).code !== ENROLLMENT_NOT_FOUND.code) {
+          summaries.push({
+            ...base,
+            enrolling: true,
+            chars: [],
+            date: FIRST_SLOT.date,
+            time: FIRST_SLOT.time,
+            savedAt: await mtimeOf(getPlaythroughPath(playthroughId)),
+            unloadable: (err as AppError).message
+          })
+        } else {
+          const applying = await applicationSummaryOf(playthroughId, base)
+          if (applying) summaries.push(applying)
+        }
       }
       continue
     }
@@ -364,6 +408,8 @@ export async function listPlaythroughs(): Promise<PlaythroughSummary[]> {
         summary = {
           ...named,
           chars: semester?.chars ?? [],
+          // A pick New Game left masked stays masked until she has been met.
+          ...(semester ? maskedField(semester.chars, semester.masked, save.charInfo) : {}),
           date: save.date,
           time: save.time,
           ...(semester && semester.index > 0 ? { semesterIndex: semester.index } : {}),
@@ -376,22 +422,52 @@ export async function listPlaythroughs(): Promise<PlaythroughSummary[]> {
         if (!reason) reason = (err as AppError).message
       }
     }
+    const registration = await registrationBeside(playthroughId)
     summaries.push(
-      withRegistration(
-        summary ?? {
-          ...named,
-          chars: [],
-          date: 0,
-          time: 0,
-          savedAt: await mtimeOf(getPlaythroughPath(playthroughId)),
-          unloadable: reason
-        },
-        await registrationBeside(playthroughId)
+      withApplication(
+        withRegistration(
+          summary ?? {
+            ...named,
+            chars: [],
+            date: 0,
+            time: 0,
+            savedAt: await mtimeOf(getPlaythroughPath(playthroughId)),
+            unloadable: reason
+          },
+          registration
+        ),
+        await applicationBeside(playthroughId),
+        record,
+        registration?.continued?.id
       )
     )
   }
 
   return summaries
+}
+
+/**
+ * A folder with no save and no enrollment, listed as the New Game still being set up in it, or
+ * with the reason its application cannot be read; null where the folder holds none.
+ */
+async function applicationSummaryOf(
+  playthroughId: string,
+  base: Omit<PlaythroughSummary, 'chars' | 'date' | 'time' | 'savedAt' | 'unloadable'>
+): Promise<PlaythroughSummary | null> {
+  try {
+    return applicationSummary(base, await readApplication(playthroughId))
+  } catch (err) {
+    if ((err as AppError).code === APPLICATION_NOT_FOUND.code) return null
+    return {
+      ...base,
+      applying: true,
+      chars: [],
+      date: FIRST_SLOT.date,
+      time: FIRST_SLOT.time,
+      savedAt: await mtimeOf(getPlaythroughPath(playthroughId)),
+      unloadable: (err as AppError).message
+    }
+  }
 }
 
 /**
@@ -410,6 +486,21 @@ async function registrationBeside(playthroughId: string): Promise<Enrollment | n
   }
 }
 
+/**
+ * The New Game in progress beside a playthrough's saves, or null; one that cannot be read is
+ * passed over, the saves beside it still standing for the playthrough.
+ */
+async function applicationBeside(playthroughId: string): Promise<Application | null> {
+  try {
+    return await readApplication(playthroughId)
+  } catch (err) {
+    const error = toAppError(err)
+    if (error.code !== APPLICATION_NOT_FOUND.code) {
+      console.warn(`[saves] ${playthroughId}'s new game in progress is unreadable:`, error.message)
+    }
+    return null
+  }
+}
 
 /**
  * Lists one playthrough's saves — the autosave, the boundary saves newest-first, then the
@@ -511,14 +602,117 @@ async function mintPlaythroughFolder(): Promise<string> {
 }
 
 /**
+ * Keeps a New Game still being set up: a first semester's first write mints the playthrough's
+ * folder, the ones after it replace the application in the folder `playthroughId` names. A folder
+ * that is gone is never made again, and one that already holds a record or an enrollment is
+ * refused. A later semester's is only ever written beside its playthrough's record.
+ */
+export async function writeApplication(
+  draft: ApplicationDraft,
+  playthroughId?: string
+): Promise<KeptApplication> {
+  const application = readApplicationRecord(
+    stampApplication(draft, Date.now()),
+    'application',
+    APPLICATION_INVALID
+  )
+  const unwritable = {
+    code: 'APPLICATION_UNWRITABLE',
+    message: 'Could not save the new game in progress.'
+  }
+  const continued = application.continued
+
+  if (playthroughId === undefined) {
+    if (continued) {
+      throw appError(
+        APPLICATION_INVALID.code,
+        APPLICATION_INVALID.message,
+        "application: a later semester's application needs its playthrough"
+      )
+    }
+    const minted = await mintPlaythroughFolder()
+    await writeAtomicJson(getApplicationPath(minted), application, unwritable)
+    return { playthroughId: minted, application }
+  }
+
+  assertSafePlaythroughId(playthroughId)
+  return inTurn(playthroughId, async () => {
+    if (continued) {
+      await assertContinuable(playthroughId, continued.id)
+    } else {
+      if (!(await playthroughExists(playthroughId))) {
+        throw appError(
+          APPLICATION_PLAYTHROUGH_GONE.code,
+          APPLICATION_PLAYTHROUGH_GONE.message,
+          playthroughId
+        )
+      }
+      if (
+        (await stampOf(getPlaythroughRecordPath(playthroughId))) !== null ||
+        (await stampOf(getEnrollmentPath(playthroughId))) !== null
+      ) {
+        throw appError(APPLICATION_SETTLED.code, APPLICATION_SETTLED.message, playthroughId)
+      }
+    }
+    await writeAtomicJson(getApplicationPath(playthroughId), application, unwritable)
+    return { playthroughId, application }
+  })
+}
+
+/**
+ * Refuses a later semester's New Game its playthrough cannot take: one whose record is gone or
+ * cannot be read, or whose semester the record or the registration beside it already holds.
+ */
+async function assertContinuable(playthroughId: string, semesterId: string): Promise<void> {
+  let record: PlaythroughRecord
+  try {
+    record = await readPlaythroughRecord(playthroughId)
+  } catch (err) {
+    throw appError(
+      APPLICATION_PLAYTHROUGH_GONE.code,
+      APPLICATION_PLAYTHROUGH_GONE.message,
+      `${playthroughId}: ${toAppError(err).message}`
+    )
+  }
+  // A registration that cannot be read holds no semester.
+  const registration = await readEnrollment(playthroughId).catch(() => null)
+  if (record.semesters?.[semesterId] || registration?.continued?.id === semesterId) {
+    throw appError(APPLICATION_SETTLED.code, APPLICATION_SETTLED.message, playthroughId)
+  }
+}
+
+/**
  * Writes a semester that has no timetable yet, so the registrar offering it can be left and
- * come back to: a first semester into a folder of its own, a next one beside the record of the
- * playthrough `playthroughId` names, replacing any registration already waiting there.
+ * come back to: a first semester into a folder of its own, or into the one whose application it
+ * replaces, and a next one beside the record of the playthrough `playthroughId` names, replacing
+ * any registration already waiting there and the application set up for the same semester.
  */
 export async function writeEnrollment(
   draft: EnrollmentDraft,
   playthroughId?: string
 ): Promise<CreatedEnrollment> {
+  if (playthroughId !== undefined && draft.continued === undefined) {
+    assertSafePlaythroughId(playthroughId)
+    return inTurn(playthroughId, async () => {
+      if (!(await playthroughExists(playthroughId))) {
+        throw appError(
+          'ENROLLMENT_PLAYTHROUGH_GONE',
+          'That playthrough no longer exists.',
+          playthroughId
+        )
+      }
+      if ((await stampOf(getPlaythroughRecordPath(playthroughId))) !== null) {
+        throw appError('PLAYTHROUGH_EXISTS', 'That playthrough has already begun.', playthroughId)
+      }
+      const enrollment = stampEnrollment(draft, Date.now())
+      await writeAtomicJson(getEnrollmentPath(playthroughId), enrollment, {
+        code: 'ENROLLMENT_UNWRITABLE',
+        message: 'Could not write the class registration.'
+      })
+      await removeApplication(playthroughId)
+      return { playthroughId, enrollment }
+    })
+  }
   if (playthroughId !== undefined) {
     assertSafePlaythroughId(playthroughId)
     return inTurn(playthroughId, async () => {
@@ -529,6 +723,12 @@ export async function writeEnrollment(
         code: 'ENROLLMENT_UNWRITABLE',
         message: 'Could not write the class registration.'
       })
+      // The application this semester was set up on is spent; one that cannot be read is kept.
+      const semesterId = draft.continued?.id
+      const waiting = await readApplication(playthroughId).catch(() => null)
+      if (semesterId !== undefined && waiting?.continued?.id === semesterId) {
+        await removeApplication(playthroughId)
+      }
       return { playthroughId, enrollment }
     })
   }
@@ -545,6 +745,13 @@ export async function writeEnrollment(
 async function removeEnrollment(playthroughId: string): Promise<void> {
   await rm(getEnrollmentPath(playthroughId), { force: true }).catch((err: unknown) => {
     console.warn('[saves] the class registration could not be removed', err)
+  })
+}
+
+/** Removes a folder's application; already gone is success. */
+async function removeApplication(playthroughId: string): Promise<void> {
+  await rm(getApplicationPath(playthroughId), { force: true }).catch((err: unknown) => {
+    console.warn('[saves] the new game in progress could not be removed', err)
   })
 }
 
@@ -576,6 +783,7 @@ export async function createPlaythrough(
     const save = await writeSaveFile(folder, folder, draft)
     // The playthrough is complete either way, and its registration is spent.
     await removeEnrollment(folder)
+    await removeApplication(folder)
     return { record, save }
   })
 }

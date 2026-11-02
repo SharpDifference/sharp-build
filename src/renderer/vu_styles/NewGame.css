@@ -1,4 +1,4 @@
-/* The New Game roster's own layout. Only the decoration is placed absolutely — it
+/* New Game's frame, worn by every screen of the New Game flow. Only the decoration is placed absolutely — it
    anchors to the stage, which is 1080 tall at every window size; everything the player reads
    is ordinary flex and grid.
 
@@ -13,8 +13,9 @@
   gap: 24px;
   height: 100%;
   padding: 44px 80px 58px;
-  /* Clips the archway's flight and the ripple that follows it — both leave the stage. */
-  overflow: hidden;
+  /* Clips the archway's flight and the ripple that follows it — both leave the stage. A clip
+     rather than a scroller, so a field focused as the screen arrives cannot scroll it aside. */
+  overflow: clip;
   background: var(--vu-ground);
   color: var(--vu-text);
   font-family: var(--font-body);
@@ -81,11 +82,69 @@
 
 /* ---- the header ------------------------------------------------------------ */
 
+/* The title row, and under it what the screen asks of the player. */
 .vu-newgame-header {
   position: relative;
   display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.vu-newgame-head-row {
+  display: flex;
   align-items: center;
   gap: 24px;
+}
+
+/* Said at rest and at reading size, under the title it belongs to: what the screen is for and
+   what is left to the writer. */
+.vu-newgame-hint-row {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  min-height: 51px;
+  padding-left: 80px;
+}
+
+/* Under a hint the count leads the screen's controls to the row's end. */
+.vu-newgame-hint-row .vu-newgame-count {
+  margin-left: auto;
+}
+
+.vu-newgame-hint-row .vu-newgame-fill {
+  margin-left: 0;
+}
+
+.vu-newgame-hint {
+  min-width: 0;
+  margin: 0;
+  max-width: 1200px;
+  color: var(--vu-text-body);
+  font: 500 19px/1.45 var(--font-body);
+}
+
+/* Where the flow stands, in the bookkeeping voice: the screens passed, the one on screen in the
+   accent, the ones ahead muted. */
+.vu-newgame-steps {
+  display: flex;
+  flex: none;
+  gap: 22px;
+  /* Clear of the blob the title leans on, which overhangs the word's own box. */
+  margin: 0 0 0 16px;
+  padding: 0;
+  list-style: none;
+  color: var(--vu-text-muted);
+  font: 700 15px var(--font-mono);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.vu-newgame-step--past {
+  color: var(--vu-text-body);
+}
+
+.vu-newgame-step--on {
+  color: var(--vu-accent);
 }
 
 .vu-newgame-back {
@@ -140,6 +199,12 @@
   height: 286px;
 }
 
+/* The flow's header carries a line more than the roster's own, which the arches give back so the
+   two rows and the foot still stand inside the stage. */
+.vu-newgame:has(.vu-newgame-hint) .vu-newgame-arch {
+  height: 250px;
+}
+
 /* Both cards of a shared first name, since the pair is the problem and neither one is.
    On the crop, which covers the face pseudo, never through `--paper-border`. */
 .vu-newgame-card--duplicate .vu-card-crop {
@@ -157,8 +222,59 @@
   font: 400 52px var(--font-display);
 }
 
+/* The flow's empty tile: the question and the plus that replaces it, standing in one seat. */
+.vu-newgame-seat {
+  display: grid;
+  place-items: center;
+}
+
+.vu-newgame-seat > .vu-newgame-plus {
+  grid-area: 1 / 1;
+}
+
 .vu-newgame-card--empty .vu-card-name {
   color: var(--vu-text-muted);
+}
+
+/* ---- the panel ------------------------------------------------------------- */
+
+/* The flow's screens that stand one panel in the body: a container, so a rounded rectangle;
+   wide, so the paper's tilt relaxes. */
+.vu-newgame-panel {
+  --paper-offset: 12px 11px;
+  --paper-tilt: -0.8deg;
+  --paper-shadow: var(--vu-panel-shadow);
+  display: flex;
+  flex: 1 1 auto;
+  min-width: 0;
+  border-radius: 44px;
+  color: var(--vu-text);
+}
+
+/* The page clips to the panel's corners, the paper itself never clipping. */
+.vu-newgame-page {
+  display: flex;
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 0;
+  border-radius: inherit;
+  overflow: hidden;
+}
+
+/* A screen whose panel stands beside a column of tabs — Setting and Finalize. */
+.vu-newgame-tabbed {
+  position: relative;
+  display: flex;
+  flex: 1 1 auto;
+  gap: 36px;
+  min-height: 0;
+}
+
+/* The palette as a column, its top level with the panel's. */
+.vu-newgame-tabs {
+  flex: none;
+  align-self: flex-start;
+  width: 132px;
 }
 
 /* ---- the foot -------------------------------------------------------------- */
@@ -173,8 +289,30 @@
   display: flex;
   align-items: flex-end;
   justify-content: flex-end;
+  gap: 24px;
   min-height: 132px;
   margin-top: auto;
+}
+
+/* The way back stands at the far end from the way forward, the screen's own tools after it,
+   centred on it. */
+.vu-newgame-foot-start {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  margin-right: auto;
+}
+
+.vu-newgame-tools {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+/* The primary doubles from its own corner into the room on its left, which a transform does not
+   reserve: the second way forward keeps that room clear. */
+.vu-newgame-skip {
+  margin-right: var(--next-room, 150px);
 }
 
 /* The wrapper is what the state scales and leans, so the button inside keeps its own hover

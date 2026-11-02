@@ -1,10 +1,8 @@
-import { TalentPanel } from './TalentPanel'
 import { ensureTalents } from '../modEntries/campus-talents'
 import { UnspokenLinkGlitch } from './UnspokenLinkGlitch'
 import { ReckoningModal } from './ReckoningModal'
 import { ReckoningDungeonView } from './ReckoningDungeon'
 import { dungeonVisible } from '../stores/reckoningDungeon'
-import { EchoPanel } from './EchoPanel'
 import { ensureEchoes } from '../stores/echoAssignments'
 import { useModsStore } from '../stores/modsStore'
 import { slotActivityAvailable } from '../mods/hooks'
@@ -27,7 +25,7 @@ import { isPermanent } from '@shared/errors'
 import { canContinueAfter, GAME_OVER_SCENES, gameCompleteSceneOf } from '@shared/gameOver'
 import { hashString } from '@shared/hash'
 import { isGameOver } from '@shared/money'
-import { calendarOf } from '@shared/semesters'
+import { semesterCalendarOf } from '@shared/semesters'
 import { quizAnswers, type QuizAnswer } from '@shared/academics'
 import {
   allBackgrounds,
@@ -75,7 +73,6 @@ import {
 } from '../stores/characterStore'
 import { LandingChrome, type LandingRow } from './LandingChrome'
 import { SceneChrome } from './SceneChrome'
-import { useTableInputLayout } from '../minigames/inputLayout'
 import { BreakthroughPanel, BreakthroughFlourish } from './BreakthroughPanel'
 import { DialogueBox } from './Dialogue'
 import {
@@ -103,6 +100,7 @@ import {
   advance,
   dismissStatusModal,
   endReplay,
+  endScene,
   enterReplay,
   hasDecisionPoint,
   interject,
@@ -146,6 +144,7 @@ import { useAudioStore } from '../stores/audioStore'
 import { useBunnyboardStore } from '../stores/bunnyboardStore'
 import { giftGivenOf, useGameStore } from '../stores/gameStore'
 import {
+  endSceneOpenOf,
   forwardOpenOf,
   openingLockOf,
   replyRowOfferOf,
@@ -299,8 +298,6 @@ type OpenPanel =
   | { kind: 'appSettings' }
   | { kind: 'controls' }
   | { kind: 'mods' }
-  | { kind: 'talents' }
-  | { kind: 'echo' }
   | { kind: 'reckoning'; charId: string }
   /** A mod's own panel over the scene, opened from its seat on the rail. */
   | { kind: 'modPanel'; modId: string }
@@ -310,6 +307,7 @@ type OpenPanel =
   | { kind: 'leaving' }
   | { kind: 'quitting' }
   | { kind: 'interruptEnding'; turn: Interjection }
+  | { kind: 'endScene' }
   /**
    * A created scene's save question: over the curtain on its way back to the creator once it is
    * over (`leftIn` the half it was left in), or in front of a leave or a quit while it runs.
@@ -597,7 +595,6 @@ function InterruptEndingModal({
 
 /** Game View: renders `gameStore`; `gameLoop.ts` owns state changes. */
 export function GameView(): JSX.Element {
-  const tableOwnsInput = useTableInputLayout((state) => state.layout !== null)
   const talentsOn = useModOn('campus-talents')
   const echoOn = useModOn('echo')
   const sceneInput = useSceneInputLayout()
@@ -696,6 +693,8 @@ export function GameView(): JSX.Element {
   const offer = useGameStore(replyRowOfferOf)
   /** Whether an earlier line of the reply may be stepped back to. */
   const rewindOpen = useGameStore(rewindOpenOf)
+  /** Whether End scene may end the scene now. */
+  const endSceneOpen = useGameStore((s) => endSceneOpenOf(s) && !s.turnError && (!s.sceneActivity || s.sceneActivity.closed))
   /** Bumped by every line a rewind steps back. */
   const lineRewound = useGameStore((s) => s.lineRewound)
   /**
@@ -1025,7 +1024,7 @@ export function GameView(): JSX.Element {
         ? undefined
         : earlierSemesters().find(({ view }) => view.index === semesterIndex)?.view
     const earlier = from && {
-      calendar: calendarOf(from.season, from.occasions),
+      calendar: semesterCalendarOf(from),
       weather: from.weather,
       semesterIndex: from.index
     }
@@ -2174,7 +2173,6 @@ export function GameView(): JSX.Element {
           goodbye menu), or the three game overs — each wearing the slot's own half of the day. */}
       {sceneMode || cinematic || created || replaying ? (
         <SceneChrome
-          inputOwned={tableOwnsInput}
           inputLayout={sceneInput}
           theme={half}
           date={date}
@@ -2226,11 +2224,12 @@ export function GameView(): JSX.Element {
           giftDead={inventory.length === 0 || !bunnyshopUnlocked || giftNote !== null}
           giftNote={giftNote}
           onGift={() => setPanel({ kind: 'gift' })}
+          endSceneShown={!cinematic && !epilogue && !replaying && !created}
+          endSceneDead={!endSceneOpen}
+          onEndScene={() => setPanel({ kind: 'endScene' })}
           calendarBadge={calendarBadge}
           bunnyboardBadge={bunnyboardBadge}
           railDead={false}
-          onTalents={talentsOn && !created && !replaying ? () => setPanel({ kind: 'talents' }) : undefined}
-          onEchoes={echoOn && !created && !replaying ? () => setPanel({ kind: 'echo' }) : undefined}
           modButtons={!created && !replaying}
           onCalendar={() => setPanel({ kind: 'calendar' })}
           onBunnyboard={() => useBunnyboardStore.getState().openApp()}
@@ -2293,8 +2292,6 @@ export function GameView(): JSX.Element {
              loses its own, an hour nobody is standing in having nothing to show. */
           bunnymapUnlocked={bunnymapShown}
           bunnyshopUnlocked={bunnyshopShown}
-          onTalents={talentsOn && !created && !replaying ? () => setPanel({ kind: 'talents' }) : undefined}
-          onEchoes={echoOn && !created && !replaying ? () => setPanel({ kind: 'echo' }) : undefined}
           onCalendar={() => setPanel({ kind: 'calendar' })}
           onBunnyboard={() => useBunnyboardStore.getState().openApp()}
           onShop={() => setPanel({ kind: 'shop' })}
@@ -2859,10 +2856,6 @@ export function GameView(): JSX.Element {
           covered={panel !== null || covered}
         />
         {panel?.kind === 'reckoning' && <ReckoningModal key={`reckoning-${panel.charId}`} charId={panel.charId} onClose={closePanel} />}
-        {panel?.kind === 'talents' && <TalentPanel key="talents" theme={half} onClose={closePanel} />}
-        {panel?.kind === 'echo' && (
-          <EchoPanel key="echo" hidden={covered || created || replaying} theme={half} onClose={closePanel} />
-        )}
         <ModSlot
           key="mod-panel-layer"
           slot="panelLayer"
@@ -2965,6 +2958,26 @@ export function GameView(): JSX.Element {
             onConfirm={() => {
               setQuitting(true)
               void quitToDesktop()
+            }}
+          />
+        )}
+
+        {/* The ask in front of End scene. The well's words and a wait still reported go with the
+            scene; a scene that ended itself meanwhile is left to its own ending. */}
+        {panel?.kind === 'endScene' && (
+          <ConfirmModal
+            key="end-scene"
+            id="end-scene"
+            theme={half}
+            title="End the scene?"
+            message="The scene up until the last line you read will be saved and the game will skip to the book-keeping prompts."
+            confirmText="End"
+            onCancel={closePanel}
+            onConfirm={() => {
+              closePanel()
+              if (!endScene()) return
+              setAction('')
+              setSending(false)
             }}
           />
         )}

@@ -1,5 +1,11 @@
 import { describe, expect, it, vi } from 'vitest'
-import { validateClassDraft, type ClassGenReply } from '../src/renderer/prompts/classPrompt'
+import {
+  NO_FILLED_CATALOG,
+  validateClassDraft,
+  type ClassGenReply,
+  type ClassPromptInput
+} from '../src/renderer/prompts/classPrompt'
+import type { Character } from '../src/shared/types'
 import { freeClassCode } from '../src/shared/classes'
 import { character } from './fixtures'
 
@@ -9,6 +15,14 @@ import { character } from './fixtures'
  * course code is that record's key.
  */
 
+/** A call whose students all major in Biology, with no interest class written yet. */
+function asking(roster: Character[]): Pick<ClassPromptInput, 'students' | 'filled'> {
+  return {
+    students: roster.map((character) => ({ character, major: 'Biology' })),
+    filled: NO_FILLED_CATALOG
+  }
+}
+
 describe('validateClassDraft', () => {
   it('renumbers a duplicate catalog code instead of failing the reply', () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
@@ -17,7 +31,6 @@ describe('validateClassDraft', () => {
       characters: {
         sarah_rose: {
           major: 'Biology',
-          majorClassesTaken: 2,
           interestClass: { code: 'MUS 150', name: 'Choir', description: 'Singing.' }
         }
       },
@@ -41,7 +54,7 @@ describe('validateClassDraft', () => {
       ]
     }
 
-    const out = validateClassDraft(draft, roster)
+    const out = validateClassDraft(draft, asking(roster))
     expect(out.classes).toHaveLength(3)
     expect(out.classes[0].code).toBe('BIO 210')
     expect(out.classes[1].code).toBe('BIO 211')
@@ -56,7 +69,6 @@ describe('validateClassDraft', () => {
       characters: {
         sarah_rose: {
           major: 'Biology',
-          majorClassesTaken: 2,
           interestClass: { code: 'ART 101', name: 'Pots', description: 'Pots.' }
         }
       },
@@ -86,11 +98,41 @@ describe('validateClassDraft', () => {
       ]
     }
 
-    const out = validateClassDraft(draft, roster)
+    const out = validateClassDraft(draft, asking(roster))
     expect(out.classes).toHaveLength(4)
     const interest = out.classes.find((c) => c.category === 'interest')
     expect(interest?.code).toBe('ART 103')
     expect(new Set(out.classes.map((c) => c.code)).size).toBe(4)
+    warn.mockRestore()
+  })
+
+  // The player's entries are taken first, so the code a reply repeats is the reply's to lose,
+  // and a major whose classes the player wrote is offered though the reply wrote none.
+  it("keeps the player's codes and counts the player's major classes", () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const sarah = character({ charId: 'char-1', firstName: 'Sarah', lastName: 'Rose' })
+    const out = validateClassDraft(
+      {
+        characters: {
+          sarah_rose: {
+            interestClass: { code: 'BIO 210', name: 'Birds', description: 'Birds.', kind: 'lecture' }
+          }
+        },
+        classes: []
+      },
+      {
+        students: [{ character: sarah, major: 'Biology' }],
+        filled: {
+          ...NO_FILLED_CATALOG,
+          major: {
+            Biology: [{ code: 'BIO 210', title: 'Cells', description: 'Cells.', kind: 'lecture' }]
+          }
+        }
+      }
+    )
+    expect(out.classes.find((c) => c.name === 'Cells')?.code).toBe('BIO 210')
+    expect(out.classes.find((c) => c.name === 'Birds')?.code).toBe('BIO 211')
+    expect(out.characters.sarah_rose.major).toBe('Biology')
     warn.mockRestore()
   })
 })

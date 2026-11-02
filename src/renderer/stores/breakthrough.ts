@@ -4,13 +4,14 @@ import { abilityUsedThisWeek, recordAbilityUse } from '@shared/talentAbilityStat
 import { affectionFor, isTrusted } from '@shared/relationship'
 import { echoAffinity } from '@shared/echo'
 import { BREAKTHROUGH_MOD, SPIRIT_MAX, breakthroughSpent, refundSpirit, normalizeBreakthrough, outcomeOf, settleBreakthrough, type BreakthroughPending } from '../../shared/breakthrough'
-import { fullNameOf, type Character, type SceneLine, type StructuredRequest } from '@shared/types'
+import { fullNameOf, type Character, type SceneLine, type StructuredRequest } from '@vx/modkit/shared'
 import { breakthroughAdvantage } from '../prompts/breakthroughPrompt'
 import { echoBreakthroughPrompt } from '../prompts/echoBreakthroughPrompt'
 import { echoBreakthroughAbility, ECHO_BREAKTHROUGH_OPTION, type EchoBreakthroughAspect } from '@shared/echoBreakthrough'
 import { optionOn } from '@vx/modkit/shared'
 import { useGameStore } from './gameStore'
-import { modIsOn, useModsStore } from './modsStore'
+import { useModsStore } from './modsStore'
+import { modIsOn } from '@vx/modkit/renderer'
 import { interjectOfferOf, replyRowOfferOf } from './loop/playback'
 
 type Game = ReturnType<typeof useGameStore.getState>

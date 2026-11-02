@@ -1,3 +1,4 @@
+import './fixtures/maestroModelKit'
 import { afterEach, expect, it } from 'vitest'
 import { CITY_LIFE_LOCATION_IDS, CITY_LIFE_LOCATIONS_MOD, cityLifeLocationsOn } from '@shared/cityLife'
 import { useGameStore } from '../src/renderer/stores/gameStore'

@@ -1,9 +1,15 @@
-import { blockText } from '@shared/presets/textBlocks'
-import type { GlobalTextId, SceneTextId, TextBlockId, TextEdits } from '@shared/presets/types'
+import type { NamedOccasionKind } from '@shared/occasionsFile'
+import {
+  blockText,
+  type GlobalTextId,
+  type SceneTextId,
+  type TextBlockId,
+  type TextEdits
+} from '@shared/promptText'
 
 /**
- * The authored text of every block a preset or the settings may rewrite, one source apiece, and
- * the helpers that pick what a call sends: the edit where there is one, else the shipped text.
+ * The authored text of every block a mod may rewrite, one source apiece, and the helpers that
+ * pick what a call sends: the edit where there is one, else the shipped text.
  */
 
 /**
@@ -98,7 +104,7 @@ export function ledgerPersonaFor(lessNsfwText: boolean): string {
 }
 
 /**
- * The persona a cast scene is written under: the active preset's edit where one is set, else the
+ * The persona a cast scene is written under: a mod's edit where one is set, else the
  * player's own verbatim where one is stored, else the shipped one this content setting sends.
  */
 export function scenePersonaFor(
@@ -213,7 +219,7 @@ const SCENE_TEXTS: Record<Exclude<SceneTextId, 'persona.scene'>, string> = {
   'scene.solo': SOLO_TEXT
 }
 
-/** One of the scene's instruction blocks, the preset's edit where there is one. */
+/** One of the scene's instruction blocks, a mod's edit where there is one. */
 export function sceneText(
   edits: TextEdits<SceneTextId> | undefined,
   id: Exclude<SceneTextId, 'persona.scene' | 'scene.solo'>
@@ -226,27 +232,21 @@ const CLASSES_SYSTEM_TEXT = [
   'You are a university registrar building a course catalog and enrolling students.',
   'You return a single JSON object matching the provided schema exactly.',
   'Course codes follow real university convention: a subject prefix and a three-digit number, like "BIO 210".'
-].join(' ')
+].join('\n')
 
 /**
  * The class call's instructions in the runs they are read in. The builder fills the lines it
- * locks (the major count, the pool sizes, the code rule and the returning-student lines) in
- * between them.
+ * locks (the pool sizes, the code rule and the returning-class lines) in between them, and sends
+ * the student run only where a student's interest class is still to be written.
  */
 export const CLASS_INSTRUCTION_RUNS = {
-  intro: [
-    'Build a course catalog for a university, then enroll each student below.',
-    '',
-    'FOR EACH STUDENT',
-    'major: the field she studies. Pick one that fits her personality. Collape similar majors like Business Studies and Business Science into a single major like Business Administration.'
-  ],
+  intro: ['Build a course catalog for a university, then enroll each student below.', ''],
   student: [
+    'FOR EACH STUDENT',
     'interestClass: one course this specific student would sign up for out of pure personal interest.',
     'It should read like something only she would pick.',
-    '',
-    'THE CATALOG'
+    ''
   ],
-  gap: [''],
   course: [
     'Every course needs a one-sentence description written the way a real course catalog writes them.',
     '',
@@ -261,7 +261,6 @@ export const CLASS_INSTRUCTION_RUNS = {
 const CLASSES_INSTRUCTIONS_TEXT = [
   ...CLASS_INSTRUCTION_RUNS.intro,
   ...CLASS_INSTRUCTION_RUNS.student,
-  ...CLASS_INSTRUCTION_RUNS.gap,
   ...CLASS_INSTRUCTION_RUNS.course
 ].join('\n')
 
@@ -300,14 +299,11 @@ const PROFILES_SPRING_BREAK_TEXT = [
   'All plans must include leaving campus and don\'t include other students or the reader.'
 ].join('\n')
 
-/** What a next semester's new students are. */
-const PROFILES_NEXT_NEWCOMERS_TEXT = 'Every new student is a first-year arriving at the university this semester.'
+/** What a next semester's new students are; ships empty, and is sent only when filled in. */
+const PROFILES_NEXT_NEWCOMERS_TEXT = ''
 
-/** Where a next semester's new students live. */
-const PROFILES_NEXT_HOUSING_TEXT = [
-  'dorm: where she lives on campus. As a first-year she lives in one of the five Lowrises, lowrise_1 through lowrise_5, the ordinary apartment-style dorms that house the bulk of students.',
-  'Spread them across the five Lowrises rather than piling everyone into one building.'
-].join('\n')
+/** Where a next semester's new students live: where a first semester's do, unless edited. */
+const PROFILES_NEXT_HOUSING_TEXT = PROFILES_HOUSING_TEXT
 
 /** What a graduate is asked for. */
 const PROFILES_NEXT_GRADUATES_TEXT = [
@@ -324,29 +320,27 @@ const OCCASIONS_SYSTEM_TEXT = [
 
 /** What the occasion call is asked to write for each event. */
 const OCCASIONS_INSTRUCTIONS_TEXT = [
-  'EVENTS TO WRITE',
-  'One entry in "events" for each id below, and nothing else. The dates are already decided — do not restate them.',
   '"title" is a few words, the way it would be printed on a poster or said out loud on campus.',
   '"description" is one or two sentences of what actually happens: who runs it, where on campus or in the city it is, what a student would see. Present tense.',
   'Each id carries an inspiration word. Let it colour that one event, loosely — it is a nudge, not a subject.',
   'Make them different from each other. Spread them across the campus and the city rather than putting everything in the Quad.'
 ].join('\n')
 
-/** What the occasion call is asked to write for the small half-day events. */
-const OCCASIONS_FILLERS_TEXT = [
-  'FILLERS',
-  'Each id below is something small happening on campus or in the city for half a day — a club running a table, a market, a screening, a tournament, a protest, a food thing. Ordinary scale. Not a dance, not a gala, not a fair.'
-].join('\n')
+/** What the occasion call is asked to write for the small events. */
+const OCCASIONS_FILLERS_TEXT =
+  'Each id below is something small happening on campus or in the city — a club running a table, a market, a screening, a tournament, a protest, a food thing. Ordinary scale. Not a dance, not a gala, not a fair.'
 
-/** The four named events' briefs, as the planner hands them out. */
-export const GALA_BRIEF =
-  'A two-night formal gala thrown by the SEB, Saturday and Sunday — the most expensive, most photographed thing the student government does all year. Give it a name students would actually use.'
-export const DANCE_BRIEF =
-  'A one-night formal dance, smaller and cheaper than the gala — a themed dance students dress up for, run in one of the campus venues.'
-export const CAREER_FAIR_BRIEF =
-  'A two-day career fair held during the day — recruiters at tables, free branded junk, and students in interview clothes they own one of. Give it a name and say who is recruiting.'
-export const CONCERT_BRIEF =
-  'A Friday night concert in Thorne Auditorium — one booked act plus student openers, run by the SEB. Say who is playing and what they sound like.'
+/** What each named event is, given to the model verbatim; its when-line says the days. */
+export const OCCASION_BRIEFS: Record<NamedOccasionKind, string> = {
+  gala:
+    'A formal gala thrown by the SEB — the most expensive, most photographed thing the student government does all year. Give it a name students would actually use.',
+  dance:
+    'A formal dance, smaller and cheaper than the gala — a themed dance students dress up for, run in one of the campus venues.',
+  'career-fair':
+    'A career fair — recruiters at tables, free branded junk, and students in interview clothes they own one of. Give it a name and say who is recruiting.',
+  concert:
+    'A concert in Thorne Auditorium — one booked act plus student openers, run by the SEB. Say who is playing and what they sound like.'
+}
 
 /** The secrets call's system prompt. */
 const SECRETS_SYSTEM_TEXT = [
@@ -394,10 +388,10 @@ const NEW_GAME_TEXTS: Record<NewGameTextId, string> = {
   'newgame.occasions.additions': '',
   'newgame.occasions.instructions': OCCASIONS_INSTRUCTIONS_TEXT,
   'newgame.occasions.fillers': OCCASIONS_FILLERS_TEXT,
-  'newgame.occasions.gala': GALA_BRIEF,
-  'newgame.occasions.dance': DANCE_BRIEF,
-  'newgame.occasions.careerFair': CAREER_FAIR_BRIEF,
-  'newgame.occasions.concert': CONCERT_BRIEF,
+  'newgame.occasions.gala': OCCASION_BRIEFS.gala,
+  'newgame.occasions.dance': OCCASION_BRIEFS.dance,
+  'newgame.occasions.careerFair': OCCASION_BRIEFS['career-fair'],
+  'newgame.occasions.concert': OCCASION_BRIEFS.concert,
   'newgame.secrets.system': SECRETS_SYSTEM_TEXT,
   'newgame.secrets.additions': '',
   'newgame.secrets.instructions': SECRETS_INSTRUCTIONS_TEXT,
@@ -419,10 +413,10 @@ export function withAdditions(
   return additions.trim() === '' ? system : `${system}\n\n${additions}`
 }
 
-/** One editable block as the studio lists it; `text` is the shipped default for the unrestricted setting. */
+/** One editable block as a mod lists it; `text` is the shipped default for the unrestricted setting. */
 export interface PromptBlock {
   id: TextBlockId
-  owner: 'preset' | 'global'
+  owner: 'scene' | 'global'
   group:
     | 'persona'
     | 'scene'
@@ -440,11 +434,11 @@ export function isNewGameBlock(block: PromptBlock): boolean {
   return block.group.startsWith('newgame.')
 }
 
-/** Every editable block in the order the studio lists them. */
+/** Every editable block, in the order a mod lists them. */
 export const PROMPT_BLOCKS: readonly PromptBlock[] = [
   {
     id: 'persona.scene',
-    owner: 'preset',
+    owner: 'scene',
     group: 'persona',
     label: 'Scene system prompt',
     hint: 'Who the writer is for every scene with a cast.',
@@ -452,7 +446,7 @@ export const PROMPT_BLOCKS: readonly PromptBlock[] = [
   },
   {
     id: 'scene.opening',
-    owner: 'preset',
+    owner: 'scene',
     group: 'scene',
     label: 'Opening instructions',
     hint: 'What the writer is asked to do when a scene starts.',
@@ -460,7 +454,7 @@ export const PROMPT_BLOCKS: readonly PromptBlock[] = [
   },
   {
     id: 'scene.continue',
-    owner: 'preset',
+    owner: 'scene',
     group: 'scene',
     label: 'Mid-scene: introduction',
     hint: 'How each turn after the first is introduced.',
@@ -468,7 +462,7 @@ export const PROMPT_BLOCKS: readonly PromptBlock[] = [
   },
   {
     id: 'scene.continue.first-line',
-    owner: 'preset',
+    owner: 'scene',
     group: 'scene',
     label: 'Mid-scene: first line',
     hint: 'How a turn picks up the reader\'s action.',
@@ -476,7 +470,7 @@ export const PROMPT_BLOCKS: readonly PromptBlock[] = [
   },
   {
     id: 'scene.continue.going',
-    owner: 'preset',
+    owner: 'scene',
     group: 'scene',
     label: 'Mid-scene: keeping it going',
     hint: 'How a turn keeps the scene moving, and what to do when it moves somewhere new.',
@@ -484,7 +478,7 @@ export const PROMPT_BLOCKS: readonly PromptBlock[] = [
   },
   {
     id: 'scene.continue.ending',
-    owner: 'preset',
+    owner: 'scene',
     group: 'scene',
     label: 'Mid-scene: wrapping up',
     hint: 'When a turn ends the scene.',
@@ -492,7 +486,7 @@ export const PROMPT_BLOCKS: readonly PromptBlock[] = [
   },
   {
     id: 'scene.closing',
-    owner: 'preset',
+    owner: 'scene',
     group: 'scene',
     label: 'Closing instructions',
     hint: 'How the goodbye is written once a scene has ended.',
@@ -500,7 +494,7 @@ export const PROMPT_BLOCKS: readonly PromptBlock[] = [
   },
   {
     id: 'scene.solo',
-    owner: 'preset',
+    owner: 'scene',
     group: 'scene',
     label: 'Solo scene instructions',
     hint: 'What the writer is asked to do for a scene with nobody else in it.',
@@ -583,7 +577,7 @@ export const PROMPT_BLOCKS: readonly PromptBlock[] = [
     owner: 'global',
     group: 'newgame.profiles',
     label: 'Profiles: housing',
-    hint: 'Where a game\'s first students live.',
+    hint: 'Where new students live. A later semester uses it too, unless its own housing text is set.',
     text: NEW_GAME_TEXTS['newgame.profiles.housing']
   },
   {
@@ -615,7 +609,7 @@ export const PROMPT_BLOCKS: readonly PromptBlock[] = [
     owner: 'global',
     group: 'newgame.profiles',
     label: 'Next semester: new students',
-    hint: 'How the first-years arriving in a later semester are introduced.',
+    hint: 'An extra line for the new students a later semester adds. Sent only when filled in.',
     text: NEW_GAME_TEXTS['newgame.profiles.next.newcomers']
   },
   {
@@ -623,7 +617,7 @@ export const PROMPT_BLOCKS: readonly PromptBlock[] = [
     owner: 'global',
     group: 'newgame.profiles',
     label: 'Next semester: housing',
-    hint: 'Where those first-years live.',
+    hint: 'Where the new students of a later semester live. Starts as the first semester\'s text.',
     text: NEW_GAME_TEXTS['newgame.profiles.next.housing']
   },
   {
@@ -663,7 +657,7 @@ export const PROMPT_BLOCKS: readonly PromptBlock[] = [
     owner: 'global',
     group: 'newgame.occasions',
     label: 'Occasions: small events',
-    hint: 'What the half-day events are asked to be. The note about the week off follows it.',
+    hint: 'What the small events are asked to be. The note about the week off follows it.',
     text: NEW_GAME_TEXTS['newgame.occasions.fillers']
   },
   {
@@ -671,7 +665,7 @@ export const PROMPT_BLOCKS: readonly PromptBlock[] = [
     owner: 'global',
     group: 'newgame.occasions',
     label: 'Occasions: gala',
-    hint: 'What the two-night gala is asked to be.',
+    hint: 'What the gala is asked to be.',
     text: NEW_GAME_TEXTS['newgame.occasions.gala']
   },
   {
@@ -679,7 +673,7 @@ export const PROMPT_BLOCKS: readonly PromptBlock[] = [
     owner: 'global',
     group: 'newgame.occasions',
     label: 'Occasions: dance',
-    hint: 'What the one-night dance is asked to be.',
+    hint: 'What the dance is asked to be.',
     text: NEW_GAME_TEXTS['newgame.occasions.dance']
   },
   {
@@ -687,7 +681,7 @@ export const PROMPT_BLOCKS: readonly PromptBlock[] = [
     owner: 'global',
     group: 'newgame.occasions',
     label: 'Occasions: career fair',
-    hint: 'What the two-day career fair is asked to be.',
+    hint: 'What the career fair is asked to be.',
     text: NEW_GAME_TEXTS['newgame.occasions.careerFair']
   },
   {
@@ -695,7 +689,7 @@ export const PROMPT_BLOCKS: readonly PromptBlock[] = [
     owner: 'global',
     group: 'newgame.occasions',
     label: 'Occasions: concert',
-    hint: 'What the Friday night concert is asked to be.',
+    hint: 'What the concert is asked to be.',
     text: NEW_GAME_TEXTS['newgame.occasions.concert']
   },
   {
@@ -741,7 +735,7 @@ export const PROMPT_BLOCKS: readonly PromptBlock[] = [
 ]
 
 /**
- * The text the studio resets a block to under the current settings: the content setting picks
+ * The text a block resets to under the current settings: the content setting picks
  * between a persona's variants, and the cast scene's persona resets to the player's own where
  * one is set.
  */

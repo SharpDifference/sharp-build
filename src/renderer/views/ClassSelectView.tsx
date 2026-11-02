@@ -1,11 +1,10 @@
 import { useEffect, useMemo, useState, type JSX } from 'react'
 import { AnimatePresence, animate, motion, useReducedMotion } from 'motion/react'
 import { MAX_PLAYER_CLASSES, MIN_PLAYER_COURSES, scheduleComplaint } from '@shared/classes'
-import type { ClassSlot } from '@shared/types'
+import type { ClassSlot, ScheduleResult } from '@shared/types'
 import markUrl from '../../../assets/vu_letters.png'
 import { ConfirmModal } from '../components/ConfirmModal'
 import { useWindowKeydown } from '../components/useWindowKeydown'
-import type { ScheduleResult } from '../stores/classScheduler'
 import { useCrossingStore } from '../stores/crossingStore'
 import { formatDatePart } from '../prompts/gameDate'
 import { ADD_DROP_DATE } from '../prompts/occasions'
@@ -45,7 +44,7 @@ export interface ClassSelectViewProps {
   /** The freshly generated catalog and per-character enrollment. */
   schedules: ScheduleResult
   /** Hands the chosen `ClassSlot` → code map back; the caller writes the save. */
-  onFinalize: (playerSchedule: Record<number, string>) => void
+  onStart: (playerSchedule: Record<number, string>) => void
   /** Whose page this is, shown signed in at the top right. */
   playerName: { first: string; last: string }
   /** Whether this semester is already on disk, so backing out of it loses nothing. */
@@ -59,7 +58,7 @@ export interface ClassSelectViewProps {
 
 export function ClassSelectView({
   schedules,
-  onFinalize,
+  onStart,
   playerName,
   saved,
   onCancel
@@ -134,7 +133,7 @@ export function ClassSelectView({
   useWindowKeydown(onKeyDown)
 
   // The one gate between here and a timetable written into the save, checked at every keystroke
-  // rather than at Finalize. This screen is a form, so it is one of four approved disable
+  // rather than at Enroll. This screen is a form, so it is one of four approved disable
   // notices: a form that refuses without naming the field is worse than a dead button.
   const complaint = scheduleComplaint(schedule, classes)
 
@@ -273,14 +272,14 @@ export function ClassSelectView({
                     Cancel
                   </motion.button>
                   <motion.button
-                    id="class-select-finalize"
+                    id="class-select-enroll"
                     className="vu-btn vu-btn--primary vu-btn--panel vu-paper"
                     type="button"
                     disabled={complaint !== null}
                     {...gestures(complaint !== null, lift, press)}
-                    onClick={() => onFinalize(schedule)}
+                    onClick={() => onStart(schedule)}
                   >
-                    Finalize
+                    Enroll
                   </motion.button>
                 </div>
               </div>
