@@ -73,24 +73,30 @@ export function sayInScene(modId: string, text: string, options: SceneLineOption
 
 /**
  * Takes a mod's transient lines back off the scene: off the transcript, the log and the queue,
- * wherever they have got to. Every other mod's lines, and the scene's own, stay.
+ * wherever they have got to. Every other mod's lines, and the scene's own, stay. A box showing
+ * one of them lands at once on the last line kept.
  */
 export function dropTransientLines(modId: string): void {
-  const patch = sceneWithout(useGameStore.getState(), (line) => transientOwner(line) === modId)
-  if (patch) useGameStore.setState(patch)
+  const game = useGameStore.getState()
+  const patch = sceneWithout(game, (line) => transientOwner(line) === modId)
+  if (!patch) return
+  const moved = patch.currentLine !== game.currentLine
+  useGameStore.setState(moved ? { ...patch, lineRewound: game.lineRewound + 1 } : patch)
 }
 
 /**
  * Brings the scene to the reader's turn. At his turn already, nothing to do; over a reply, an
  * interjection's own steps (see `takeTurnFromReply`). A scene left standing on a mod's last line,
  * with nothing behind it and not counted as a turn to take, as at a class scene's opening, has
- * its turn opened. False where the scene is busy, or takes no lines.
+ * its turn opened. False, with nothing changed, where the scene takes no lines (its ending among
+ * them) or is busy.
  */
 export function reachTurn(): boolean {
+  if (!sceneTakesLines()) return false
   const game = useGameStore.getState()
   if (game.awaitingInput && !game.busy && game.pendingLines.length === 0) return true
   if (takeTurnFromReply()) return true
-  if (!sceneTakesLines() || game.busy || game.streaming || game.pendingLines.length > 0) return false
+  if (game.busy || game.streaming || game.pendingLines.length > 0) return false
   game.setAwaitingInput(true)
   return true
 }

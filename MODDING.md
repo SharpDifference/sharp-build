@@ -1047,11 +1047,13 @@ scene, or no scene takes lines (none is running, it is a replay, or it is ending
 `boxParts(text)` is the same split alone, for a panel that paces each part itself.
 `readerSaysInScene(text)` puts the reader's words on the scene as an action he took, with nobody
 asked to answer. `reachTurn()` brings the scene to his turn: `takeTurnFromReply`, or, where a
-mod's own last line stands on the box with nothing behind it, the turn opened.
+mod's own last line stands on the box with nothing behind it, the turn opened. Where no scene
+takes lines, it returns `false` and changes nothing, so it never cuts into an ending.
 
 A `transient` line is said for the moment only, such as a game's move-by-move narration.
 `dropTransientLines(id)` takes the mod's own transient lines back off the transcript, the log
-and the queue, wherever they have got to, and leaves every other line. No capture of the scene
+and the queue, wherever they have got to, and leaves every other line. A box showing one lands
+on the last line kept, and a gift stays on the action that handed it over. No capture of the scene
 holds one, so neither does any save: a reload never brings back a line the mod could no longer
 take back.
 

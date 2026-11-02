@@ -1,6 +1,6 @@
 import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { installMods, type ModDef } from '@shared/mods'
-import { charKeyOf, READER_SPEAKER, type SceneLine } from '@shared/types'
+import { charKeyOf, READER_SPEAKER, type SceneGift, type SceneLine } from '@shared/types'
 import { character, sceneLines, stubApi } from './fixtures'
 
 /**
@@ -86,6 +86,15 @@ describe('sayInScene', () => {
   })
 })
 
+describe('reachTurn', () => {
+  it('refuses during the ending, leaving it running', () => {
+    useGameStore.setState({ sceneEnding: true, busy: true, awaitingInput: false })
+
+    expect(kit.reachTurn()).toBe(false)
+    expect(useGameStore.getState().sceneEnding).toBe(true)
+  })
+})
+
 describe('transient lines', () => {
   it("takes back one mod's lines alone, read or still queued, and keeps the summary marks on their lines", () => {
     kit.sayInScene('line-table', 'She turns the queen.', { transient: true })
@@ -104,6 +113,40 @@ describe('transient lines', () => {
     expect(texts(game.pendingLines)).toEqual(['She wins the hand.'])
     // The mark covered the first four lines; one of them is gone, so it covers three.
     expect(game.sceneSummaries.map((mark) => mark.at)).toEqual([3])
+  })
+
+  it('lands the box on the last line kept when the line it shows is taken back', () => {
+    kit.sayInScene('line-table', 'She turns the queen.', { transient: true })
+    readAll()
+    const before = useGameStore.getState().lineRewound
+
+    kit.dropTransientLines('line-table')
+
+    expect(useGameStore.getState().currentLine?.text).toBe('The table is set.')
+    expect(useGameStore.getState().lineRewound).toBe(before + 1)
+  })
+
+  it('keeps a gift on its action when lines before it are taken back, live and through a save', () => {
+    kit.sayInScene('line-table', 'She turns the queen.', { transient: true })
+    kit.sayInScene('line-table', 'You draw a two.', { transient: true })
+    readAll()
+    const rose: SceneGift = { charId: sarah.charId, itemId: 'rose', repeat: false, reaction: 'liked' }
+    const game = useGameStore.getState()
+    useGameStore.setState({ sceneGifts: [{ ...rose, at: game.currentSceneTranscript.length }, rose] })
+    game.logPlayerAction('I give her a rose.', true)
+
+    const scene = useGameStore.getState().captureScene()
+    expect(scene?.gifts?.map((gift) => gift.at)).toEqual([2, undefined])
+    expect(scene?.transcript[2]?.text).toBe('I give her a rose.')
+
+    kit.dropTransientLines('line-table')
+    expect(useGameStore.getState().sceneGifts.map((gift) => gift.at)).toEqual([2, undefined])
+    // A cut to what was read keeps the action, so it keeps the gift too, live and once reloaded.
+    useGameStore.getState().truncateUnread()
+    expect(useGameStore.getState().sceneGifts).toHaveLength(2)
+    useGameStore.getState().restoreScene(scene)
+    useGameStore.getState().truncateUnread()
+    expect(useGameStore.getState().sceneGifts).toHaveLength(2)
   })
 
   it('leaves them out of a capture of the scene, and the box shows the last line kept', () => {
@@ -125,18 +168,21 @@ describe('transient lines', () => {
     const [kept, gone, unread] = sceneLines('kept', 'gone', 'unread')
     const records = {
       currentSceneTranscript: [kept, gone, unread],
-      sceneLog: [],
-      pendingLines: [kept, gone, unread],
+      sceneLog: [kept, gone],
+      pendingLines: [unread],
+      currentLine: gone,
       sceneSummaries: [{ summary: 'before', at: 1 }, { summary: 'after', at: 3 }],
+      sceneGifts: [],
       endingEditAt: 2,
-      reread: 2
+      reread: 1
     }
 
-    const cut = sceneWithout(records, (line) => line === gone)
+    const cut = sceneWithout({ ...records, pendingLines: [gone, unread], reread: 2 }, (line) => line === gone)
 
     expect(cut?.reread).toBe(1)
     expect(cut?.sceneSummaries.map((mark) => mark.at)).toEqual([1, 2])
     expect(cut?.endingEditAt).toBe(1)
+    expect(cut?.currentLine).toBe(kept)
     expect(sceneWithout(records, () => false)).toBeNull()
   })
 })

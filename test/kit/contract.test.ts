@@ -198,6 +198,13 @@ describe('the entry points', () => {
     expect(rendererKit.bunnybotSays).toBe(native.bunnybotSays)
   })
 
+  it("hands mods the game's own scene lines and turn, so a mod's line is the scene's", async () => {
+    const native = await import('../../src/renderer/stores/sceneLines')
+    for (const name of ['boxParts', 'dropTransientLines', 'reachTurn', 'readerSaysInScene', 'sayInScene'] as const) {
+      expect(rendererKit[name], name).toBe(native[name])
+    }
+  })
+
   it("hands main the game's guarded archive, image sniffer and live option reader", async () => {
     const archive = await import('../../src/main/services/archiveService')
     const images = await import('../../src/main/services/imageFiles')
