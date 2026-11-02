@@ -2,6 +2,7 @@ import { useEffect, useState, type JSX } from 'react'
 import { AnimatePresence } from 'motion/react'
 import { writerReady } from '@shared/settingsRules'
 import { loadInstalledMods } from './mods'
+import { startSwitchedOn } from './mods/hooks'
 import { Crossing } from './components/Crossing'
 import { Cursor } from './components/Cursor'
 import { ModalHost } from './components/ModalHost'
@@ -93,6 +94,9 @@ async function boot(): Promise<void> {
   // The installed mods' code, imported one at a time, every registration made before any screen
   // draws. One that fails is off for the session, and the notice under the cover says so.
   await loadInstalledMods((id) => modIsOn(id))
+
+  // Every mod that is on reads what it keeps before the first screen; a mod that fails only warns.
+  await startSwitchedOn()
 
   // The graph opens as soon as the sliders it mixes against are in.
   useAudioStore.getState().start()

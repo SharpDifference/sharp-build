@@ -447,6 +447,9 @@ export interface ModHooks {
     stageLayer?: ComponentType<ScreenSlotProps['stageLayer']>;
     statActivities?: (stat: StatKey) => readonly SlotActivityOffer[];
     statFloor?: (key: StatKey) => number | undefined;
+    switchedOn?: (ctx: {
+        atBoot: boolean;
+    }) => void | Promise<void>;
     updatesTab?: UpdatesTab;
 }
 
