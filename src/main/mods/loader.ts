@@ -16,7 +16,7 @@ import { INVOKE_NAME_RULE, type InvokeHandler } from './invoke'
  * manifests, orders the mods by what they require, decides which may run main-process code, and
  * requires each `main.js` in that order. It produces the session table the renderer reads before
  * any mod code runs, and the routes and folders the `vxmod://` protocol serves. Everything here
- * starts before `app.whenReady()`. Built-in main entries load before the window is created.
+ * runs before `app.whenReady()`, synchronously, on plain `fs` reads and entry function calls.
  */
 
 /** A handler one `main.js` exports under `protocols`, answering `vxmod://<id>/@/<route>/…`. */
@@ -34,8 +34,8 @@ export interface LoaderInput {
    * mod joined it. A folder with one of these ids is refused; the build's own copy runs.
    */
   readonly builtIn: readonly string[]
-  /** The core-owned lazy entries; a test or rerun may supply the same exports again. */
-  readonly builtInMain?: Readonly<Record<string, () => unknown | Promise<unknown>>>
+  /** The core-owned entry functions; a test or rerun may supply the same exports again. */
+  readonly builtInMain?: Readonly<Record<string, () => unknown>>
   /** The build's version (`BUILD.version`), which the table and the messages name as core's. */
   readonly coreVersion: string
   /** The game's version (`app.getVersion()`), which a manifest's `game` range is held against. */
@@ -72,7 +72,7 @@ interface Candidate {
   /** The `hooks` names that are hooks or kit APIs; the library exports are checked apart. */
   declaredCore: string[]
   /** Present only on a built-in row, so no installed main.js can replace its entry. */
-  mainEntry?: () => unknown | Promise<unknown>
+  mainEntry?: () => unknown
 }
 
 function isFile(path: string): boolean {
@@ -143,7 +143,7 @@ function fail(candidate: Candidate, status: ModStatus, message: string): void {
   candidate.entry.message = message
 }
 
-/** Built-in definitions and lazy entries, checked against the list captured before installs. */
+/** Built-in definitions and entry functions, checked against the list captured before installs. */
 function builtInCandidates(input: LoaderInput): Candidate[] {
   const entries = input.builtInMain ?? BUILT_IN_MAIN_ENTRIES
   const defs = MODS.filter((mod) => input.builtIn.includes(mod.id))
@@ -329,12 +329,12 @@ function invokesOf(exported: unknown, declared: readonly string[]): Map<string, 
  * Loads each built-in entry or installed `main.js` in dependency order. A throw is `failed`; a read of an undeclared
  * kit API is `refused`; either way the whole mod is off, and whatever requires it is blocked.
  */
-async function requireCandidates(
+function requireCandidates(
   candidates: Candidate[],
   order: readonly string[],
   optionalPresent: Readonly<Record<string, readonly string[]>>,
   input: LoaderInput
-): Promise<{ routes: Map<string, Map<string, RouteHandler>>; invokes: Map<string, Map<string, InvokeHandler>>; mainExports: Map<string, unknown> }> {
+): { routes: Map<string, Map<string, RouteHandler>>; invokes: Map<string, Map<string, InvokeHandler>>; mainExports: Map<string, unknown> } {
   const byId = new Map(candidates.filter((one) => one.entry.def).map((one) => [one.entry.id, one]))
   const routes = new Map<string, Map<string, RouteHandler>>()
   const invokes = new Map<string, Map<string, InvokeHandler>>()
@@ -359,7 +359,7 @@ async function requireCandidates(
     const dependencies = new Set([...required, ...optional])
     if (!candidate.hasMain) continue
     try {
-      const exported = manifest === null ? await candidate.mainEntry!() : requireMain({
+      const exported = manifest === null ? candidate.mainEntry!() : requireMain({
         id,
         folder: candidate.entry.folder,
         file: join(candidate.entry.folder, 'main.js'),
@@ -413,7 +413,7 @@ function servedOf(table: ModSessionTable): Map<string, ServedMod> {
  * Runs the loader once. Its own failure turns every installed mod off for the session, with the
  * table saying why, and the game starts as core; nothing here ever writes to disk.
  */
-export async function loadMods(input: LoaderInput): Promise<LoaderResult> {
+export function loadMods(input: LoaderInput): LoaderResult {
   let candidates: Candidate[] = []
   try {
     candidates = builtInCandidates(input)
@@ -426,7 +426,7 @@ export async function loadMods(input: LoaderInput): Promise<LoaderResult> {
       const table = tableOf(candidates, order, input, null)
       return { table, routes: new Map(), invokes: new Map(), served: servedOf(table), mainExports: new Map() }
     }
-    const { routes, invokes, mainExports } = await requireCandidates(candidates, order, optionalPresent, input)
+    const { routes, invokes, mainExports } = requireCandidates(candidates, order, optionalPresent, input)
     const table = tableOf(candidates, order, input, null)
     for (const mod of table.mods) {
       const line = mod.status === 'loaded' ? 'loaded' : `${mod.status}: ${mod.message ?? ''}`

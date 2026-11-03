@@ -22,9 +22,9 @@ afterEach(async () => {
 })
 
 describe('an installed mod whose id the build carries', () => {
-  it('is refused as already part of this build, standing for no mod, from a folder and from a developer folder alike', async () => {
+  it('is refused as already part of this build, standing for no mod, from a folder and from a developer folder alike', () => {
     installFixture(root, 'hello-mod')
-    const result = await loadMods({
+    const result = loadMods({
       modsDir: join(root, 'mods'),
       devFolders: [join(FIXTURES, 'hello-mod')],
       allowUnreviewedMain: true,

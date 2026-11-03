@@ -11,6 +11,8 @@ import { handleModProtocol } from '../../src/main/mods/protocol'
 import { useModSessionStore } from '../../src/renderer/stores/modSessionStore'
 import { FIXTURES, installFixture } from './fixtureMods'
 import { restoreApi, stubApi } from '../fixtures'
+import { entry } from '../fixtures/builtin-main/entry'
+import { throwingEntry } from '../fixtures/builtin-main/throws'
 
 const electron = vi.hoisted(() => ({ handle: vi.fn(), fetch: vi.fn() }))
 vi.mock('electron', () => ({ protocol: { handle: electron.handle }, net: { fetch: electron.fetch } }))
@@ -22,7 +24,6 @@ const def = (id: string, hooks?: readonly string[]): ModDef => ({
   id, hooks, name: id, author: 'test', version: '1.0.0', scope: 'anytime',
   defaultOn: false, blurb: 'A built-in fixture.'
 })
-const entry = () => import('../fixtures/builtin-main/entry')
 
 beforeEach(async () => {
   root = await mkdtemp(join(tmpdir(), 'vu-builtin-main-'))
@@ -35,7 +36,7 @@ afterEach(async () => {
   await rm(root, { recursive: true, force: true })
 })
 
-function run(builtInMain: LoaderInput['builtInMain'], over: Partial<LoaderInput> = {}): Promise<LoaderResult> {
+function run(builtInMain: LoaderInput['builtInMain'], over: Partial<LoaderInput> = {}): LoaderResult {
   return loadMods({
     modsDir: join(root, 'mods'), devFolders: [], allowUnreviewedMain: true,
     builtIn: MODS.map(mod => mod.id), builtInMain,
@@ -61,7 +62,7 @@ async function call(result: LoaderResult, id: string): Promise<unknown> {
 
 it('loads built-ins from start, dispatches their invoke and serves their route without exposing core files', async () => {
   installMods([def('one', ['invoke']), def('no-main')])
-  const result = await run({ one: entry })
+  const result = run({ one: entry })
   expect(sessionRow(result.table, 'one')?.status).toBe('loaded')
   expect(sessionRow(result.table, 'no-main')?.status).toBe('loaded')
   // A default-off switch does not prevent a loaded handler from answering.
@@ -83,11 +84,11 @@ it.each([
     { route: 'ping', handle: () => 'bad' }, { route: 'ping', handle: () => 'bad' }
   ] })],
   ['bad route name', () => ({ protocols: [{ route: 'Bad/name', handle: () => 'bad' }] })],
-  ['load exception', () => import('../fixtures/builtin-main/throws')]
+  ['entry exception', throwingEntry]
 ])('fails only the offending built-in for %s, leaving its whole mod off', async (_reason, bad) => {
   installMods([def('bad', ['invoke']), def('good', ['invoke'])])
   // A valid route cannot survive another part of the same entry failing validation.
-  const result = await run({ bad: async () => ({ protocols: (await entry()).protocols, ...await bad() }), good: entry })
+  const result = run({ bad: () => ({ protocols: entry().protocols, ...bad() }), good: entry })
   expect(sessionRow(result.table, 'bad')?.status).toBe('failed')
   expect(sessionRow(result.table, 'bad')?.message).toMatch(/^main entry failed:/)
   expect(isRunning(result.table, 'bad')).toBe(false)
@@ -108,17 +109,17 @@ it.each([
 
 it('refuses an undeclared invoke through the same declaration check as installed main.js', async () => {
   installMods([def('undeclared')])
-  const result = await run({ undeclared: entry })
+  const result = run({ undeclared: entry })
   expect(sessionRow(result.table, 'undeclared')?.status).toBe('failed')
   expect(sessionRow(result.table, 'undeclared')?.message).toContain('`invoke`')
   expect(result.invokes.has('undeclared')).toBe(false)
   expect(result.routes.has('undeclared')).toBe(false)
 })
 
-it('refuses unknown table ids without importing them or affecting known entries', async () => {
+it('refuses unknown table ids without calling their functions or affecting known entries', async () => {
   installMods([def('known', ['invoke'])])
   const unknown = vi.fn(entry)
-  const result = await run({ unknown, known: entry })
+  const result = run({ unknown, known: entry })
   expect(unknown).not.toHaveBeenCalled()
   expect(result.table.mods.find(mod => mod.id === 'unknown')).toMatchObject({ status: 'refused', def: null })
   expect(result.invokes.has('unknown')).toBe(false)
@@ -127,7 +128,7 @@ it('refuses unknown table ids without importing them or affecting known entries'
 
 it('keeps handlers and routes in their owning id, including result claims', async () => {
   installMods([def('one', ['invoke']), def('two')])
-  const result = await run({ one: entry })
+  const result = run({ one: entry })
   await expect(call(result, 'two')).rejects.toMatchObject({ code: 'MOD_INVOKE_UNKNOWN' })
   const invocations = new ModInvocations()
   invocations.replace(result.table, result.invokes)
@@ -144,7 +145,7 @@ it.each(['hello-mod', 'another-folder'])('cannot replace a built-in entry throug
   const dev = join(root, 'dev', folderName)
   cpSync(join(FIXTURES, 'hello-mod'), dev, { recursive: true })
   const requireMain = vi.fn(() => ({ invoke: { identity: () => 'replacement' } }))
-  const result = await run({ 'hello-mod': entry }, { devFolders: [dev], requireMain })
+  const result = run({ 'hello-mod': entry }, { devFolders: [dev], requireMain })
   const refused = result.table.mods.filter(mod => mod.def === null)
   expect(refused).toHaveLength(2)
   expect(refused.map(mod => [mod.dev, mod.status, mod.message])).toEqual([
@@ -156,10 +157,10 @@ it.each(['hello-mod', 'another-folder'])('cannot replace a built-in entry throug
   expect(await (await serve(result)(new Request('vxmod://hello-mod/@/ping'))).text()).toBe('built-in pong')
 })
 
-it('does not import built-in entries in safe start', async () => {
+it('does not call built-in entry functions in safe start', () => {
   installMods([def('one', ['invoke'])])
   const load = vi.fn(entry)
-  const result = await run({ one: load }, { safeStart: 'flag' })
+  const result = run({ one: load }, { safeStart: 'flag' })
   expect(load).not.toHaveBeenCalled()
   expect(result.invokes.size).toBe(0)
   expect(result.routes.size).toBe(0)

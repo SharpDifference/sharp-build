@@ -50,7 +50,7 @@ describe('shared rules in main', () => {
     installFixture(data, 'hello-mod')
     await installBroken(data)
     await setModSwitches({ on: {}, options: {} })
-    await startModSession()
+    startModSession()
   })
   afterEach(async () => {
     await rm(root, { recursive: true, force: true })

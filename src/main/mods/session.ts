@@ -16,7 +16,7 @@ import { ModInvocations } from './invoke'
 /**
  * The one mod session of this run: the loader's result, held for the protocol, the bridge and
  * the Mods screen. Started at the top of `main/index.ts`, before the schemes are registered;
- * its lazy built-in entries finish loading before the window is created.
+ * everything it does before `ready` is synchronous.
  */
 
 let result: LoaderResult | null = null
@@ -65,10 +65,10 @@ function safeStartOf(): SafeStart {
 }
 
 /** Runs the loader. Called once, before the schemes are registered. */
-export async function startModSession(): Promise<void> {
+export function startModSession(): void {
   const { devFolders, allowUnreviewedMain } = loaderSettings()
   hold(
-    await loadMods({
+    loadMods({
       modsDir: getModsDirPath(),
       devFolders,
       allowUnreviewedMain,
@@ -93,10 +93,10 @@ export function modSession(): ModSessionTable {
  * already required hands back what it exported the first time. What the window reads on its next
  * load is then this run's table, and `MODS` holds its definitions.
  */
-export async function rerunModChecks(): Promise<void> {
+export function rerunModChecks(): void {
   const before = result
   const { devFolders, allowUnreviewedMain } = loaderSettings()
-  const next = await loadMods({
+  const next = loadMods({
     modsDir: getModsDirPath(),
     devFolders,
     allowUnreviewedMain,
@@ -166,9 +166,9 @@ function markFailed(id: string, status: ModStatus, message: string): void {
  * reload the window makes reads a fresh table; `main.js` cannot be swapped in place, so that is
  * only told. Every window hears of it and decides what to offer.
  */
-async function devFolderChanged(folder: string, kind: DevChangeKind, files: readonly string[]): Promise<void> {
+function devFolderChanged(folder: string, kind: DevChangeKind, files: readonly string[]): void {
   const id = result?.table.mods.find((mod) => mod.dev && mod.folder === resolve(folder))?.id ?? basename(folder)
-  if (kind === 'renderer') await rerunModChecks()
+  if (kind === 'renderer') rerunModChecks()
   console.log(`[mods] ${id}: ${kind === 'main' ? 'main.js' : files.join(', ')} changed in ${folder}`)
   for (const window of BrowserWindow.getAllWindows()) {
     if (!window.webContents.isDestroyed()) window.webContents.send('mods:devChanged', { id, kind })
