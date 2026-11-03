@@ -1,14 +1,14 @@
 import { createHash } from 'crypto'
 import { open, mkdir, readFile, readdir, lstat, unlink } from 'fs/promises'
 import { basename, join } from 'path'
-import { appError } from '@shared/errors'
+import { appError } from '@vx/modkit/shared'
 import { modOn } from '@vx/modkit/shared'
 import { requiredBackupPart } from '@vx/modkit/main'
 import { SoundtrackLibrary } from '../../shared/soundtrackLibrary'
 import { SOUNDTRACK_FILE, SOUNDTRACK_MAX_BYTES, SOUNDTRACK_MOD } from '../../shared/soundtracks'
 import { getDataPath } from '../paths'
 import { getModSwitches } from './modsService'
-import { writeAtomicBytes, writeAtomicJson } from './jsonFile'
+import { writeAtomicBytes, writeAtomicJson } from '@vx/modkit/main'
 import { soundtrackBackupPart } from './soundtrackBackup'
 
 const WRITE_ERROR = { code: 'SOUNDTRACK_WRITE', message: 'Could not save soundtrack choices.' }

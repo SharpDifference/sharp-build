@@ -1,7 +1,7 @@
 import { create } from 'zustand'
 import { assertSoundtrackDuration, SOUNDTRACK_MOD, type SoundtrackKey, type SoundtrackMap } from '../../shared/soundtracks'
 import { toAppError } from '@shared/errors'
-import type { Result } from '@shared/types'
+import type { Result } from '@vx/modkit/shared'
 import { modIsOn } from '@vx/modkit/renderer'
 
 function unwrap<T>(result: Result<T>): T {

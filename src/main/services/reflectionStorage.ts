@@ -1,10 +1,10 @@
 import { mkdir, readFile, readdir, rename, rm, writeFile } from 'fs/promises'
 import { join } from 'path'
 import { randomUUID } from 'crypto'
-import { assertSafeCharId } from '@shared/characterRules'
+import { assertSafeCharId } from '@vx/modkit/shared'
 import { ECHO_ART_ID } from '../../shared/echo'
 import { assertReflectionStage, reflectionStageOf, type ReflectionStage } from '@shared/reflectionPortrait'
-import { imageTypeOf } from '@shared/imageBytes'
+import { imageTypeOf } from '@vx/modkit/shared'
 import { getDataPath } from '../paths'
 
 /** Optional JSON extension: no new ZIP paths or changes to the stock character schema. */
