@@ -104,7 +104,7 @@ are dropped and at most four kept.
 | `src/renderer/views/StoryAssistantPanel.tsx` | The rail seat, the panel and the mark |
 | `src/renderer/views/StoryAssistantPage.tsx` | The mod's page on the Mods screen |
 | `src/renderer/vu_styles/StoryAssistant.css` | All three surfaces' layout |
-| `src/renderer/modEntries/story-assistant.ts` | Registers `scenePlay`, `stageLayer` and `modDetail` |
+| `src/renderer/modEntries/story-assistant.ts` | Registers `scenePlay`, `stageLayer` and `modDetail`, each screen loaded when it is first drawn |
 
 The kit has no reader yet for the scene being played, so the store reads the game store and the
 helpers a continuation's prompt is built from (the transcript stubs, her memory, secret and notes
