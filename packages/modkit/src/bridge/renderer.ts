@@ -94,3 +94,5 @@ export { FEED_EMOJI, FEED_EMOJI_BAG, FEED_HANDLE_BAG, FEED_HANDLE_POOL } from '.
 
 export { bunnybotSays } from '../../../../src/renderer/mods/bunnybot'
 export { invoke } from '../../../../src/renderer/mods/invoke'
+export { addMemory, addPostComments, toggleFeedLike } from '../../../../src/renderer/mods/records'
+export { saveChanges } from '../../../../src/renderer/stores/loop/saves'
