@@ -1,5 +1,4 @@
 import { pendingTraining } from './training'
-import { writeAutosave } from '../stores/loop/saves'
 import { gameById } from './prefs'
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type JSX } from 'react'
 import { createPortal } from 'react-dom'
@@ -29,6 +28,7 @@ import {
   TextField,
   TitleTab,
   TurnField,
+  dropTransientLines,
   useModalShell,
   useModOption,
   useSceneInput,
@@ -37,12 +37,11 @@ import {
 import type { ScenePanelProps } from '../mods/hooks'
 import { useGameStore } from '../stores/gameStore'
 import { gameComponent, type GamePlay, type Opponent, type PlayResult } from './play'
-import { agreementAvailable, checkpointResult, keptAgreed, useTableStore, type Agreed } from './session'
+import { agreementAvailable, checkpointResult, keptAgreed, saveSceneMiniGame, useTableStore, type Agreed } from './session'
 import { tableRound } from './round'
 import { skillOf } from './skill'
 import {
   closeTable,
-  compactTable,
   fileResult,
   nameOf,
   holdForReader,
@@ -194,7 +193,7 @@ export function MiniGamePanel({ theme, onClose }: ScenePanelProps): JSX.Element 
       charIds: seated.opponents.map(girl => girl.charId), location,
       stake: seated.stake, options: seated.options })
     useTableStore.getState().dropAgreed()
-    void writeAutosave(useGameStore.getState().captureScene())
+    void saveSceneMiniGame()
   }, [seated?.game.id, seated?.opponents, seated?.options, seated?.stake, location])
 
   // Her skill, judged when she agreed and ready by now more often than not.
@@ -450,7 +449,7 @@ export function MiniGamePanel({ theme, onClose }: ScenePanelProps): JSX.Element 
       },
       finish: (ended) => {
         checkpointResult(ended, seated?.opponents?.map(girl => girl.name) ?? [])
-        void writeAutosave(useGameStore.getState().captureScene())
+        void saveSceneMiniGame()
         setResult(ended)
       }
     }),
@@ -460,13 +459,13 @@ export function MiniGamePanel({ theme, onClose }: ScenePanelProps): JSX.Element 
   function leave(ended: PlayResult): void {
     if (training && ended.outcome === 'broken') {
       closeTable()
-      compactTable()
+      dropTransientLines(MINI_GAMES)
       setResult(null)
       setTrainingFault(true)
       return
     }
     closeTable()
-    compactTable()
+    dropTransientLines(MINI_GAMES)
     if (!seated) return
     // Whoever sat down, judged yet or not: she was at the table either way.
     const names = seated.opponents?.map((opponent) => opponent.name) ?? (agreed?.charIds ?? []).map(nameOf)

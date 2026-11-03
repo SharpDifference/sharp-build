@@ -20,7 +20,7 @@ import { MiniGameSeat } from '../minigames/MiniGameSeat'
 import { agreedOf, withOffer, withGameHints, withInvitationField, type InviteChoice } from '../minigames/offer'
 import { gameComponent } from '../minigames/play'
 import { answerOf, withProposal, type Asked } from '../minigames/proposal'
-import { clearMatch, keepInvitation, keptInvitation, sceneMiniGame, useTableStore } from '../minigames/session'
+import { clearMatch, keepInvitation, keptInvitation, savedMiniGame, sceneMiniGame, useTableStore } from '../minigames/session'
 import { skillOf } from '../minigames/skill'
 import { gameIsOn, nameOf } from '../minigames/table'
 import { registerHooks } from '../mods/hooks'
@@ -173,7 +173,7 @@ registerHooks(MINI_GAMES, {
     requestedOffer = null
     const table = useTableStore.getState()
     table.setPlayed(null)
-    if (sceneMiniGame()?.match?.status === 'result') clearMatch()
+    if (sceneMiniGame().match?.status === 'result') clearMatch()
     keepInvitation(null)
     const invitation = reply.minigameInvite as { game?: unknown; location?: unknown } | undefined
     const invited = !ending && offered?.choices.find(choice => choice.game.id === invitation?.game &&
@@ -218,7 +218,7 @@ registerHooks(MINI_GAMES, {
 
   // A save taken at a table starts its match over; one taken after it goes on from the result.
   saveNote: (scene) => {
-    const status = scene.miniGame?.match?.status
+    const status = savedMiniGame(scene).match?.status
     if (status === 'playing') return 'Loading this save restarts the mini-game with the same players and settings.'
     return status === 'result' ? 'The mini-game result is saved. Loading continues after the match.' : null
   }

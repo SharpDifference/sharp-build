@@ -1,19 +1,26 @@
-import {beforeEach, describe, it, expect, vi} from 'vitest'
+import {beforeAll, beforeEach, describe, it, expect, vi} from 'vitest'
+import { miniGamesReady } from './fixtures/miniGamesKit'
+import {bindSceneFieldSaves} from '@vx/modkit/host/renderer'
 import {useGameStore} from '../src/renderer/stores/gameStore'
-import {checkpointResult, clearMatch, keepInvitation, keptInvitation, keptAgreed, sceneMiniGame, useTableStore} from '../src/renderer/minigames/session'
+import {checkpointResult, clearMatch, keepInvitation, keptInvitation, keptAgreed, savedMiniGame, sceneMiniGame, useTableStore} from '../src/renderer/minigames/session'
 import {fileResult, resumeMiniGameResult} from '../src/renderer/minigames/table'
-import {writeAutosave, queuedScene} from '../src/renderer/stores/loop/saves'
+import {queuedScene} from '../src/renderer/stores/loop/saves'
 import {submitAction} from '../src/renderer/stores/gameLoop'
 import DARTS from '@shared/minigameEntries/darts'
 
 // The kit's renderer entry loads the game's stores; these tests take each name from its own module.
 vi.mock('@vx/modkit/renderer', async () => (await import('./fixtures/miniGamesKit')).miniGamesKit())
+beforeAll(miniGamesReady)
 vi.mock('../src/renderer/stores/gameLoop',()=>({submitAction:vi.fn(),takeTurnFromReply:vi.fn(()=>false)}))
-vi.mock('../src/renderer/stores/loop/saves',async original=>({...await original<typeof import('../src/renderer/stores/loop/saves')>(),writeAutosave:vi.fn(async()=>{})}))
+
 vi.mock('../src/renderer/stores/loop/hooks',async original=>({...await original<typeof import('../src/renderer/stores/loop/hooks')>(),advance:vi.fn()}))
 vi.mock('../src/renderer/views/boxRows',()=>({boxFits:()=>true}))
 const agreed={gameId:'darts',location:'pino_cola_lounge',charIds:['a','b'],stake:'Peach fizz',options:{'darts-mode':2,'darts-start':2}}
 const outcome={outcome:'won' as const,summary:'You won.',account:['The final dart has landed.']}
+type Written={ok:true;data:null}
+// The scene field's saves, standing in for core's: each puts the value on the store and is written.
+const save=vi.fn(async(_modId:string,_keys:readonly string[],apply:()=>void):Promise<Written>=>{apply();return {ok:true,data:null}})
+beforeAll(()=>bindSceneFieldSaves({save}))
 beforeEach(()=>{
  vi.clearAllMocks()
  useGameStore.getState().reset()
@@ -42,8 +49,9 @@ describe('mini-game scene checkpoint',()=>{
   useTableStore.getState().setAgreed({...agreed,charIds:[]})
   const saved=useGameStore.getState().captureScene()!
   sceneMiniGame()!.match!.options['darts-mode']=1
-  expect(saved.mods!.miniGame!.match!.options['darts-mode']).toBe(2)
-  expect(saved.mods!.miniGame!.match!.charIds).toEqual([])
+  const kept=savedMiniGame(saved.mods!)
+  expect(kept.match!.options['darts-mode']).toBe(2)
+  expect(kept.match!.charIds).toEqual([])
  })
  it('rewinding before an invitation invalidates it',()=>{
   useGameStore.setState({currentSceneTranscript:[{speaker:'reader',text:'Hello'},{speaker:'a',text:'Darts?'}]})
@@ -58,7 +66,7 @@ describe('mini-game scene checkpoint',()=>{
   expect(keptAgreed()).toBeNull()
   useTableStore.getState().setAgreed(agreed)
   useGameStore.getState().setCast([])
-  expect(sceneMiniGame()).toBeUndefined()
+  expect(sceneMiniGame()).toEqual({})
  })
  it('settled result blocks restart even before the final dialogue is read',()=>{
   useTableStore.getState().setAgreed(agreed)
@@ -66,21 +74,21 @@ describe('mini-game scene checkpoint',()=>{
   expect(keptAgreed()).toBeNull()
   const saved=useGameStore.getState().captureScene()!
   useGameStore.getState().restoreScene(saved)
-  expect(sceneMiniGame()?.match?.result).toEqual(outcome)
+  expect(sceneMiniGame().match?.result).toEqual(outcome)
   useTableStore.getState().setAgreed(agreed)
   expect(keptAgreed()).toBeNull()
  })
  it('persists once before starting aftermath and ignores duplicate callbacks',async()=>{
   useTableStore.getState().setAgreed(agreed)
   let saved!:()=>void
-  vi.mocked(writeAutosave).mockImplementationOnce(()=>new Promise<void>(resolve=>{saved=resolve}))
+  save.mockImplementationOnce((_modId,_keys,apply)=>{apply();return new Promise<Written>(resolve=>{saved=()=>resolve({ok:true,data:null})})})
   fileResult(outcome,{game:DARTS,names:['Ana','Bea'],stake:agreed.stake})
   expect(submitAction).not.toHaveBeenCalled()
-  expect(sceneMiniGame()?.match?.status).toBe('result')
+  expect(sceneMiniGame().match?.status).toBe('result')
   // A recovery effect cannot submit a second request while persistence is busy.
   resumeMiniGameResult()
   saved(); await vi.waitFor(()=>expect(submitAction).toHaveBeenCalledTimes(1))
-  expect(writeAutosave).toHaveBeenCalledTimes(1)
+  expect(save).toHaveBeenCalledTimes(1)
   fileResult(outcome,{game:DARTS,names:['Ana','Bea'],stake:agreed.stake})
   expect(submitAction).toHaveBeenCalledTimes(1)
  })
@@ -105,6 +113,21 @@ describe('mini-game scene checkpoint',()=>{
   useTableStore.getState().setAgreed(agreed)
   const base=useGameStore.getState().captureScene()!
   clearMatch()
-  expect(queuedScene(base,[]).mods?.miniGame?.match).toBeUndefined()
+  expect(savedMiniGame(queuedScene(base,[]).mods??{}).match).toBeUndefined()
+ })
+ it('reads a match an older save kept under its old key, and moves it on the next change',()=>{
+  const match={...agreed,id:'m1',status:'playing'}
+  useGameStore.getState().restoreScene({...useGameStore.getState().captureScene()!,mods:{miniGame:{match}} as never})
+  expect(keptAgreed()).toMatchObject(agreed)
+  checkpointResult(outcome,['Ana','Bea'])
+  const mods=useGameStore.getState().captureScene()!.mods as Record<string,unknown>
+  expect(mods).not.toHaveProperty('miniGame')
+  expect(savedMiniGame(mods).match?.result).toEqual(outcome)
+ })
+ it('leaves out a damaged match rather than reopening it',()=>{
+  useGameStore.getState().restoreScene({...useGameStore.getState().captureScene()!,
+   mods:{'mini-games':{match:{gameId:'darts',status:'playing',charIds:'a'},invitation:{gameId:'darts',location:null}}} as never})
+  expect(keptAgreed()).toBeNull()
+  expect(sceneMiniGame()).toEqual({invitation:{gameId:'darts',location:null}})
  })
 })
