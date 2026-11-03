@@ -1,9 +1,6 @@
 import type { ModDef } from '@vx/modkit/shared'
-import { RECKONING_AFFECTION_MIN, type ReckoningState } from '../reckoning'
-import { registerTermCarry } from '../modCarry'
+import { RECKONING_AFFECTION_MIN } from '../reckoning'
 
-declare module '../modCarry' { interface ModCarryFields { exReckoning?: ReckoningState } }
-registerTermCarry('exReckoning', () => ({ version: 1, active: null }))
 const mod: ModDef = {
   id: 'reckoning',
   name: 'Breaking Through the Silence',

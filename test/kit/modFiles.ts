@@ -217,7 +217,7 @@ export const MOD_FILES: Record<string, ModSet> = {
       'assets/sound/community/reckoning/**'
     ]
   },
-  'starting-challenge': { globs: ['src/shared/startingChallenge.ts'] },
+  'starting-challenge': { globs: ['src/shared/startingChallenge.ts', 'src/shared/startingChallengeCarry.ts'] },
   'story-memory': {
     globs: [
       'src/shared/storyMemory*.ts',
