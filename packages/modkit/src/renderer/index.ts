@@ -59,6 +59,7 @@ export type {
   ResolvedSave,
   SceneDividerProps,
   SceneInputLayout,
+  SceneLineOptions,
   ScreenTheme,
   SelectFieldOption,
   SelectFieldProps,
@@ -160,4 +161,5 @@ export {
 } from '../bridge/renderer'
 
 export { bunnybotSays } from '../bridge/renderer'
+export { boxParts, dropTransientLines, reachTurn, readerSaysInScene, sayInScene } from '../bridge/renderer'
 export { invoke } from '../bridge/renderer'

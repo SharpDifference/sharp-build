@@ -12,7 +12,7 @@ import {
   type SceneState,
   type TimeSlot
 } from '@shared/types'
-import { useGameStore, type ReplayStayFields } from '../gameStore'
+import { savedSceneRecords, useGameStore, type ReplayStayFields } from '../gameStore'
 import { sceneActiveOf } from '../textingLoop'
 import { useUiStore } from '../uiStore'
 import {
@@ -104,12 +104,12 @@ export function replayOffer(): ReplayOffer {
 
 /**
  * The record a finished slot's scene leaves for the calendar, read before the scene is cleared:
- * its cast with the keys they were played under, and the transcript as delivered. Null where the
- * scene said nothing but the reader's own lines.
+ * its cast with the keys they were played under, and the transcript as delivered, less any mod's
+ * lines for the moment only. Null where the scene said nothing but the reader's own lines.
  */
 export function slotReplayOf(date: number, time: TimeSlot): SlotReplay | null {
   const game = useGameStore.getState()
-  const transcript = game.currentSceneTranscript
+  const transcript = savedSceneRecords(game).currentSceneTranscript
   if (!transcript.some((line) => line.speaker !== READER_SPEAKER)) return null
   const cast = [...game.cast]
   const keys = Object.fromEntries(
