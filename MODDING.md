@@ -223,6 +223,8 @@ else the highest, with a line in the log. The loader deletes nothing and writes 
 `await modIsOn(modId)` from `@vx/modkit/main` reads the current switches from disk
 and answers whether that mod is enabled and running this session. Declare
 `main:modIsOn`. Unknown mods, failed loads and safe-start exclusions answer false.
+The renderer's `modIsOn` returns a boolean synchronously; main's returns a Promise.
+Always `await` the main version: testing the Promise itself would always be truthy.
 A malformed/unreadable switches file rejects through the normal application error;
 it never silently enables the mod. Main has no active playthrough, so playthrough
 mods are checked against their global switch, not a particular save's enrollment.
@@ -1049,6 +1051,26 @@ being read are cut, the live scene call and any pending ending are dropped and t
 as a decision point; over a reply's last line, that line is taken as turned; at a decision point
 already, nothing changes. It returns `false` when none of these applies (the scene is busy, or
 nothing is waiting on the reader), and then the panel sends nothing.
+
+A panel that says something in the scene without sending a turn uses the scene's lines from
+`@vx/modkit/renderer`. `sayInScene(id, text, { charId, expression, transient })` puts the words
+on the transcript, which every later request quotes, and on the box. They are split as the
+scene's own lines are, and the reader's turn is closed until they are read. With `charId` they
+are hers, and `expression` sets her face in the outfit she has on; without, they are narration.
+It returns `false` and says nothing where the mod is off, the words are empty, she is not in the
+scene, or no scene takes lines (none is running, it is a replay, or it is ending).
+`boxParts(text)` is the same split alone, for a panel that paces each part itself.
+`readerSaysInScene(text)` puts the reader's words on the scene as an action he took, with nobody
+asked to answer. `reachTurn()` brings the scene to his turn: `takeTurnFromReply`, or, where a
+mod's own last line stands on the box with nothing behind it, the turn opened. Where no scene
+takes lines, it returns `false` and changes nothing, so it never cuts into an ending.
+
+A `transient` line is said for the moment only, such as a game's move-by-move narration.
+`dropTransientLines(id)` takes the mod's own transient lines back off the transcript, the log
+and the queue, wherever they have got to, and leaves every other line. A box showing one lands
+on the last line kept, and a gift stays on the action that handed it over. Nothing written to disk
+holds one, whether a save, a calendar replay or a Scene Creator saved scene: a reload never
+brings back a line the mod could no longer take back.
 
 A hook point is added where mods actually meet, not ahead of need. Once mods use one, it stays
 as it is: renaming it or changing what it passes breaks them. A change that is needed goes in

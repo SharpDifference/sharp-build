@@ -30,6 +30,7 @@ import {
   type SemesterCalendar
 } from '@shared/semesters'
 import { displaySlotsOf, retireCgs } from './stageDisplay'
+import { transientOwner } from './transientLines'
 import {
   chargeAbsences,
   firstReaderIndexOf,
@@ -1405,6 +1406,73 @@ export function summariesWithin(
   return { sceneSummaries: kept, sceneSummary: kept[kept.length - 1]?.summary ?? null }
 }
 
+/** The scene's records of its lines, the line on the box, and what counts along them. */
+type SceneRecords = Pick<
+  GameStoreState,
+  | 'currentSceneTranscript'
+  | 'sceneLog'
+  | 'pendingLines'
+  | 'currentLine'
+  | 'sceneSummaries'
+  | 'sceneGifts'
+  | 'endingEditAt'
+  | 'reread'
+>
+
+/**
+ * The scene's records without the lines `gone` accepts: off the transcript, the log and the
+ * queue alike. Every mark counted in transcript lines, a gift's action among them, moves down
+ * past the lines taken out before it, and a rewind's count of lines to read again loses those it
+ * would have met. A box showing one shows the log's last line kept that is not the reader's.
+ * Null where no record holds such a line.
+ */
+export function sceneWithout(state: SceneRecords, gone: (line: SceneLine) => boolean): SceneRecords | null {
+  const { currentSceneTranscript: transcript, sceneLog, pendingLines } = state
+  if (!transcript.some(gone) && !sceneLog.some(gone) && !pendingLines.some(gone)) return null
+  const keep = (line: SceneLine): boolean => !gone(line)
+  const goneBefore = (at: number): number => transcript.slice(0, at).filter(gone).length
+  // The lines a rewind put back at the head of the queue, the reader's own not counted.
+  let reread = state.reread
+  let ahead = state.reread
+  for (const line of pendingLines) {
+    if (ahead <= 0) break
+    if (line.speaker === READER_SPEAKER) continue
+    ahead--
+    if (gone(line)) reread--
+  }
+  const keptLog = sceneLog.filter(keep)
+  return {
+    currentSceneTranscript: transcript.filter(keep),
+    sceneLog: keptLog,
+    pendingLines: pendingLines.filter(keep),
+    sceneSummaries: state.sceneSummaries.map((mark) => {
+      const at = mark.at - goneBefore(mark.at)
+      return at === mark.at ? mark : { ...mark, at }
+    }),
+    // A gift stamped before gifts kept their action's index has nothing to move.
+    sceneGifts: state.sceneGifts.map((gift) => {
+      if (gift.at === undefined) return gift
+      const at = gift.at - goneBefore(gift.at)
+      return at === gift.at ? gift : { ...gift, at }
+    }),
+    endingEditAt: state.endingEditAt === null ? null : state.endingEditAt - goneBefore(state.endingEditAt),
+    reread: Math.max(0, reread),
+    currentLine:
+      state.currentLine && gone(state.currentLine)
+        ? (keptLog[lastNonReaderIndexOf(keptLog)] ?? null)
+        : state.currentLine
+  }
+}
+
+/**
+ * The scene's records as anything written to disk holds them: every mod's lines for the moment
+ * only left out, as if it had taken them back, since a scene read back could never take them back
+ * itself.
+ */
+export function savedSceneRecords(state: SceneRecords): SceneRecords {
+  return sceneWithout(state, (line) => transientOwner(line) !== undefined) ?? state
+}
+
 /** A blank stage with its own containers — `emptyStage`'s are shared module-scope objects. */
 function freshStage(): typeof emptyStage {
   return {
@@ -1938,6 +2006,7 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
       return null
     }
     const mods = savedModScene(state.sceneMods)
+    const records = savedSceneRecords(state)
     return {
       // First, so a key core owns always wins.
       ...state.sceneRest,
@@ -1966,14 +2035,14 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
       ...(state.sceneSecret ? { secret: state.sceneSecret } : {}),
       ...(state.sceneEvent ? { event: { ...state.sceneEvent } } : {}),
       ...(state.sceneReceivedGift ? { receivedGift: { ...state.sceneReceivedGift } } : {}),
-      ...(state.sceneGifts.length > 0 ? { gifts: state.sceneGifts.map((g) => ({ ...g })) } : {}),
+      ...(records.sceneGifts.length > 0 ? { gifts: records.sceneGifts.map((g) => ({ ...g })) } : {}),
       ...(state.sceneQuiz
         ? { quiz: { ...state.sceneQuiz, questions: state.sceneQuiz.questions.map((q) => ({ ...q })) } }
         : {}),
-      transcript: [...state.currentSceneTranscript],
+      transcript: [...records.currentSceneTranscript],
       summary: state.sceneSummary,
-      ...(state.sceneSummaries.length > 0
-        ? { summaries: state.sceneSummaries.map((mark) => ({ ...mark })) }
+      ...(records.sceneSummaries.length > 0
+        ? { summaries: records.sceneSummaries.map((mark) => ({ ...mark })) }
         : {}),
       bg: state.bg,
       slots: [...state.slots],
@@ -1988,9 +2057,9 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
       ...(state.bgOverride ? { bgOverride: state.bgOverride } : {}),
       ...(Object.keys(state.outfitLock).length > 0 ? { outfitLock: { ...state.outfitLock } } : {}),
       ...(state.cgLock ? { cgLock: { ...state.cgLock } } : {}),
-      sceneLog: [...state.sceneLog],
-      currentLine: state.currentLine,
-      pendingLines: [...state.pendingLines]
+      sceneLog: [...records.sceneLog],
+      currentLine: records.currentLine,
+      pendingLines: [...records.pendingLines]
     }
   },
 
