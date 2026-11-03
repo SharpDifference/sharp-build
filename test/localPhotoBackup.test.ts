@@ -126,8 +126,9 @@ it('rejects a broken image before core restore and discards its staging', async 
     dir: share, list: [`100/lia/${image}`]
   }, legacy())).rejects.toMatchObject({ code: 'PHOTO_FILE_INVALID' })
   expect(await readFile(dest(image))).toEqual(PNG)
-  expect((await readdir(join(root, 'data', 'mod-data', 'photo-feature')))
-    .filter(name => name.startsWith('.restore-'))).toEqual([])
+  expect((await readdir(tmpdir())).filter(name => name.startsWith('vx-photo-restore-'))).toEqual([])
+  // Staging makes no global mod-data folder.
+  await expect(access(join(root, 'data', 'mod-data', 'photo-feature'))).rejects.toBeTruthy()
 })
 
 it('never includes or replaces native cloud photos', async () => {
@@ -151,11 +152,19 @@ it('restores an older backup with no companion as an empty Photo share', async (
   expect(await exists(dest(image))).toBe(false)
 })
 
-it('fails export rather than discarding a conflicting legacy copy', async () => {
+it('backs up the new copy of a name, leaving a conflicting older copy where it is', async () => {
   await put(dest(image), PNG)
-  await put(join(root, 'data', 'saves', '100', 'photos', 'lia', image),
-    Buffer.concat([PNG, Buffer.from('different legacy image')]))
+  const legacy = join(root, 'data', 'saves', '100', 'photos', 'lia', image)
+  const older = Buffer.concat([PNG, Buffer.from('different legacy image')])
+  await put(legacy, older)
+  const output = await part.export({ scratch: join(root, 'share'), playthroughIds: ['100'] })
+  expect(output.files).toEqual([`100/lia/${image}`])
+  expect(await readFile(join(root, 'share', '100', 'lia', image))).toEqual(PNG)
+  expect(await readFile(legacy)).toEqual(older)
+})
+
+it('names the photo that stops a backup', async () => {
+  await put(dest(image), 'not an image')
   await expect(part.export({ scratch: join(root, 'share'), playthroughIds: ['100'] })).rejects
-    .toMatchObject({ code: 'PHOTO_COPY_FAILED' })
-  expect(await readFile(dest(image))).toEqual(PNG)
+    .toMatchObject({ code: 'PHOTO_FILE_INVALID', detail: image })
 })

@@ -1,13 +1,14 @@
+import { tmpdir } from 'os'
 import { mkdtemp, mkdir, readdir, rm, access } from 'fs/promises'
 import { join } from 'path'
 import {
-  extractZip, modDataPath, requiredBackupPart,
+  extractZip, requiredBackupPart,
   type BackupPart, type BackupPartLegacy
 } from '@vx/modkit/main'
 import { appError, BACKUP_ZIP_LIMITS, SAFE_CHAR_ID, SAFE_NUMERIC_ID } from '@vx/modkit/shared'
 import { isPhotoSidecar } from '../shared/photoFiles'
 import {
-  copyPhotoFile, getPhotoPath, getPhotosRoot, isPhotoImage, legacyPhotosRoot, movePhotoFiles,
+  copyPhotoFile, forgetPhotoMoves, getPhotoPath, getPhotosRoot, isPhotoImage, legacyPhotosRoot, movePhotoFiles,
   photoCharacters, photoFileRendering, photoNames, readPhotoSidecar
 } from './photoFiles'
 
@@ -73,12 +74,12 @@ export const photoBackupPart: BackupPart = {
             if (photoFileRendering(pid, charId, file)) continue
             const source = join(root, charId, file)
             // Old or unreadable metadata never makes a finished image optional.
+            // The new folder is read first; an older copy of the same name is never the backup's.
+            if (copied.has(rel)) continue
             if (isPhotoSidecar(file) && !(await readPhotoSidecar(source))) continue
             await copyPhotoFile(source, join(scratch, pid, charId, file))
-            if (!copied.has(rel)) {
-              copied.add(rel)
-              files.push(rel)
-            }
+            copied.add(rel)
+            files.push(rel)
           }
         }
       }
@@ -86,7 +87,8 @@ export const photoBackupPart: BackupPart = {
     return { json: { schemaVersion: 1 }, files }
   },
   prepare: async (json, files, legacy) => {
-    const stage = await mkdtemp(join(modDataPath('photo-feature'), '.restore-'))
+    // Staged in the system's temporary folder, so a restore makes no global mod-data folder.
+    const stage = await mkdtemp(join(tmpdir(), 'vx-photo-restore-'))
     try {
       let names: string[]
       if (json === undefined && files.list.length === 0) {
@@ -118,7 +120,11 @@ export const photoBackupPart: BackupPart = {
               }
               await copyPhotoFile(join(stage, rel), dest)
             }
-          } finally { await rm(stage, { recursive: true, force: true }) }
+          } finally {
+            await rm(stage, { recursive: true, force: true })
+            // The restored saves folder may hold old photo folders again: the next read looks.
+            forgetPhotoMoves()
+          }
         },
         discard: () => rm(stage, { recursive: true, force: true })
       }

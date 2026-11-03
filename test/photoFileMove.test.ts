@@ -36,6 +36,7 @@ async function put(path: string, bytes: Buffer | string): Promise<void> {
 }
 
 beforeEach(async () => {
+  files.forgetPhotoMoves()
   root = await mkdtemp(join(tmpdir(), 'photo-move-'))
   for (const pid of ['100', '200']) await mkdir(join(root, 'data', 'saves', pid), { recursive: true })
   const actual = await vi.importActual<typeof import('fs/promises')>('fs/promises')
@@ -79,6 +80,8 @@ it('serves the legacy photo while a move fails, then resumes without a done flag
     'everyday', 'At the cafe', image)).toMatchObject({ recorded: true, seed: 41 })
   const actual = await vi.importActual<typeof import('fs/promises')>('fs/promises')
   mocks.copy.mockImplementation(actual.copyFile)
+  // A pass that moved nothing waits for the next session.
+  files.forgetPhotoMoves()
   await files.movePhotoFiles('100')
   expect(await readFile(dest(image))).toEqual(PNG)
   expect(await exists(old(image))).toBe(false)
@@ -92,6 +95,8 @@ it('resumes after copying succeeded but retiring the old copy was interrupted', 
   expect(await readFile(dest(image))).toEqual(PNG)
   expect(await exists(old(image))).toBe(true)
   mocks.remove.mockImplementation(actual.rm)
+  // A pass that moved nothing waits for the next session.
+  files.forgetPhotoMoves()
   await files.movePhotoFiles('100')
   expect(await readFile(dest(image))).toEqual(PNG)
   expect(await exists(old(image))).toBe(false)
@@ -116,6 +121,8 @@ it('retains legacy originals while a checkpoint is unreadable, then retries', as
   expect(await readFile(dest(image))).toEqual(PNG)
   expect(await exists(old(image))).toBe(true)
   await put(join(root, 'data', 'saves', '100', 'autosave.json'), JSON.stringify({ photo: { file: image } }))
+  // A pass that moved nothing waits for the next session.
+  files.forgetPhotoMoves()
   await files.movePhotoFiles('100')
   expect(await exists(old(image))).toBe(false)
   expect(await service.photoLanded('100', 'lia', image)).toBe(true)
@@ -145,7 +152,7 @@ it('carries images and sidecars from both roots into the destination mod data', 
   await put(dest('lia_bunnyboard_002.json'), JSON.stringify({ ...info, seed: 42 }))
   const actual = await vi.importActual<typeof import('fs/promises')>('fs/promises')
   mocks.copy.mockImplementation(async (...args: Parameters<typeof copyFile>) => {
-    if (String(args[1]).includes('/100/mod-data/')) throw new Error('Legacy move interrupted')
+    if (String(args[1]).includes(join('100', 'mod-data'))) throw new Error('Legacy move interrupted')
     return actual.copyFile(...args)
   })
   await service.carryPhotos('100', '200')
@@ -207,4 +214,15 @@ it('keeps photo work inside the playthrough, creating no global mod-data folder'
   await files.movePhotoFiles('100')
   expect(await files.findPhotoImage('100', 'lia', image)).toBe(dest(image))
   expect(await exists(join(root, 'data', 'mod-data', 'photo-feature'))).toBe(false)
+})
+
+it('reads no save again while the only things left in an old folder will not move', async () => {
+  const leftover = join(root, 'data', 'saves', '100', 'photos', 'lia', 'lia_chat_009.png.tmp')
+  await put(leftover, 'half written')
+  await files.movePhotoFiles('100')
+  mocks.read.mockClear()
+  await files.findPhotoImage('100', 'lia', image)
+  await files.findPhotoImage('100', 'lia', image)
+  expect(mocks.read.mock.calls.filter(call => String(call[0]).endsWith('.json'))).toEqual([])
+  expect(await exists(leftover)).toBe(true)
 })

@@ -33,7 +33,7 @@ import { buildDuoPhotoPrompt, buildPhotoPrompt } from '../../shared/photoPrompt'
 import {
   beginPhotoFile, copyPhotoFile, dropPhotoTwins, findPhotoImage, findPhotoSidecar,
   getPhotoPath, getPhotosPath, getPhotosRoot, legacyPhotosRoot, movePhotoFiles,
-  afterOneMove, photoCharacters, photoNames, photoPlaythroughPath, photoReferences, readPhotoImage, readPhotoSidecar
+  afterOneMove, photoCharacters, photoMoveSettled, photoNames, photoPlaythroughPath, photoReferences, readPhotoImage, readPhotoSidecar
 } from '../photoFiles'
 import { withBodySetting } from '../bodySetting'
 import { renderComfyImage, writeAtomicBytes, type ComfyRenderRequest } from '@vx/modkit/main'
@@ -514,6 +514,8 @@ export async function dropPhoto(
   assertSafePlaythroughId(playthroughId)
   assertSafeCharId(charId)
   assertPhotoFile(file)
+  // A move running now could copy the old file across after this drop: let it finish first.
+  await photoMoveSettled(playthroughId)
   try {
     if ((await photoReferences(playthroughId)).all.has(pngPhotoOf(file))) return
   } catch {

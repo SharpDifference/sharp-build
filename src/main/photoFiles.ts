@@ -1,6 +1,6 @@
 import { constants } from 'fs'
 import { copyFile, lstat, mkdir, readdir, readFile, rm, rmdir } from 'fs/promises'
-import { dirname, join } from 'path'
+import { basename, dirname, join } from 'path'
 import { modDataPath, sniffImageFile, writeAtomicBytes } from '@vx/modkit/main'
 import { SAFE_CHAR_ID, assertSafeCharId, assertSafePlaythroughId, appError } from '@vx/modkit/shared'
 import { isPhotoFile, isPhotoSidecar, pngPhotoOf } from '../shared/photoFiles'
@@ -109,7 +109,9 @@ export async function validPhotoFile(path: string): Promise<boolean> {
 
 /** Copies and verifies before a caller may retire its source; conflicting valid copies are kept. */
 export async function copyPhotoFile(source: string, dest: string, keepExisting = false): Promise<void> {
-  if (!(await validPhotoFile(source))) throw appError('PHOTO_FILE_INVALID', 'The photo file is unreadable.')
+  if (!(await validPhotoFile(source))) {
+    throw appError('PHOTO_FILE_INVALID', 'The photo file is unreadable.', basename(source))
+  }
   await mkdir(dirname(dest), { recursive: true })
   if (await regularFile(dest)) {
     if (keepExisting) return
@@ -156,6 +158,18 @@ export async function photoReferences(pid: string): Promise<{ saved: Set<string>
 }
 
 const moves = new Map<string, Promise<void>>()
+/** Playthroughs whose last pass found nothing it could move: later reads skip the move. */
+const idleMoves = new Set<string>()
+
+/** Forgets which playthroughs had nothing to move, after a restore may have brought old folders back. */
+export function forgetPhotoMoves(): void {
+  idleMoves.clear()
+}
+
+/** Resolves once any move running for this playthrough has finished. */
+export async function photoMoveSettled(pid: string): Promise<void> {
+  await moves.get(legacyPhotosRoot(pid))?.catch(() => {})
+}
 /** Playthroughs whose move already ran in the caller's current pass; later reads skip it. */
 const settledMoves = new Set<string>()
 
@@ -178,24 +192,35 @@ export async function movePhotoFiles(
   known?: { saved: Set<string>; all: Set<string> }
 ): Promise<void> {
   assertSafePlaythroughId(pid)
-  if (settledMoves.has(pid)) return
+  if (settledMoves.has(pid) || idleMoves.has(pid)) return
   const oldRoot = legacyPhotosRoot(pid)
   const running = moves.get(oldRoot)
   if (running) return running
   const moving = (async () => {
     const who = await photoCharacters(oldRoot)
-    if (who.length === 0) return
-    const refs = known ?? await photoReferences(pid).catch(() => null)
+    const waiting = new Map<string, string[]>()
     for (const charId of who) {
+      const names = await photoNames(join(oldRoot, charId))
+      if (names.length > 0) waiting.set(charId, names)
+    }
+    // Nothing of Photo's left to move: no save is read, and later reads skip the move.
+    if (waiting.size === 0) {
+      idleMoves.add(pid)
+      return
+    }
+    const refs = known ?? await photoReferences(pid).catch(() => null)
+    let moved = 0
+    for (const [charId, names] of waiting) {
       const folder = join(oldRoot, charId)
-      const names = await photoNames(folder)
-      if (names.length === 0 && (await photoNames(getPhotosPath(pid, charId))).length === 0) continue
       // Referenced images reach the new root first; every source still requires verification.
       names.sort((a, b) => Number(refs?.all.has(pngPhotoOf(b))) - Number(refs?.all.has(pngPhotoOf(a))))
       for (const file of names) {
         try {
           await copyPhotoFile(join(folder, file), getPhotoPath(pid, charId, file))
-          if (refs) await rm(join(folder, file))
+          if (refs) {
+            await rm(join(folder, file))
+            moved += 1
+          }
         } catch (error) {
           console.warn('[photo] kept an unmoved legacy file:', file, error)
         }
@@ -203,6 +228,8 @@ export async function movePhotoFiles(
       // rmdir only succeeds when no unknown, invalid or conflicting files remain.
       await rmdir(folder).catch(() => {})
     }
+    // A pass that moved nothing would move nothing again: what is left stays for this session.
+    if (moved === 0) idleMoves.add(pid)
   })()
   moves.set(oldRoot, moving)
   try { await moving }
