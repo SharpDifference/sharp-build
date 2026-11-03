@@ -33,6 +33,17 @@ const listed = (side: string): string[] =>
   KIT_APIS.filter((api) => api.startsWith(`${side}:`)).map((api) => api.slice(side.length + 1)).sort()
 
 describe('the entry points', () => {
+  it('re-exports narrow native readers and feed draws without wrapping stores', async () => {
+    const readers = await import('../../src/renderer/mods/readers')
+    const mods = await import('../../src/renderer/stores/modsStore')
+    for (const name of ['noNsfwImages', 'subscribeNoNsfwImages', 'useNoNsfwImages',
+      'canRenderLocalImages', 'subscribeCanRenderLocalImages', 'phoneOpen', 'viewingThread',
+      'subscribePhoneView', 'useViewingThread', 'drawFeedHandles', 'drawFeedEmoji'] as const) {
+      expect(rendererKit[name], name).toBe(readers[name])
+    }
+    expect(rendererKit.modOptionOn).toBe(mods.modOptionOn)
+  })
+
   it('re-exports the native lightbox and prompt helpers without wrappers', async () => {
     const lightbox = await import('../../src/renderer/components/Lightbox')
     const relationship = await import('../../src/renderer/prompts/relationship')

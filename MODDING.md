@@ -318,6 +318,23 @@ A few of the game's own readers, each declared as `renderer:<name>` or `shared:<
   the playthrough's first slot, and graduation morning.
 - `lessNsfwText()` and `useLessNsfwText()` (`renderer`): the player has Less NSFW text on, so the
   game's own writing is toned down and a mod's should be. True until the settings are read.
+- `noNsfwImages()`, `useNoNsfwImages()` and `subscribeNoNsfwImages(onChange)` (`renderer`):
+  the game's No NSFW images flag, false until settings are read. The subscription fires only
+  when the flag changes and returns an unsubscribe function.
+- `canRenderLocalImages()` and `subscribeCanRenderLocalImages(onChange)` (`renderer`): core's
+  local-rendering rule. False on the web or before settings load; external ComfyUI is available
+  without a managed install, while managed ComfyUI must be ready and not deferred. The
+  subscription follows both settings and setup and fires only when availability changes.
+- `phoneOpen()`, `viewingThread()` and `useViewingThread()` (`renderer`): whether the phone is
+  open and its selected DM charId (null on its list). `subscribePhoneView(onChange)` follows
+  either value and returns an unsubscribe function; unrelated phone state does not notify.
+  A close handler can keep the previous `phoneOpen()` value and act on true becoming false.
+- `modOptionOn(modId, optionId)` (`renderer`): the non-hook option reader, with the same option
+  defaults as `useModOption`. It reads the option alone, not whether the mod is on; use existing
+  `modIsOn` for that. Unknown options are false.
+- `drawFeedHandles(count)` and `drawFeedEmoji(count)` (`renderer`): draw strings from the game's
+  persistent feed bags. These are draws, not read-only snapshots. Separate calls let a reply
+  keep one part of an identity without spending its replacement. Neither exposes the bag store.
 - `useSfxGain()` (`renderer`): the gain a mod's own sound effects play at, the player's effects
   volume as the game's mix applies it.
 - `modsOnLine()` and `buildLabel()` (`renderer`): the mods that are on, each with its version, as

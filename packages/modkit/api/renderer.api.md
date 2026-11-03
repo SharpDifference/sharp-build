@@ -49,6 +49,9 @@ export function BunnyMark(): JSX.Element;
 export function cancelCalls(modId: string, group: string): Promise<void>;
 
 // @public
+export function canRenderLocalImages(): boolean;
+
+// @public
 export function Card(input: {
     label: string;
     className?: string;
@@ -157,6 +160,12 @@ export function defaultBlockText(id: TextBlockId, settings: {
 
 // @public
 export type DividerWord = 'hover' | 'locked' | 'unavailable' | 'ending';
+
+// @public
+export function drawFeedEmoji(count: number): string[];
+
+// @public
+export function drawFeedHandles(count: number): string[];
 
 // @public
 export function dropTransientLines(modId: string): void;
@@ -478,6 +487,9 @@ export interface ModHooks {
 export function modIsOn(id: string, record?: Pick<PlaythroughRecord, 'mods'> | null): boolean;
 
 // @public
+export function modOptionOn(modId: string, optionId: string): boolean;
+
+// @public
 export function modsOnLine(): string;
 
 // @public
@@ -507,6 +519,9 @@ export function newestFirst(a: {
 }): number;
 
 // @public
+export function noNsfwImages(): boolean;
+
+// @public
 export const noteIn: Variants;
 
 // @public
@@ -526,6 +541,9 @@ export function ownsPostComments(modId: string): boolean;
 
 // @public (undocumented)
 export const panelUnderTab: Variants;
+
+// @public
+export function phoneOpen(): boolean;
 
 // @public
 export function PlusIcon(input: {
@@ -1180,6 +1198,15 @@ sceneEvents?: TurnSnapshot['sceneEvents'],
 answeredReminder?: string, activity?: SlotActivityOffer): Promise<void>;
 
 // @public
+export function subscribeCanRenderLocalImages(onChange: () => void): () => void;
+
+// @public
+export function subscribeNoNsfwImages(onChange: () => void): () => void;
+
+// @public
+export function subscribePhoneView(onChange: () => void): () => void;
+
+// @public
 export function takeTurnFromReply(): boolean;
 
 // @public
@@ -1347,6 +1374,9 @@ export function useModOn(id: string, record?: Pick<PlaythroughRecord, 'mods'> | 
 export function useModOption(modId: string, optionId: string): boolean;
 
 // @public
+export function useNoNsfwImages(): boolean;
+
+// @public
 export function useSafePoint(): ManualSaveOffer;
 
 // @public
@@ -1359,7 +1389,13 @@ export function useScenePersona(): string | undefined;
 export function useSfxGain(): number;
 
 // @public
+export function useViewingThread(): string | null;
+
+// @public
 export const veilIn: Variants;
+
+// @public
+export function viewingThread(): string | null;
 
 // @public
 export type ViewName = 'boot' | 'setup'
