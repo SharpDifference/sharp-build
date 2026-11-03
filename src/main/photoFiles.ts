@@ -156,17 +156,36 @@ export async function photoReferences(pid: string): Promise<{ saved: Set<string>
 }
 
 const moves = new Map<string, Promise<void>>()
+/** Playthroughs whose move already ran in the caller's current pass; later reads skip it. */
+const settledMoves = new Set<string>()
+
+/** Runs `work` after one move, so its many file lookups do not each re-read every save. */
+export async function afterOneMove<T>(
+  pid: string,
+  known: { saved: Set<string>; all: Set<string> },
+  work: () => Promise<T>
+): Promise<T> {
+  await movePhotoFiles(pid, known)
+  if (settledMoves.has(pid)) return work()
+  settledMoves.add(pid)
+  try { return await work() }
+  finally { settledMoves.delete(pid) }
+}
 
 /** Retries while old character folders exist, retaining every unverified or uncertain original. */
-export async function movePhotoFiles(pid: string): Promise<void> {
+export async function movePhotoFiles(
+  pid: string,
+  known?: { saved: Set<string>; all: Set<string> }
+): Promise<void> {
   assertSafePlaythroughId(pid)
+  if (settledMoves.has(pid)) return
   const oldRoot = legacyPhotosRoot(pid)
   const running = moves.get(oldRoot)
   if (running) return running
   const moving = (async () => {
     const who = await photoCharacters(oldRoot)
     if (who.length === 0) return
-    const refs = await photoReferences(pid).catch(() => null)
+    const refs = known ?? await photoReferences(pid).catch(() => null)
     for (const charId of who) {
       const folder = join(oldRoot, charId)
       const names = await photoNames(folder)

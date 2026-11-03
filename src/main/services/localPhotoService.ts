@@ -33,7 +33,7 @@ import { buildDuoPhotoPrompt, buildPhotoPrompt } from '../../shared/photoPrompt'
 import {
   beginPhotoFile, copyPhotoFile, dropPhotoTwins, findPhotoImage, findPhotoSidecar,
   getPhotoPath, getPhotosPath, getPhotosRoot, legacyPhotosRoot, movePhotoFiles,
-  photoCharacters, photoNames, photoPlaythroughPath, photoReferences, readPhotoImage, readPhotoSidecar
+  afterOneMove, photoCharacters, photoNames, photoPlaythroughPath, photoReferences, readPhotoImage, readPhotoSidecar
 } from '../photoFiles'
 import { withBodySetting } from '../bodySetting'
 import { renderComfyImage, writeAtomicBytes, type ComfyRenderRequest } from '@vx/modkit/main'
@@ -555,17 +555,20 @@ export async function flushRetiredPhotos(playthroughId: string): Promise<void> {
   cleanup.running = (async () => {
     try {
       const refs = await photoReferences(playthroughId)
-      for (const [key, photo] of cleanup.pending) {
-        if (cleanup.revision !== revision) break
-        if (
-          !refs.saved.has(pngPhotoOf(photo.newFile)) ||
-          refs.all.has(pngPhotoOf(photo.oldFile))
-        ) continue
-        if (!(await photoLanded(playthroughId, photo.charId, photo.newFile))) continue
-        if (cleanup.revision !== revision) break
-        await removePhotoFiles(playthroughId, photo.charId, photo.oldFile)
-        cleanup.pending.delete(key)
-      }
+      // One move with the references just read; the landing checks below read no saves again.
+      await afterOneMove(playthroughId, refs, async () => {
+        for (const [key, photo] of cleanup.pending) {
+          if (cleanup.revision !== revision) break
+          if (
+            !refs.saved.has(pngPhotoOf(photo.newFile)) ||
+            refs.all.has(pngPhotoOf(photo.oldFile))
+          ) continue
+          if (!(await photoLanded(playthroughId, photo.charId, photo.newFile))) continue
+          if (cleanup.revision !== revision) break
+          await removePhotoFiles(playthroughId, photo.charId, photo.oldFile)
+          cleanup.pending.delete(key)
+        }
+      })
     } catch {
       // A missing, changing or unreadable checkpoint cannot prove a file is unreferenced.
     }
