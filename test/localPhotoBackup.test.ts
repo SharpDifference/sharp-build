@@ -1,152 +1,161 @@
-import { cp, mkdir, mkdtemp, readdir, readFile, rm, writeFile } from 'fs/promises'
-import { existsSync } from 'fs'
+import { mkdir, mkdtemp, readFile, readdir, rm, writeFile, access } from 'fs/promises'
 import { tmpdir } from 'os'
 import { dirname, join } from 'path'
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 
-/**
- * Her DM and feed photos, kept in a zip beside the build's backup. The zip itself is 7-Zip's,
- * which this suite stands in for with a folder copy: what is tested is which files go in, where
- * they come back to, and that a backup with no photos beside it is still restored.
- */
 let root = ''
+const mocks = vi.hoisted(() => ({ render: vi.fn(), afterWrite: vi.fn() }))
 vi.mock('electron', () => ({
   app: { isPackaged: false, getAppPath: () => root, getPath: () => root }
 }))
-vi.mock('../src/main/services/archiveService', async (original) => ({
-  ...(await original<typeof import('../src/main/services/archiveService')>()),
-  createZip: (sourceDir: string, archivePath: string) =>
-    cp(sourceDir, archivePath, { recursive: true }),
-  extractZip: (archivePath: string, destDir: string) =>
-    cp(archivePath, destDir, { recursive: true })
-}))
-
-const { exportLocalPhotos, importLocalPhotos, localPhotosBackupPath } =
-  await import('../src/main/localPhotoBackup')
-
-/** Enough of a PNG for the sniffer: its signature, then anything. */
-const PNG = Buffer.concat([
-  Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
-  Buffer.alloc(32)
-])
-
-const saves = (): string => join(root, 'data', 'saves')
-
-async function put(rel: string, bytes: Buffer | string = PNG): Promise<void> {
-  const path = join(saves(), rel)
+vi.mock('@vx/modkit/main', async original => {
+  const actual = await original<typeof import('@vx/modkit/main')>()
+  return { ...actual, renderComfyImage: mocks.render,
+    writeAtomicBytes: async (...args: Parameters<typeof actual.writeAtomicBytes>) => {
+      await actual.writeAtomicBytes(...args)
+      await mocks.afterWrite(args[0])
+    }
+  }
+})
+const { photoBackupPart: part, localPhotosBackupPath } = await import('../src/main/localPhotoBackup')
+const files = await import('../src/main/photoFiles')
+const { photoInfo, generatePhoto } = await import('../src/main/services/localPhotoService')
+const { character } = await import('./fixtures')
+const { createZip } = await import('../src/main/services/archiveService')
+const PNG = Buffer.concat([Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]), Buffer.alloc(24)])
+const info = { schemaVersion: 1, seed: 91, tier: 'everyday', positive: 'At the cafe', negative: 'bad hands' }
+const image = 'lia_chat_001.png', sidecar = 'lia_chat_001.json'
+const dest = (file: string) => files.getPhotoPath('100', 'lia', file)
+const legacy = () => ({ record: {}, dirs: [], archive: join(root, 'backup.zip') })
+const exists = (path: string) => access(path).then(() => true, () => false)
+async function put(path: string, data: Buffer | string): Promise<void> {
   await mkdir(dirname(path), { recursive: true })
-  await writeFile(path, bytes)
+  await writeFile(path, data)
 }
-
-/** Every file under `dir`, `/`-joined and sorted. */
-async function filesUnder(dir: string): Promise<string[]> {
-  const entries = await readdir(dir, { withFileTypes: true, recursive: true })
-  return entries
-    .filter((entry) => entry.isFile())
-    .map((entry) =>
-      join(entry.parentPath, entry.name)
-        .slice(dir.length + 1)
-        .replace(/\\/g, '/')
-    )
-    .sort()
+async function restoreOwnPhase(): Promise<void> {
+  await rm(join(root, 'data', 'saves'), { recursive: true, force: true })
+  await mkdir(join(root, 'data', 'saves', '100'), { recursive: true })
 }
 
 beforeEach(async () => {
-  root = await mkdtemp(join(tmpdir(), 'venus-local-photos-'))
+  root = await mkdtemp(join(tmpdir(), 'photo-backup-'))
+  await mkdir(join(root, 'data', 'saves', '100'), { recursive: true })
+  mocks.render.mockReset().mockResolvedValue(PNG)
+  mocks.afterWrite.mockReset()
+  vi.spyOn(console, 'warn').mockImplementation(() => {})
 })
-
 afterEach(async () => {
+  vi.restoreAllMocks()
   await rm(root, { recursive: true, force: true })
 })
 
-describe('localPhotosBackupPath', () => {
-  it('names the photos zip after the backup', () => {
-    expect(localPhotosBackupPath('/b/venus-university-backup-2026-10-03.zip')).toBe(
-      '/b/venus-university-backup-2026-10-03.photos.zip'
-    )
-    expect(localPhotosBackupPath('/b/backup.ZIP')).toBe('/b/backup.photos.zip')
-    expect(localPhotosBackupPath('/b/backup')).toBe('/b/backup.photos.zip')
+it('exports finished images and sidecars, leaving an unfinished render out', async () => {
+  await put(dest(image), PNG)
+  await put(dest(sidecar), JSON.stringify(info))
+  await put(dest('lia_chat_002.png'), PNG)
+  await put(dest('lia_chat_002.json'), JSON.stringify({ ...info, seed: 92 }))
+  let release!: () => void
+  mocks.afterWrite.mockImplementation(async (path: string) => {
+    if (path.endsWith('lia_chat_002.png')) await new Promise<void>(resolve => { release = resolve })
   })
+  const drawing = generatePhoto('100', character({ charId: 'lia' }), 'everyday',
+    'At the cafe', 'lia_chat_002.png')
+  await vi.waitFor(() => expect(release).toBeTypeOf('function'))
+  try {
+    const output = await part.export({ scratch: join(root, 'share'), playthroughIds: ['100'] })
+    expect([...output.files!].sort()).toEqual([`100/lia/${sidecar}`, `100/lia/${image}`].sort())
+    expect(await readFile(join(root, 'share', '100', 'lia', image))).toEqual(PNG)
+  } finally { release(); await drawing }
 })
 
-describe('exportLocalPhotos', () => {
-  it("takes her photos and nothing else, not the build's own camera roll", async () => {
-    await put('123/photos/winter/winter_chat_001.png')
-    await put('123/photos/winter/winter_bunnyboard_002.png')
-    await put('456/photos/livvie/livvie_chat_001.png')
-    // The build's own photos sit beside her folders, under a number.
-    await put('123/photos/1790000000000.png')
-    await put('123/photos/1790000000000.json', '{}')
-    // Named as one of hers but not a picture, and a picture not named as one.
-    await put('123/photos/winter/winter_chat_003.png', 'not a picture')
-    await put('123/photos/winter/notes.png')
-    await put('123/save_auto.json', '{}')
-
-    const backup = join(root, 'out', 'backup.zip')
-    await exportLocalPhotos(backup)
-
-    expect(await filesUnder(localPhotosBackupPath(backup))).toEqual([
-      '123/winter/winter_bunnyboard_002.png',
-      '123/winter/winter_chat_001.png',
-      '456/livvie/livvie_chat_001.png'
-    ])
-  })
-
-  it('writes nothing where there are no photos, and never leaves an older zip behind', async () => {
-    await put('123/save_auto.json', '{}')
-    const backup = join(root, 'out', 'backup.zip')
-    // A zip from an earlier backup under the same name.
-    await mkdir(join(root, 'out'), { recursive: true })
-    await writeFile(localPhotosBackupPath(backup), 'an older zip')
-
-    await exportLocalPhotos(backup)
-
-    expect(existsSync(localPhotosBackupPath(backup))).toBe(false)
-  })
+it('fails a finished image export instead of silently omitting unreadable data', async () => {
+  await put(dest(image), 'not an image')
+  await expect(part.export({ scratch: join(root, 'share'), playthroughIds: ['100'] })).rejects
+    .toMatchObject({ code: 'PHOTO_FILE_INVALID' })
 })
 
-describe('importLocalPhotos', () => {
-  it('puts her photos back into the playthroughs the restore brought back', async () => {
-    await put('123/photos/winter/winter_chat_001.png')
-    const backup = join(root, 'out', 'backup.zip')
-    await exportLocalPhotos(backup)
+it('restores a new backup after core replaces the playthrough folders, preserving recorded info', async () => {
+  await put(dest(image), PNG)
+  await put(dest(sidecar), JSON.stringify(info))
+  await put(dest('lia_chat_002.png'), PNG)
+  const output = await part.export({ scratch: join(root, 'share'), playthroughIds: ['100'] })
+  const restore = await part.prepare(output.json,
+    { dir: join(root, 'share'), list: output.files! }, legacy())
+  await restoreOwnPhase()
+  await restore.commit()
+  expect(await readFile(dest(image))).toEqual(PNG)
+  expect(await readFile(dest('lia_chat_002.png'))).toEqual(PNG)
+  expect(await photoInfo('100', character({ charId: 'lia' }), undefined, 'everyday', 'At the cafe', image))
+    .toMatchObject({ ...info, recorded: true })
+  await restore.discard()
+})
 
-    // The restore replaced the saves folder: playthrough 123 is back, without her photos.
-    await rm(saves(), { recursive: true, force: true })
-    await put('123/save_auto.json', '{}')
+it('imports an older companion zip, including 1.7.0 sidecars and photos without one', async () => {
+  const source = join(root, 'old-share')
+  await put(join(source, '100', 'lia', image), PNG)
+  await put(join(source, '100', 'lia', sidecar), JSON.stringify(info))
+  await put(join(source, '100', 'lia', 'lia_chat_002.png'), PNG)
+  await put(join(source, '100', 'lia', 'lia_chat_002.json'), '{')
+  await createZip(source, localPhotosBackupPath(legacy().archive))
+  const restore = await part.prepare(undefined, { dir: join(root, 'empty'), list: [] }, legacy())
+  await restoreOwnPhase()
+  await restore.commit()
+  expect(await readFile(dest(image))).toEqual(PNG)
+  expect(JSON.parse(await readFile(dest(sidecar), 'utf8'))).toEqual(info)
+  expect(await readFile(dest('lia_chat_002.png'))).toEqual(PNG)
+  expect(await exists(dest('lia_chat_002.json'))).toBe(false)
+})
 
-    await importLocalPhotos(backup)
+it('does not let unreadable optional sidecars block restoring their images', async () => {
+  const share = join(root, 'share')
+  await put(join(share, '100', 'lia', image), PNG)
+  await put(join(share, '100', 'lia', sidecar), '{"schemaVersion":999}')
+  const restore = await part.prepare({ schemaVersion: 1 }, {
+    dir: share, list: [`100/lia/${image}`, `100/lia/${sidecar}`]
+  }, legacy())
+  await restore.commit()
+  expect(await readFile(dest(image))).toEqual(PNG)
+  expect(await exists(dest(sidecar))).toBe(false)
+})
 
-    expect(await readFile(join(saves(), '123/photos/winter/winter_chat_001.png'))).toEqual(PNG)
-  })
+it('rejects a broken image before core restore and discards its staging', async () => {
+  await put(dest(image), PNG)
+  const share = join(root, 'share')
+  await put(join(share, '100', 'lia', image), 'corrupt')
+  await expect(part.prepare({ schemaVersion: 1 }, {
+    dir: share, list: [`100/lia/${image}`]
+  }, legacy())).rejects.toMatchObject({ code: 'PHOTO_FILE_INVALID' })
+  expect(await readFile(dest(image))).toEqual(PNG)
+  expect((await readdir(join(root, 'data', 'mod-data', 'photo-feature')))
+    .filter(name => name.startsWith('.restore-'))).toEqual([])
+})
 
-  it('leaves out a photo for a playthrough the backup did not bring back, and anything not hers', async () => {
-    const backup = join(root, 'out', 'backup.zip')
-    const zip = localPhotosBackupPath(backup)
-    for (const rel of [
-      '123/winter/winter_chat_001.png',
-      '999/winter/winter_chat_001.png',
-      '123/winter/../escape.png',
-      '123/winter/readme.txt',
-      '123/winter/extra/winter_chat_002.png'
-    ]) {
-      const path = join(zip, rel)
-      await mkdir(dirname(path), { recursive: true })
-      await writeFile(path, PNG)
-    }
-    await put('123/save_auto.json', '{}')
+it('never includes or replaces native cloud photos', async () => {
+  const native = join(root, 'data', 'saves', '100', 'photos', '1790000000000.png')
+  await put(native, PNG)
+  await put(native.replace('.png', '.json'), '{"native":true}')
+  await put(dest(image), PNG)
+  const output = await part.export({ scratch: join(root, 'share'), playthroughIds: ['100'] })
+  expect(output.files).toEqual([`100/lia/${image}`])
+  const restore = await part.prepare(output.json,
+    { dir: join(root, 'share'), list: output.files! }, legacy())
+  await restore.commit()
+  expect(await readFile(native)).toEqual(PNG)
+  expect(await readFile(native.replace('.png', '.json'), 'utf8')).toBe('{"native":true}')
+})
 
-    await importLocalPhotos(backup)
+it('restores an older backup with no companion as an empty Photo share', async () => {
+  const restore = await part.prepare(undefined, { dir: join(root, 'empty'), list: [] }, legacy())
+  await restoreOwnPhase()
+  await restore.commit()
+  expect(await exists(dest(image))).toBe(false)
+})
 
-    expect(await filesUnder(saves())).toEqual([
-      '123/photos/winter/winter_chat_001.png',
-      '123/save_auto.json'
-    ])
-  })
-
-  it('does nothing when there is no photos zip beside the backup', async () => {
-    await put('123/save_auto.json', '{}')
-    await importLocalPhotos(join(root, 'out', 'backup.zip'))
-    expect(await filesUnder(saves())).toEqual(['123/save_auto.json'])
-  })
+it('fails export rather than discarding a conflicting legacy copy', async () => {
+  await put(dest(image), PNG)
+  await put(join(root, 'data', 'saves', '100', 'photos', 'lia', image),
+    Buffer.concat([PNG, Buffer.from('different legacy image')]))
+  await expect(part.export({ scratch: join(root, 'share'), playthroughIds: ['100'] })).rejects
+    .toMatchObject({ code: 'PHOTO_COPY_FAILED' })
+  expect(await readFile(dest(image))).toEqual(PNG)
 })

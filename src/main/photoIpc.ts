@@ -1,3 +1,4 @@
+import './localPhotoBackup'
 import type { IpcMainInvokeEvent } from 'electron'
 import type { PhotoRenderOptions } from '../shared/photoTypes'
 import { appError, type Character } from '@vx/modkit/shared'

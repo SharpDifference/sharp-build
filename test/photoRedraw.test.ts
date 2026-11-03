@@ -25,13 +25,13 @@ const { dropPhoto, retirePhoto, flushRetiredPhotos } = await import(
 )
 const girl = character({ charId: 'a' })
 const run = (): string => join(root, 'data', 'saves', '1')
-const image = (file: string): string => join(run(), 'photos', 'a', file)
+const image = (file: string): string => join(run(), 'mod-data', 'photo-feature', 'a', file)
 const exists = (path: string): Promise<boolean> => access(path).then(() => true, () => false)
 let currentFile: () => string
 
 beforeEach(async () => {
   root = await mkdtemp(join(tmpdir(), 'photo-redraw-'))
-  await mkdir(join(run(), 'photos', 'a'), { recursive: true })
+  await mkdir(join(run(), 'mod-data', 'photo-feature', 'a'), { recursive: true })
   useGameStore.getState().reset()
   setPhotoSwitches({ on: true, photos: true, explicit: true, webp: false })
   useSettingsStore.setState({ settings: { comfyDeferred: false } as never })
