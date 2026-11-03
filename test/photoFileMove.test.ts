@@ -201,3 +201,10 @@ it('continues reading the legacy image when the new playthrough directory is unw
   expect(await service.readPhotoBytes('100', 'lia', image)).toEqual(new Uint8Array(PNG))
   expect(await exists(old(image))).toBe(true)
 })
+
+it('keeps photo work inside the playthrough, creating no global mod-data folder', async () => {
+  await put(old(image), PNG)
+  await files.movePhotoFiles('100')
+  expect(await files.findPhotoImage('100', 'lia', image)).toBe(dest(image))
+  expect(await exists(join(root, 'data', 'mod-data', 'photo-feature'))).toBe(false)
+})

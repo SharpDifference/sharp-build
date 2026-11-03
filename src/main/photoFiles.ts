@@ -14,10 +14,18 @@ export function getPhotosRoot(pid: string): string {
   return modDataPath('photo-feature', pid)
 }
 
-/** The playthrough folder containing checkpoints and replays. */
+/**
+ * The playthrough folder containing checkpoints and replays: two levels above its mod data. When
+ * that folder cannot be made, the saves folder is found beside the global mod data instead, so
+ * older photos stay readable.
+ */
 export function photoPlaythroughPath(pid: string): string {
   assertSafePlaythroughId(pid)
-  return join(modDataPath('photo-feature'), '..', '..', 'saves', pid)
+  try {
+    return join(modDataPath('photo-feature', pid), '..', '..')
+  } catch {
+    return join(modDataPath('photo-feature'), '..', '..', 'saves', pid)
+  }
 }
 
 /** The legacy parent also contains native camera-roll files, which Photo never enumerates as its own. */
