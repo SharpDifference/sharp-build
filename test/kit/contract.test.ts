@@ -33,6 +33,19 @@ const listed = (side: string): string[] =>
   KIT_APIS.filter((api) => api.startsWith(`${side}:`)).map((api) => api.slice(side.length + 1)).sort()
 
 describe('the entry points', () => {
+  it('re-exports the native lightbox and prompt helpers without wrappers', async () => {
+    const lightbox = await import('../../src/renderer/components/Lightbox')
+    const relationship = await import('../../src/renderer/prompts/relationship')
+    const scene = await import('../../src/renderer/prompts/scenePrompt')
+    const image = await import('../../src/shared/imagePromptDrafts')
+    expect(rendererKit.Lightbox).toBe(lightbox.Lightbox)
+    expect(rendererKit.relationshipLines).toBe(relationship.relationshipLines)
+    for (const name of ['memoryLines', 'profileLines', 'spaced'] as const) {
+      expect(rendererKit[name]).toBe(scene[name])
+    }
+    expect(sharedKit.registerImagePromptDraft).toBe(image.registerImagePromptDraft)
+  })
+
   it('export exactly what KIT_APIS lists, side by side', () => {
     expect(runtime(sharedKit)).toEqual(listed('shared'))
     expect(runtime(rendererKit)).toEqual(listed('renderer'))

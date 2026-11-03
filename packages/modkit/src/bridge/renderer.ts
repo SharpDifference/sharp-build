@@ -94,3 +94,8 @@ export { FEED_EMOJI, FEED_EMOJI_BAG, FEED_HANDLE_BAG, FEED_HANDLE_POOL } from '.
 
 export { bunnybotSays } from '../../../../src/renderer/mods/bunnybot'
 export { invoke } from '../../../../src/renderer/mods/invoke'
+
+export { Lightbox } from '../../../../src/renderer/components/Lightbox'
+export { relationshipLines } from '../../../../src/renderer/prompts/relationship'
+export type { RelationshipMedium, RelationshipProgress } from '../../../../src/renderer/prompts/relationship'
+export { memoryLines, profileLines, spaced } from '../../../../src/renderer/prompts/scenePrompt'

@@ -310,6 +310,12 @@ export function lessNsfwText(): boolean;
 export const lift: TargetAndTransition;
 
 // @public
+export function Lightbox(input: {
+    src: string;
+    onClose: () => void;
+}): JSX.Element;
+
+// @public
 export interface LikesAsk {
     author: string;
     // (undocumented)
@@ -328,6 +334,9 @@ export function Locked(input: {
 
 // @public
 export type ManualSaveOffer = 'open' | 'waiting' | 'none';
+
+// @public
+export function memoryLines(character: Character, memories: readonly CharMemory[], textMemory: CharMemory | undefined, season: Season): string[];
 
 // @public
 export interface ModalShell {
@@ -574,6 +583,9 @@ export function postVisible(post: SocialPost): boolean;
 export const press: TargetAndTransition;
 
 // @public
+export function profileLines(character: Character, flags: CharFlags, castSize?: number): string[];
+
+// @public
 export const PROMPT_BLOCKS: readonly PromptBlock[];
 
 // @public
@@ -760,6 +772,22 @@ export interface RecordFieldSpec<T> {
 
 // @public
 export function registerHooks(modId: string, hooks: ModHooks): void;
+
+// @public
+export function relationshipLines(character: Character, flags: CharFlags, nameKnown: boolean, affection: number, progress: RelationshipProgress | undefined, stats?: PlayerStats, medium?: RelationshipMedium, mood?: {
+    date: number;
+    offset: number;
+    sick?: boolean;
+}, attractionGate?: boolean): string[];
+
+// @public
+export interface RelationshipMedium {
+    texted: boolean;
+    texting: boolean;
+}
+
+// @public
+export type RelationshipProgress = Pick<CharInfo, 'romanceScenes' | 'upperHalves'>;
 
 // @public (undocumented)
 export interface RequestSpots {
@@ -1141,6 +1169,9 @@ export interface SlotSettled {
     // (undocumented)
     ledger: LedgerResponse | null;
 }
+
+// @public
+export function spaced(lines: readonly string[]): string[];
 
 // @public
 export function submitAction(action: string, gift?: boolean, preset?: Verdict,

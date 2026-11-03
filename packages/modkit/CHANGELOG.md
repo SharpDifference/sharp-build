@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- Renderer re-exports the native `Lightbox`, `relationshipLines`, `profileLines`, `memoryLines`
+  and `spaced`, with relationship input types. Image-prompt draft registration remains shared;
+  its boot guidance now covers the shared-catalog import cycle and both processes.
+
+
 - `lead` on a `dm` prompt addition puts its fields ahead of the reply's own, and `dmReplyLead`
   hands them over the moment they have streamed in, before her first text lands. Once per reply,
   never for an abandoned one. Its signal aborts when the reply does not land; the finished
