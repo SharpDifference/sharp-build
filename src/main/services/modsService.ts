@@ -31,6 +31,12 @@ export function modOptionOn(modId: string, optionId: string): boolean {
   return optionOn(known, modId, optionId)
 }
 
+/** Read current switches from disk; a mod that could not load this session is always off. */
+export async function modIsOn(modId: string): Promise<boolean> {
+  const switches = await getModSwitches()
+  return isRunning(session(), modId) && modOn(switches, modId)
+}
+
 /** The installed mod's manifest as the session read it; null for an in-repo mod or one not installed. */
 export function installedManifest(modId: string): Manifest | null {
   return session().mods.find((mod) => mod.id === modId)?.manifest ?? null
