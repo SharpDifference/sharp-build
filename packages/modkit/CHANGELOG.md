@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- `ModDef.hooks` optionally declares hook and kit API names for a built-in main entry, as a manifest does.
+
 - `lead` on a `dm` prompt addition puts its fields ahead of the reply's own, and `dmReplyLead`
   hands them over the moment they have streamed in, before her first text lands. Once per reply,
   never for an abandoned one. Its signal aborts when the reply does not land; the finished

@@ -815,6 +815,7 @@ export interface ModDef {
     author: string;
     blurb: string;
     defaultOn: boolean;
+    hooks?: readonly string[];
     id: string;
     library?: boolean;
     // (undocumented)

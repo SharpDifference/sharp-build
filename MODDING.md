@@ -218,6 +218,14 @@ else the highest, with a line in the log. The loader deletes nothing and writes 
   standing in for an installed copy of the same id). While the game runs, a change to the folder
   reloads the window, at once off a game and on offer in one; a changed `main.js` offers a restart.
 
+In-repo mods list their main entries in `src/main/modEntries/index.ts` as lazy imports of
+`src/main/modEntries/<id>.ts`. Export named `invoke` and `protocols` values just as an installed
+`main.js` would, and put the same hook and kit API declarations in the shared `ModDef.hooks`;
+`invoke` must be declared there. Existing definitions without main entries need no declarations.
+The id must already be built into `MODS`. Entries use the installed loader's validation and
+registries; a load or validation failure switches the whole mod off with the usual notice.
+Built-ins serve routes only, and an installed copy or dev folder cannot replace their entries.
+
 ### Modal controls
 
 An installed mod imports `useModalShell` and `useDismissLayer` from `@vx/modkit/renderer`,

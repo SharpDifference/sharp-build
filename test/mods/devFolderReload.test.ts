@@ -41,7 +41,7 @@ const helloManifest = (): Record<string, unknown> => JSON.parse(readFileSync(joi
 /** Rewrites the folder's manifest with these fields over the fixture's, and reruns the checks as the watcher would. */
 async function rewrite(over: Record<string, unknown>): Promise<void> {
   await writeFile(join(dev, 'vxmod.json'), JSON.stringify({ ...helloManifest(), ...over }))
-  rerunModChecks()
+  await rerunModChecks()
 }
 
 const row = (id: string): import('../../src/shared/modSession').ModSessionEntry | undefined => modSession().mods.find((mod) => mod.id === id)
@@ -56,7 +56,7 @@ describe('a developer folder reloaded while the game runs', () => {
     await mkdir(data, { recursive: true })
     await writeFile(join(data, 'settings.json'), JSON.stringify({ devModFolders: [dev] }))
     await setModSwitches({ on: {}, options: {} })
-    startModSession()
+    await startModSession()
     expect(row('hello-mod')?.status).toBe('loaded')
     expect(sharedModOn('hello-mod')).toBe(true)
   })
@@ -94,7 +94,7 @@ describe('a developer folder reloaded while the game runs', () => {
   it('drops a mod whose folder is gone', async () => {
     await setModSwitches({ on: { 'hello-mod': true }, options: {} })
     await rm(dev, { recursive: true, force: true })
-    rerunModChecks()
+    await rerunModChecks()
     expect(row('hello-mod')?.def).toBeNull()
     expect(MODS.map((mod) => mod.id)).toEqual(['lib'])
     expect(sharedModOn('hello-mod')).toBe(false)
