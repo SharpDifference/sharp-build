@@ -1,4 +1,6 @@
 import { activePlotTwist, PLOT_TWIST_MOD } from '../../shared/plotTwists'
+// Legacy carry registration must run after the catalogue, even while the mod is off.
+import '../../shared/plotTwistCarry'
 import { plotTwistBlock } from '../prompts/plotTwist'
 import { registerHooks } from '@vx/modkit/renderer'
 import { plotTwist } from '../stores/plotTwist'

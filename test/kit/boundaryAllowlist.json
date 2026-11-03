@@ -374,7 +374,6 @@
   "src/shared/modEntries/photo-feature.ts -> ../imagePromptDrafts",
   "src/shared/modEntries/reckoning.ts -> ../modCarry",
   "src/shared/modEntries/starting-challenge.ts -> ../modCarry",
-  "src/shared/plotTwistCarry.ts -> ./modCarry",
   "src/shared/reckoning.ts -> ./characterDynamics",
   "src/shared/reckoning.ts -> ./relationship",
   "src/shared/reckoning.ts -> ./sha256",
