@@ -15,7 +15,7 @@ import {
 import { bindModWrites, bindSceneFieldSaves, saveFields, writeModSlices as slicesWith } from '@vx/modkit/host/renderer'
 import { isGraduationSlot } from '../../prompts/graduation'
 import { useBunnyboardStore } from '../bunnyboardStore'
-import { PORTRAIT_SLOTS, useGameStore } from '../gameStore'
+import { PORTRAIT_SLOTS, savedSceneRecords, useGameStore } from '../gameStore'
 import { modIsOn } from '../modsStore'
 import { lastReaderIndexOf } from '../stageStep'
 import { sceneActiveOf, textingUnsettled } from '../textingLoop'
@@ -198,7 +198,8 @@ function withReaderAction(log: readonly SceneLine[], transcript: readonly SceneL
 
 /**
  * The scene as it stood *before* `lines` played, with them queued. The turn's own action is read
- * onto the log: `base` was captured before it was logged.
+ * onto the log: `base` was captured before it was logged. The transcript and its marks are the
+ * store's as a capture takes them, so they count the same lines as `base`'s log and gifts.
  */
 export function queuedScene(
   base: SceneState | null,
@@ -206,19 +207,20 @@ export function queuedScene(
   extra: Partial<SceneState> = {}
 ): SceneState {
   const game = useGameStore.getState()
+  const records = savedSceneRecords(game)
   const from = base ?? openingScene([])
   const scene: SceneState = {
     ...from,
     cast: [...game.cast],
-    transcript: [...game.currentSceneTranscript],
+    transcript: [...records.currentSceneTranscript],
     summary: game.sceneSummary,
-    sceneLog: withReaderAction(from.sceneLog, game.currentSceneTranscript),
+    sceneLog: withReaderAction(from.sceneLog, records.currentSceneTranscript),
     pendingLines: lines,
     ...extra
   }
   // Set-or-delete, like the kinds below: the marks are the store's, never the base's.
-  if (game.sceneSummaries.length > 0) {
-    scene.summaries = game.sceneSummaries.map((mark) => ({ ...mark }))
+  if (records.sceneSummaries.length > 0) {
+    scene.summaries = records.sceneSummaries.map((mark) => ({ ...mark }))
   } else delete scene.summaries
   const mods = savedModScene(game.sceneMods)
   if (mods) scene.mods = mods

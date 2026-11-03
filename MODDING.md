@@ -1053,9 +1053,9 @@ takes lines, it returns `false` and changes nothing, so it never cuts into an en
 A `transient` line is said for the moment only, such as a game's move-by-move narration.
 `dropTransientLines(id)` takes the mod's own transient lines back off the transcript, the log
 and the queue, wherever they have got to, and leaves every other line. A box showing one lands
-on the last line kept, and a gift stays on the action that handed it over. No capture of the scene
-holds one, so neither does any save: a reload never brings back a line the mod could no longer
-take back.
+on the last line kept, and a gift stays on the action that handed it over. Nothing written to disk
+holds one, whether a save, a calendar replay or a Scene Creator saved scene: a reload never
+brings back a line the mod could no longer take back.
 
 A hook point is added where mods actually meet, not ahead of need. Once mods use one, it stays
 as it is: renaming it or changing what it passes breaks them. A change that is needed goes in

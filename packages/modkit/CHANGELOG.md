@@ -19,7 +19,7 @@
   narration or a girl's line, in her face and outfit, on the transcript and the box;
   `boxParts` is the box's split alone; `readerSaysInScene` files the reader's words with nobody
   asked to answer; `reachTurn` brings the scene to his turn. A `transient` line is taken back by
-  its mod's `dropTransientLines` and left out of every capture of the scene, so of every save.
+  its mod's `dropTransientLines` and left out of every save, replay and saved scene.
 
 ## 0.7.0
 

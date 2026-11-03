@@ -1464,6 +1464,15 @@ export function sceneWithout(state: SceneRecords, gone: (line: SceneLine) => boo
   }
 }
 
+/**
+ * The scene's records as anything written to disk holds them: every mod's lines for the moment
+ * only left out, as if it had taken them back, since a scene read back could never take them back
+ * itself.
+ */
+export function savedSceneRecords(state: SceneRecords): SceneRecords {
+  return sceneWithout(state, (line) => transientOwner(line) !== undefined) ?? state
+}
+
 /** A blank stage with its own containers — `emptyStage`'s are shared module-scope objects. */
 function freshStage(): typeof emptyStage {
   return {
@@ -1997,9 +2006,7 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
       return null
     }
     const mods = savedModScene(state.sceneMods)
-    // A mod's lines for the moment only are left out, as if it had taken them back: a scene read
-    // back from the capture could never take them back itself.
-    const records = sceneWithout(state, (line) => transientOwner(line) !== undefined) ?? state
+    const records = savedSceneRecords(state)
     return {
       // First, so a key core owns always wins.
       ...state.sceneRest,

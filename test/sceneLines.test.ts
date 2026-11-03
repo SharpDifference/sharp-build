@@ -15,6 +15,8 @@ const kit = await import('@vx/modkit/renderer')
 const { sceneWithout, useGameStore } = await import('../src/renderer/stores/gameStore')
 const { registerLoopHooks } = await import('../src/renderer/stores/loop/hooks')
 const { resetLoopState } = await import('../src/renderer/stores/loop/state')
+const { queuedScene } = await import('../src/renderer/stores/loop/saves')
+const { slotReplayOf } = await import('../src/renderer/stores/loop/replay')
 
 function def(id: string, extra: Partial<ModDef> = {}): ModDef {
   return { id, name: id, author: 'test', version: '1.0.0', scope: 'anytime', defaultOn: true, blurb: '', ...extra }
@@ -162,6 +164,33 @@ describe('transient lines', () => {
     expect(scene?.currentLine?.text).toBe('You both draw.')
     // The scene being played still has it, for its mod to take back.
     expect(useGameStore.getState().currentSceneTranscript).toHaveLength(4)
+  })
+
+  it('leaves them out of the reply save and the replay, with a gift on its action once reloaded', () => {
+    kit.sayInScene('line-table', 'She turns the queen.', { transient: true })
+    kit.sayInScene('line-table', 'You draw a two.', { transient: true })
+    readAll()
+    const game = useGameStore.getState()
+    useGameStore.setState({
+      sceneGifts: [{ charId: sarah.charId, itemId: 'rose', repeat: false, reaction: 'liked', at: game.currentSceneTranscript.length }]
+    })
+    game.logPlayerAction('I give her a rose.', true)
+    const base = useGameStore.getState().captureScene()
+    const reply = sceneLines('She smiles.')
+    useGameStore.getState().appendSceneLines(reply)
+    const replay = slotReplayOf(0, 0)
+
+    // Through JSON, as the save bridge carries it, so no line keeps its identity.
+    const saved = JSON.parse(JSON.stringify(queuedScene(base, reply)))
+    useGameStore.getState().restoreScene(saved)
+    kit.dropTransientLines('line-table')
+
+    const texts = (lines: readonly SceneLine[] | undefined): string[] => (lines ?? []).map((line) => line.text)
+    const kept = ['I sit down.', 'The table is set.', 'I give her a rose.', 'She smiles.']
+    const after = useGameStore.getState()
+    expect(texts(after.currentSceneTranscript)).toEqual(kept)
+    expect(after.sceneGifts.map((gift) => gift.at)).toEqual([2])
+    expect(texts(replay?.transcript)).toEqual(kept)
   })
 
   it('counts off a rewound line taken out, so reading forward again stops where the queue does', () => {
