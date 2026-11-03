@@ -9,7 +9,7 @@ import { useGameStore } from '../stores/gameStore'
 import { gestures, lift, press, quietLift, quietPress, useModOn, cancelCalls } from '@vx/modkit/renderer'
 import { generateMeanwhile, meanwhileReady } from '../stores/meanwhile'
 import { profileUrl, useSpriteVersion } from '../stores/characterStore'
-import { formatShortGameDate } from '../prompts/gameDate'
+import { formatShortGameDate } from '@vx/modkit/renderer'
 import { meanwhileBackgroundUrl } from './meanwhileImages'
 import '../vu_styles/Meanwhile.css'
 
