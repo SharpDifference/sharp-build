@@ -33,21 +33,15 @@ import { isPhotoTier, type PhotoTier } from '../../shared/photoGate'
 import { buildDuoPhotoPrompt, buildPhotoPrompt } from '../../shared/photoPrompt'
 import { getPhotoPath, getPhotosPath, getPhotosRoot } from '../photoProtocol'
 import { withBodySetting } from '../bodySetting'
-import { runGenerationJob } from './comfyService'
 import { dropImageTwins, findImage } from './imageFiles'
-import { writeAtomicBytes } from '@vx/modkit/main'
+import { renderComfyImage, writeAtomicBytes, type ComfyRenderRequest } from '@vx/modkit/main'
+import soloWorkflow from '../../../assets/workflows/characterPhoto.json'
+import duoWorkflow from '../../../assets/workflows/characterPhotoDuo.json'
 
 /**
- * Rendering the pictures a character texts the reader.
- *
- * It sits beside `comfyService` rather than inside it, and asks that file for two things only:
- * `runGenerationJob`, the submit-wait-save pipeline every render shares, and its `texts` field,
- * which fills the two girls' prompts in a picture of two. The graph, the node map, the folder and
- * the naming are all this file's own, so a sync that replaces `comfyService` costs those two.
- *
- * Unlike a sprite, a photo is a whole picture — it keeps its background, so nothing cuts it
- * out — and it belongs to one save rather than to her: what she sends one reader in one
- * playthrough is not part of her art.
+ * Photo owns its graphs, prompts and playthrough destinations. The kit queues each graph,
+ * starts ComfyUI and returns checked image bytes; Photo keeps them atomically. A duo supplies
+ * each girl's prompt through extra text nodes, and the renderer handles WebP encoding.
  */
 
 /** Node ids overwritten in `assets/workflows/characterPhotoDuo.json`. */
@@ -298,33 +292,14 @@ export async function generatePhoto(
   const prompts = overrides.prompts
     ? { positive: overrides.prompts.positive, negative: overrides.prompts.negative }
     : buildPhotoPrompt(await withBodySetting(character), tier as PhotoTier, photoPrompt)
-  const logged = lora ? `, lora=${lora.name}@${lora.weight}` : ''
 
-  await runGenerationJob(
-    {
-      workflowFile: 'characterPhoto.json',
-      nodes: PHOTO_NODE,
-      // Her body only while the body switch is on, as her sprites are drawn.
-      prompts,
-      seed,
-      lora,
-      // Rendered as PNG either way; a WebP name is encoded by the renderer once it lands.
-      destPath: getPhotoPath(playthroughId, character.charId, pngPhotoOf(file)),
-      // Written as ComfyUI rendered it; the renderer does any encoding.
-      format: 'raw',
-      label: `${character.charId} / photo:${tier}`,
-      logContext: `seed=${seed} file=${file}${logged}`
-    },
-    options
-  )
-
-  await keepPhotoSidecar(playthroughId, character.charId, file, {
-    schemaVersion: 1,
+  await renderPhotoImage(playthroughId, character.charId, file, {
+    workflow: soloWorkflow,
+    nodes: PHOTO_NODE,
+    prompts,
     seed,
-    tier,
-    ...prompts,
-    ...(lora ? { lora } : {})
-  })
+    lora
+  }, { schemaVersion: 1, seed, tier, ...prompts, ...(lora ? { lora } : {}) }, options)
 
   // On disk now, so the folder itself says the name is taken.
   reservedPhotoNames.get(getPhotosPath(playthroughId, character.charId))?.delete(file)
@@ -386,29 +361,59 @@ export async function generateDuoPhoto(
     right: built.right
   }
 
-  await runGenerationJob(
-    {
-      workflowFile: 'characterPhotoDuo.json',
-      nodes: DUO_PHOTO_NODE,
-      prompts: { positive: prompts.positive, negative: prompts.negative },
-      texts: { [DUO_GIRL_NODE.left]: prompts.left, [DUO_GIRL_NODE.right]: prompts.right },
-      seed,
-      destPath: getPhotoPath(playthroughId, character.charId, pngPhotoOf(file)),
-      format: 'raw',
-      label: `${character.charId} + ${friend.charId} / photo:${tier}`,
-      logContext: `seed=${seed} file=${file}`
-    },
-    options
-  )
+  await renderPhotoImage(playthroughId, character.charId, file, {
+    workflow: duoWorkflow,
+    nodes: DUO_PHOTO_NODE,
+    prompts: { positive: prompts.positive, negative: prompts.negative },
+    texts: { [DUO_GIRL_NODE.left]: prompts.left, [DUO_GIRL_NODE.right]: prompts.right },
+    seed
+  }, { schemaVersion: 1, seed, tier, ...prompts }, options)
 
-  await keepPhotoSidecar(playthroughId, character.charId, file, {
-    schemaVersion: 1,
-    seed,
-    tier,
-    ...prompts
-  })
   reservedPhotoNames.get(getPhotosPath(playthroughId, character.charId))?.delete(file)
   return file
+}
+
+/** Keeps returned image bytes and their request, removing a cancelled write before it settles. */
+async function renderPhotoImage(
+  playthroughId: string,
+  charId: string,
+  file: string,
+  request: ComfyRenderRequest,
+  sidecar: PhotoSidecar,
+  options: { signal?: AbortSignal; onProgress?: (step: string) => void }
+): Promise<void> {
+  const signal = options.signal ?? new AbortController().signal
+  const check = (): void => {
+    if (signal.aborted) throw appError('CANCELLED', 'Generation was cancelled.')
+  }
+  const bytes = await renderComfyImage('photo-feature', request, {
+    signal,
+    onProgress: options.onProgress
+  })
+  check()
+  const dest = getPhotoPath(playthroughId, charId, pngPhotoOf(file))
+  await mkdir(getPhotosPath(playthroughId, charId), { recursive: true })
+  check()
+  let written = false
+  try {
+    await writeAtomicBytes(dest, bytes, {
+      code: 'PHOTO_WRITE_FAILED',
+      message: 'Could not save the photo.'
+    })
+    written = true
+    check()
+    await dropImageTwins(dest)
+    check()
+    await keepPhotoSidecar(playthroughId, charId, file, sidecar)
+    check()
+  } catch (error) {
+    if (written && signal.aborted) {
+      await rm(dest, { force: true })
+      await rm(getPhotoPath(playthroughId, charId, photoSidecarOf(file)), { force: true })
+    }
+    check()
+    throw error
+  }
 }
 
 /** Keeps the request next to its landed picture; metadata failure leaves the picture usable. */
