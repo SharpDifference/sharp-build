@@ -60,6 +60,16 @@ initialization; that gameplay/state migration remains separate from these screen
 
 ## Saves, backups and source map
 
+### Local creature artwork rendering
+
+Echo sends its own parsed Megaten workflow to the kit's `renderComfyImage` under
+the `echo` mod id. Core owns the render queue, ComfyUI startup, checked image bytes
+and temporary-output cleanup. Echo retains its managed Python/LoRA preflight,
+prompt, cancellation signal and subsequent cutout processing. External servers
+still bypass managed-install checks. This is a partial migration: target discovery
+and managed model paths remain native dependencies, and Unheard Soul reference
+uploads retain their existing implementation. No Photo Feature dependency is added.
+
 ### Screen-hook integration
 
 Echo registers `portraitOverlay` and `photosPageSection` from its renderer mod entry. The native portrait and Photos page render the generic `ModSlot` outlets; they no longer mount Echo directly at those two locations. The portrait contribution reuses `EchoAura`, including the saved placement, opacity, floating motion, owner visibility, and replay/created-scene gates. The optional Photos contribution reuses the existing gallery and manager with the page's theme. Neither hook requires Photo Feature, and switching Echo off removes both contributions without erasing its saved data.
