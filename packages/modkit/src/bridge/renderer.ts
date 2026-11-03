@@ -18,6 +18,14 @@ export { modIsOn, useModOn, useModOption } from '../../../../src/renderer/stores
 export { PostCommentAction, PostCommentsView, PostPicture } from '../../../../src/renderer/components/PostSpots'
 export { EmojiTool, SentText, useBareMessage, useEmojiTool } from '../../../../src/renderer/components/TextSpots'
 export { submitAction, takeTurnFromReply } from '../../../../src/renderer/stores/gameLoop'
+export type { SceneLineOptions } from '../../../../src/renderer/stores/sceneLines'
+export {
+  boxParts,
+  dropTransientLines,
+  reachTurn,
+  readerSaysInScene,
+  sayInScene
+} from '../../../../src/renderer/stores/sceneLines'
 export { finishSlotActivity } from '../../../../src/renderer/stores/slotActivity'
 export { fileLatePost } from '../../../../src/renderer/stores/loop/feed'
 export { Card, Locked } from '../../../../src/renderer/views/ContactPage'
