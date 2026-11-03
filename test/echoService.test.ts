@@ -6,7 +6,15 @@ const mocks = vi.hoisted(() => ({
   switches: vi.fn(), cloud: vi.fn(), local: vi.fn(), reflectionLocal: vi.fn(), target: vi.fn(), decode: vi.fn(), prepare: vi.fn(), cutout: vi.fn(),
   mkdir: vi.fn(), write: vi.fn(), read: vi.fn(), stat: vi.fn(), matte: vi.fn(), rename:vi.fn(),character:vi.fn(),sprite:vi.fn(), rm:vi.fn(), readdir:vi.fn()
 }))
-vi.mock('../src/main/services/modsService', () => ({ getModSwitches: mocks.switches }))
+vi.mock('../src/main/services/modsService', async () => {
+  const { modOn, optionOn } = await import('../src/shared/mods')
+  let switches: import('../src/shared/mods').ModSwitches = { on: {}, options: {} }
+  return {
+    getModSwitches: mocks.switches,
+    modIsOn: async (id: string) => { switches = await mocks.switches(); return modOn(switches, id) },
+    modOptionOn: (id: string, option: string) => optionOn(switches, id, option)
+  }
+})
 vi.mock('@shared/llm/cloudImage', () => ({ generateImage: mocks.cloud }))
 vi.mock('../src/main/services/echoLocalImage', () => ({ generateLocalEcho: mocks.local }))
 vi.mock('../src/main/services/reflectionLocalImage', () => ({ generateLocalReflection: mocks.reflectionLocal, resolveLocalReflectionTarget: mocks.target }))
