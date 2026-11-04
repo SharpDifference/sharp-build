@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- Read-only game records, clock, stats, pictures and the legacy feed-read marker
+  (`since: '0.8.0'`) have detached frozen snapshots, component hooks and narrow subscriptions.
+  `useProfileImageUrl` follows her image version; `sceneActive` follows core's scene predicate;
+  `readerPromptText` returns core's READER block. No stores, actions or save writers are exposed.
+
 - Narrow renderer readers cover image rules, local rendering availability and the phone's view,
   with subscriptions and component hooks where needed. `modOptionOn` is the non-hook option
   reader. Feed handles and emoji can be drawn independently from the game's persistent bags.
