@@ -37,6 +37,8 @@ describe('the entry points', () => {
     const readers = await import('../../src/renderer/mods/readers')
     const mods = await import('../../src/renderer/stores/modsStore')
     for (const name of ['noNsfwImages', 'subscribeNoNsfwImages', 'useNoNsfwImages',
+      'imageApiConfigured', 'subscribeImageApiConfigured', 'useImageApiConfigured',
+      'localImageSource', 'subscribeLocalImageSource', 'useLocalImageSource',
       'canRenderLocalImages', 'subscribeCanRenderLocalImages', 'phoneOpen', 'viewingThread',
       'subscribePhoneView', 'useViewingThread', 'drawFeedHandles', 'drawFeedEmoji'] as const) {
       expect(rendererKit[name], name).toBe(readers[name])
