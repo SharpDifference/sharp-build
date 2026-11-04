@@ -74,6 +74,7 @@ for (const entry of ['shared', 'renderer', 'main']) {
   const config = ExtractorConfig.prepare({
     configObject: {
       projectFolder: kit,
+      newlineKind: 'lf',
       mainEntryPointFilePath: resolve(dts, 'packages/modkit/src', entry, 'index.d.ts'),
       bundledPackages: [],
       compiler: { tsconfigFilePath: resolve(temp, 'tsconfig.json') },
@@ -108,6 +109,10 @@ for (const entry of ['shared', 'renderer', 'main']) {
   if (!result.succeeded) {
     console.error(`api-extractor failed on the ${entry} entry.`)
     process.exit(1)
+  }
+  if (!check) {
+    const report = resolve(kit, 'api', `${entry}.api.md`)
+    writeFileSync(report, readFileSync(report, 'utf8').replace(/\r\n/g, '\n'))
   }
   if (result.apiReportChanged) changed = true
 }
