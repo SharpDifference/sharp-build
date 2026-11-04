@@ -60,6 +60,9 @@ export function BunnyMark(): JSX.Element;
 export function cancelCalls(modId: string, group: string): Promise<void>;
 
 // @public
+export function canRenderLocalImages(): boolean;
+
+// @public
 export function Card(input: {
     label: string;
     className?: string;
@@ -168,6 +171,12 @@ export function defaultBlockText(id: TextBlockId, settings: {
 
 // @public
 export type DividerWord = 'hover' | 'locked' | 'unavailable' | 'ending';
+
+// @public
+export function drawFeedEmoji(count: number): string[];
+
+// @public
+export function drawFeedHandles(count: number): string[];
 
 // @public
 export function dropTransientLines(modId: string): void;
@@ -321,6 +330,12 @@ export function lessNsfwText(): boolean;
 export const lift: TargetAndTransition;
 
 // @public
+export function Lightbox(input: {
+    src: string;
+    onClose: () => void;
+}): JSX.Element;
+
+// @public
 export interface LikesAsk {
     author: string;
     // (undocumented)
@@ -339,6 +354,9 @@ export function Locked(input: {
 
 // @public
 export type ManualSaveOffer = 'open' | 'waiting' | 'none';
+
+// @public
+export function memoryLines(character: Character, memories: readonly CharMemory[], textMemory: CharMemory | undefined, season: Season): string[];
 
 // @public
 export interface ModalShell {
@@ -480,6 +498,9 @@ export interface ModHooks {
 export function modIsOn(id: string, record?: Pick<PlaythroughRecord, 'mods'> | null): boolean;
 
 // @public
+export function modOptionOn(modId: string, optionId: string): boolean;
+
+// @public
 export function modsOnLine(): string;
 
 // @public
@@ -509,6 +530,9 @@ export function newestFirst(a: {
 }): number;
 
 // @public
+export function noNsfwImages(): boolean;
+
+// @public
 export const noteIn: Variants;
 
 // @public
@@ -528,6 +552,9 @@ export function ownsPostComments(modId: string): boolean;
 
 // @public (undocumented)
 export const panelUnderTab: Variants;
+
+// @public
+export function phoneOpen(): boolean;
 
 // @public
 export function PlusIcon(input: {
@@ -583,6 +610,9 @@ export function postVisible(post: SocialPost): boolean;
 
 // @public
 export const press: TargetAndTransition;
+
+// @public
+export function profileLines(character: Character, flags: CharFlags, castSize?: number): string[];
 
 // @public
 export const PROMPT_BLOCKS: readonly PromptBlock[];
@@ -794,6 +824,22 @@ export interface RecordWriteOptions {
 
 // @public
 export function registerHooks(modId: string, hooks: ModHooks): void;
+
+// @public
+export function relationshipLines(character: Character, flags: CharFlags, nameKnown: boolean, affection: number, progress: RelationshipProgress | undefined, stats?: PlayerStats, medium?: RelationshipMedium, mood?: {
+    date: number;
+    offset: number;
+    sick?: boolean;
+}, attractionGate?: boolean): string[];
+
+// @public
+export interface RelationshipMedium {
+    texted: boolean;
+    texting: boolean;
+}
+
+// @public
+export type RelationshipProgress = Pick<CharInfo, 'romanceScenes' | 'upperHalves'>;
 
 // @public (undocumented)
 export interface RequestSpots {
@@ -1182,10 +1228,22 @@ export interface SlotSettled {
 }
 
 // @public
+export function spaced(lines: readonly string[]): string[];
+
+// @public
 export function submitAction(action: string, gift?: boolean, preset?: Verdict,
 planId?: string,
 sceneEvents?: TurnSnapshot['sceneEvents'],
 answeredReminder?: string, activity?: SlotActivityOffer): Promise<void>;
+
+// @public
+export function subscribeCanRenderLocalImages(onChange: () => void): () => void;
+
+// @public
+export function subscribeNoNsfwImages(onChange: () => void): () => void;
+
+// @public
+export function subscribePhoneView(onChange: () => void): () => void;
 
 // @public
 export function takeTurnFromReply(): boolean;
@@ -1358,6 +1416,9 @@ export function useModOn(id: string, record?: Pick<PlaythroughRecord, 'mods'> | 
 export function useModOption(modId: string, optionId: string): boolean;
 
 // @public
+export function useNoNsfwImages(): boolean;
+
+// @public
 export function useSafePoint(): ManualSaveOffer;
 
 // @public
@@ -1370,7 +1431,13 @@ export function useScenePersona(): string | undefined;
 export function useSfxGain(): number;
 
 // @public
+export function useViewingThread(): string | null;
+
+// @public
 export const veilIn: Variants;
+
+// @public
+export function viewingThread(): string | null;
 
 // @public
 export type ViewName = 'boot' | 'setup'
