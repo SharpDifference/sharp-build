@@ -5,15 +5,21 @@ import { photoUrl } from '../../shared/photoFiles'
 import { photoGenerationOn } from '../../shared/photoSwitches'
 import type { ChatPhoto, PhotoRenderOptions } from '../../shared/photoTypes'
 import { useExplicitBlocked, usePhotoSwitches, usePhotosVisible } from '../stores/photoSwitchHooks'
-import { useBunnyboardStore } from '../stores/bunnyboardStore'
 import { useGameStore } from '../stores/gameStore'
 import { redrawPostPhoto, rerollPostPhoto } from '../stores/photoPost'
 import { tellAboutFeedPhotos } from '../stores/photoTipDelivery'
 import { redrawMessagePhoto, rerollMessagePhoto } from '../stores/photoTurn'
-import { bunnyHop, typingDot, BunnyMark, EyeIcon, EyeOffIcon } from '@vx/modkit/renderer'
+import {
+  bunnyHop,
+  typingDot,
+  BunnyMark,
+  EyeIcon,
+  EyeOffIcon,
+  Lightbox,
+  useViewingThread
+} from '@vx/modkit/renderer'
 import { PhotoInfoButton, PhotoRedrawFailure } from './PhotoInfo'
 import { photoRedrawKey, usePhotoRedraw } from '../stores/photoRedraw'
-import { Lightbox } from './Lightbox'
 import '../vu_styles/PhotoBubble.css'
 
 /**
@@ -272,7 +278,7 @@ export function MessagePhotoBubble({
   sender: 'player' | 'contact'
   messageId: string
 }): JSX.Element | null {
-  const charId = useBunnyboardStore((s) => s.viewingCharId)
+  const charId = useViewingThread()
   const visible = usePhotosVisible()
   if (!charId || !visible) return null
   const side = sender === 'player' ? 'mine' : 'theirs'
