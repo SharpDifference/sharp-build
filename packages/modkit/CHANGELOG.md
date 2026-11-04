@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Optional `ModDef.hooks` lists hook and kit API declarations for built-in main entries, with the
+  same name, shape and meaning as a manifest's `hooks`.
+
 - Narrow renderer readers cover image rules, local rendering availability and the phone's view,
   with subscriptions and component hooks where needed. `modOptionOn` is the non-hook option
   reader. Feed handles and emoji can be drawn independently from the game's persistent bags.

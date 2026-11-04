@@ -11,6 +11,8 @@ export interface ServedMod {
   readonly id: string
   /** The absolute folder its files are read from. */
   readonly folder: string
+  /** A built-in has routes only, never a folder of core files to serve. */
+  readonly routesOnly?: boolean
   /** From a developer folder: answered with `Cache-Control: no-store`. */
   readonly dev: boolean
   /** Only a mod that is running is served; anything else is not found. */
@@ -145,5 +147,6 @@ export function resolveModUrl(url: string, mods: ReadonlyMap<string, ServedMod>,
   const mod = mods.get(hostname)
   if (!mod || !mod.loaded) return null
   if (pathname.startsWith(ROUTE_PREFIX)) return resolveRoute(mod.id, pathname.slice(ROUTE_PREFIX.length))
+  if (mod.routesOnly) return null
   return resolveFile(mod, pathname, realPath)
 }

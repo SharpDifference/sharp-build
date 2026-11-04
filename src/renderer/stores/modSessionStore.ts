@@ -75,7 +75,7 @@ interface ModSessionState {
 
 /** What the start notice remembers a mod by: its version, or the fact that its manifest could not be read. */
 export function noticeKeyOf(mod: ModSessionEntry): string {
-  return mod.manifest?.version ?? 'unreadable'
+  return mod.manifest?.version ?? mod.def?.version ?? 'unreadable'
 }
 
 /** The one line a row and the notice say of a mod that is not running. */
@@ -97,7 +97,8 @@ export const useModSessionStore = create<ModSessionState>((set, get) => ({
   running: (id) => {
     const { table, shiftStart } = get()
     if (!sessionRow(table, id)) return true
-    return isRunning(table, id) && !shiftStart
+    const builtIn = table.mods.some((mod) => mod.id === id && mod.manifest === null && mod.folder === '')
+    return isRunning(table, id) && (!shiftStart || builtIn)
   },
 
   markFailed: (id, status, message) => {
