@@ -4,7 +4,7 @@ import { MODS } from '@shared/mods'
 import { BUILT_IN_MAIN_ENTRIES } from '../modEntries'
 import { checkCompat, hookNameKind, modDefOf, parseManifest } from '@vx/modkit/host/shared'
 import { satisfies } from '../../../packages/modkit/src/shared/range'
-import { modFileUrl, type ModSessionEntry, type ModSessionTable, type ModStatus, type SafeStart } from '@shared/modSession'
+import { isRunning, modFileUrl, type ModSessionEntry, type ModSessionTable, type ModStatus, type SafeStart } from '@shared/modSession'
 import { findInstalledMods, readInstalled } from './layout'
 import { orderMods, type OrderInput } from './order'
 import { requireMain as requireMainFile, UndeclaredApiError, type MainContext } from './require'
@@ -146,7 +146,9 @@ function fail(candidate: Candidate, status: ModStatus, message: string): void {
 /** Built-in definitions and entry functions, checked against the list captured before installs. */
 function builtInCandidates(input: LoaderInput): Candidate[] {
   const entries = input.builtInMain ?? BUILT_IN_MAIN_ENTRIES
-  const defs = MODS.filter((mod) => input.builtIn.includes(mod.id))
+  // Only a built-in with a main entry gets a session row; every other built-in stays out of the
+  // table, and so runs whatever the session's safe start.
+  const defs = MODS.filter((mod) => input.builtIn.includes(mod.id) && Object.hasOwn(entries, mod.id))
   const candidates: Candidate[] = defs.map((def) => ({
     entry: {
       id: def.id, def, manifest: null, status: 'loaded', message: null, warnings: [],
@@ -169,6 +171,11 @@ function builtInCandidates(input: LoaderInput): Candidate[] {
     })
   }
   return candidates
+}
+
+/** A built-in's own row: part of the build, with no manifest and no folder. */
+function isBuiltIn(candidate: Candidate): boolean {
+  return candidate.entry.manifest === null && candidate.entry.folder === '' && candidate.entry.def !== null
 }
 
 /** Every folder's candidate: the installed mods, then the developer folders, one entry per id. */
@@ -403,7 +410,7 @@ function servedOf(table: ModSessionTable): Map<string, ServedMod> {
     served.set(mod.id, {
       id: mod.id, folder: mod.folder, dev: mod.dev,
       ...(mod.manifest === null ? { routesOnly: true } : {}),
-      loaded: mod.status === 'loaded' && table.loaderError === null && table.safeStart === null
+      loaded: isRunning(table, mod.id)
     })
   }
   return served
@@ -423,8 +430,11 @@ export function loadMods(input: LoaderInput): LoaderResult {
     permitCandidates(candidates, input.allowUnreviewedMain)
     if (input.safeStart !== null) {
       input.log(`[mods] started without mods (${input.safeStart}): nothing installed runs this session`)
+      // The build's own entries still run: safe start skips installed code only.
+      const own = candidates.filter(isBuiltIn)
+      const { routes, invokes, mainExports } = requireCandidates(own, order.filter((id) => own.some((one) => one.entry.id === id)), optionalPresent, input)
       const table = tableOf(candidates, order, input, null)
-      return { table, routes: new Map(), invokes: new Map(), served: servedOf(table), mainExports: new Map() }
+      return { table, routes, invokes, served: servedOf(table), mainExports }
     }
     const { routes, invokes, mainExports } = requireCandidates(candidates, order, optionalPresent, input)
     const table = tableOf(candidates, order, input, null)
@@ -438,8 +448,17 @@ export function loadMods(input: LoaderInput): LoaderResult {
     const message = err instanceof Error ? err.message : String(err)
     input.log(`[mods] the mod loader failed: ${message}`)
     if (err instanceof Error && err.stack) input.log(err.stack)
+    // The build's own entries are tried once more on their own, so a loader failure in installed
+    // mods leaves them working.
+    const own = candidates.filter(isBuiltIn)
+    let mine: ReturnType<typeof requireCandidates> = { routes: new Map(), invokes: new Map(), mainExports: new Map() }
+    try {
+      mine = requireCandidates(own, own.map((one) => one.entry.id), {}, input)
+    } catch (ownErr) {
+      input.log(`[mods] built-in main entries failed after the loader error: ${ownErr instanceof Error ? ownErr.message : String(ownErr)}`)
+    }
     const table = tableOf(candidates, [], input, `the mod loader failed: ${message}`)
-    return { table, routes: new Map(), invokes: new Map(), served: servedOf(table), mainExports: new Map() }
+    return { table, routes: mine.routes, invokes: mine.invokes, served: servedOf(table), mainExports: mine.mainExports }
   }
 }
 

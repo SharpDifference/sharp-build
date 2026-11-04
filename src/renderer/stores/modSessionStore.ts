@@ -97,7 +97,8 @@ export const useModSessionStore = create<ModSessionState>((set, get) => ({
   running: (id) => {
     const { table, shiftStart } = get()
     if (!sessionRow(table, id)) return true
-    return isRunning(table, id) && !shiftStart
+    const builtIn = table.mods.some((mod) => mod.id === id && mod.manifest === null && mod.folder === '')
+    return isRunning(table, id) && (!shiftStart || builtIn)
   },
 
   markFailed: (id, status, message) => {

@@ -64,7 +64,9 @@ it('loads built-ins from start, dispatches their invoke and serves their route w
   installMods([def('one', ['invoke']), def('no-main')])
   const result = run({ one: entry })
   expect(sessionRow(result.table, 'one')?.status).toBe('loaded')
-  expect(sessionRow(result.table, 'no-main')?.status).toBe('loaded')
+  // A built-in with nothing in main has no row, so it runs whatever the session does.
+  expect(sessionRow(result.table, 'no-main')).toBeUndefined()
+  expect(isRunning(result.table, 'no-main')).toBe(true)
   // A default-off switch does not prevent a loaded handler from answering.
   expect(await call(result, 'one')).toEqual({ id: 'one', value: 'hello' })
   const respond = serve(result)
@@ -157,12 +159,27 @@ it.each(['hello-mod', 'another-folder'])('cannot replace a built-in entry throug
   expect(await (await serve(result)(new Request('vxmod://hello-mod/@/ping'))).text()).toBe('built-in pong')
 })
 
-it('does not call built-in entry functions in safe start', () => {
-  installMods([def('one', ['invoke'])])
+it.each(['flag', 'shift'] as const)('keeps built-ins running, with and without a main entry, in safe start (%s)', async (safeStart) => {
+  installMods([def('one', ['invoke']), def('no-main')])
   const load = vi.fn(entry)
-  const result = run({ one: load }, { safeStart: 'flag' })
-  expect(load).not.toHaveBeenCalled()
-  expect(result.invokes.size).toBe(0)
-  expect(result.routes.size).toBe(0)
-  expect(result.served.get('one')?.loaded).toBe(false)
+  const result = run({ one: load }, { safeStart })
+  expect(load).toHaveBeenCalledOnce()
+  expect(isRunning(result.table, 'one')).toBe(true)
+  expect(isRunning(result.table, 'no-main')).toBe(true)
+  expect(sessionRow(result.table, 'no-main')).toBeUndefined()
+  expect(result.served.get('one')?.loaded).toBe(true)
+  expect(await call(result, 'one')).toEqual({ id: 'one', value: 'hello' })
+  useModSessionStore.setState({ table: result.table, shiftStart: true })
+  expect(useModSessionStore.getState().running('one')).toBe(true)
+  expect(useModSessionStore.getState().running('no-main')).toBe(true)
+})
+
+it('keeps built-in entries working after a loader error in installed mods', async () => {
+  installMods([def('one', ['invoke'])])
+  const result = run({ one: entry }, { modsDir: '\0 not a folder' })
+  expect(result.table.loaderError).not.toBeNull()
+  {
+    expect(isRunning(result.table, 'one')).toBe(true)
+    expect(await call(result, 'one')).toEqual({ id: 'one', value: 'hello' })
+  }
 })
