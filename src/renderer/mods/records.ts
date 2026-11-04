@@ -151,20 +151,22 @@ function updateRecord(
 
 bindRecordWrites({ update: updateRecord })
 
-const COMMENT_KEYS: Readonly<Record<keyof PostComment, 'string' | 'number' | 'ex'>> = {
+// The native comment's own fields only. Partial, so a field other code adds to `PostComment`
+// stays off the list, and a comment holding one is refused.
+const COMMENT_KEYS = {
   id: 'string',
   handle: 'string',
   emoji: 'string',
   text: 'string',
   at: 'number',
   ex: 'ex'
-}
+} as const satisfies Partial<Record<keyof PostComment, 'string' | 'number' | 'ex'>>
 
 /** Why `comment` cannot go under a post for `modId`, or null where it can. */
 function commentRefusal(comment: unknown, modId: string): string | null {
   if (!isPlainObject(comment)) return 'A comment is not an object.'
   for (const [key, value] of Object.entries(comment)) {
-    const kind = Object.hasOwn(COMMENT_KEYS, key) ? COMMENT_KEYS[key as keyof PostComment] : undefined
+    const kind = Object.hasOwn(COMMENT_KEYS, key) ? COMMENT_KEYS[key as keyof typeof COMMENT_KEYS] : undefined
     if (kind === undefined) return `A comment has \`${key}\`, which is not a comment's; a mod keeps its own in its slice.`
     if (kind === 'ex' ? !ownSlicesOnly(value, modId) : kind === 'number' ? !Number.isFinite(value) : typeof value !== 'string') {
       return `A comment's \`${key}\` is not what a comment holds there.`

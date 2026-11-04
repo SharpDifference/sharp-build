@@ -4,6 +4,10 @@ import type { PostComment } from '@shared/postComments'
 import type { CharMemory, GameSave, Result, SaveDraft, SocialPost } from '@shared/types'
 import { charInfo, restoreApi, sceneLines, stubApi } from './fixtures'
 
+// A field another file adds to the comment, as Bunnyfeeds does on main: core must still
+// typecheck with it, and a comment holding such a field is refused below.
+declare module '@shared/postComments' { interface PostComment { addedElsewhere?: string } }
+
 /**
  * A mod's writes to the game's own records: its slice on a live text, post or comment, with the
  * record's own fields and every other mod's slice kept; the comments it adds under a post and the
@@ -150,6 +154,7 @@ describe('addPostComments', () => {
   it.each([
     ['MOD_WRITE_NOT_OWNER', 'rec-other', [comment('c2')]],
     ['MOD_WRITE_INVALID', 'rec-writer', [comment('c2', { player: true })]],
+    ['MOD_WRITE_INVALID', 'rec-writer', [comment('c2', { addedElsewhere: 'x' })]],
     ['MOD_WRITE_INVALID', 'rec-writer', [comment('c2', { ex: other })]],
     ['MOD_WRITE_INVALID', 'rec-writer', [comment('c2', { at: 'soon' })]],
     ['MOD_WRITE_INVALID', 'rec-writer', [comment('c2'), comment('c2')]],
