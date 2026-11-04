@@ -445,7 +445,9 @@ asked.
 The framework keeps its state with the scene through the mod kit, under Mini-games' own name: a
 save from an earlier version still loads, and its state moves across the first time the table
 changes. A game's result is written into the save a reload lands on, which the game's later saves
-of that point build on, so none of them can drop it. The table speaks into the scene through the
+of that point build on, so none of them can drop it. So is a table as it is set, and as it is left
+before its first move: a reload brings back a table that was waiting, never one the reader stood
+up from. The table speaks into the scene through the
 kit, and its narration of the moves is left out of every save. Nothing changes at the table, and
 no pack has to change.
 

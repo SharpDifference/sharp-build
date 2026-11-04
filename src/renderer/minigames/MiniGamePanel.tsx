@@ -37,7 +37,7 @@ import {
 import type { ScenePanelProps } from '../mods/hooks'
 import { useGameStore } from '../stores/gameStore'
 import { gameComponent, type GamePlay, type Opponent, type PlayResult } from './play'
-import { agreementAvailable, checkpointResult, keptAgreed, saveSceneMiniGame, useTableStore, type Agreed } from './session'
+import { agreementAvailable, cancelMatch, checkpointResult, keptAgreed, saveSceneMiniGame, useTableStore, type Agreed } from './session'
 import { tableRound } from './round'
 import { skillOf } from './skill'
 import {
@@ -236,7 +236,7 @@ export function MiniGamePanel({ theme, onClose }: ScenePanelProps): JSX.Element 
 
   /** Closes a table before its first move, letting go of the match kept for a reload. */
   function standUp(): void {
-    useTableStore.getState().setAgreed(null)
+    void cancelMatch()
     onClose()
   }
 

@@ -2,7 +2,7 @@ import {beforeAll, beforeEach, describe, it, expect, vi} from 'vitest'
 import { miniGamesReady } from './fixtures/miniGamesKit'
 import {bindSceneFieldSaves} from '@vx/modkit/host/renderer'
 import {useGameStore} from '../src/renderer/stores/gameStore'
-import {checkpointResult, clearMatch, keepInvitation, keptInvitation, keptAgreed, savedMiniGame, sceneMiniGame, useTableStore} from '../src/renderer/minigames/session'
+import {cancelMatch, checkpointResult, clearMatch, keepInvitation, keptInvitation, keptAgreed, savedMiniGame, saveSceneMiniGame, sceneMiniGame, useTableStore} from '../src/renderer/minigames/session'
 import {fileResult, resumeMiniGameResult} from '../src/renderer/minigames/table'
 import {queuedScene} from '../src/renderer/stores/loop/saves'
 import {submitAction} from '../src/renderer/stores/gameLoop'
@@ -19,7 +19,8 @@ const agreed={gameId:'darts',location:'pino_cola_lounge',charIds:['a','b'],stake
 const outcome={outcome:'won' as const,summary:'You won.',account:['The final dart has landed.']}
 type Written={ok:true;data:null}
 // The scene field's saves, standing in for core's: each puts the value on the store and is written.
-const save=vi.fn(async(_modId:string,_keys:readonly string[],apply:()=>void):Promise<Written>=>{apply();return {ok:true,data:null}})
+const written=async(_modId:string,_keys:readonly string[],apply:()=>void):Promise<Written>=>{apply();return {ok:true,data:null}}
+const save=vi.fn(written)
 beforeAll(()=>bindSceneFieldSaves({save}))
 beforeEach(()=>{
  vi.clearAllMocks()
@@ -44,6 +45,24 @@ describe('mini-game scene checkpoint',()=>{
   useGameStore.getState().restoreScene(JSON.parse(JSON.stringify(saved)))
   expect(keptAgreed()).toMatchObject(agreed)
   expect(keptAgreed()).not.toHaveProperty('score')
+ })
+ it('a table cancelled before its first move does not come back on reload',async()=>{
+  // Core's decision point, standing in: each scene-field save copies the scene into it.
+  let held=useGameStore.getState().captureScene()
+  save.mockImplementation(async(modId,keys,apply)=>{const done=await written(modId,keys,apply);held=useGameStore.getState().captureScene();return done})
+  try{
+   // Seated, as the panel seats a solo table.
+   useTableStore.getState().setAgreed({...agreed,charIds:[]})
+   useTableStore.getState().dropAgreed()
+   await saveSceneMiniGame()
+   expect(savedMiniGame(held!.mods!).match?.status).toBe('playing')
+   await cancelMatch()
+   // Leaving writes the decision point; loading it must not reopen the table.
+   useGameStore.getState().restoreScene(null)
+   useGameStore.getState().restoreScene(JSON.parse(JSON.stringify(held)))
+   expect(keptAgreed()).toBeNull()
+   expect(sceneMiniGame().match).toBeUndefined()
+  }finally{save.mockImplementation(written)}
  })
  it('captures a solo match and does not leak mutable options into the save',()=>{
   useTableStore.getState().setAgreed({...agreed,charIds:[]})

@@ -150,6 +150,15 @@ export function checkpointResult(result: MiniGameResult, names: readonly string[
   setSceneMiniGame({ ...state, match: { ...state.match, status: 'result', result: { ...result }, names: [...names] } })
 }
 
+/**
+ * Lets go of a table before its first move: the match leaves the scene, and the save a reload
+ * lands on, which took it when the table was set. A settled result is kept, as `setAgreed` keeps it.
+ */
+export function cancelMatch(): Promise<Result<null>> {
+  useTableStore.getState().setAgreed(null)
+  return saveSceneMiniGame()
+}
+
 /** Drops the match kept with the scene, once its result has been told. */
 export function clearMatch(): void {
   const state = sceneMiniGame()
