@@ -28,7 +28,7 @@ vi.mock('electron', () => ({
   safeStorage: {}
 }))
 
-const { getModSwitches, setModSwitches, modOptionOn } = await import('../src/main/services/modsService')
+const { getModSwitches, setModSwitches, modOptionOn, modIsOn } = await import('../src/main/services/modsService')
 const { modSession, startModSession } = await import('../src/main/mods/session')
 const { MODS, switchedOn, optionOn, optionKey } = await import('../src/shared/mods')
 const { sharedModOn } = await import('../src/shared/modRules')
@@ -88,5 +88,24 @@ describe('shared rules in main', () => {
     const switches = await setModSwitches({ on: { broken: true }, options: {} }).then(getModSwitches)
     expect(switchedOn(switches, 'broken')).toBe(true)
     expect(sharedModOn('broken')).toBe(false)
+    expect(await modIsOn('broken')).toBe(false)
+  })
+
+  it('reads fresh switches for a main caller and refreshes options in the same read', async () => {
+    const mod = MODS.find(mod => mod.id === 'hello-mod')!
+    const option = mod.options![0]
+    expect(await modIsOn(mod.id)).toBe(true)
+    await writeFile(join(root, 'data', 'mods.json'), JSON.stringify({
+      schemaVersion: 1, on: { [mod.id]: false },
+      options: { [optionKey(mod.id, option.id)]: !option.default }
+    }))
+    expect(await modIsOn(mod.id)).toBe(false)
+    expect(modOptionOn(mod.id, option.id)).toBe(!option.default)
+    expect(await modIsOn('not-installed')).toBe(false)
+  })
+
+  it('propagates an unreadable switch record rather than silently enabling a mod', async () => {
+    await writeFile(join(root, 'data', 'mods.json'), '{broken')
+    await expect(modIsOn('hello-mod')).rejects.toMatchObject({ code: 'MODS_MALFORMED' })
   })
 })

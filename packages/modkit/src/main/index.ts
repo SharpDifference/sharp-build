@@ -14,7 +14,7 @@ export type {
   ReadJsonResult
 } from '../bridge/main'
 
-export { extractZip, modOptionOn, readJsonFile, sniffImageFile, writeAtomicBytes, writeAtomicJson } from '../bridge/main'
+export { extractZip, modIsOn, modOptionOn, readJsonFile, sniffImageFile, writeAtomicBytes, writeAtomicJson } from '../bridge/main'
 
 export type { InvokeContext, InvokeHandler } from '../bridge/main'
 
