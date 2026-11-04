@@ -10,10 +10,12 @@ import { playthroughRecord, restoreApi, stubApi } from './fixtures'
 
 stubApi({ jobs: { onProgress: () => () => {} } })
 const { plotTwist } = await import('../src/renderer/stores/plotTwist')
+await import('../src/renderer/modEntries/plot-twist')
 
-it('accepts a semester continuation prepared by the previous build', () => {
+it.each([true, false])('accepts an old prepared semester continuation with the switch %s', enabled => {
   const game = () => useGameStore.getState()
   game().reset()
+  useModsStore.setState({ switches: { on: { [PLOT_TWIST_MOD]: enabled }, options: {} } })
   const oldCarry = JSON.parse('{"exPlotTwist":"A direction carried by the previous build."}')
   const opening = stampSave({ ...game().toGameSave(), ...carriedModFields(oldCarry) }, '123', 'next', 1)
   game().loadSave(opening, playthroughRecord({ chars: [] }), {})
