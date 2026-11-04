@@ -124,6 +124,9 @@ export type InvokeHandler = (context: InvokeContext, ...args: unknown[]) => unkn
 export function modDataPath(modId: string, playthroughId?: string): string;
 
 // @public
+export function modIsOn(modId: string): Promise<boolean>;
+
+// @public
 export function modOptionOn(modId: string, optionId: string): boolean;
 
 // @public
