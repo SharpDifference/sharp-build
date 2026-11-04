@@ -29,8 +29,11 @@ requirement. The character's tag is retained when the mod is off.
 
 ## Implementation and limits
 
-The threshold is registered by `src/shared/modEntries/godlike-standards.ts` through the small
-additive extension in `src/shared/romanceRequirements.ts`. Core's `sharedModOn` supplies the
+The shared entry holds only the mod definition. At renderer boot, after the shared catalogue
+has loaded, `src/renderer/modEntries/godlike-standards.ts` registers the trait and threshold
+through `registerCharacterTrait` and `registerRomanceRequirement` from `@vx/modkit/shared`.
+It registers even while switched off, so the editor retains the opt-in tag and its gold tone.
+The core-owned additive extension in `src/shared/romanceRequirements.ts` and `sharedModOn` supply the
 live mod lookup. Disabled or absent rules add no requirements; multiple rules combine by taking
 the highest minimum per stat.
 
@@ -38,7 +41,9 @@ the highest minimum per stat.
 optional context on `foldRelationshipEvents`. `gameStore.ts` and `sceneSanitizer.ts` supply
 that context for both saved and projected milestones. The sanitizer rejects an entire
 blocked group act rather than inventing a different pairing. Stored crush awards are checked
-as well. These are small shared integration changes; the game is not a zero-edit plugin host.
+as well. The romance registry is core's implementation, identical on core and main, rather
+than a Godlike-owned file. Godlike's shared and renderer entries now import only the public
+kit; its boundary exception count is zero. Packaging/install validation remains separate.
 
 `prompts/relationship.ts` adds the same requirement to scene, texting and opening context.
 An AI can still write inconsistent free-form prose; the code prevents that prose from
