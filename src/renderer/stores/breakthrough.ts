@@ -8,16 +8,14 @@ import { fullNameOf, type Character, type SceneLine, type StructuredRequest } fr
 import { breakthroughAdvantage } from '../prompts/breakthroughPrompt'
 import { echoBreakthroughPrompt } from '../prompts/echoBreakthroughPrompt'
 import { echoBreakthroughAbility, ECHO_BREAKTHROUGH_OPTION, type EchoBreakthroughAspect } from '@shared/echoBreakthrough'
-import { optionOn } from '@vx/modkit/shared'
 import { useGameStore } from './gameStore'
-import { useModsStore } from './modsStore'
-import { modIsOn } from '@vx/modkit/renderer'
+import { modIsOn, modOptionOn } from '@vx/modkit/renderer'
 import { interjectOfferOf, replyRowOfferOf } from './loop/playback'
 
 type Game = ReturnType<typeof useGameStore.getState>
 
 export function availableEchoBreakthrough(game:Game, borrowedFrom?:string) {
-  if(!modIsOn('echo')||!optionOn(useModsStore.getState().switches,'echo',ECHO_BREAKTHROUGH_OPTION))return null
+  if(!modIsOn('echo')||!modOptionOn('echo',ECHO_BREAKTHROUGH_OPTION))return null
   if (borrowedFrom && (!modIsOn('campus-talents')||!game.exEcho.player||!abilityRank(game.exTalents,TALENT_ABILITIES.borrowed)||
     !breakthroughCast(game).includes(borrowedFrom)||!game.charInfo[borrowedFrom]?.nameKnown||
     !isTrusted(affectionFor(game.charInfo[borrowedFrom],game.date,game.characters[borrowedFrom]))||
