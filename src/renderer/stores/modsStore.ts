@@ -119,6 +119,11 @@ export function useModOn(id: string, record?: Pick<PlaythroughRecord, 'mods'> | 
   return useModsStore((s) => running && modOn(s.switches, id, record))
 }
 
+/** Where a mod's option stands outside a component, using its declared default when unset. */
+export function modOptionOn(modId: string, optionId: string): boolean {
+  return optionOn(useModsStore.getState().switches, modId, optionId)
+}
+
 /** Where one of a mod's options stands, for a component. */
 export function useModOption(modId: string, optionId: string): boolean {
   return useModsStore((s) => optionOn(s.switches, modId, optionId))
