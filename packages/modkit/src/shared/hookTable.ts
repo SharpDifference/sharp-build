@@ -196,6 +196,8 @@ export const KIT_APIS = [
   'renderer:useReaderPromptText',
   'renderer:subscribeReaderPromptText',
   'renderer:useProfileImageUrl',
+  'renderer:profileImageUrl',
+  'renderer:subscribeProfileImageUrl',
 
   'shared:SAFE_CHAR_ID',
   'shared:assertSafeCharId',

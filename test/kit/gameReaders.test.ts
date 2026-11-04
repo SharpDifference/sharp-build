@@ -197,12 +197,19 @@ it('profile image hooks follow only the selected native image version and game a
   images.setState({ spriteVersion: { a: 2, b: 1 } })
   expect(changed).toHaveBeenCalledOnce()
   expect(read()).toBe(profileUrl('a', 2))
+  expect(readers.profileImageUrl('a')).toBe(profileUrl('a', 2))
+  const plain = vi.fn(), stopPlain = readers.subscribeProfileImageUrl('a', plain)
+  images.setState({ spriteVersion: { a: 3, b: 1 } })
+  expect(plain).toHaveBeenCalledOnce()
+  stopPlain()
+  // The hook's own subscription also heard that version change.
+  expect(changed).toHaveBeenCalledTimes(2)
   game.setState({ playthroughId: null })
   expect(read()).toBeUndefined()
-  expect(changed).toHaveBeenCalledTimes(2)
+  expect(changed).toHaveBeenCalledTimes(3)
   stop()
   game.setState({ playthroughId: '1' })
-  expect(changed).toHaveBeenCalledTimes(2)
+  expect(changed).toHaveBeenCalledTimes(3)
 })
 
 it('every component hook uses the corresponding stable snapshot and filtered subscription', () => {

@@ -125,7 +125,10 @@ export const subscribeConversation = conversations.subscribe
 const EMPTY_FEED: readonly Readonly<SocialPost>[] = Object.freeze([])
 const feeds = recordReader<readonly Readonly<SocialPost>[]>((game, id) =>
   game.playthroughId ? game.charInfo[id]?.feed ?? EMPTY_FEED : EMPTY_FEED)
-/** Her posts in saved order, without filtering visibility or arrival dates. @since 0.8.0 */
+/**
+ * Her posts in saved order, without filtering visibility or arrival dates. To show what the
+ * player sees, keep the posts the kit's `postVisible` passes. @since 0.8.0
+ */
 export const feed = feeds.read
 /** Her feed in a component. @since 0.8.0 */
 export const useFeed = feeds.use
@@ -207,5 +210,9 @@ const profileImages = recordReader((game, id) => {
   if (!game.playthroughId || !game.characters[id]) return undefined
   return profileUrl(id, useCharacterStore.getState().spriteVersion[id] ?? 0)
 }, [gameChanges, imageChanges])
-/** Her profile image with native cache invalidation; undefined without her game. @since 0.8.0 */
+/** Her profile image URL with native cache invalidation; undefined without her game. @since 0.8.0 */
+export const profileImageUrl = profileImages.read
+/** Her profile image in a component. @since 0.8.0 */
 export const useProfileImageUrl = profileImages.use
+/** Watches only her profile image URL, including a new sprite version. @since 0.8.0 */
+export const subscribeProfileImageUrl = profileImages.subscribe

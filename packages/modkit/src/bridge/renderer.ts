@@ -151,5 +151,7 @@ export {
   readerPromptText,
   useReaderPromptText,
   subscribeReaderPromptText,
-  useProfileImageUrl
+  useProfileImageUrl,
+  profileImageUrl,
+  subscribeProfileImageUrl
 } from '../../../../src/renderer/mods/gameReaders'

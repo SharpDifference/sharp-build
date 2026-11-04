@@ -689,9 +689,10 @@ seed its own mod data from older saves. It neither creates nor updates that key.
 `gameFacts`/`useGameFacts` for the playthrough id and reader's name, and `charKeyOf` to derive a
 character key. No second identity reader is needed.
 
-`useProfileImageUrl(id)` combines the native profile URL with its image-cache version and follows
-changes to that girl's image. It returns `undefined` without a game or that girl. This is a
-component-only reader because the current consumer draws her face; it exposes no image store.
+`profileImageUrl(id)` combines the native profile URL with its image-cache version; it returns
+`undefined` without a game or that girl. `useProfileImageUrl(id)` is the component hook and
+`subscribeProfileImageUrl(id, onChange)` the plain subscription, both following changes to that
+girl's image only. No image store is exposed.
 `sceneActive` uses core's scene-ownership predicate. Together with `clock` and existing
 `isGraduationSlot`, it replaces the selectors used to close commenting while a scene or the
 epilogue owns the phone. It is not the same question as `safePoint`.

@@ -219,5 +219,7 @@ export {
   readerPromptText,
   useReaderPromptText,
   subscribeReaderPromptText,
-  useProfileImageUrl
+  useProfileImageUrl,
+  profileImageUrl,
+  subscribeProfileImageUrl
 } from '../bridge/renderer'

@@ -72,7 +72,9 @@ describe('the entry points', () => {
       'readerPromptText',
       'useReaderPromptText',
       'subscribeReaderPromptText',
-      'useProfileImageUrl'
+      'useProfileImageUrl',
+      'profileImageUrl',
+      'subscribeProfileImageUrl'
     ] as const) {
       expect(rendererKit[name], name).toBe(native[name])
     }

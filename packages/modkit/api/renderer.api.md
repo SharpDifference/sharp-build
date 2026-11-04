@@ -632,6 +632,9 @@ export function postVisible(post: SocialPost): boolean;
 export const press: TargetAndTransition;
 
 // @public
+export const profileImageUrl: (id: string) => string | undefined;
+
+// @public
 export function profileLines(character: Character, flags: CharFlags, castSize?: number): string[];
 
 // @public
@@ -1274,6 +1277,9 @@ export const subscribePlayerProfilePicture: (onChange: () => void) => () => void
 
 // @public
 export const subscribePlayerStats: (onChange: () => void) => () => void;
+
+// @public
+export const subscribeProfileImageUrl: (id: string, onChange: () => void) => () => void;
 
 // @public
 export const subscribeReaderPromptText: (onChange: () => void) => () => void;
