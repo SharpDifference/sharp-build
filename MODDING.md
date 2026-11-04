@@ -218,6 +218,21 @@ else the highest, with a line in the log. The loader deletes nothing and writes 
   standing in for an installed copy of the same id). While the game runs, a change to the folder
   reloads the window, at once off a game and on offer in one; a changed `main.js` offers a restart.
 
+### Main-process enablement
+
+`await modIsOn(modId)` from `@vx/modkit/main` reads the current switches from disk
+and answers whether that mod is enabled and running this session. Declare
+`main:modIsOn`. Unknown mods, failed loads and safe-start exclusions answer false.
+The renderer's `modIsOn` returns a boolean synchronously; main's returns a Promise.
+Always `await` the main version: testing the Promise itself would always be truthy.
+A malformed/unreadable switches file rejects through the normal application error;
+it never silently enables the mod. Main has no active playthrough, so playthrough
+mods are checked against their global switch, not a particular save's enrollment.
+
+This read also refreshes the option snapshot used by `modOptionOn`. For a service
+that needs both, await `modIsOn` first, then read its option synchronously. Neither
+function grants permission to invoke another mod or cancels work already running.
+
 ### Modal controls
 
 An installed mod imports `useModalShell` and `useDismissLayer` from `@vx/modkit/renderer`,

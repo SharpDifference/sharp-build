@@ -10,6 +10,9 @@
   and `spaced`, with relationship input types. Image-prompt draft registration remains shared;
   its boot guidance now covers the shared-catalog import cycle and both processes.
 
+- Main's `modIsOn` reads a mod's current enabled state from disk and honors session
+  load failures and safe start. The same read refreshes `modOptionOn`'s snapshot.
+  It has its own `main:modIsOn` capability; no raw switches service is exposed.
 
 - `lead` on a `dm` prompt addition puts its fields ahead of the reply's own, and `dmReplyLead`
   hands them over the moment they have streamed in, before her first text lands. Once per reply,

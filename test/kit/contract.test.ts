@@ -236,6 +236,7 @@ describe('the entry points', () => {
     expect(mainKit.extractZip).toBe(archive.extractZip)
     expect(mainKit.sniffImageFile).toBe(images.sniffImageFile)
     expect(mainKit.modOptionOn).toBe(mods.modOptionOn)
+    expect(mainKit.modIsOn).toBe(mods.modIsOn)
   })
 
   it('hands the window the native main-call binding', async () => {
