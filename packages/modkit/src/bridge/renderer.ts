@@ -14,7 +14,7 @@ export type { ModalShell } from '../../../../src/renderer/components/useModalShe
 export { useModalShell, useDismissLayer } from '../../../../src/renderer/components/useModalShell'
 export type { SceneInputLayout } from '../../../../src/renderer/components/useSceneInput'
 export { useSceneInput } from '../../../../src/renderer/components/useSceneInput'
-export { modIsOn, useModOn, useModOption } from '../../../../src/renderer/stores/modsStore'
+export { modIsOn, modOptionOn, useModOn, useModOption } from '../../../../src/renderer/stores/modsStore'
 export { PostCommentAction, PostCommentsView, PostPicture } from '../../../../src/renderer/components/PostSpots'
 export { EmojiTool, SentText, useBareMessage, useEmojiTool } from '../../../../src/renderer/components/TextSpots'
 export { submitAction, takeTurnFromReply } from '../../../../src/renderer/stores/gameLoop'
@@ -94,3 +94,22 @@ export { FEED_EMOJI, FEED_EMOJI_BAG, FEED_HANDLE_BAG, FEED_HANDLE_POOL } from '.
 
 export { bunnybotSays } from '../../../../src/renderer/mods/bunnybot'
 export { invoke } from '../../../../src/renderer/mods/invoke'
+
+export { Lightbox } from '../../../../src/renderer/components/Lightbox'
+export { relationshipLines } from '../../../../src/renderer/prompts/relationship'
+export type { RelationshipMedium, RelationshipProgress } from '../../../../src/renderer/prompts/relationship'
+export { memoryLines, profileLines, spaced } from '../../../../src/renderer/prompts/scenePrompt'
+
+export {
+  noNsfwImages,
+  subscribeNoNsfwImages,
+  useNoNsfwImages,
+  canRenderLocalImages,
+  subscribeCanRenderLocalImages,
+  phoneOpen,
+  viewingThread,
+  subscribePhoneView,
+  useViewingThread,
+  drawFeedHandles,
+  drawFeedEmoji
+} from '../../../../src/renderer/mods/readers'
