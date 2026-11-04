@@ -286,6 +286,9 @@ export function hasTexted(conversation: Conversation | undefined): boolean;
 export function HeartIcon(input?: MarkProps): JSX.Element;
 
 // @public
+export function imageApiConfigured(): boolean;
+
+// @public
 export function invoke<T>(modId: string, name: string, args: unknown[], options?: {
     signal?: AbortSignal;
 }): Promise<Result<T>>;
@@ -335,6 +338,9 @@ export interface LikesAsk {
     // (undocumented)
     playthroughId?: string | null;
 }
+
+// @public
+export function localImageSource(): 'managed' | 'external' | null;
 
 // @public
 export function Locked(input: {
@@ -1213,6 +1219,12 @@ answeredReminder?: string, activity?: SlotActivityOffer): Promise<void>;
 export function subscribeCanRenderLocalImages(onChange: () => void): () => void;
 
 // @public
+export function subscribeImageApiConfigured(onChange: () => void): () => void;
+
+// @public
+export function subscribeLocalImageSource(onChange: () => void): () => void;
+
+// @public
 export function subscribeNoNsfwImages(onChange: () => void): () => void;
 
 // @public
@@ -1379,8 +1391,14 @@ export function useGameFacts(): {
     readerName: string;
 };
 
+// @public (undocumented)
+export function useImageApiConfigured(): boolean;
+
 // @public
 export function useLessNsfwText(): boolean;
+
+// @public (undocumented)
+export function useLocalImageSource(): 'managed' | 'external' | null;
 
 // @public
 export function useModalShell(onClose: () => void, sound?: 'panel' | 'phone' | 'none', primary?: () => void): ModalShell;
