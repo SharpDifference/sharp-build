@@ -95,6 +95,10 @@ on them, from any mod that puts one there, get threads like any other post.
 - After New Game+ the count starts over with the new semester: last semester's replies are still
   listed, as read.
 
+## 1.1.4
+
+- No change you would notice; it reads more of the game through the mod kit now.
+
 ## 1.1.3
 
 - **Replies are saved when they arrive**: closing the game right after the girls answer no
