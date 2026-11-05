@@ -135,3 +135,9 @@ Validated on the integrated 0.3.1 build:
 - All 34 traits plus a long starting explanation fit a scrollable panel with the footer visible at the supported stage sizes.
 
 UI tests used canned generation results and synthetic saves; live model behavior still needs playtesting.
+
+## Legacy semester registration
+
+The legacy carry adapter registers at renderer boot, after the shared catalogue, even
+while the feature is off. See [Maestro legacy semester carry](legacy-semester-carry.md)
+for the adapter paths, retention guarantees and remaining standalone typing limitation.
