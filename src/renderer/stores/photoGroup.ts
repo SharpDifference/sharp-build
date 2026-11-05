@@ -1,4 +1,3 @@
-import { PHOTO_FEATURE } from '@shared/mods'
 import { npcFriendsOf, type Character, type StructuredRequest, type TimeSlot } from '@vx/modkit/shared'
 import { groupPhotoPair, type GroupPhotoPair } from '../../shared/photoDuo'
 import { duoPhotosOn } from '../../shared/photoSwitches'
@@ -14,6 +13,8 @@ import { postCommentLines, postPhotoLines } from '../prompts/photoBrief'
 import { useGameStore } from './gameStore'
 import { canSendPhotos } from './localPhotoStore'
 import { startHeldPostPhoto } from './photoPost'
+
+const PHOTO_FEATURE = 'photo-feature'
 
 /**
  * The group photo: two of the girls in the scene the reader just committed to, posted by one of

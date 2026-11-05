@@ -1,4 +1,5 @@
-import { PHOTO_FEATURE } from '@shared/mods'
+import { registerImagePromptDraft } from '@vx/modkit/shared'
+import { registerPhotoDraft } from '../../shared/modEntries/photo-feature'
 import { reachOf, rollAudienceLikes } from '../../shared/postAudience'
 import { postIsOut } from '../../shared/heldPosts'
 import {
@@ -37,6 +38,10 @@ import { BODY_EDITOR_FIELD, writeBody } from '../views/bodyFields'
 import { PhotoComments, PhotoPostPicture } from '../components/PhotoPostSpots'
 import { MessagePhotoAttachment, PhotoLightboxHost } from '../components/PhotoBubble'
 import { GalleryPanel, galleryShown, PostPhotoExtra } from '../views/ContactGallery'
+
+registerPhotoDraft(registerImagePromptDraft)
+
+const PHOTO_FEATURE = 'photo-feature'
 
 /**
  * Photo Feature, plugged into the game through its hooks. Everything it adds to the game's own

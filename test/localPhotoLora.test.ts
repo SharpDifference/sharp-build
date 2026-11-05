@@ -1,4 +1,4 @@
-import { mkdtemp, readFile, readdir, rm, writeFile } from 'fs/promises'
+import { mkdir, mkdtemp, readFile, readdir, rm, writeFile } from 'fs/promises'
 import { tmpdir } from 'os'
 import { join, resolve } from 'path'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
@@ -8,12 +8,7 @@ import { character } from './fixtures'
 let root = ''
 const mocks = vi.hoisted(() => ({ render: vi.fn(), afterWrite: vi.fn() }))
 vi.mock('electron', () => ({
-  app: { isPackaged: false, getAppPath: () => process.cwd(), getPath: () => root }
-}))
-vi.mock('../src/main/photoProtocol', () => ({
-  getPhotoPath: (_save: string, _char: string, file: string) => join(root, file),
-  getPhotosPath: () => root,
-  getPhotosRoot: () => root
+  app: { isPackaged: false, getAppPath: () => root, getPath: () => root }
 }))
 // A prompt-only copy without her LoRA makes using her stored record observable.
 vi.mock('../src/main/bodySetting', () => ({
@@ -33,11 +28,13 @@ vi.mock('@vx/modkit/main', async original => {
 const { generateDuoPhoto, generatePhoto } = await import('../src/main/services/localPhotoService')
 const PNG = new Uint8Array([137, 80, 78, 71, 13, 10, 26, 10])
 const file = 'sarah_chat_001.png'
+const folder = () => join(root, 'data', 'saves', '100', 'mod-data', 'photo-feature', 'char-1')
 const graphOf = async (name: string) =>
   JSON.parse(await readFile(resolve('assets/workflows', name), 'utf8'))
 
 beforeEach(async () => {
   root = await mkdtemp(join(tmpdir(), 'venus-photo-lora-'))
+  await mkdir(folder(), { recursive: true })
   mocks.render.mockReset().mockResolvedValue(PNG)
   mocks.afterWrite.mockReset()
 })
@@ -62,8 +59,8 @@ it.each([undefined, { name: 'her.safetensors', weight: 0.65 }])(
     for (const id of Object.values(request.nodes) as string[]) {
       expect(request.workflow).toHaveProperty(id)
     }
-    expect(new Uint8Array(await readFile(join(root, file)))).toEqual(PNG)
-    expect(JSON.parse(await readFile(join(root, 'sarah_chat_001.json'), 'utf8'))).toMatchObject({
+    expect(new Uint8Array(await readFile(join(folder(), file)))).toEqual(PNG)
+    expect(JSON.parse(await readFile(join(folder(), 'sarah_chat_001.json'), 'utf8'))).toMatchObject({
       seed: 42, ...prompts, ...(lora ? { lora } : {})
     })
   }
@@ -83,7 +80,7 @@ it('sends the duo scene and both girls to the kit without a character LoRA node'
   for (const id of [...Object.values(request.nodes), ...Object.keys(request.texts)] as string[]) {
     expect(request.workflow).toHaveProperty(id)
   }
-  expect(JSON.parse(await readFile(join(root, 'sarah_chat_001.json'), 'utf8'))).toMatchObject({
+  expect(JSON.parse(await readFile(join(folder(), 'sarah_chat_001.json'), 'utf8'))).toMatchObject({
     seed: 43, ...prompts
   })
 })
@@ -100,7 +97,7 @@ it.each(['solo', 'duo'] as const)('writes nothing for a cancelled %s render retu
     : generateDuoPhoto('100', her, character({ charId: 'friend-1' }), 'everyday',
       'At the cafe', file, { signal: controller.signal })
   await expect(result).rejects.toMatchObject({ code: 'CANCELLED' })
-  expect(await readdir(root)).toEqual([])
+  expect(await readdir(folder())).toEqual([])
 })
 
 it.each(['png', 'json'])('cleans up cancellation during the %s write', async extension => {
@@ -110,11 +107,11 @@ it.each(['png', 'json'])('cleans up cancellation during the %s write', async ext
   })
   await expect(generatePhoto('100', character(), 'everyday', 'At the cafe', file,
     { signal: controller.signal })).rejects.toMatchObject({ code: 'CANCELLED' })
-  expect(await readdir(root)).toEqual([])
+  expect(await readdir(folder())).toEqual([])
 })
 
 it('retires an older WebP twin after the replacement PNG lands', async () => {
-  await writeFile(join(root, 'sarah_chat_001.webp'), PNG)
+  await writeFile(join(folder(), 'sarah_chat_001.webp'), PNG)
   await generatePhoto('100', character(), 'everyday', 'At the cafe', file)
-  expect((await readdir(root)).sort()).toEqual(['sarah_chat_001.json', file])
+  expect((await readdir(folder())).sort()).toEqual(['sarah_chat_001.json', file])
 })

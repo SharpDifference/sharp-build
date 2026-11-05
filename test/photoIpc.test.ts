@@ -1,4 +1,4 @@
-import { access, mkdtemp, rm } from 'fs/promises'
+import { access, mkdir, mkdtemp, rm } from 'fs/promises'
 import { tmpdir } from 'os'
 import { join } from 'path'
 import type { IpcMainInvokeEvent } from 'electron'
@@ -27,12 +27,13 @@ const generate = (id = '1', seed = 1) => handlers.get('comfy:generatePhoto')!(
 const drop = (options?: { cancelOnly?: boolean; replacement?: string }) =>
   handlers.get('comfy:dropPhoto')!(event, '1', girl.charId, file, options)
 const exists = (id = '1') => access(join(root, 'data', 'saves', id,
-  'photos', girl.charId, file)).then(() => true, () => false)
+  'mod-data', 'photo-feature', girl.charId, file)).then(() => true, () => false)
 let finish: ((bytes: Uint8Array) => void) | undefined
 let signal: AbortSignal | undefined
 
 beforeEach(async () => {
   root = await mkdtemp(join(tmpdir(), 'photo-ipc-'))
+  for (const pid of ['1', '2']) await mkdir(join(root, 'data', 'saves', pid), { recursive: true })
   finish = undefined
   signal = undefined
   sender.send.mockReset()

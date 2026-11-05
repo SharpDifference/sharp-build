@@ -270,3 +270,9 @@ The stable IDs, defaults, dependencies, save fields and gameplay behavior are un
 ## October 14 confession follow-up
 
 Departed bystanders no longer prevent private confession bookkeeping. Graduation goodbyes preserve a previously discovered identity, but do not permit a first confession: their generation route has no ledger step to validate and persist that discovery. Normal eligible private scenes remain the route for first discovery. Quoted speaker, trust, privacy and stale-result checks still apply.
+
+## Legacy semester registration
+
+The legacy carry adapter registers at renderer boot, after the shared catalogue, even
+while the feature is off. See [Maestro legacy semester carry](legacy-semester-carry.md)
+for the adapter paths, retention guarantees and remaining standalone typing limitation.

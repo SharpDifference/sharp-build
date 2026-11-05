@@ -6,15 +6,14 @@ import { join } from 'path'
 import { ECHO_ART_ID, echoImagePrompt, echoLocalImagePrompt, normalizeEchoIdentity, type EchoArtRequest } from '../../shared/echo'
 import { generateImage } from '@shared/llm/cloudImage'
 import { getDataPath } from '../paths'
-import { modOn, optionOn } from '@vx/modkit/shared'
-import { getModSwitches } from './modsService'
+import { modIsOn, modOptionOn } from '@vx/modkit/main'
 import { clearEchoMatte } from './echoMatte'
 import { generateLocalEcho } from './echoLocalImage'
 import { decodeEchoArt, MAX_ECHO_ART_BYTES } from './echoArtImage'
 import { generateLocalReflection, resolveLocalReflectionTarget } from './reflectionLocalImage'
 import { installEchoModels } from './echoModelSetup'
 import { cutoutEchoImage, prepareEchoCutout, releaseEchoCutout } from './echoCutout'
-import { assertSafeCharId } from '@shared/characterRules'
+import { assertSafeCharId } from '@vx/modkit/shared'
 import { expressionRel } from '@shared/characterFiles'
 import { getCharacter, readCharacterImage } from './characterService'
 import { reflectionPortraitPrompt, reflectionStageOf, assertReflectionStage, type ReflectionStage } from '@shared/reflectionPortrait'
@@ -31,7 +30,7 @@ export async function readReflectionStage(charId:string):Promise<ReflectionStage
 }
 export async function saveReflectionStage(charId:string,value:unknown):Promise<ReflectionStage> {
  assertSafeCharId(charId);assertReflectionStage(value)
- if(!modOn(await getModSwitches(),'reckoning'))throw Error('Enable Reckoning in Mods first.')
+ if(!await modIsOn('reckoning'))throw Error('Enable Reckoning in Mods first.')
  const stage=reflectionStageOf(value),existing=await readPortableReflection(charId)
  await writePortableReflection(charId,{version:1,image:existing?.image??null,stage})
  return stage
@@ -42,7 +41,7 @@ export async function readReflectionPortrait(charId:string):Promise<string|null>
 /** An explicit null masks legacy artwork too, without removing the saved placement. */
 export async function resetReflectionPortrait(charId:string):Promise<void> {
  assertSafeCharId(charId);await getCharacter(charId)
- if(!modOn(await getModSwitches(),'reckoning'))throw Error('Enable Reckoning in Mods first.')
+ if(!await modIsOn('reckoning'))throw Error('Enable Reckoning in Mods first.')
  if(jobs.size)throw Error('Wait for image generation to finish or cancel it first.')
  const existing=await readPortableReflection(charId)
  await writePortableReflection(charId,{version:1,image:null,stage:existing?.stage??reflectionStageOf(null)})
@@ -56,7 +55,7 @@ async function storeReflection(charId:string,bytes:Uint8Array,signal?:AbortSigna
 }
 export async function uploadReflectionPortrait(charId:string,path:string):Promise<string> {
  assertSafeCharId(charId);await getCharacter(charId)
- if(!modOn(await getModSwitches(),'reckoning'))throw Error('Enable Reckoning in Mods first.')
+ if(!await modIsOn('reckoning'))throw Error('Enable Reckoning in Mods first.')
  if((await stat(path)).size>MAX_BYTES)throw Error('Choose an image smaller than 20 MB.')
  return storeReflection(charId,await readFile(path))
 }
@@ -69,8 +68,8 @@ export async function generateReflectionPortrait(charId:string,requestId:string,
  const controller=new AbortController();jobs.set(requestId,{owner,controller})
  try {
   const signal=AbortSignal.any([controller.signal,AbortSignal.timeout(source==='local'?900000:600000)])
-  const switches=await getModSwitches();signal.throwIfAborted()
-  if(!modOn(switches,'reckoning'))throw Error('Enable Reckoning in Mods first.')
+  const on=await modIsOn('reckoning');signal.throwIfAborted()
+  if(!on)throw Error('Enable Reckoning in Mods first.')
   const target=source==='local'?await resolveLocalReflectionTarget():null
   signal.throwIfAborted()
   const character=await getCharacter(charId),original=await readCharacterImage(charId,expressionRel('neutral'))
@@ -112,10 +111,10 @@ export async function generateEchoArt(value: EchoArtRequest, owner: number): Pro
   const controller = new AbortController()
   jobs.set(value.requestId,{owner,controller})
   try {
-    const switches = await getModSwitches()
+    const on = await modIsOn('echo')
     controller.signal.throwIfAborted()
-    if (!modOn(switches,'echo')) throw Error('Enable Echo in Mods first.')
-    const local = optionOn(switches,'echo','megaten-art')
+    if (!on) throw Error('Enable Echo in Mods first.')
+    const local = modOptionOn('echo','megaten-art')
     const signal = AbortSignal.any([controller.signal,AbortSignal.timeout(local ? 900000 : 600000)])
     const prompt = (local ? echoLocalImagePrompt : echoImagePrompt)({...value,identity})
     await prepareEchoCutout(signal)
@@ -152,7 +151,7 @@ export async function installLocalEchoModels(id: string, owner: number): Promise
   finally { jobs.delete(id) }
 }
 export async function uploadEchoArt(path: string): Promise<string> {
-  if (!modOn(await getModSwitches(),'echo')) throw Error('Enable Echo in Mods first.')
+  if (!await modIsOn('echo')) throw Error('Enable Echo in Mods first.')
   if ((await stat(path)).size > MAX_BYTES) throw Error('Choose an image smaller than 20 MB.')
   return storeArt(await readFile(path))
 }

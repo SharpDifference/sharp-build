@@ -21,6 +21,10 @@ import { resetLoopState } from '../src/renderer/stores/loop/state'
 import '../src/renderer/modEntries/story-memory'
 import { character, charactersById, charInfo, playthroughRecord, restoreApi, stubApi } from './fixtures'
 
+// This store-only fixture does not boot the renderer entry catalogue.
+await import('../src/shared/meanwhileCarry')
+await import('../src/shared/whisperCarry')
+
 const game = () => useGameStore.getState()
 const cast = charactersById(character({ charId: 'a' }), character({ charId: 'b', firstName: 'Mina' }))
 const record = playthroughRecord({ chars: ['a', 'b'] })

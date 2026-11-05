@@ -1,3 +1,6 @@
+import './localPhotoBackup'
+import { registerImagePromptDraft } from '@vx/modkit/shared'
+import { registerPhotoDraft } from '../shared/modEntries/photo-feature'
 import type { IpcMainInvokeEvent } from 'electron'
 import type { PhotoRenderOptions } from '../shared/photoTypes'
 import { appError, type Character } from '@vx/modkit/shared'
@@ -95,6 +98,7 @@ type Handle = <Args extends unknown[], T>(
 
 /** Registers the photo channels. Called from `registerIpcHandlers` with its own `handle`. */
 export function registerPhotoIpc(handle: Handle): void {
+  registerPhotoDraft(registerImagePromptDraft)
   // Reserves the name the waiting bubble will carry into the save.
   handle(
     'comfy:reservePhotoName',

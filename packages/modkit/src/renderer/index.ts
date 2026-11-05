@@ -163,3 +163,27 @@ export {
 export { bunnybotSays } from '../bridge/renderer'
 export { boxParts, dropTransientLines, reachTurn, readerSaysInScene, sayInScene } from '../bridge/renderer'
 export { invoke } from '../bridge/renderer'
+
+export { Lightbox, memoryLines, profileLines, relationshipLines, spaced } from '../bridge/renderer'
+export type { RelationshipMedium, RelationshipProgress } from '../bridge/renderer'
+
+export {
+  noNsfwImages,
+  subscribeNoNsfwImages,
+  useNoNsfwImages,
+  imageApiConfigured,
+  subscribeImageApiConfigured,
+  useImageApiConfigured,
+  localImageSource,
+  subscribeLocalImageSource,
+  useLocalImageSource,
+  canRenderLocalImages,
+  subscribeCanRenderLocalImages,
+  phoneOpen,
+  viewingThread,
+  subscribePhoneView,
+  useViewingThread,
+  drawFeedHandles,
+  drawFeedEmoji,
+  modOptionOn
+} from '../bridge/renderer'

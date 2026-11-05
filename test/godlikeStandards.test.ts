@@ -1,4 +1,5 @@
 import './fixtures/maestroModelKit'
+import '../src/renderer/modEntries/godlike-standards'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createElement } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
