@@ -1,3 +1,5 @@
+// Carry registration follows catalogue loading and runs even while switched off.
+import '../../shared/breakthroughCarry'
 import { BREAKTHROUGH_MOD } from '../../shared/breakthrough'
 import { breakthroughContinuity } from '../prompts/breakthroughPrompt'
 import { settleSpirit } from '../stores/breakthrough'

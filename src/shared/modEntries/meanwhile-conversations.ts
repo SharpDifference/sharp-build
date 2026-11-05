@@ -1,5 +1,4 @@
 import type { ModDef } from '@vx/modkit/shared'
-import '../meanwhileCarry'
 import { MEANWHILE_MOD } from '../meanwhile'
 
 const mod: ModDef = {

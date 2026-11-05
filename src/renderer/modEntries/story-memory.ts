@@ -1,3 +1,5 @@
+// Carry registration follows catalogue loading and runs even while switched off.
+import '../../shared/storyMemoryCarry'
 import { acceptStoryFacts, recallPayload, STORY_MEMORY_LIGHT_OPTION } from '../../shared/storyMemory'
 import { optionOn } from '@vx/modkit/shared'
 import { useModsStore } from '../stores/modsStore'

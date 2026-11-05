@@ -8,7 +8,15 @@ const mocks = vi.hoisted(() => ({
   mkdir: vi.fn(), write: vi.fn(), read: vi.fn(), stat: vi.fn(), rename: vi.fn(),
   character: vi.fn(), sprite: vi.fn(), rm: vi.fn(), readdir: vi.fn()
 }))
-vi.mock('../src/main/services/modsService', () => ({ getModSwitches: mocks.switches }))
+vi.mock('../src/main/services/modsService', async () => {
+  const { modOn, optionOn } = await import('../src/shared/mods')
+  let switches: import('../src/shared/mods').ModSwitches = { on: {}, options: {} }
+  return {
+    getModSwitches: mocks.switches,
+    modIsOn: async (id: string) => { switches = await mocks.switches(); return modOn(switches, id) },
+    modOptionOn: (id: string, option: string) => optionOn(switches, id, option)
+  }
+})
 vi.mock('@shared/llm/cloudImage', () => ({ generateImage: mocks.cloud }))
 vi.mock('../src/main/services/echoLocalImage', () => ({ generateLocalEcho: mocks.local }))
 vi.mock('../src/main/services/reflectionLocalImage', () => ({ generateLocalReflection: vi.fn(), resolveLocalReflectionTarget: vi.fn() }))

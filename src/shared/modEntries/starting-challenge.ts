@@ -1,11 +1,5 @@
 import type { ModDef } from '@vx/modkit/shared'
-import { registerTermCarry } from '../modCarry'
-import { readStartingChallenge, STARTING_CHALLENGE_MOD, type StartingChallenge } from '../startingChallenge'
-
-declare module '../modCarry' {
-  interface ModCarryFields { exStartingChallenge?: StartingChallenge }
-}
-registerTermCarry('exStartingChallenge', save => readStartingChallenge(save.exStartingChallenge))
+import { STARTING_CHALLENGE_MOD } from '../startingChallenge'
 
 const mod: ModDef = {
   id: STARTING_CHALLENGE_MOD,
