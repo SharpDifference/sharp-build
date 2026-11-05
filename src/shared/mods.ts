@@ -56,6 +56,8 @@ export interface ModDef {
   blurb: string
   /** What switching it off leaves alone, where a player might fear otherwise. */
   offNote?: string
+  /** Hook and kit API declarations, as in vxmod.json; needed by a built-in main entry. */
+  hooks?: readonly string[]
   /** Mods this one cannot act without, by id. */
   requires?: readonly string[]
   options?: readonly ModOption[]
