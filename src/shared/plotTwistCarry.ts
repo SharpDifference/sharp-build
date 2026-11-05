@@ -1,5 +1,7 @@
-import { registerTermCarry } from './modCarry'
+import { registerTermCarry } from '@vx/modkit/shared'
 
+// This erased declaration is compatibility typing for the in-repo legacy carry.
+// Augmenting the public barrel alone shadows other legacy fields; migrate those together.
 declare module './modCarry' { interface ModCarryFields { exPlotTwist?: string } }
 
 // Old, already-prepared semester continuations can still carry mods.exPlotTwist.

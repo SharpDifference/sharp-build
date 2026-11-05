@@ -1,5 +1,4 @@
 import type { ModDef } from '@vx/modkit/shared'
-import '../storyMemoryCarry'
 
 const mod: ModDef = {
   id: 'story-memory', name: 'Story Memory', author: 'Maestro Leeds', version: '1.1.1',

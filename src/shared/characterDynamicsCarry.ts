@@ -1,4 +1,4 @@
-import { registerTermCarry } from './modCarry'
+import { registerTermCarry } from '@vx/modkit/shared'
 import { readCharacterDynamics, type CharacterDynamics } from './characterDynamics'
 
 declare module './modCarry' {

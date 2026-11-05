@@ -184,3 +184,9 @@ and saves; live-model narrative effectiveness is not a measured probability.
 - `src/renderer/modEntries/breakthrough.ts` loads the hooks automatically at boot.
 
 The stable IDs, defaults, dependencies, save fields and gameplay behavior are unchanged. Native character notes, scene-creator saves and calendar replays remain separate base-game features. Merge framework updates from `core` into this mod branch; resolve conflicts with `main` on a separate `integrate/breakthrough` branch.
+
+## Legacy semester registration
+
+The legacy carry adapter registers at renderer boot, after the shared catalogue, even
+while the feature is off. See [Maestro legacy semester carry](legacy-semester-carry.md)
+for the adapter paths, retention guarantees and remaining standalone typing limitation.
