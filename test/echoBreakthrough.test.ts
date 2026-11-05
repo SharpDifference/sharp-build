@@ -33,6 +33,17 @@ beforeEach(()=>{
 afterEach(async()=>{await writesSettled();restoreApi()})
 
 describe('Echo Breakthrough prototype',()=>{
+  it('follows option overrides and their removal without changing saved spirit',()=>{
+    const before=structuredClone(game().exBreakthrough)
+    expect(availableEchoBreakthrough(game())?.aspect).toBe('horizonbound')
+    useModsStore.setState({switches:withOption(useModsStore.getState().switches,'echo',ECHO_BREAKTHROUGH_OPTION,false)})
+    expect(availableEchoBreakthrough(game())).toBeNull()
+    useModsStore.setState({switches:{on:{echo:true},options:{}}})
+    expect(availableEchoBreakthrough(game())?.aspect).toBe('horizonbound')
+    useModsStore.setState({switches:{on:{echo:false},options:{}}})
+    expect(availableEchoBreakthrough(game())).toBeNull()
+    expect(game().exBreakthrough).toEqual(before)
+  })
   it('covers every aspect exactly once with distinct abilities',()=>{
     const abilities=Object.values(ECHO_BREAKTHROUGH_ABILITIES)
     expect(Object.keys(ECHO_BREAKTHROUGH_ABILITIES).sort()).toEqual(ECHO_ASPECTS.map(a=>a.id).sort())

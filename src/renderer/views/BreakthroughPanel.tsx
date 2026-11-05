@@ -4,20 +4,18 @@ import { motion, useReducedMotion } from 'motion/react'
 import { BREAKTHROUGH_MOD } from '../../shared/breakthrough'
 import { echoBreakthroughAbility, ECHO_BREAKTHROUGH_OPTION } from '@shared/echoBreakthrough'
 import { aspectOf } from '@shared/echo'
-import { optionOn } from '@vx/modkit/shared'
 import { fullNameOf } from '@vx/modkit/shared'
 import { availableEchoBreakthrough, activateBreakthrough, breakthroughCast, canBreakthrough } from '../stores/breakthrough'
 import { interject } from '../stores/gameLoop'
 import { useGameStore } from '../stores/gameStore'
-import { useModsStore } from '../stores/modsStore'
-import { useModOn } from '@vx/modkit/renderer'
+import { useModOn, useModOption } from '@vx/modkit/renderer'
 import { BREAKTHROUGH_SECONDS, breakthroughBannerMotion, breakthroughHaloMotion } from './BreakthroughMotion'
 import '../vu_styles/Breakthrough.css'
 import { ReckoningEntry } from './ReckoningModal'
 
 export function BreakthroughPanel({ hidden, blocked, onReckoning }: { hidden: boolean; blocked: boolean; onReckoning?:(id:string)=>void }): JSX.Element | null {
   const game = useGameStore(s => s), on = useModOn(BREAKTHROUGH_MOD)
-  const echoOn=useModOn('echo'),echoAbilities=useModsStore(s=>optionOn(s.switches,'echo',ECHO_BREAKTHROUGH_OPTION))
+  const echoOn=useModOn('echo'),echoAbilities=useModOption('echo',ECHO_BREAKTHROUGH_OPTION)
   const talentsOn=useModOn('campus-talents')
   const available=echoOn&&echoAbilities?availableEchoBreakthrough(game):null
   const [mode,setMode]=useState<'echo'|'normal'>('echo')

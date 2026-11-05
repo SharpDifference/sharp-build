@@ -17,8 +17,12 @@ import {
 import { cgSetDraft, spriteDraft } from '../src/shared/imagePrompt'
 import { setSharedModRules } from '../src/shared/modRules'
 import { setPhotoSwitches } from '../src/shared/photoSwitches'
-// Photo Feature registers her body in the drafts from its shared entry, which the mod list loads.
+import { registerImagePromptDraft } from '@vx/modkit/shared'
+import { registerPhotoDraft } from '../src/shared/modEntries/photo-feature'
+// Register after the shared catalogue has loaded, as each process does at startup.
 import '../src/shared/mods'
+
+registerPhotoDraft(registerImagePromptDraft)
 
 // Photo Feature on, with body details, as the drafts below are read.
 setSharedModRules(() => true)
