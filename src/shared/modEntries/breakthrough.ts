@@ -1,5 +1,4 @@
 import type { ModDef } from '@vx/modkit/shared'
-import '../breakthroughCarry'
 
 const mod: ModDef = {
   id: 'breakthrough', name: 'Breakthrough', author: 'Maestro Leeds', version: '1.0.0',

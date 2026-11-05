@@ -15,6 +15,10 @@ import { continuedStartOf } from '../src/renderer/stores/semesterStart'
 import { modFieldsLeaving } from '../src/renderer/stores/semesterModCarry'
 import { character, charInfo, enrollment, playthroughRecord } from './fixtures'
 
+// Mirror renderer boot's carry registration for this store-only setup fixture.
+await import('../src/shared/echoCarry')
+await import('../src/shared/characterDynamicsCarry')
+
 const returning = character({ charId: 'returning' })
 const untagged = character({ charId: 'untagged' })
 const graduate = character({ charId: 'graduate' })

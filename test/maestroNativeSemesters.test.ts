@@ -16,6 +16,16 @@ import { continuedStartOf } from '../src/renderer/stores/semesterStart'
 import { character, charInfo, enrollment, playthroughRecord, stubApi, restoreApi } from './fixtures'
 
 stubApi({ jobs: { onProgress: () => () => {} } })
+// This fixture enters stores directly rather than starting the renderer catalogue.
+await import('../src/shared/breakthroughCarry')
+await import('../src/shared/talentCarry')
+await import('../src/shared/characterDynamicsCarry')
+await import('../src/shared/echoCarry')
+await import('../src/shared/meanwhileCarry')
+await import('../src/shared/reckoningCarry')
+await import('../src/shared/startingChallengeCarry')
+await import('../src/shared/storyMemoryCarry')
+await import('../src/shared/whisperCarry')
 const { plotTwist } = await import('../src/renderer/stores/plotTwist')
 
 afterEach(() => { restoreApi() })
