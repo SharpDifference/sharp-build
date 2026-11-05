@@ -2,6 +2,7 @@
  * The bridge for the window: every type and function of core's `src/renderer` that the kit hands
  * a mod, re-exported here and nowhere else in the kit (see `shared.ts`).
  */
+export { spriteUrl } from '../../../../src/renderer/stores/characterStore'
 export type { PromptState } from '../../../../src/renderer/prompts/scenePrompt'
 export type { SlotIntroInput } from '../../../../src/renderer/prompts/slotIntroPrompt'
 export type { TextingPromptState } from '../../../../src/renderer/prompts/textingPrompt'
@@ -104,6 +105,12 @@ export {
   noNsfwImages,
   subscribeNoNsfwImages,
   useNoNsfwImages,
+  imageApiConfigured,
+  subscribeImageApiConfigured,
+  useImageApiConfigured,
+  localImageSource,
+  subscribeLocalImageSource,
+  useLocalImageSource,
   canRenderLocalImages,
   subscribeCanRenderLocalImages,
   phoneOpen,

@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+- Renderer exports native `spriteUrl` for character sprites, including cache versions and
+  staging, through the game's desktop/web image resolver.
+
+- Renderer readers expose whether image API credentials are configured and the selected local
+  image source, with component hooks and subscriptions for each. No keys, URLs or settings
+  objects are exposed; configuration and connectivity remain distinct.
+
 - Optional `ModDef.hooks` lists hook and kit API declarations for built-in main entries, with the
   same name, shape and meaning as a manifest's `hooks`.
 

@@ -286,6 +286,9 @@ export function hasTexted(conversation: Conversation | undefined): boolean;
 export function HeartIcon(input?: MarkProps): JSX.Element;
 
 // @public
+export function imageApiConfigured(): boolean;
+
+// @public
 export function invoke<T>(modId: string, name: string, args: unknown[], options?: {
     signal?: AbortSignal;
 }): Promise<Result<T>>;
@@ -335,6 +338,9 @@ export interface LikesAsk {
     // (undocumented)
     playthroughId?: string | null;
 }
+
+// @public
+export function localImageSource(): 'managed' | 'external' | null;
 
 // @public
 export function Locked(input: {
@@ -1204,6 +1210,9 @@ export interface SlotSettled {
 export function spaced(lines: readonly string[]): string[];
 
 // @public
+export function spriteUrl(charId: string, value: SpriteRef, version?: number, staged?: boolean): string;
+
+// @public
 export function submitAction(action: string, gift?: boolean, preset?: Verdict,
 planId?: string,
 sceneEvents?: TurnSnapshot['sceneEvents'],
@@ -1211,6 +1220,12 @@ answeredReminder?: string, activity?: SlotActivityOffer): Promise<void>;
 
 // @public
 export function subscribeCanRenderLocalImages(onChange: () => void): () => void;
+
+// @public
+export function subscribeImageApiConfigured(onChange: () => void): () => void;
+
+// @public
+export function subscribeLocalImageSource(onChange: () => void): () => void;
 
 // @public
 export function subscribeNoNsfwImages(onChange: () => void): () => void;
@@ -1379,8 +1394,14 @@ export function useGameFacts(): {
     readerName: string;
 };
 
+// @public (undocumented)
+export function useImageApiConfigured(): boolean;
+
 // @public
 export function useLessNsfwText(): boolean;
+
+// @public (undocumented)
+export function useLocalImageSource(): 'managed' | 'external' | null;
 
 // @public
 export function useModalShell(onClose: () => void, sound?: 'panel' | 'phone' | 'none', primary?: () => void): ModalShell;

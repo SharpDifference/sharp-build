@@ -37,6 +37,8 @@ describe('the entry points', () => {
     const readers = await import('../../src/renderer/mods/readers')
     const mods = await import('../../src/renderer/stores/modsStore')
     for (const name of ['noNsfwImages', 'subscribeNoNsfwImages', 'useNoNsfwImages',
+      'imageApiConfigured', 'subscribeImageApiConfigured', 'useImageApiConfigured',
+      'localImageSource', 'subscribeLocalImageSource', 'useLocalImageSource',
       'canRenderLocalImages', 'subscribeCanRenderLocalImages', 'phoneOpen', 'viewingThread',
       'subscribePhoneView', 'useViewingThread', 'drawFeedHandles', 'drawFeedEmoji'] as const) {
       expect(rendererKit[name], name).toBe(readers[name])
@@ -45,6 +47,8 @@ describe('the entry points', () => {
   })
 
   it('re-exports the native lightbox and prompt helpers without wrappers', async () => {
+    const characters = await import('../../src/renderer/stores/characterStore')
+    expect(rendererKit.spriteUrl).toBe(characters.spriteUrl)
     const lightbox = await import('../../src/renderer/components/Lightbox')
     const relationship = await import('../../src/renderer/prompts/relationship')
     const scene = await import('../../src/renderer/prompts/scenePrompt')
