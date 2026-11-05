@@ -17,6 +17,17 @@ import { UseBoundStore } from 'zustand';
 import { Variants } from 'motion/react';
 
 // @public
+export function addMemory(modId: string, charId: string, memory: CharMemory, options?: RecordWriteOptions & {
+    replacing?: (memory: Readonly<CharMemory>) => boolean;
+}): Result<null>;
+
+// @public
+export function addPostComments(modId: string, post: {
+    charId: string;
+    postId: string;
+}, comments: readonly PostComment[], options?: RecordWriteOptions): Result<null>;
+
+// @public
 export function boxParts(text: string): string[];
 
 // @public
@@ -308,6 +319,9 @@ export function hasTexted(conversation: Conversation | undefined): boolean;
 export function HeartIcon(input?: MarkProps): JSX.Element;
 
 // @public
+export function imageApiConfigured(): boolean;
+
+// @public
 export function invoke<T>(modId: string, name: string, args: unknown[], options?: {
     signal?: AbortSignal;
 }): Promise<Result<T>>;
@@ -357,6 +371,9 @@ export interface LikesAsk {
     // (undocumented)
     playthroughId?: string | null;
 }
+
+// @public
+export function localImageSource(): 'managed' | 'external' | null;
 
 // @public
 export function Locked(input: {
@@ -815,6 +832,8 @@ export function recordField<T>(modId: string, spec: RecordFieldSpec<T>): RecordF
 // @public
 export interface RecordFieldHandle<T> {
     read(record: ModDataRecord): T;
+    set(ref: RecordRef, next: T, options?: RecordWriteOptions): Result<null>;
+    update(ref: RecordRef, change: (current: T) => T | undefined, options?: RecordWriteOptions): Result<null>;
     with<R extends ModDataRecord>(record: R, next: T): R;
 }
 
@@ -823,6 +842,27 @@ export interface RecordFieldSpec<T> {
     empty: T;
     legacy?: readonly string[];
     normalize?: (stored: unknown, legacy: Readonly<Record<string, unknown>>, from: string | null) => T;
+}
+
+// @public
+export type RecordRef = {
+    kind: 'message';
+    charId: string;
+    messageId: string;
+} | {
+    kind: 'post';
+    charId: string;
+    postId: string;
+} | {
+    kind: 'comment';
+    charId: string;
+    postId: string;
+    commentId: string;
+};
+
+// @public
+export interface RecordWriteOptions {
+    run?: object;
 }
 
 // @public
@@ -893,6 +933,11 @@ export function runStale(run: object): boolean;
 
 // @public
 export function safePoint(): ManualSaveOffer;
+
+// @public
+export function saveChanges(modId: string, options?: {
+    run?: object;
+}): Promise<Result<'written' | 'deferred'>>;
 
 // @public
 export interface SaveChoice extends WayOn {
@@ -1237,6 +1282,9 @@ export interface SlotSettled {
 export function spaced(lines: readonly string[]): string[];
 
 // @public
+export function spriteUrl(charId: string, value: SpriteRef, version?: number, staged?: boolean): string;
+
+// @public
 export function submitAction(action: string, gift?: boolean, preset?: Verdict,
 planId?: string,
 sceneEvents?: TurnSnapshot['sceneEvents'],
@@ -1262,6 +1310,12 @@ export const subscribeFeed: (id: string, onChange: () => void) => () => void;
 
 // @public
 export const subscribeFeedReadThrough: (onChange: () => void) => () => void;
+
+// @public
+export function subscribeImageApiConfigured(onChange: () => void): () => void;
+
+// @public
+export function subscribeLocalImageSource(onChange: () => void): () => void;
 
 // @public
 export function subscribeNoNsfwImages(onChange: () => void): () => void;
@@ -1381,6 +1435,9 @@ export interface TitleTabProps {
 }
 
 // @public
+export function toggleFeedLike(charId: string, postId: string): void;
+
+// @public
 export const toggleLift: TargetAndTransition;
 
 // @public
@@ -1469,8 +1526,14 @@ export function useGameFacts(): {
     readerName: string;
 };
 
+// @public (undocumented)
+export function useImageApiConfigured(): boolean;
+
 // @public
 export function useLessNsfwText(): boolean;
+
+// @public (undocumented)
+export function useLocalImageSource(): 'managed' | 'external' | null;
 
 // @public
 export function useModalShell(onClose: () => void, sound?: 'panel' | 'phone' | 'none', primary?: () => void): ModalShell;
