@@ -348,6 +348,15 @@ A few of the game's own readers, each declared as `renderer:<name>` or `shared:<
 - `noNsfwImages()`, `useNoNsfwImages()` and `subscribeNoNsfwImages(onChange)` (`renderer`):
   the game's No NSFW images flag, false until settings are read. The subscription fires only
   when the flag changes and returns an unsubscribe function.
+- `imageApiConfigured()`, `useImageApiConfigured()` and
+  `subscribeImageApiConfigured(onChange)` (`renderer`): the selected image API has credentials
+  configured, following the native image-key fallback rule. False before settings load.
+  This is not a connectivity or account-credit check; it reveals no key or endpoint.
+- `localImageSource()`, `useLocalImageSource()` and `subscribeLocalImageSource(onChange)`
+  (`renderer`): `'managed'` or `'external'`, or null before settings load. This says which
+  source is selected, not whether it is ready or reachable. Both subscriptions fire only
+  when their own answer changes and return an unsubscribe function. Each exported value
+  has its matching `renderer:<name>` capability.
 - `canRenderLocalImages()` and `subscribeCanRenderLocalImages(onChange)` (`renderer`): core's
   local-rendering rule. False on the web or before settings load; external ComfyUI is available
   without a managed install, while managed ComfyUI must be ready and not deferred. The
