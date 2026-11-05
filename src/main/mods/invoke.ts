@@ -1,3 +1,4 @@
+import { isRunning } from '@shared/modSession'
 import { randomUUID } from 'crypto'
 import { MOD_ID_RULE } from '@vx/modkit/host/shared'
 import { appError } from '@shared/errors'
@@ -60,10 +61,11 @@ export class ModInvocations {
     }
   }
 
-  /** Whether the installed mod is currently loaded, including safe-start and loader failure. */
+  /** Whether the mod is running: an installed one honours safe start and loader failure, a built-in doesn't. */
   private loaded(id: string): boolean {
-    return this.table?.safeStart === null && this.table.loaderError === null &&
-      this.table.mods.some((mod) => mod.id === id && mod.def !== null && mod.status === 'loaded') === true
+    const table = this.table
+    if (!table || !table.mods.some((mod) => mod.id === id && mod.def !== null)) return false
+    return isRunning(table, id)
   }
 
   /** Reads the two operations on the fixed invoke channel, rejecting malformed envelopes. */

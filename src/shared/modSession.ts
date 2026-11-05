@@ -88,6 +88,8 @@ export function sessionRow(table: ModSessionTable, id: string): ModSessionEntry 
 export function isRunning(table: ModSessionTable, id: string): boolean {
   const row = sessionRow(table, id)
   if (!row) return true
+  // A built-in's row (no manifest, no folder) is the build's own: only its own status counts.
+  if (row.manifest === null && row.folder === '') return row.status === 'loaded'
   return row.status === 'loaded' && table.loaderError === null && table.safeStart === null
 }
 
