@@ -7,7 +7,7 @@ import {
   subscribePhotoSwitches,
   type PhotoSwitches
 } from '../../shared/photoSwitches'
-import { noNsfwImagesOf, useSettingsStore } from './settingsStore'
+import { useNoNsfwImages } from '@vx/modkit/renderer'
 
 /** Photo Feature's switches in a component, which redraws when one moves. */
 export function usePhotoSwitches(): PhotoSwitches {
@@ -24,7 +24,7 @@ export function usePhotosVisible(): boolean {
  * A photo she has already sent stays covered, and cannot be uncovered, while it is.
  */
 export function useExplicitBlocked(): boolean {
-  const noNsfw = useSettingsStore(noNsfwImagesOf)
+  const noNsfw = useNoNsfwImages()
   return !explicitPhotosAllowed(noNsfw, usePhotoSwitches())
 }
 

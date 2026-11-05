@@ -4,8 +4,7 @@ import { useGameStore } from './gameStore'
 import { writeAutosave } from './loop/saves'
 import { loopState } from './loop/state'
 import { sceneInProgress } from './loop/stream'
-import { noNsfwImagesOf, useSettingsStore } from './settingsStore'
-import { comfyAvailable, useSetupStore } from './setupStore'
+import { canRenderLocalImages, noNsfwImages } from '@vx/modkit/renderer'
 
 /**
  * The photo feature's writes into the game store, and the one question about whether a picture
@@ -22,7 +21,7 @@ import { comfyAvailable, useSetupStore } from './setupStore'
  * own ComfyUI, or the app's install once verified and not deferred; never on the web.
  */
 function canRenderImages(): boolean {
-  return comfyAvailable(useSettingsStore.getState().settings, useSetupStore.getState().status)
+  return canRenderLocalImages()
 }
 
 /**
@@ -38,7 +37,7 @@ export function canSendPhotos(): boolean {
  * own option where a build has one. What a photo she has already sent may show follows the same.
  */
 export function noExplicitPhotos(): boolean {
-  return !explicitPhotosAllowed(noNsfwImagesOf(useSettingsStore.getState()))
+  return !explicitPhotosAllowed(noNsfwImages())
 }
 
 /**

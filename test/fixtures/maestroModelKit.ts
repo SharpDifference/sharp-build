@@ -7,6 +7,7 @@ vi.mock('@vx/modkit/renderer', async () => ({
   ...await import('../../src/renderer/mods/llm'),
   ...await import('../../src/renderer/prompts/feedRandoms'),
   ...await import('../../src/renderer/prompts/graduation'),
+  ...await import('../../src/renderer/mods/readers'),
   ...await import('../../src/renderer/mods/hooks'),
   ...await import('../../packages/modkit/src/renderer/saveField'),
   ...await import('../../packages/modkit/src/renderer/sceneField'),
