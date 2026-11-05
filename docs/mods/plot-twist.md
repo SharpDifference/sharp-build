@@ -88,6 +88,14 @@ prepared by an older build; its opening save then goes through the same normaliz
 continuations carry the versioned slice under `carry.ex`. Fresh games start empty. Removing
 the mod keeps its stored slice; reinstalling lets the field read it again.
 
+Version 1.1.2 registers the legacy adapter from the renderer entry, after the shared
+catalogue, through the kit's `registerTermCarry`. Registration is unconditional at boot,
+including while switched off. The shared entry is metadata only. This removes the last
+scanned private import. An erased `declare module './modCarry'` remains as in-repo legacy
+typing: augmenting the public barrel alone shadows other legacy fields. That typing needs
+a coordinated migration before independently typechecking a standalone source package;
+zero scanned imports alone does not mean packaging is finished.
+
 This is forward migration, not a promise that an old build can read the new slice. Preserve
 an original save when testing a downgrade. Version 1.1.1 moves prompt capture to the generic
 `promptState.scene` hook; a standalone manifest must declare it as well as `prompts.scene`.

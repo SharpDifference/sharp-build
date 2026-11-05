@@ -218,6 +218,18 @@ else the highest, with a line in the log. The loader deletes nothing and writes 
   standing in for an installed copy of the same id). While the game runs, a change to the folder
   reloads the window, at once off a game and on offer in one; a changed `main.js` offers a restart.
 
+In-repo mods statically import their main entry functions from `src/main/modEntries/<id>.ts`
+and list them by id in `src/main/modEntries/index.ts`. Each function synchronously returns
+`{ invoke?, protocols? }`, the exports an installed `main.js` would have. Put setup inside the
+function so the loader can catch its failures. Put the same hook and kit API declarations in
+the shared `ModDef.hooks`; `invoke` must be declared there. Existing definitions without main
+entries need no declarations. The id must already be built into `MODS`. Entries use the installed
+loader's validation and registries; a thrown exception or validation failure switches the whole
+mod off with the usual notice. Built-ins serve routes only, and an installed copy or dev folder
+cannot replace their entries.
+Safe start and a loader failure skip installed mods only: built-in mods, and their main
+entries, keep running.
+
 ### Main-process enablement
 
 `await modIsOn(modId)` from `@vx/modkit/main` reads the current switches from disk
@@ -311,6 +323,17 @@ A mod's panel draws its title and fields with the game's own components, from
 
 They are the game's components, so a mod's panel looks and behaves as a native one does and
 changes with it. Their props are the ones the game's own screens pass, typed in the kit.
+### Prompt helpers and image viewing
+
+`Lightbox({ src, onClose })` from `@vx/modkit/renderer` is the game's image viewer, with its own
+styles and motion. `relationshipLines`, `profileLines`, `memoryLines` and `spaced` are the same
+prompt helpers core uses; they take their inputs from the caller and do not read a game store.
+`RelationshipMedium` and `RelationshipProgress` describe relationship-helper inputs.
+`globalSlotOf(date, time)` is already in `@vx/modkit/shared`.
+
+A mod can declare its own id as a string constant. It does not need a core export for its id.
+For sent text, use `SentText` and `useBareMessage(text)` rather than the internal hook selector.
+
 ### Small readers
 
 A few of the game's own readers, each declared as `renderer:<name>` or `shared:<name>`:
@@ -322,6 +345,23 @@ A few of the game's own readers, each declared as `renderer:<name>` or `shared:<
   the playthrough's first slot, and graduation morning.
 - `lessNsfwText()` and `useLessNsfwText()` (`renderer`): the player has Less NSFW text on, so the
   game's own writing is toned down and a mod's should be. True until the settings are read.
+- `noNsfwImages()`, `useNoNsfwImages()` and `subscribeNoNsfwImages(onChange)` (`renderer`):
+  the game's No NSFW images flag, false until settings are read. The subscription fires only
+  when the flag changes and returns an unsubscribe function.
+- `canRenderLocalImages()` and `subscribeCanRenderLocalImages(onChange)` (`renderer`): core's
+  local-rendering rule. False on the web or before settings load; external ComfyUI is available
+  without a managed install, while managed ComfyUI must be ready and not deferred. The
+  subscription follows both settings and setup and fires only when availability changes.
+- `phoneOpen()`, `viewingThread()` and `useViewingThread()` (`renderer`): whether the phone is
+  open and its selected DM charId (null on its list). `subscribePhoneView(onChange)` follows
+  either value and returns an unsubscribe function; unrelated phone state does not notify.
+  A close handler can keep the previous `phoneOpen()` value and act on true becoming false.
+- `modOptionOn(modId, optionId)` (`renderer`): the non-hook option reader, with the same option
+  defaults as `useModOption`. It reads the option alone, not whether the mod is on; use existing
+  `modIsOn` for that. Unknown options are false.
+- `drawFeedHandles(count)` and `drawFeedEmoji(count)` (`renderer`): draw strings from the game's
+  persistent feed bags. These are draws, not read-only snapshots. Separate calls let a reply
+  keep one part of an identity without spending its replacement. Neither exposes the bag store.
 - `useSfxGain()` (`renderer`): the gain a mod's own sound effects play at, the player's effects
   volume as the game's mix applies it.
 - `modsOnLine()` and `buildLabel()` (`renderer`): the mods that are on, each with its version, as
@@ -808,10 +848,14 @@ a setter, and set it from `modsStore.ts` at boot and whenever a switch moves
 
 ## Sprite and CG prompt drafts
 
-`shared/imagePromptDrafts.ts` lets a shared mod entry add to a sprite's or a CG's prompt draft,
-in both processes: the editor's regenerate draft in the renderer and every render in main are
-built by the same `spriteDraft` and `cgSetDraft`. Register once at boot with
-`registerImagePromptDraft(modId, { draft, regen? })`, from `@vx/modkit/shared`.
+`registerImagePromptDraft(modId, { draft, regen? })` and its `ImagePromptDraft`,
+`ImagePromptKind` and `ImagePromptParts` types are in `@vx/modkit/shared`. The same drafts build
+both the editor's regenerate prompt in the renderer and every native render in main.
+
+Keep a shared mod entry's draft definition pure. Do not call kit values while that entry loads:
+the shared catalog and the kit can be importing one another. Register after the catalog has
+loaded, from the mod's renderer entry and its main startup path. Registering only in the renderer
+would leave native main-process renders without the draft. Re-registering an id replaces its own.
 
 - `draft(parts, { character, kind })` is handed the draft's `appearance` and `negative` tags
   and returns them with the mod's own in; `kind` is `sprite`, `nude` or `cg`. Each mod that is

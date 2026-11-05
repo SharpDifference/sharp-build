@@ -146,7 +146,7 @@ export function handleModSession(): void {
 /** Marks a mod the renderer could not load as off for the session, so `vxmod://<id>/…` stops serving it. */
 function markFailed(id: string, status: ModStatus, message: string): void {
   if (!result) return
-  const entry = result.table.mods.find((mod) => mod.id === id)
+  const entry = result.table.mods.find((mod) => mod.id === id && mod.def !== null)
   if (!entry || entry.status !== 'loaded') return
   entry.status = status
   entry.message = message

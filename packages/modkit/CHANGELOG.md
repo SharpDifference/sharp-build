@@ -2,6 +2,17 @@
 
 ## Unreleased
 
+- Optional `ModDef.hooks` lists hook and kit API declarations for built-in main entries, with the
+  same name, shape and meaning as a manifest's `hooks`.
+
+- Narrow renderer readers cover image rules, local rendering availability and the phone's view,
+  with subscriptions and component hooks where needed. `modOptionOn` is the non-hook option
+  reader. Feed handles and emoji can be drawn independently from the game's persistent bags.
+
+- Renderer re-exports the native `Lightbox`, `relationshipLines`, `profileLines`, `memoryLines`
+  and `spaced`, with relationship input types. Image-prompt draft registration remains shared;
+  its boot guidance now covers the shared-catalog import cycle and both processes.
+
 - Main's `modIsOn` reads a mod's current enabled state from disk and honors session
   load failures and safe start. The same read refreshes `modOptionOn`'s snapshot.
   It has its own `main:modIsOn` capability; no raw switches service is exposed.
