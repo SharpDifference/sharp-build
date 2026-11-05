@@ -227,3 +227,13 @@ it('every component hook uses the corresponding stable snapshot and filtered sub
     stop()
   }
 })
+
+it('answers nothing for an id that is only an inherited key', () => {
+  for (const id of ['constructor', 'toString', '__proto__', 'hasOwnProperty']) {
+    expect(readers.character(id)).toBeUndefined()
+    expect(readers.characterInfo(id)).toBeUndefined()
+    expect(readers.conversation(id)).toBeUndefined()
+    expect(readers.feed(id)).toEqual([])
+    expect(readers.profileImageUrl(id)).toBeUndefined()
+  }
+})
