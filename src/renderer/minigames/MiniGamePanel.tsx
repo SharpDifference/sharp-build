@@ -37,7 +37,7 @@ import {
 import type { ScenePanelProps } from '../mods/hooks'
 import { useGameStore } from '../stores/gameStore'
 import { gameComponent, type GamePlay, type Opponent, type PlayResult } from './play'
-import { agreementAvailable, cancelMatch, checkpointResult, keptAgreed, saveSceneMiniGame, useTableStore, type Agreed } from './session'
+import { agreementAvailable, cancelMatch, checkpointResult, keptAgreed, saveSceneMiniGame, seatMatch, useTableStore, type Agreed, type OpenTable } from './session'
 import { tableRound } from './round'
 import { skillOf } from './skill'
 import {
@@ -187,13 +187,13 @@ export function MiniGamePanel({ theme, onClose }: ScenePanelProps): JSX.Element 
     [sitting, only]
   )
   const Game = seated ? gameComponent(seated.game.id) : undefined
+  // This opening of the table, which standing up from it closes for good.
+  const table = useRef<OpenTable>({ left: false })
   useEffect(() => {
     if (!seated || seated.opponents === null) return
-    useTableStore.getState().setAgreed({ gameId: seated.game.id,
+    void seatMatch(table.current, { gameId: seated.game.id,
       charIds: seated.opponents.map(girl => girl.charId), location,
       stake: seated.stake, options: seated.options })
-    useTableStore.getState().dropAgreed()
-    void saveSceneMiniGame()
   }, [seated?.game.id, seated?.opponents, seated?.options, seated?.stake, location])
 
   // Her skill, judged when she agreed and ready by now more often than not.
@@ -236,7 +236,7 @@ export function MiniGamePanel({ theme, onClose }: ScenePanelProps): JSX.Element 
 
   /** Closes a table before its first move, letting go of the match kept for a reload. */
   function standUp(): void {
-    void cancelMatch()
+    void cancelMatch(table.current)
     onClose()
   }
 

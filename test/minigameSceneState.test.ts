@@ -2,7 +2,7 @@ import {beforeAll, beforeEach, describe, it, expect, vi} from 'vitest'
 import { miniGamesReady } from './fixtures/miniGamesKit'
 import {bindSceneFieldSaves} from '@vx/modkit/host/renderer'
 import {useGameStore} from '../src/renderer/stores/gameStore'
-import {cancelMatch, checkpointResult, clearMatch, keepInvitation, keptInvitation, keptAgreed, savedMiniGame, saveSceneMiniGame, sceneMiniGame, useTableStore} from '../src/renderer/minigames/session'
+import {cancelMatch, checkpointResult, clearMatch, keepInvitation, keptInvitation, keptAgreed, savedMiniGame, seatMatch, sceneMiniGame, useTableStore} from '../src/renderer/minigames/session'
 import {fileResult, resumeMiniGameResult} from '../src/renderer/minigames/table'
 import {queuedScene} from '../src/renderer/stores/loop/saves'
 import {submitAction} from '../src/renderer/stores/gameLoop'
@@ -52,12 +52,26 @@ describe('mini-game scene checkpoint',()=>{
   save.mockImplementation(async(modId,keys,apply)=>{const done=await written(modId,keys,apply);held=useGameStore.getState().captureScene();return done})
   try{
    // Seated, as the panel seats a solo table.
-   useTableStore.getState().setAgreed({...agreed,charIds:[]})
-   useTableStore.getState().dropAgreed()
-   await saveSceneMiniGame()
+   const table={left:false}
+   await seatMatch(table,{...agreed,charIds:[]})
    expect(savedMiniGame(held!.mods!).match?.status).toBe('playing')
-   await cancelMatch()
+   await cancelMatch(table)
    // Leaving writes the decision point; loading it must not reopen the table.
+   useGameStore.getState().restoreScene(null)
+   useGameStore.getState().restoreScene(JSON.parse(JSON.stringify(held)))
+   expect(keptAgreed()).toBeNull()
+   expect(sceneMiniGame().match).toBeUndefined()
+  }finally{save.mockImplementation(written)}
+ })
+ it('a game that fails as it first draws is not seated again after it is cancelled',async()=>{
+  let held=useGameStore.getState().captureScene()
+  save.mockImplementation(async(modId,keys,apply)=>{const done=await written(modId,keys,apply);held=useGameStore.getState().captureScene();return done})
+  try{
+   // The game throws on its first render: its guard stands the reader up during that commit,
+   // and the panel's seating for the same render runs after.
+   const table={left:false}
+   await cancelMatch(table)
+   await seatMatch(table,{...agreed,charIds:[]})
    useGameStore.getState().restoreScene(null)
    useGameStore.getState().restoreScene(JSON.parse(JSON.stringify(held)))
    expect(keptAgreed()).toBeNull()

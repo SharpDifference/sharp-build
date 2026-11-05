@@ -150,11 +150,30 @@ export function checkpointResult(result: MiniGameResult, names: readonly string[
   setSceneMiniGame({ ...state, match: { ...state.match, status: 'result', result: { ...result }, names: [...names] } })
 }
 
+/** One opening of the table, from the panel showing it to the panel closing. */
+export interface OpenTable {
+  /** The reader stood up from it before its first move: nothing seats it again. */
+  left: boolean
+}
+
+/**
+ * Sets the match at an open table and writes it into the save a reload lands on. Does nothing
+ * once the reader has stood up from it: a game that fails as it first draws stands him up before
+ * the panel's seating has run.
+ */
+export async function seatMatch(table: OpenTable, agreed: Agreed): Promise<void> {
+  if (table.left) return
+  useTableStore.getState().setAgreed(agreed)
+  useTableStore.getState().dropAgreed()
+  await saveSceneMiniGame()
+}
+
 /**
  * Lets go of a table before its first move: the match leaves the scene, and the save a reload
  * lands on, which took it when the table was set. A settled result is kept, as `setAgreed` keeps it.
  */
-export function cancelMatch(): Promise<Result<null>> {
+export function cancelMatch(table: OpenTable): Promise<Result<null>> {
+  table.left = true
   useTableStore.getState().setAgreed(null)
   return saveSceneMiniGame()
 }
