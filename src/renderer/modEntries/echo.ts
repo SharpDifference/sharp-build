@@ -1,3 +1,5 @@
+// Carry registration follows catalogue loading and runs even while switched off.
+import '../../shared/echoCarry'
 import { assignEchoes, settleEchoMemories } from '../../shared/echo'
 import { createElement, lazy, Suspense } from 'react'
 import { registerHooks, type ScreenSlotProps } from '@vx/modkit/renderer'

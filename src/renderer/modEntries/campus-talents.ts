@@ -1,3 +1,5 @@
+// Carry registration follows catalogue loading and runs even while switched off.
+import '../../shared/talentCarry'
 import { seedTalents, settleSavings, settleTalentPoints } from '../../shared/campusTalents'
 import { affectionFor } from '@vx/modkit/shared'
 import { settleTalentMemories } from '../../shared/talentMemories'

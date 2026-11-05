@@ -329,3 +329,9 @@ The stable IDs, defaults, dependencies, save fields and gameplay behavior are un
 ## October 14 editor follow-up
 
 Editing a hidden encounter recap retains its hidden flag and existing metadata through the normal save lane. Editing alone never restores it to recall. Standard and Light mode budgets are unchanged. See [QA follow-up](../qa-third-fourth-pass-2026-10-14.md) for current combined checks.
+
+## Legacy semester registration
+
+The legacy carry adapter registers at renderer boot, after the shared catalogue, even
+while the feature is off. See [Maestro legacy semester carry](legacy-semester-carry.md)
+for the adapter paths, retention guarantees and remaining standalone typing limitation.

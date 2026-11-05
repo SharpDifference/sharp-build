@@ -105,3 +105,9 @@ Prepared questions, including an outstanding request, survive committing the lin
 ## Fifth-pass persistence and context checks
 
 Prepared questions and new Unspoken snapshots use Character Dynamics starting choices only when enabled in the running playthrough record. Changing the menu switch for future games does not change that decision. Carried choices remain saved while inactive; earned growth and its completion guard remain independent. Existing paid encounter snapshots remain stable.
+
+## Legacy semester registration
+
+The legacy carry adapter registers at renderer boot, after the shared catalogue, even
+while the feature is off. See [Maestro legacy semester carry](legacy-semester-carry.md)
+for the adapter paths, retention guarantees and remaining standalone typing limitation.
