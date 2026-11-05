@@ -106,3 +106,9 @@ Current validation and remaining release checks are in [echo-validation.md](echo
 ## Fifth-pass persistence and context checks
 
 Closing the Echo manager before Save starts discards the draft. Once storage acknowledges a dispatched Save, the live Echo and next autosave retain that edit even if the manager has closed. A load/reset or different playthrough still blocks stale completion, and failed writes leave live state unchanged.
+
+## Legacy semester registration
+
+The legacy carry adapter registers at renderer boot, after the shared catalogue, even
+while the feature is off. See [Maestro legacy semester carry](legacy-semester-carry.md)
+for the adapter paths, retention guarantees and remaining standalone typing limitation.

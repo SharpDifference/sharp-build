@@ -1,3 +1,5 @@
+// Carry registration follows catalogue loading and runs even while switched off.
+import '../../shared/characterDynamicsCarry'
 import { CHARACTER_DYNAMICS_MOD } from '../../shared/characterDynamics'
 import { registerHooks } from '@vx/modkit/renderer'
 import { characterDynamicsLines, withCharacterDynamics } from '../prompts/characterDynamics'

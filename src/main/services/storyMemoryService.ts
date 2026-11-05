@@ -1,6 +1,6 @@
 import { existsSync, statSync } from 'node:fs'
 import { join } from 'node:path'
-import { modOn, optionOn } from '@vx/modkit/shared'
+import { modIsOn, modOptionOn } from '@vx/modkit/main'
 import {
   assertStoryRecall,
   formatStoryRecall,
@@ -12,14 +12,12 @@ import {
 } from '../../shared/storyMemory'
 import type { StructuredRequest } from '@vx/modkit/shared'
 import { getPlaythroughPath } from '../paths'
-import { getModSwitches } from './modsService'
 import { recallFromSqlite } from './storyMemoryIndex'
 
 /** Lazy native import keeps unsupported desktop runtimes on deterministic save-based recall. */
 export async function inspectStoryMemory(payload: StoryRecallRequest): Promise<StoryRecall> {
   assertStoryRecall(payload)
-  const switches = await getModSwitches()
-  if (!modOn(switches, 'story-memory'))
+  if (!await modIsOn('story-memory'))
     return {
       text: '',
       included: [],
@@ -27,7 +25,7 @@ export async function inspectStoryMemory(payload: StoryRecallRequest): Promise<S
       engine: 'Save snapshot',
       warning: 'Story Memory is off.'
     }
-  payload = { ...payload, mode: optionOn(switches, 'story-memory', STORY_MEMORY_LIGHT_OPTION) ? 'light' : 'standard' }
+  payload = { ...payload, mode: modOptionOn('story-memory', STORY_MEMORY_LIGHT_OPTION) ? 'light' : 'standard' }
   try {
     const { DatabaseSync } = await import('node:sqlite')
     const folder = getPlaythroughPath(payload.playthroughId)

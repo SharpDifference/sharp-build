@@ -9,7 +9,14 @@ import { inspectStoryMemory as webRecall, prepareStoryRequest as prepareWebStory
 
 const env = vi.hoisted(() => ({ root: '', switches: { on: {}, options: {} } as ModSwitches }))
 vi.mock('../src/main/paths', () => ({ getPlaythroughPath: (id: string) => join(env.root, id) }))
-vi.mock('../src/main/services/modsService', () => ({ getModSwitches: async () => env.switches }))
+vi.mock('../src/main/services/modsService', async () => {
+  const { modOn, optionOn } = await import('../src/shared/mods')
+  return {
+    getModSwitches: async () => env.switches,
+    modIsOn: async (id: string) => modOn(env.switches, id),
+    modOptionOn: (id: string, option: string) => optionOn(env.switches, id, option)
+  }
+})
 vi.mock('../src/web/mods', () => ({ readModSwitches: () => env.switches }))
 const p: StoryRecallRequest = {
   playthroughId: '123',

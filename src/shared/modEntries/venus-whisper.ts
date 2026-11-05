@@ -1,5 +1,4 @@
 import type { ModDef } from '@vx/modkit/shared'
-import '../whisperCarry'
 import { VENUS_WHISPER_MOD, WHISPER_TITLE } from '../venusWhisper'
 
 const mod: ModDef = {
