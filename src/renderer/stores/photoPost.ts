@@ -10,7 +10,7 @@ import {
   savePhotoStateAwaitable,
   setFeedPostPhoto
 } from './localPhotoStore'
-import { noNsfwImagesOf, useSettingsStore } from './settingsStore'
+import { noNsfwImages } from '@vx/modkit/renderer'
 import { renderPhoto } from './photoWebp'
 
 /**
@@ -38,7 +38,7 @@ function settlePostPhoto(image: string | undefined): { tier: PhotoTier; scene: s
   const scene = image?.trim()
   if (!scene || !canSendPhotos()) return null
 
-  const allowed = allowedPostTier(noNsfwImagesOf(useSettingsStore.getState()))
+  const allowed = allowedPostTier(noNsfwImages())
   const verdict = settlePhoto({ sendPhoto: true, photoPrompt: scene, allowed })
   if (!verdict.send) {
     if (verdict.note) console.log(`[feed] no picture on a post: ${verdict.note}`)

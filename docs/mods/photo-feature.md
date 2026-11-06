@@ -273,6 +273,10 @@ over. That is three places:
 
 Its entry, `src/shared/modEntries/photo-feature.ts`, is `PHOTO_FEATURE_MOD` from
 `photoSwitches.ts` with the version added, so its name, text and options come from the mod.
+Body details reach the game's sprite and CG prompts through an image-prompt draft. It is
+registered once the mod catalogue has loaded, by the renderer entry and by Photo's main
+startup, since both draw prompts; registering while the catalogue loads would find the kit
+half-made.
 
 Off, nobody sends a new photo, posts get no new comments, body details are not used and likes
 are the game's own. Photos, galleries and comments already made are hidden, not deleted. Its

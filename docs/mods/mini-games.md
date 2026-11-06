@@ -379,8 +379,9 @@ closes with `Ana called against the odds 2 times: poor play, not bad luck.` and 
 Keep it compact: a long game is summed up, not replayed.
 
 When the table clears, the game's move-by-move narration is taken back off the scene's
-transcript, since every later request quotes it; what was said across the table stays, and the
-reader still has all of it in the chat log. What the scene keeps of the game is the result.
+transcript, since every later request quotes it, and no save ever holds it; what was said across
+the table stays, and the reader still has all of it in the chat log. What the scene keeps of the
+game is the result.
 
 Walking away needs nothing from the game. The framework files `You walk away from the game of
 High-Low with Ana before it is over.`, tells the model nobody won, and leaves what that means
@@ -438,6 +439,17 @@ quickest way to a table is a game with `min: 0`, which opens from the dice seat 
 asked.
 
 ## What changed
+
+### 0.2.2
+
+The framework keeps its state with the scene through the mod kit, under Mini-games' own name: a
+save from an earlier version still loads, and its state moves across the first time the table
+changes. A game's result is written into the save a reload lands on, which the game's later saves
+of that point build on, so none of them can drop it. So is a table as it is set, and as it is left
+before its first move: a reload brings back a table that was waiting, never one the reader stood
+up from. The table speaks into the scene through the
+kit, and its narration of the moves is left out of every save. Nothing changes at the table, and
+no pack has to change.
 
 ### 0.2.1
 

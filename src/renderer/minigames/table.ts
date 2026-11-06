@@ -1,22 +1,25 @@
 import { MINI_GAMES } from '@shared/minigames'
 import { finishSlotActivity } from '../stores/slotActivity'
-import { writeAutosave } from '../stores/loop/saves'
-import { currentRun, runStale } from '@vx/modkit/renderer'
+import {
+  boxParts,
+  currentRun,
+  reachTurn,
+  readerSaysInScene,
+  runStale,
+  sayInScene,
+  submitAction,
+  takeTurnFromReply
+} from '@vx/modkit/renderer'
 import { create } from 'zustand'
 import { gamesOffered, gameSwitchOn, listed, type MiniGameDef } from '@shared/minigames'
-import { charKeyOf, modById, optionKey, READER_SPEAKER } from '@vx/modkit/shared'
-import { parseSpriteRef } from '@shared/outfits'
+import { modById, optionKey, READER_SPEAKER } from '@vx/modkit/shared'
 import type { Emotion } from '@shared/types'
 import { useGameStore } from '../stores/gameStore'
-import { submitAction, takeTurnFromReply } from '../stores/gameLoop'
-import { advance } from '../stores/loop/hooks'
 import { replyRowOfferOf } from '../stores/loop/playback'
 import { useModsStore, modIsOn } from '../stores/modsStore'
-import { splitOverflow } from '../stores/sceneSanitizer'
-import { boxFits } from '../views/boxRows'
 import { gameComponent, type PlayResult } from './play'
 import { gameById, tunedGame, usePrefsStore } from './prefs'
-import { checkpointResult, sceneMiniGame, useTableStore } from './session'
+import { checkpointResult, saveSceneMiniGame, sceneMiniGame, useTableStore } from './session'
 import { tableLine } from './talk'
 import { useScenePlace } from './place'
 
@@ -115,41 +118,11 @@ export function takeTurnForGame(): boolean {
 }
 
 /**
- * Brings the scene to the reader's turn for something the table is about to send. At his turn
- * already, nothing to do; over a reply, the interjection's own steps. A table that has been
- * narrating stands on its own last line with nothing behind it, and where the scene will not
- * count that as a turn to take (a class scene's opening), the turn is simply opened.
+ * A line from the table onto the scene. Hers stays in it; the table's own narration of the moves
+ * is for the moment only, and is taken back once the game is over.
  */
-function reachTurn(): boolean {
-  const game = useGameStore.getState()
-  if (game.awaitingInput && !game.busy && game.pendingLines.length === 0) return true
-  if (takeTurnFromReply()) return true
-  if (game.busy || game.streaming || game.pendingLines.length > 0) return false
-  game.setAwaitingInput(true)
-  return true
-}
-
-/**
- * Every line of move-by-move narration a table has said and not yet taken back, as the very
- * objects on the scene's records: what {@link compactTable} removes, wherever they have got to.
- */
-let moveLines = new Set<object>()
-
-/**
- * Puts lines on the transcript and on the box at once, the box turning to the first of them.
- * `moves` marks a game's own narration of its moves, as against a result that stays in the scene.
- */
-function playLines(text: string, speaker = '', moves = false, expression?: Emotion): void {
-  const game = useGameStore.getState()
-  const charId = game.charKeyToId[speaker]
-  const outfit = charId ? parseSpriteRef(game.emotions[charId] ?? 'neutral')?.set : undefined
-  const actions = expression && charId ? [`sprite:${speaker},${expression}${outfit ? `_${outfit}` : ''}`] : undefined
-  const lines = splitOverflow({ speaker, text, ...(actions ? { actions } : {}) }, boxFits)
-  if (moves) for (const line of lines) moveLines.add(line)
-  game.appendSceneLines(lines)
-  game.appendPendingLines(lines)
-  game.setAwaitingInput(false)
-  advance()
+function sayLine(text: string, charId?: string, expression?: Emotion): void {
+  sayInScene(MINI_GAMES, text, charId === undefined ? { transient: true } : { charId, expression })
 }
 
 /**
@@ -232,27 +205,6 @@ export function openTable(readerPaced = false): void {
   stepTable()
 }
 
-/**
- * Takes a finished game's move-by-move narration back off the scene: off the transcript, which
- * every later request quotes; off the log, which the scene's closing bookkeeping reads and a
- * rewind walks; and off whatever was still waiting to be shown. A few games' worth of card turns
- * is a lot of scene to send and to think through for nothing, and the three records must go on
- * agreeing line for line. What was said across the table stays, and what the game came to goes
- * in once, with its result.
- */
-export function compactTable(): void {
-  const gone = moveLines
-  moveLines = new Set()
-  if (gone.size === 0) return
-  const kept = <T extends object>(lines: readonly T[]): T[] => lines.filter((line) => !gone.has(line))
-  const game = useGameStore.getState()
-  useGameStore.setState({
-    currentSceneTranscript: kept(game.currentSceneTranscript),
-    sceneLog: kept(game.sceneLog),
-    pendingLines: kept(game.pendingLines)
-  })
-}
-
 /** The table is cleared; lines still waiting on the box are dropped. */
 export function closeTable(): void {
   sitting++
@@ -265,37 +217,40 @@ export function tableQuietIn(): number {
   return Math.max(0, heldUntil - performance.now())
 }
 
-/** Resolves once the line is on the box, which is after everything said before it. */
-function show(text: string, speaker: string, expression?: Emotion): Promise<void> {
+/**
+ * Resolves once the line is on the box, which is after everything said before it: hers where
+ * `charId` names a girl, the table's own narration where it names none.
+ */
+function show(text: string, charId?: string, expression?: Emotion): Promise<void> {
   // A line too long for the box is several, each given the box in its turn: put on together,
   // only the first would be shown and every later line would run one behind.
-  const parts = splitOverflow({ speaker, text }, boxFits)
+  const parts = boxParts(text)
   if (parts.length > 1) {
     return parts.reduce<Promise<void>>(
-      (said, part) => said.then(() => showOne(part.text, speaker, expression)),
+      (said, part) => said.then(() => showOne(part, charId, expression)),
       Promise.resolve()
     )
   }
-  return showOne(text, speaker, expression)
+  return showOne(text, charId, expression)
 }
 
-function showOne(text: string, speaker: string, expression?: Emotion): Promise<void> {
+function showOne(text: string, charId?: string, expression?: Emotion): Promise<void> {
   const at = sitting
   if (stepped) {
     // Behind whatever is still being read, and on the box as soon as he steps past it.
     chain = chain.then(stepPast).then(() => {
       if (at !== sitting) return
-      playLines(text, speaker, speaker === '', expression)
+      sayLine(text, charId, expression)
       unread = true
     })
     return chain
   }
   const now = performance.now()
   const wait = Math.max(0, heldUntil - now)
-  heldUntil = Math.max(now, heldUntil) + holdFor(text, speaker !== '')
+  heldUntil = Math.max(now, heldUntil) + holdFor(text, charId !== undefined)
   return new Promise((resolve) => {
     const put = (): void => {
-      if (at === sitting) playLines(text, speaker, speaker === '', expression)
+      if (at === sitting) sayLine(text, charId, expression)
       resolve()
     }
     if (wait === 0) put()
@@ -317,7 +272,7 @@ export function moveAtTable(): Promise<void> {
 
 /** A line from the table in the scene's dialogue box, once the turn is the table's. */
 export function narrateAtTable(text: string): Promise<void> {
-  return show(text, '')
+  return show(text)
 }
 
 /**
@@ -331,7 +286,7 @@ export async function sayAtTable(charId: string, situation: string, cue: string)
   if (!character) return
   const line = await tableLine(character, situation, cue)
   if (!line || at !== sitting) return
-  await show(line, charKeyOf(character.firstName, character.lastName))
+  await show(line, charId)
   // At the reader's own pace the line is his to leave; otherwise it is given its time.
   if (!stepped) await new Promise((resolve) => setTimeout(resolve, holdFor(line, true)))
 }
@@ -341,15 +296,14 @@ export async function speakAtTable(charId: string, text: string, expression?: Em
   const character = useGameStore.getState().characters[charId]
   const line = text.trim()
   if (!character || !line) return
-  await show(line, charKeyOf(character.firstName, character.lastName), expression)
+  await show(line, charId, expression)
   // At the reader's own pace the line is his to leave; otherwise it is given its time.
   if (!stepped) await new Promise((resolve) => setTimeout(resolve, holdFor(line, true)))
 }
 
 /** The reader's own words as part of a game: onto the scene as his, with nobody asked to answer. */
 export function readerPlaysAtTable(words: string): void {
-  const text = words.trim()
-  if (text) useGameStore.getState().logPlayerAction(text, true)
+  readerSaysInScene(words)
 }
 
 /**
@@ -362,8 +316,7 @@ export async function readerSaysAtTable(
   words: string
 ): Promise<void> {
   const text = words.trim()
-  if (!text) return
-  useGameStore.getState().logPlayerAction(text, true)
+  if (!readerSaysInScene(text)) return
   await sayAtTable(charId, situation, `The reader says across the table: "${text}"`)
 }
 
@@ -390,8 +343,7 @@ function resultRun(run: object) {
 
 /** Persist the settled outcome before narration. Reload recovers it, never the match. */
 export function fileResult(result: PlayResult, played: PlayedWith, tries = 0): void {
-  const game = useGameStore.getState()
-  const match = game.sceneMods.miniGame?.match
+  const match = sceneMiniGame().match
   if (!match || match.gameId !== played.game.id) { deliverResult(result, played, tries); return }
   const run = currentRun()
   const delivery = resultRun(run)
@@ -399,18 +351,18 @@ export function fileResult(result: PlayResult, played: PlayedWith, tries = 0): v
   if (delivery.filing.has(key) || delivery.dispatched.has(key)) return
   if (!reachTurn()) {
     if (tries < FILE_TRIES) setTimeout(() => {
-      if (!runStale(run) && sceneMiniGame()?.match?.id === key) fileResult(result, played, tries + 1)
+      if (!runStale(run) && sceneMiniGame().match?.id === key) fileResult(result, played, tries + 1)
     }, FILE_WAIT_MS)
     return
   }
   checkpointResult(result, played.names)
   delivery.filing.add(key)
   useGameStore.setState({ busy: true })
-  void writeAutosave(useGameStore.getState().captureScene()).then(() => {
+  void saveSceneMiniGame().then(() => {
     if (runStale(run)) return
     useGameStore.setState({ busy: false })
     delivery.dispatched.add(key)
-    const saved = sceneMiniGame()?.match
+    const saved = sceneMiniGame().match
     deliverResult(saved?.result ?? result, { ...played, names: saved?.names ?? played.names })
   }).finally(() => { delivery.filing.delete(key) })
 }
@@ -418,7 +370,7 @@ export function fileResult(result: PlayResult, played: PlayedWith, tries = 0): v
 /** Puts a result saved before its scene was told of it into the scene, once nothing else holds it. */
 export function resumeMiniGameResult(): void {
   const state = useGameStore.getState()
-  const match = state.sceneMods.miniGame?.match
+  const match = sceneMiniGame().match
   if (!match || match.status !== 'result' || !match.result || state.busy || state.turnError || state.sceneEnding || useTableStore.getState().active) return
   const game = gameById(match.gameId)
   if (game) fileResult(match.result, { game, names: match.names ?? [], stake: match.stake })
@@ -500,7 +452,7 @@ function deliverResult(result: PlayResult, played: PlayedWith, tries = 0): void 
 
   // Played alone, what the game has to say about how it went rides with the next turn's prompt,
   // whoever is there to have watched.
-  if (result.account?.length || sceneMiniGame()?.match) {
+  if (result.account?.length || sceneMiniGame().match) {
     useTableStore.getState().setPlayed({
       text: result.summary,
       next: true,
@@ -508,11 +460,11 @@ function deliverResult(result: PlayResult, played: PlayedWith, tries = 0): void 
         'MINI-GAME',
         `The reader has just played ${played.game.name} on his own, for real, in this scene. It is over: do not replay it or change how it came out. Anyone here saw it and may bring it up.`,
         ...(result.account ?? []),
-        ...(sceneMiniGame()?.match ? played.game.resultBrief ?? [] : [])
+        ...(sceneMiniGame().match ? played.game.resultBrief ?? [] : [])
       ]
     })
   }
-  if (sceneMiniGame()?.match?.status === 'result') {
+  if (sceneMiniGame().match?.status === 'result') {
     void submitAction(result.summary)
-  } else playLines(result.summary)
+  } else sayInScene(MINI_GAMES, result.summary)
 }
