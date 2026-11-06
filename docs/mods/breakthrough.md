@@ -1,5 +1,11 @@
 # Breakthrough
 
+The Echo ability option is read through the kit: `useModOption` keeps the panel reactive,
+and renderer `modOptionOn` checks the current value at activation. Both preserve the native
+declared default when an override is absent; the separate Echo on/off gate still applies.
+The store and panel no longer import the native mod-switches store for these reads. A
+standalone manifest declares the corresponding renderer capabilities.
+
 Breakthrough is a standalone **anytime** mod. It needs neither Story & Social nor SQLite.
 The scene's upper-right card shows a spirit bar for each present character. Choose one,
 expand the card, and at 100 spirit write what the player does and what they hope changes.

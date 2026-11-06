@@ -1,5 +1,5 @@
 import './fixtures/maestroModelKit'
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { restoreApi, stubApi } from './fixtures'
 
 /**
@@ -9,10 +9,6 @@ import { restoreApi, stubApi } from './fixtures'
  */
 
 stubApi({ jobs: { onProgress: () => () => {} } })
-
-beforeEach(() => {
-  vi.resetModules()
-})
 
 afterEach(() => {
   vi.restoreAllMocks()
