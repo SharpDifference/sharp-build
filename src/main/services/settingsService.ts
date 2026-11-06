@@ -1,5 +1,4 @@
 import { mkdir } from 'fs/promises'
-import { safeStorage } from 'electron'
 import { appError, messageOf } from '@shared/errors'
 import {
   defaultSettings,
@@ -13,6 +12,7 @@ import {
 import type { RendererSettings, Settings, SettingsPatch } from '@shared/types'
 import { getDataPath, getSettingsPath } from '../paths'
 import { readValidatedJson, writeAtomicJson } from './jsonFile'
+import { decryptSecret, encryptSecret } from './secrets'
 
 /**
  * The on-disk shape: {@link Settings} with each secret as a DPAPI blob (`apiKeyEnc`,
@@ -49,29 +49,6 @@ export async function ensureDataDir(): Promise<void> {
     }
     throw appError('DATA_DIR_UNWRITABLE', 'Could not create the data directory.', detail)
   }
-}
-
-/** Encrypts one secret for disk: empty writes neither field, no keyring writes plaintext. */
-function encryptSecret(plain: string): { enc?: string; plain?: string } {
-  if (!plain) return {}
-  if (!safeStorage.isEncryptionAvailable()) return { plain }
-  return { enc: safeStorage.encryptString(plain).toString('base64') }
-}
-
-/** Decrypts one secret off disk, preferring the blob; one DPAPI refuses reads as unset. */
-function decryptSecret(enc: string | undefined, plain: string | undefined, field: string): string {
-  if (enc) {
-    try {
-      return safeStorage.decryptString(Buffer.from(enc, 'base64'))
-    } catch (err) {
-      console.warn(
-        `settings.json: stored ${field} could not be decrypted; treating it as unset.`,
-        err
-      )
-      return ''
-    }
-  }
-  return plain ?? ''
 }
 
 /** Runtime settings in the on-disk shape, each secret encrypted where the keyring allows. */
@@ -135,10 +112,10 @@ export async function getSettings(): Promise<Settings> {
   } = candidate
   return {
     ...stored,
-    apiKey: decryptSecret(apiKeyEnc, plain, 'apiKey'),
+    apiKey: decryptSecret(apiKeyEnc, plain, 'settings.json: stored apiKey'),
     endpointApiKey:
-      decryptSecret(endpointApiKeyEnc, endpointPlain, 'endpointApiKey') || undefined,
-    imageApiKey: decryptSecret(imageApiKeyEnc, imagePlain, 'imageApiKey') || undefined
+      decryptSecret(endpointApiKeyEnc, endpointPlain, 'settings.json: stored endpointApiKey') || undefined,
+    imageApiKey: decryptSecret(imageApiKeyEnc, imagePlain, 'settings.json: stored imageApiKey') || undefined
   }
 }
 

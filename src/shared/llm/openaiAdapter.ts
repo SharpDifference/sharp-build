@@ -239,7 +239,8 @@ export const openaiAdapter: LlmAdapter = {
     serviceTier,
     maxOutputTokens,
     streaming,
-    sampling
+    sampling,
+    plainText
   }: BuildCallContext): LlmCall {
     const images = request.images ?? []
     // Plain text where there are no images: the oldest servers take nothing else.
@@ -268,10 +269,14 @@ export const openaiAdapter: LlmAdapter = {
           { role: 'user', content }
         ],
         // `strict` off: an endpoint that cannot enforce the schema still gets to try.
-        response_format: {
-          type: 'json_schema',
-          json_schema: { name: request.schema.name, schema: request.schema.schema, strict: false }
-        },
+        ...(plainText
+          ? {}
+          : {
+              response_format: {
+                type: 'json_schema',
+                json_schema: { name: request.schema.name, schema: request.schema.schema, strict: false }
+              }
+            }),
         reasoning_effort: thinkingLevel,
         // Top level, and only where the player picked one: a server that knows no tiers may refuse it.
         ...(serviceTier ? { service_tier: serviceTier } : {}),

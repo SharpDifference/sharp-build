@@ -108,6 +108,15 @@ export const MOD_FILES: Record<string, ModSet> = {
       'src/renderer/vu_styles/Meanwhile.css'
     ]
   },
+  ghostwriter: {
+    globs: [
+      'src/shared/ghostwriter*.ts',
+      'src/main/services/ghostwriterService.ts',
+      'src/main/modEntries/ghostwriter.ts',
+      'src/renderer/views/GhostwriterPage.tsx',
+      'src/renderer/vu_styles/Ghostwriter.css'
+    ]
+  },
   'mini-games': {
     globs: [
       'src/renderer/minigames/*',

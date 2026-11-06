@@ -4,8 +4,8 @@
  */
 export { registerComfyLaunchEnvironment } from '../../../../src/main/services/comfyLaunchEnvironment'
 export type { ComfyLaunchContext } from '../../../../src/main/services/comfyLaunchEnvironment'
-export { registerFinalRequest } from '../../../../src/main/services/finalRequest'
-export type { FinalRequestHook, FinalRequestPlan } from '../../../../src/main/services/finalRequest'
+export { registerFinalRequest, registerRequestSender } from '../../../../src/main/services/finalRequest'
+export type { FinalRequestHook, FinalRequestPlan, RequestSender, RequestSenderContext } from '../../../../src/main/services/finalRequest'
 export { readJsonFile, writeAtomicBytes, writeAtomicJson } from '../../../../src/main/services/jsonFile'
 export type { ReadJsonOptions, ReadJsonResult } from '../../../../src/main/services/jsonFile'
 export { modDataPath } from '../../../../src/main/services/modDataService'

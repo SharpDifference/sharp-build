@@ -181,6 +181,11 @@ const PERMANENT_CODES = new Set([
   'LLM_REQUEST_REJECTED',
   // A custom endpoint URL that cannot be sent to; only Settings changes that.
   'LLM_ENDPOINT_INVALID',
+  // Ghostwriter's saved settings cannot be read; only setting it up again or switching it off changes that.
+  'GHOSTWRITER_CONFIG_UNREADABLE',
+  // Ghostwriter's page asked for something its settings do not allow yet; only the page's own fields change that.
+  'GHOSTWRITER_NOT_SET_UP',
+  'GHOSTWRITER_PATCH_INVALID',
   // An unadjustable content filter fired; the player has to reword.
   'LLM_BLOCKED',
   // The generated class catalog broke a rule the scheduler depends on; retried from New Game.

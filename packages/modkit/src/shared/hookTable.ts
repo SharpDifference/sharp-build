@@ -407,6 +407,7 @@ export const KIT_APIS = [
   'main:modDataPath',
   'main:registerComfyLaunchEnvironment',
   'main:registerFinalRequest',
+  'main:registerRequestSender',
   'main:readJsonFile',
   'main:requiredBackupPart',
   'main:writeAtomicBytes',

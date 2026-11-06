@@ -15,7 +15,7 @@ vi.mock('@shared/llm/cloudLlm', async (original) => ({
 }))
 
 const { setSharedModRules } = await import('../packages/modkit/src/shared/modRules')
-const { registerFinalRequest, completeWithFinalRequest } = await import('../src/main/services/finalRequest')
+const { registerFinalRequest, registerRequestSender, completeWithFinalRequest } = await import('../src/main/services/finalRequest')
 const { withoutLocalFields } = await import('../src/shared/llm/cloudLlm')
 
 const asked = {
@@ -75,5 +75,58 @@ describe('the final request of a tagged scene call', () => {
       sceneSpot: { spot: 'opening', cast: [] }
     } as unknown as StructuredRequest)
     expect(clean).toEqual({ system: 's', user: 'u', schema: { name: 'scene' } })
+  })
+})
+
+describe('the request sender of a tagged scene call', () => {
+  it('is handed the reshaped request and its wire sampling, replaces the send, and the finish reads its reply', async () => {
+    const seen: unknown[] = []
+    const stops = [
+      registerFinalRequest('fr-a', () => ({
+        request: rewritten,
+        sampling: { temperature: 0.5 },
+        finish: () => ({ read: true })
+      })),
+      registerRequestSender('fr-a', async (request, ctx) => {
+        seen.push(request, ctx.tag, ctx.sampling)
+        return { reply: { lines: ['sent'] } }
+      })
+    ]
+
+    const reply = (await completeWithFinalRequest<Record<string, unknown>>(asked)) as Record<string, unknown>
+
+    expect(seen).toEqual([rewritten, 2, { temperature: 0.5 }])
+    expect(sent.complete).not.toHaveBeenCalled()
+    expect(reply).toEqual({ lines: ['sent'], modReply: { 'fr-a': { read: true } } })
+    stops.forEach((stop) => stop())
+  })
+
+  it('leaves the call as built when the sender declines', async () => {
+    const stop = registerRequestSender('fr-a', async () => null)
+    await completeWithFinalRequest(asked)
+    stop()
+
+    expect(sent.complete.mock.calls[0][0]).toBe(asked)
+  })
+
+  it('fails the call when the sender throws', async () => {
+    const stop = registerRequestSender('fr-a', async () => {
+      throw Error('refused')
+    })
+    await expect(completeWithFinalRequest(asked)).rejects.toThrow('refused')
+    stop()
+  })
+
+  it('runs only the first enabled tagged sender by id', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const ran: string[] = []
+    const stops = ['fr-a', 'fr-b', 'fr-off'].map((id) =>
+      registerRequestSender(id, async () => (ran.push(id), { reply: {} }))
+    )
+    await completeWithFinalRequest(asked)
+    stops.forEach((stop) => stop())
+
+    expect(ran).toEqual(['fr-a'])
+    warn.mockRestore()
   })
 })

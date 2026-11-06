@@ -58,6 +58,8 @@ export interface BuildCallContext {
   streaming: boolean
   /** The sampling values this call carries under their wire keys, already resolved — send them as they are. */
   sampling: Record<string, number>
+  /** True when the reply is prose: the call carries no schema and no JSON response type. */
+  plainText?: boolean
 }
 
 /** Everything an adapter needs to build one image call. */

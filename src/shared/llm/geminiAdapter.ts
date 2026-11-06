@@ -287,7 +287,8 @@ export const geminiAdapter: LlmAdapter & ImageAdapter = {
     thinkingLevel,
     serviceTier,
     maxOutputTokens,
-    streaming
+    streaming,
+    plainText
   }: BuildCallContext): LlmCall {
     // `?alt=sse` makes the stream `data:`-framed SSE rather than a growing JSON array.
     const method = streaming ? 'streamGenerateContent?alt=sse' : 'generateContent'
@@ -316,12 +317,12 @@ export const geminiAdapter: LlmAdapter & ImageAdapter = {
           }
         ],
         generationConfig: {
-          responseMimeType: 'application/json',
+          ...(plainText ? {} : { responseMimeType: 'application/json' }),
           // Always the pinned ceiling here, the player's own cap being a custom endpoint's
           // alone, so a reply that ran out of room is unambiguous when read back.
           maxOutputTokens,
           // `responseJsonSchema`, never `responseSchema`.
-          responseJsonSchema: request.schema.schema,
+          ...(plainText ? {} : { responseJsonSchema: request.schema.schema }),
           // Never pair with the legacy `thinkingBudget`: sending both is a 400.
           thinkingConfig: { thinkingLevel },
           // Per model, not per provider — see `providers.ts`.

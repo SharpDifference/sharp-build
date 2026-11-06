@@ -1426,6 +1426,14 @@ tagged it is named in a warning and skipped. A hook that throws or answers null 
 and the call goes as built. Registering returns a disposer, and a second registration for the same
 id throws. The browser build runs no main-process hooks, so there a tag reaches nothing.
 
+One mod can also send a tagged call in place of the game, after the reshaper:
+`registerRequestSender(modId, sender)` from `@vx/modkit/main` (`main:registerRequestSender`). The
+first by id that tagged the call, is on, and has a sender is handed the request as the reshaper
+left it, still carrying `parts`, `sceneSpot` and `modTags`, with its tag, the cancel signal,
+`onDelta` and the reshaper's sampler values under their wire keys. It answers `{ reply }`, which
+stands as the call's reply, or null, and the call goes as built. A throw is the call's failure and
+reaches the player as any failed call does. The reshaper's `finish` reads the sender's reply too.
+
 `sceneReplyLanded` is told of every scene call's reply once its lines are on the transcript, the
 closing's included, before the save that pays for it. It is handed the reply, `modReply` (what
 each mod's `finish` returned, by id), the spot, and `at`, the transcript length the reply's lines

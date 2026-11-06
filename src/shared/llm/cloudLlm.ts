@@ -193,23 +193,23 @@ export function withoutLocalFields(request: StructuredRequest): StructuredReques
 }
 
 /**
- * Sends one provider-enforced structured-output request and returns parsed JSON;
- * `onDelta` is preview-only and the full response stays authoritative, `override` sends the
- * call on candidate settings rather than the stored ones, and `samplingOverride` (wire keys) is
- * laid over the stored sampling values for this call alone, on a custom endpoint only.
+ * Sends one call, with the schema or without it, and returns the reply's text with the stream's
+ * skipped-frame and ignored-line tallies; the one attempt body both public calls share.
  */
-export async function completeStructured<T>(
+async function sendRequest(
   asked: StructuredRequest,
+  plainText: boolean,
   signal?: AbortSignal,
   onDelta?: (delta: string) => void,
   override?: Settings,
-  samplingOverride?: Record<string, number>
-): Promise<T> {
+  samplingOverride?: Record<string, number>,
+  label?: string
+): Promise<{ content: string; skipped: number; ignored: number }> {
   // Whatever else is true of the caller, the fields only this app reads stop here.
   const request = withoutLocalFields(asked)
   const settings = await writerSettings('generate characters', override)
 
-  const provider = providerToRun(settings)
+  const provider = label ? { ...providerToRun(settings), label } : providerToRun(settings)
   const model = modelToRun(settings, request.kind)
   // Against the model that will actually run, so a secondary that takes fewer levels than the
   // primary falls to its own default rather than 400ing.
@@ -225,7 +225,7 @@ export async function completeStructured<T>(
   }
   const adapter = adapterFor(provider)
 
-  // Carried out of the attempt so the `JSON.parse` failure can name the stream's holes.
+  // Carried out of the attempt so a `JSON.parse` failure can name the stream's holes.
   let skipped = 0
   let ignored = 0
 
@@ -244,7 +244,8 @@ export async function completeStructured<T>(
       serviceTier,
       maxOutputTokens,
       streaming,
-      sampling
+      sampling,
+      plainText
     })
 
     const samplingLog = Object.entries(sampling)
@@ -253,7 +254,7 @@ export async function completeStructured<T>(
     console.log(
       `[llm] → ${log.what} (thinking=${thinkingLevel}, tier=${serviceTier ?? 'none'}` +
         `, maxTokens=${maxOutputTokens}` +
-        `, schema=${request.schema.name}` +
+        `, schema=${plainText ? 'none' : request.schema.name}` +
         `${request.cacheKey ? `, cacheKey=${request.cacheKey}` : ''}` +
         `${request.kind ? `, kind=${request.kind}` : ''}` +
         `${streaming ? ', streaming' : ''}` +
@@ -336,8 +337,8 @@ export async function completeStructured<T>(
         if (!stream.finished) {
           if (signal?.aborted) throw appError('CANCELLED', 'The job was cancelled.')
 
-          // The salvage exception: zero skipped frames and a whole JSON document.
-          if (skipped === 0 && parsesAsJsonDocument(content)) {
+          // The salvage exception: zero skipped frames and a whole JSON document, never prose.
+          if (!plainText && skipped === 0 && parsesAsJsonDocument(content)) {
             console.warn(
               `[llm] ⚠ ${log.what} stream ended with no finish reason after ${elapsed()}ms, ` +
                 `but the reply parses whole — accepting it (${content.length} chars)` +
@@ -401,6 +402,33 @@ export async function completeStructured<T>(
   }
 
   const content = await attempt()
+  return { content, skipped, ignored }
+}
+
+/**
+ * Sends one provider-enforced structured-output request and returns parsed JSON;
+ * `onDelta` is preview-only and the full response stays authoritative, `override` sends the
+ * call on candidate settings rather than the stored ones, `samplingOverride` (wire keys) is
+ * laid over the stored sampling values for this call alone, on a custom endpoint only, and
+ * `label` stands in for the provider's name in the log and in the errors the player reads.
+ */
+export async function completeStructured<T>(
+  asked: StructuredRequest,
+  signal?: AbortSignal,
+  onDelta?: (delta: string) => void,
+  override?: Settings,
+  samplingOverride?: Record<string, number>,
+  label?: string
+): Promise<T> {
+  const { content, skipped, ignored } = await sendRequest(
+    asked,
+    false,
+    signal,
+    onDelta,
+    override,
+    samplingOverride,
+    label
+  )
   try {
     return JSON.parse(content) as T
   } catch (err) {
@@ -416,4 +444,23 @@ export async function completeStructured<T>(
       withSkipNote(`${reason} — content: ${truncate(content, 1000)}`, skipped, ignored)
     )
   }
+}
+
+/**
+ * Sends one request with no schema and returns the reply's prose, trimmed; the request's own
+ * `schema` is ignored. The other parameters are `completeStructured`'s, and an empty reply is
+ * `LLM_EMPTY`.
+ */
+export async function completeText(
+  asked: StructuredRequest,
+  signal?: AbortSignal,
+  onDelta?: (delta: string) => void,
+  override?: Settings,
+  samplingOverride?: Record<string, number>,
+  label?: string
+): Promise<string> {
+  const { content } = await sendRequest(asked, true, signal, onDelta, override, samplingOverride, label)
+  const text = content.trim()
+  if (!text) throw appError('LLM_EMPTY', 'The model returned an empty response.', truncate(content, 2000))
+  return text
 }

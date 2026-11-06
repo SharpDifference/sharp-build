@@ -1,0 +1,8 @@
+/* The mod's page: one column of fields, the frame a model list is placed against being its own box. */
+.vu-ghostwriter {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 17px;
+  min-width: 0;
+}

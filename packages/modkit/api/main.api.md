@@ -161,10 +161,29 @@ export function registerComfyLaunchEnvironment(modId: string, provider: Environm
 export function registerFinalRequest(modId: string, hook: FinalRequestHook): () => void;
 
 // @public
+export function registerRequestSender(modId: string, sender: RequestSender): () => void;
+
+// @public
 export function renderComfyImage(modId: string, request: ComfyRenderRequest, input: {
     signal: AbortSignal;
     onProgress?: (step: string) => void;
 }): Promise<Uint8Array>;
+
+// @public
+export type RequestSender = (request: StructuredRequest, ctx: RequestSenderContext) => Promise<{
+    reply: unknown;
+} | null>;
+
+// @public
+export interface RequestSenderContext {
+    // (undocumented)
+    onDelta?: (delta: string) => void;
+    sampling: Record<string, number>;
+    // (undocumented)
+    signal?: AbortSignal;
+    // (undocumented)
+    tag: unknown;
+}
 
 // @public
 export function requiredBackupPart(modId: string, part: BackupPart): void;

@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Main's `registerRequestSender` lets one tagged mod send a scene call in place of the game, after
+  the reshaper, and answer `{ reply }` or null to let the call go as built.
+
 - Renderer exports native `spriteUrl` for character sprites, including cache versions and
   staging, through the game's desktop/web image resolver.
 
