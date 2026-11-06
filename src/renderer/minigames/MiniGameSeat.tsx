@@ -6,7 +6,7 @@ import type { SceneSeatProps } from '../mods/hooks'
 import { fewestWith } from '@shared/minigames'
 import { useGameStore } from '../stores/gameStore'
 import { DiceIcon } from '../views/screenIcons'
-import { agreementAvailable, keptAgreed, useTableStore } from './session'
+import { agreementAvailable, keptAgreed, useSceneMiniGame, useTableStore } from './session'
 import { resumeMiniGameResult, useAtTurn, useGamesOffered, useSceneSpent, useTableOpen } from './table'
 
 /**
@@ -22,18 +22,18 @@ export function MiniGameSeat({ Seat, visible, open }: SceneSeatProps): JSX.Eleme
   const activity = useGameStore(s => s.sceneActivity)
   const training = activity?.owner === MINI_GAMES && activity.status === 'pending' ? activity : null
   const openedTraining = useRef<unknown>(null)
-  const saved = useGameStore(state => state.sceneMods.miniGame)
+  const saved = useSceneMiniGame()
   const active = useTableStore(state => state.active)
   const busy = useGameStore(state => state.busy)
   const turnError = useGameStore(state => state.turnError)
   useEffect(() => {
-    if (atTurn && !active && !busy && !turnError && saved?.match?.status === 'result') resumeMiniGameResult()
+    if (atTurn && !active && !busy && !turnError && saved.match?.status === 'result') resumeMiniGameResult()
   }, [atTurn, active, busy, turnError, saved])
   // Read at the effect rather than depended on: the rail hands down a new one every render.
   const opener = useRef(open)
   opener.current = open
   useEffect(() => {
-    if (!atTurn || !visible || active || saved?.match?.status === 'result') return
+    if (!atTurn || !visible || active || saved.match?.status === 'result') return
     // In hand, or kept beside the save for exactly this point of the scene: a game reloaded
     // between her yes and the table.
     const due = agreed ?? keptAgreed()
