@@ -38,19 +38,25 @@ the game sends them.
 2. The writer is sent the request without its reply rules and with no schema, told to write
    prose alone: narration as paragraphs, each line of dialogue on its own line under the
    speaker's first name, and nothing about JSON, actions, sprites, CGs, backgrounds, the summary
-   or the end of the scene. Everything else the game sends — persona, setting, the reader, the
-   cast, the lorebook, the story so far, the turn's instructions — reaches it as built. A
-   preset's samplers are laid over the writer's own for that call.
+   or the end of the scene. It may add stage notes, each on a line of its own starting with
+   `Action:`, where somebody arrives or leaves, the scene moves or somebody changes clothes. Of
+   the reply rules it keeps only the places the game can show, so it sets its scenes and notes
+   in them. Everything else the game sends — persona, setting, the reader, the cast, the
+   lorebook, the story so far, the turn's instructions — reaches it as built. A preset's
+   samplers are laid over the writer's own for that call.
 3. The converter is sent only what the reply needs: a line saying what it does in place of the
-   persona, the reply rules and schema, the cast's character keys, the NOW block, the story and
-   scene so far, the turn's instructions and whatever the mods added beside them, such as a group
-   photo to fill in, with the draft after it. The setting, the reader, the cast, the class, the
-   lorebook, the mods' notes and the preset's blocks are the writer's alone, so a girl's own
-   outfits and room go unused, and the converter is not offered Prompt Studio's `vars`: scene
-   replies change no variables, which the mod's page says while Prompt Studio is on. It keeps the
-   draft's words, splits them into lines, gives each its speaker and adds the stage directions,
-   changing nothing that happens. It decides whether the scene ends and writes the summary
-   itself. Where the reply rules or the turn cannot be found in the request, as after the player
+   persona, the reply rules and schema, the cast's character keys with each girl's outfit
+   suffixes and room and the reader's room, all read off the schema, the NOW block, the story
+   and scene so far, the turn's instructions and whatever the mods added beside them, such as a
+   group photo to fill in, with the draft after it. The setting, the reader, the cast, the
+   class, the lorebook, the mods' notes and the preset's blocks are the writer's alone, so when
+   to wear one of her own outfits is the writer's to say in a stage note, and the converter is
+   not offered Prompt Studio's `vars`: scene replies change no variables, which the mod's page
+   says while Prompt Studio is on. It carries out each stage note in the stage directions and
+   never writes one as a line, keeps the rest of the draft's words, splits them into lines, gives
+   each its speaker and adds the stage directions, changing nothing that happens. A scene too
+   big for the schema to list its stage directions gives it no outfit suffixes. It decides
+   whether the scene ends and writes the summary itself. Where the reply rules or the turn cannot be found in the request, as after the player
    edits a failed prompt, it is sent the whole request instead, preset and all.
 4. The converter's reply streams to the window and is sanitized there exactly as any scene
    reply is. Nothing shows while the writer drafts, so a turn takes longer.

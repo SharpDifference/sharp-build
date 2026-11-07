@@ -16,12 +16,19 @@ const CONTEXT_PARTS: readonly string[] = ['persona', 'setting', 'reader', 'cast'
 
 const WRITER_BLOCK = [
   'GHOSTWRITING',
-  'Another writer will turn your draft into the game\'s script, so write it as plain prose and nothing else: no JSON, no code blocks, no headings and no notes to anybody.',
+  'Another writer will turn your draft into the game\'s script, so write it as plain prose: no JSON, no code blocks, no headings and no notes to anybody but the stage notes below.',
   'Ignore every instruction above about JSON, schemas, fields, the summary, actions, sprites, CGs, backgrounds and end_scene. Those are the other writer\'s job. Everything else still stands: who everyone is, what they know, how the scene should go and when it should end.',
-  'Write narration as ordinary paragraphs. Give each line of dialogue a line of its own, starting with the speaker\'s first name and a colon, like this: <first name>: "You\'re late."'
+  'Write narration as ordinary paragraphs. Give each line of dialogue a line of its own, starting with the speaker\'s first name and a colon, like this: <first name>: "You\'re late."',
+  'Where something changes that the other writer has to stage, you may add a stage note on a line of its own, starting with "Action:": a move to a new place, somebody arriving or leaving, a change of clothes. For example: Action: they now move to the reader\'s room.'
 ].join('\n')
 
-const WRITER_REMINDER = 'Write your draft now, as prose alone.'
+/** The line before the places the game can show, which the writer is given out of the JSON rules. */
+const WRITER_PLACES = 'The game can show these places, so set the scene in them and name them in your stage notes. A girl\'s own room, where her character info names one, works too.'
+
+/** The bg id of the reader's room, a single in Lowrise 4. */
+const READER_ROOM_BG = 'lowrise_dorm_room'
+
+const WRITER_REMINDER = 'Write your draft now, as prose alone, with any stage notes on lines of their own.'
 
 /** Who the converter is, in place of RITA, where the writer's context has been cut from its request. */
 const CONVERTER_PERSONA =
@@ -30,7 +37,8 @@ const CONVERTER_PERSONA =
 const CONVERTER_BLOCK = [
   'CONVERTING A DRAFT',
   'The scene has already been written, as a prose draft under DRAFT at the end of the user message. Turn it into the JSON reply, following the JSON RULES above.',
-  'Keep the draft\'s words. Split it into lines, give each line its speaker, and add the actions and bg the JSON RULES call for.',
+  'A line of the draft starting with "Action:" is a stage note, not part of the scene. Carry it out with the actions and bg the JSON RULES call for, on the line after it, or on the line before it where it ends the draft, and never write it as a line of its own.',
+  'Stage notes aside, keep the draft\'s words. Split it into lines, give each line its speaker, and add the actions and bg the JSON RULES call for.',
   'Don\'t change what anybody says or does, don\'t add events, dialogue or narration the draft doesn\'t have, and don\'t leave any out.',
   'Any instruction above on how long the reply should be or how it should go is already answered by the draft.',
   'If the reply has an end_scene field, decide it from the draft, following the instructions in YOUR TURN.',
@@ -59,18 +67,69 @@ function cut(side: string, text: string): string | null {
   return before && after ? `${before}\n\n${after}` : before + after
 }
 
+/** The JSON rules part's text, where the request carries it in its system text. */
+function jsonRulesOf(request: StructuredRequest): string | undefined {
+  return request.parts?.find((part) => part.id === JSON_RULES_PART && part.role === 'system')?.text
+}
+
 /** The system text without its first copy of the JSON rules. */
 function withoutJsonRules(request: StructuredRequest): string {
-  const text = request.parts?.find((part) => part.id === JSON_RULES_PART && part.role === 'system')?.text
+  const text = jsonRulesOf(request)
   return (text && cut(request.system, text)) ?? request.system
 }
 
-/** The cast's character keys, read off the schema's speaker enum; none for a solo scene. */
-function characterKeysOf(schema: StructuredRequest['schema']): string[] {
-  const lines = recordOf(recordOf(schema.schema.properties)?.lines)
-  const speaker = recordOf(recordOf(recordOf(lines?.items)?.properties)?.speaker)
-  const keys = speaker?.enum
-  return Array.isArray(keys) ? keys.filter((key): key is string => typeof key === 'string' && key !== '') : []
+/** The writer's list of places: the JSON rules' background lines under a line of its own; empty where they list none. */
+function writerPlacesOf(request: StructuredRequest): string {
+  const lines = (jsonRulesOf(request) ?? '').split('\n').filter((line) => /^(Interiors|Exteriors): /.test(line))
+  return lines.length > 0 ? [WRITER_PLACES, ...lines].join('\n') : ''
+}
+
+/** The strings a schema property's enum lists; none where it lists none. */
+function enumOf(property: unknown): string[] {
+  const values = recordOf(property)?.enum
+  return Array.isArray(values) ? values.filter((value): value is string => typeof value === 'string' && value !== '') : []
+}
+
+/**
+ * What the converter is told about staging in place of the cast, read off the schema: each girl's
+ * key, the outfit suffixes her sprites are offered under and her room, then the reader's room.
+ */
+function stagingOf(schema: StructuredRequest['schema']): string {
+  const line = recordOf(recordOf(recordOf(recordOf(schema.schema.properties)?.lines)?.items)?.properties)
+  const keys = enumOf(line?.speaker)
+  const actions = enumOf(recordOf(line?.actions)?.items)
+  const bgs = enumOf(line?.bg)
+
+  const girls = keys.map((key) => {
+    // `sprite:<key>,<emotion>_<suffix>`: an emotion is one word, so the suffix is what follows its first underscore.
+    const suffixes = new Set<string>()
+    for (const action of actions) {
+      if (!action.startsWith(`sprite:${key},`)) continue
+      const ref = action.slice(`sprite:${key},`.length)
+      const at = ref.indexOf('_')
+      if (at > 0) suffixes.add(`_${ref.slice(at + 1)}`)
+    }
+    const room = `${key}_room`
+    const details = [
+      ...(suffixes.size > 0 ? [`Outfit suffixes: ${[...suffixes].join(', ')}`] : []),
+      ...(bgs.includes(room) ? [`Her room: ${room}`] : [])
+    ]
+    return details.length > 0 ? `${[key, ...details].join('. ')}.` : key
+  })
+
+  const blocks = [
+    ...(keys.length > 0
+      ? [
+          [
+            'CHARACTER KEYS',
+            ...girls,
+            'Each girl\'s dialogue goes under the key that starts with her first name. Anyone else who speaks does so in a narration line.'
+          ].join('\n')
+        ]
+      : []),
+    ...(bgs.includes(READER_ROOM_BG) ? [`The reader's room is ${READER_ROOM_BG}.`] : [])
+  ]
+  return blocks.join('\n\n')
 }
 
 /** The schema without the `vars` field Prompt Studio adds, which the converter is never told how to fill. */
@@ -81,11 +140,15 @@ function withoutVars(schema: StructuredRequest['schema']): StructuredRequest['sc
   return { ...schema, schema: { ...schema.schema, properties: rest } }
 }
 
-/** The scene request as the writer gets it: no JSON rules, and the instruction to write prose alone. */
+/**
+ * The scene request as the writer gets it: no JSON rules but the places they list, and the
+ * instruction to write prose alone.
+ */
 export function writerRequestOf(request: StructuredRequest): StructuredRequest {
+  const places = writerPlacesOf(request)
   return {
     ...request,
-    system: `${withoutJsonRules(request)}\n\n${WRITER_BLOCK}`,
+    system: [withoutJsonRules(request), WRITER_BLOCK, ...(places ? [places] : [])].join('\n\n'),
     user: `${request.user}\n\n${WRITER_REMINDER}`
   }
 }
@@ -110,14 +173,9 @@ export function converterTextOf(request: StructuredRequest): ConverterText | nul
     else user = cut(user, part.text) ?? user
   }
 
-  const keys = characterKeysOf(request.schema)
-  const keyBlock = [
-    'CHARACTER KEYS',
-    keys.join(', '),
-    'Each girl\'s dialogue goes under the key that starts with her first name. Anyone else who speaks does so in a narration line.'
-  ].join('\n')
+  const staging = stagingOf(request.schema)
   return {
-    system: [CONVERTER_PERSONA, system, ...(keys.length > 0 ? [keyBlock] : []), CONVERTER_BLOCK].join('\n\n'),
+    system: [CONVERTER_PERSONA, system, ...(staging ? [staging] : []), CONVERTER_BLOCK].join('\n\n'),
     user
   }
 }
