@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type JSX } from 'react'
 import { motion } from 'motion/react'
-import { invoke } from '@vx/modkit/renderer'
+import { invoke, useModOn } from '@vx/modkit/renderer'
 import { endpointProblem } from '@shared/endpoint'
 import {
   GHOSTWRITER_CALLS,
@@ -118,6 +118,7 @@ function GhostwriterForm(): JSX.Element | null {
     converter: 'idle'
   })
   const [popupHost, setPopupHost] = useState<HTMLElement | null>(null)
+  const studioOn = useModOn('prompt-studio')
 
   // What main last stored, and the boxes as typed: read at the moment of a blur, which may come
   // in the same tick as the change before it.
@@ -392,6 +393,12 @@ function GhostwriterForm(): JSX.Element | null {
           ? 'Scenes take longer with Ghostwriter on: nothing shows until the writer\'s draft is done.'
           : 'Until the writer has a URL and a model, scenes are written as usual.'}
       </p>
+      {studioOn && writerReady(view.writer) && (
+        <p className="vu-mods-note">
+          Scene replies don't update Prompt Studio's variables with Ghostwriter on: the converter isn't sent the
+          preset's blocks.
+        </p>
+      )}
       {section('writer')}
       <hr className="vu-rule" />
       {section('converter')}

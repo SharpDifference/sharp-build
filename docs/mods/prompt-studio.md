@@ -103,7 +103,8 @@ macro typed into scene text, a player's action or any of the game's own text goe
 as written.
 
 Each scene reply may also carry a `vars` list of `set`, `add` and `append` changes, which the
-preset's blocks can ask the model to use. Replies change at most 50 at a time, a save holds
+preset's blocks can ask the model to use. With Ghostwriter writing the scenes it carries none,
+since the model that writes the reply is never sent the preset's blocks. Replies change at most 50 at a time, a save holds
 200 variables, and long names and values are cut. The result is saved with the game, in the
 mod's own part of the save, carried into the next semester, and edited or reset from the
 Variables tab wherever Save Game is open. Interjecting or rewinding to an earlier line takes

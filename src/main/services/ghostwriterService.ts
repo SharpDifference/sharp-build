@@ -14,7 +14,7 @@ import {
   type GhostwriterStage,
   type GhostwriterView
 } from '@shared/ghostwriter'
-import { converterRequestOf, writerRequestOf } from '@shared/ghostwriterPrompt'
+import { converterRequestOf, converterTextOfTag, writerRequestOf } from '@shared/ghostwriterPrompt'
 import { completeStructured, completeText } from '@shared/llm/cloudLlm'
 import { listModels } from '@shared/llm/endpointProbe'
 import { readSettings } from '@shared/llm/settingsPort'
@@ -352,7 +352,7 @@ function throwIfCancelled(signal: AbortSignal | undefined): void {
  */
 async function sendScene(
   request: StructuredRequest,
-  ctx: { signal?: AbortSignal; onDelta?: (delta: string) => void; sampling: Record<string, number> }
+  ctx: { tag: unknown; signal?: AbortSignal; onDelta?: (delta: string) => void; sampling: Record<string, number> }
 ): Promise<{ reply: unknown } | null> {
   const config = await configOrThrow()
   if (!writerReady(config.writer)) {
@@ -380,9 +380,14 @@ async function sendScene(
 
   const own = converterOwnEndpoint(config.converter)
   const converterSettings = own ? await candidateOf(config.converter, {}) : undefined
-  console.log(`[ghostwriter] converter: ${own ? 'its own endpoint' : "the game's model"}`)
+  const converterText = converterTextOfTag(ctx.tag)
+  console.log(
+    `[ghostwriter] converter: ${own ? 'its own endpoint' : "the game's model"}, sent ${
+      converterText ? 'the reply rules, the stage, the story and the turn' : 'the whole request'
+    }`
+  )
   const reply = await completeStructured<unknown>(
-    converterRequestOf(request, draft),
+    converterRequestOf(request, draft, converterText),
     ctx.signal,
     ctx.onDelta,
     converterSettings,
