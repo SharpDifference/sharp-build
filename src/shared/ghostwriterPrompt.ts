@@ -18,7 +18,7 @@ const WRITER_BLOCK = [
   'GHOSTWRITING',
   'Another writer will turn your draft into the game\'s script, so write it as plain prose: no JSON, no code blocks, no headings and no notes to anybody but the stage notes below.',
   'Ignore every instruction above about JSON, schemas, fields, the summary, actions, sprites, CGs, backgrounds and end_scene. Those are the other writer\'s job. Everything else still stands: who everyone is, what they know, how the scene should go and when it should end.',
-  'Write narration as ordinary paragraphs. Give each line of dialogue a line of its own, starting with the speaker\'s first name and a colon, like this: <first name>: "You\'re late."',
+  'Write narration as ordinary paragraphs. Give each line of dialogue a line of its own, starting with the speaker\'s first name and a colon, like this: <first name>: "You\'re late." The reader\'s own lines start with "You:" instead.',
   'Where something changes that the other writer has to stage, you may add a stage note on a line of its own, starting with "Action:": a move to a new place, somebody arriving or leaving, a change of clothes. For example: Action: they now move to the reader\'s room.'
 ].join('\n')
 
@@ -38,7 +38,8 @@ const CONVERTER_BLOCK = [
   'CONVERTING A DRAFT',
   'The scene has already been written, as a prose draft under DRAFT at the end of the user message. Turn it into the JSON reply, following the JSON RULES above.',
   'A line of the draft starting with "Action:" is a stage note, not part of the scene. Carry it out with the actions and bg the JSON RULES call for, on the line after it, or on the line before it where it ends the draft, and never write it as a line of its own.',
-  'Stage notes aside, keep the draft\'s words. Split it into lines, give each line its speaker, and add the actions and bg the JSON RULES call for.',
+  'Only the cast speak lines of their own. Anybody else\'s words become narration that reports what they say instead of quoting it: the reader\'s lines, which start with "You:", in the second person, like this: You nod, saying that you\'ve got enough time. Anybody else\'s, such as a teacher\'s, in the third person, like this: Professor Esposito launches into a ramble about the theory of mechanics.',
+  'Apart from stage notes and those lines, keep the draft\'s words. Split it into lines, give each line its speaker, and add the actions and bg the JSON RULES call for.',
   'Don\'t change what anybody says or does, don\'t add events, dialogue or narration the draft doesn\'t have, and don\'t leave any out.',
   'Any instruction above on how long the reply should be or how it should go is already answered by the draft.',
   'If the reply has an end_scene field, decide it from the draft, following the instructions in YOUR TURN.',
@@ -123,7 +124,7 @@ function stagingOf(schema: StructuredRequest['schema']): string {
           [
             'CHARACTER KEYS',
             ...girls,
-            'Each girl\'s dialogue goes under the key that starts with her first name. Anyone else who speaks does so in a narration line.'
+            'Each girl\'s dialogue goes under the key that starts with her first name.'
           ].join('\n')
         ]
       : []),

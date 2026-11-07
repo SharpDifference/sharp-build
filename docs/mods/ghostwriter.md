@@ -37,8 +37,8 @@ the game sends them.
    preset, where one is in force, has been laid over it.
 2. The writer is sent the request without its reply rules and with no schema, told to write
    prose alone: narration as paragraphs, each line of dialogue on its own line under the
-   speaker's first name, and nothing about JSON, actions, sprites, CGs, backgrounds, the summary
-   or the end of the scene. It may add stage notes, each on a line of its own starting with
+   speaker's first name, the reader's under `You:`, and nothing about JSON, actions, sprites,
+   CGs, backgrounds, the summary or the end of the scene. It may add stage notes, each on a line of its own starting with
    `Action:`, where somebody arrives or leaves, the scene moves or somebody changes clothes. Of
    the reply rules it keeps only the places the game can show, so it sets its scenes and notes
    in them. Everything else the game sends — persona, setting, the reader, the cast, the
@@ -53,11 +53,13 @@ the game sends them.
    to wear one of her own outfits is the writer's to say in a stage note, and the converter is
    not offered Prompt Studio's `vars`: scene replies change no variables, which the mod's page
    says while Prompt Studio is on. It carries out each stage note in the stage directions and
-   never writes one as a line, keeps the rest of the draft's words, splits them into lines, gives
-   each its speaker and adds the stage directions, changing nothing that happens. A scene too
-   big for the schema to list its stage directions gives it no outfit suffixes. It decides
-   whether the scene ends and writes the summary itself. Where the reply rules or the turn cannot be found in the request, as after the player
-   edits a failed prompt, it is sent the whole request instead, preset and all.
+   never writes one as a line, reports what the reader or anybody outside the cast says in
+   narration instead of quoting it, the reader's in the second person, keeps the rest of the
+   draft's words, splits them into lines, gives each its speaker and adds the stage directions,
+   changing nothing that happens. A scene too big for the schema to list its stage directions
+   gives it no outfit suffixes. It decides whether the scene ends and writes the summary itself.
+   Where the reply rules or the turn cannot be found in the request, as after the player edits a
+   failed prompt, it is sent the whole request instead, preset and all.
 4. The converter's reply streams to the window and is sanitized there exactly as any scene
    reply is. Nothing shows while the writer drafts, so a turn takes longer.
 
