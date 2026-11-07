@@ -44,8 +44,8 @@ the game sends them.
    in them. Everything else the game sends — persona, setting, the reader, the cast, the
    lorebook, the story so far, the turn's instructions — reaches it as built. A preset's
    samplers are laid over the writer's own for that call.
-3. The converter is sent only what the reply needs: a line saying what it does in place of the
-   persona, the reply rules and schema, the cast's character keys with each girl's outfit
+3. The converter is sent only what the reply needs: in place of the persona, a few lines making
+   it RITA's script editor, who keeps her voice in any line it words itself, the reply rules and schema, the cast's character keys with each girl's outfit
    suffixes and room and the reader's room, all read off the schema, the NOW block, the story
    and scene so far, the turn's instructions and whatever the mods added beside them, such as a
    group photo to fill in, with the draft after it. The setting, the reader, the cast, the

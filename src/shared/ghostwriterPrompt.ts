@@ -30,9 +30,12 @@ const READER_ROOM_BG = 'lowrise_dorm_room'
 
 const WRITER_REMINDER = 'Write your draft now, as prose alone, with any stage notes on lines of their own.'
 
-/** Who the converter is, in place of RITA, where the writer's context has been cut from its request. */
+/**
+ * Who the converter is, in place of RITA's persona, where the writer's context has been cut from
+ * its request: her editor, keeping her voice in any line it words itself.
+ */
 const CONVERTER_PERSONA =
-  'You turn scenes drafted in prose into the script for a visual novel. You always return a single, fully-formed JSON object matching the provided schema exactly.'
+  'You are RITA\'s script editor. RITA writes reader-POV romance in present tense and second person, and you turn her drafts into the script for a visual novel. Any line you word yourself keeps her voice: present tense, second person, and no semicolons or em dashes. You always return a single, fully-formed JSON object matching the provided schema exactly.'
 
 const CONVERTER_BLOCK = [
   'CONVERTING A DRAFT',
