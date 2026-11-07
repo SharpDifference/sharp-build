@@ -33,6 +33,81 @@ const listed = (side: string): string[] =>
   KIT_APIS.filter((api) => api.startsWith(`${side}:`)).map((api) => api.slice(side.length + 1)).sort()
 
 describe('the entry points', () => {
+  it('re-exports read-only game readers as the native functions', async () => {
+    const native = await import('../../src/renderer/mods/gameReaders')
+    for (const name of [
+      'character',
+      'useCharacter',
+      'subscribeCharacter',
+      'characterInfo',
+      'useCharacterInfo',
+      'subscribeCharacterInfo',
+      'rosterIds',
+      'subscribeRosterIds',
+      'useRosterIds',
+      'conversation',
+      'useConversation',
+      'subscribeConversation',
+      'feed',
+      'useFeed',
+      'subscribeFeed',
+      'npcRelationships',
+      'useNpcRelationships',
+      'subscribeNpcRelationships',
+      'clock',
+      'useClock',
+      'subscribeClock',
+      'playerStats',
+      'usePlayerStats',
+      'subscribePlayerStats',
+      'playerProfilePicture',
+      'usePlayerProfilePicture',
+      'subscribePlayerProfilePicture',
+      'feedReadThrough',
+      'useFeedReadThrough',
+      'subscribeFeedReadThrough',
+      'sceneActive',
+      'useSceneActive',
+      'subscribeSceneActive',
+      'readerPromptText',
+      'useReaderPromptText',
+      'subscribeReaderPromptText',
+      'useProfileImageUrl',
+      'profileImageUrl',
+      'subscribeProfileImageUrl'
+    ] as const) {
+      expect(rendererKit[name], name).toBe(native[name])
+    }
+  })
+
+  it('re-exports narrow native readers and feed draws without wrapping stores', async () => {
+    const readers = await import('../../src/renderer/mods/readers')
+    const mods = await import('../../src/renderer/stores/modsStore')
+    for (const name of ['noNsfwImages', 'subscribeNoNsfwImages', 'useNoNsfwImages',
+      'imageApiConfigured', 'subscribeImageApiConfigured', 'useImageApiConfigured',
+      'localImageSource', 'subscribeLocalImageSource', 'useLocalImageSource',
+      'canRenderLocalImages', 'subscribeCanRenderLocalImages', 'phoneOpen', 'viewingThread',
+      'subscribePhoneView', 'useViewingThread', 'drawFeedHandles', 'drawFeedEmoji'] as const) {
+      expect(rendererKit[name], name).toBe(readers[name])
+    }
+    expect(rendererKit.modOptionOn).toBe(mods.modOptionOn)
+  })
+
+  it('re-exports the native lightbox and prompt helpers without wrappers', async () => {
+    const characters = await import('../../src/renderer/stores/characterStore')
+    expect(rendererKit.spriteUrl).toBe(characters.spriteUrl)
+    const lightbox = await import('../../src/renderer/components/Lightbox')
+    const relationship = await import('../../src/renderer/prompts/relationship')
+    const scene = await import('../../src/renderer/prompts/scenePrompt')
+    const image = await import('../../src/shared/imagePromptDrafts')
+    expect(rendererKit.Lightbox).toBe(lightbox.Lightbox)
+    expect(rendererKit.relationshipLines).toBe(relationship.relationshipLines)
+    for (const name of ['memoryLines', 'profileLines', 'spaced'] as const) {
+      expect(rendererKit[name]).toBe(scene[name])
+    }
+    expect(sharedKit.registerImagePromptDraft).toBe(image.registerImagePromptDraft)
+  })
+
   it('export exactly what KIT_APIS lists, side by side', () => {
     expect(runtime(sharedKit)).toEqual(listed('shared'))
     expect(runtime(rendererKit)).toEqual(listed('renderer'))
@@ -198,6 +273,22 @@ describe('the entry points', () => {
     expect(rendererKit.bunnybotSays).toBe(native.bunnybotSays)
   })
 
+  it("hands mods the game's own scene lines and turn, so a mod's line is the scene's", async () => {
+    const native = await import('../../src/renderer/stores/sceneLines')
+    for (const name of ['boxParts', 'dropTransientLines', 'reachTurn', 'readerSaysInScene', 'sayInScene'] as const) {
+      expect(rendererKit[name], name).toBe(native[name])
+    }
+  })
+
+  it("hands mods the game's own record writes and save, so a mod's change is the game's", async () => {
+    const records = await import('../../src/renderer/mods/records')
+    const saves = await import('../../src/renderer/stores/loop/saves')
+    for (const name of ['addMemory', 'addPostComments', 'toggleFeedLike'] as const) {
+      expect(rendererKit[name], name).toBe(records[name])
+    }
+    expect(rendererKit.saveChanges).toBe(saves.saveChanges)
+  })
+
   it("hands main the game's guarded archive, image sniffer and live option reader", async () => {
     const archive = await import('../../src/main/services/archiveService')
     const images = await import('../../src/main/services/imageFiles')
@@ -205,6 +296,7 @@ describe('the entry points', () => {
     expect(mainKit.extractZip).toBe(archive.extractZip)
     expect(mainKit.sniffImageFile).toBe(images.sniffImageFile)
     expect(mainKit.modOptionOn).toBe(mods.modOptionOn)
+    expect(mainKit.modIsOn).toBe(mods.modIsOn)
   })
 
   it('hands the window the native main-call binding', async () => {

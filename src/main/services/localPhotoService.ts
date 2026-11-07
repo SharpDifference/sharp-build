@@ -1,8 +1,7 @@
-import { constants, watch, type FSWatcher } from 'fs'
-import { copyFile, mkdir, readdir, readFile, rm } from 'fs/promises'
+import { watch, type FSWatcher } from 'fs'
+import { mkdir, readFile, rm } from 'fs/promises'
 import { join } from 'path'
 import {
-  SAFE_CHAR_ID,
   characterLoraOf,
   appError,
   imageTypeOf,
@@ -31,23 +30,20 @@ import {
 import { photoSwitches } from '../../shared/photoSwitches'
 import { isPhotoTier, type PhotoTier } from '../../shared/photoGate'
 import { buildDuoPhotoPrompt, buildPhotoPrompt } from '../../shared/photoPrompt'
-import { getPhotoPath, getPhotosPath, getPhotosRoot } from '../photoProtocol'
+import {
+  beginPhotoFile, copyPhotoFile, dropPhotoTwins, findPhotoImage, findPhotoSidecar,
+  getPhotoPath, getPhotosPath, getPhotosRoot, legacyPhotosRoot, movePhotoFiles,
+  afterOneMove, photoCharacters, photoMoveSettled, photoNames, photoPlaythroughPath, photoReferences, readPhotoImage, readPhotoSidecar
+} from '../photoFiles'
 import { withBodySetting } from '../bodySetting'
-import { runGenerationJob } from './comfyService'
-import { dropImageTwins, findImage } from './imageFiles'
-import { writeAtomicBytes } from '@vx/modkit/main'
+import { renderComfyImage, writeAtomicBytes, type ComfyRenderRequest } from '@vx/modkit/main'
+import soloWorkflow from '../../../assets/workflows/characterPhoto.json'
+import duoWorkflow from '../../../assets/workflows/characterPhotoDuo.json'
 
 /**
- * Rendering the pictures a character texts the reader.
- *
- * It sits beside `comfyService` rather than inside it, and asks that file for two things only:
- * `runGenerationJob`, the submit-wait-save pipeline every render shares, and its `texts` field,
- * which fills the two girls' prompts in a picture of two. The graph, the node map, the folder and
- * the naming are all this file's own, so a sync that replaces `comfyService` costs those two.
- *
- * Unlike a sprite, a photo is a whole picture — it keeps its background, so nothing cuts it
- * out — and it belongs to one save rather than to her: what she sends one reader in one
- * playthrough is not part of her art.
+ * Photo owns its graphs, prompts and playthrough destinations. The kit queues each graph,
+ * starts ComfyUI and returns checked image bytes; Photo keeps them atomically. A duo supplies
+ * each girl's prompt through extra text nodes, and the renderer handles WebP encoding.
  */
 
 /** Node ids overwritten in `assets/workflows/characterPhotoDuo.json`. */
@@ -78,12 +74,9 @@ const reservedPhotoNames = new Map<string, Set<string>>()
 /** The names already spoken for in one girl's folder: what is on disk, and what is in flight. */
 async function takenPhotoNames(playthroughId: string, charId: string): Promise<string[]> {
   const folder = getPhotosPath(playthroughId, charId)
-  let onDisk: string[] = []
-  try {
-    onDisk = await readdir(folder)
-  } catch {
-    // No folder yet is no pictures yet, which is the ordinary state of a new playthrough.
-  }
+  await movePhotoFiles(playthroughId)
+  const onDisk = [...await photoNames(folder),
+    ...await photoNames(join(legacyPhotosRoot(playthroughId), charId))]
   return [...onDisk, ...(reservedPhotoNames.get(folder) ?? [])]
 }
 
@@ -140,7 +133,7 @@ export async function photoLanded(
   assertSafePlaythroughId(playthroughId)
   if (!isPhotoFile(file)) return false
   // A WebP the renderer never got to encode is still there as its PNG.
-  return (await findImage(getPhotoPath(playthroughId, charId, file))) !== null
+  return (await findPhotoImage(playthroughId, charId, file)) !== null
 }
 
 /**
@@ -155,9 +148,7 @@ export async function readPhotoBytes(
   assertSafeCharId(charId)
   assertSafePlaythroughId(playthroughId)
   assertPhotoFile(file)
-  const path = await findImage(getPhotoPath(playthroughId, charId, file))
-  if (!path) throw appError('PHOTO_MISSING', 'That picture is not on disk.', file)
-  return new Uint8Array(await readFile(path))
+  return readPhotoImage(playthroughId, charId, file)
 }
 
 /**
@@ -178,12 +169,14 @@ export async function storeWebpPhoto(
   if (!(bytes instanceof Uint8Array) || imageTypeOf(bytes) !== 'image/webp') {
     throw appError('PHOTO_NOT_WEBP', 'The encoded picture is not a WebP.', file)
   }
+  await movePhotoFiles(playthroughId)
+  await mkdir(getPhotosPath(playthroughId, charId), { recursive: true })
   const path = getPhotoPath(playthroughId, charId, file)
   await writeAtomicBytes(path, bytes, {
     code: 'PHOTO_WRITE_FAILED',
     message: 'Could not save the photo as WebP.'
   })
-  await dropImageTwins(path)
+  await dropPhotoTwins(path)
 }
 
 /**
@@ -199,29 +192,37 @@ export async function carryPhotos(
 ): Promise<void> {
   assertSafePlaythroughId(fromPlaythroughId)
   assertSafePlaythroughId(toPlaythroughId)
-  const who =
-    charIds ??
-    (await readdir(getPhotosRoot(fromPlaythroughId)).catch(() => [] as string[])).filter((name) =>
-      SAFE_CHAR_ID.test(name)
-    )
+  await movePhotoFiles(fromPlaythroughId)
+  await movePhotoFiles(toPlaythroughId)
+  const roots = [getPhotosRoot(fromPlaythroughId), legacyPhotosRoot(fromPlaythroughId)]
+  const who = charIds ?? [...new Set((await Promise.all(roots.map(photoCharacters))).flat())]
   for (const charId of who) {
     assertSafeCharId(charId)
-    const source = getPhotosPath(fromPlaythroughId, charId)
-    let files: string[]
-    try {
-      files = (await readdir(source)).filter((name) => isPhotoFile(name) || isPhotoSidecar(name))
-    } catch {
-      continue
+    const sources = new Map<string, string>()
+    for (const root of roots) {
+      for (const file of await photoNames(join(root, charId))) {
+        if (!sources.has(file)) sources.set(file, join(root, charId, file))
+      }
     }
-    if (files.length === 0) continue
-    const target = getPhotosPath(toPlaythroughId, charId)
-    await mkdir(target, { recursive: true })
-    for (const file of files) {
-      await copyFile(join(source, file), join(target, file), constants.COPYFILE_EXCL).catch(
-        (err: unknown) => {
-          if ((err as NodeJS.ErrnoException).code !== 'EEXIST') throw err
+    for (const [file, source] of sources) {
+      if (!isPhotoSidecar(file)) {
+        await copyPhotoFile(source, getPhotoPath(toPlaythroughId, charId, file), true)
+      }
+    }
+    for (const [file, source] of sources) {
+      if (!isPhotoSidecar(file) || !(await readPhotoSidecar(source))) continue
+      const stem = file.replace(/\.json$/, '')
+      const targetImage = await findPhotoImage(toPlaythroughId, charId, `${stem}.png`)
+      if (!targetImage) continue
+      let matched = false
+      for (const name of [`${stem}.webp`, `${stem}.png`]) {
+        const sourceImage = sources.get(name)
+        if (sourceImage && (await readFile(sourceImage)).equals(await readFile(targetImage))) {
+          matched = true
+          break
         }
-      )
+      }
+      if (matched) await copyPhotoFile(source, getPhotoPath(toPlaythroughId, charId, file), true)
     }
   }
 }
@@ -298,33 +299,14 @@ export async function generatePhoto(
   const prompts = overrides.prompts
     ? { positive: overrides.prompts.positive, negative: overrides.prompts.negative }
     : buildPhotoPrompt(await withBodySetting(character), tier as PhotoTier, photoPrompt)
-  const logged = lora ? `, lora=${lora.name}@${lora.weight}` : ''
 
-  await runGenerationJob(
-    {
-      workflowFile: 'characterPhoto.json',
-      nodes: PHOTO_NODE,
-      // Her body only while the body switch is on, as her sprites are drawn.
-      prompts,
-      seed,
-      lora,
-      // Rendered as PNG either way; a WebP name is encoded by the renderer once it lands.
-      destPath: getPhotoPath(playthroughId, character.charId, pngPhotoOf(file)),
-      // Written as ComfyUI rendered it; the renderer does any encoding.
-      format: 'raw',
-      label: `${character.charId} / photo:${tier}`,
-      logContext: `seed=${seed} file=${file}${logged}`
-    },
-    options
-  )
-
-  await keepPhotoSidecar(playthroughId, character.charId, file, {
-    schemaVersion: 1,
+  await renderPhotoImage(playthroughId, character.charId, file, {
+    workflow: soloWorkflow,
+    nodes: PHOTO_NODE,
+    prompts,
     seed,
-    tier,
-    ...prompts,
-    ...(lora ? { lora } : {})
-  })
+    lora
+  }, { schemaVersion: 1, seed, tier, ...prompts, ...(lora ? { lora } : {}) }, options)
 
   // On disk now, so the folder itself says the name is taken.
   reservedPhotoNames.get(getPhotosPath(playthroughId, character.charId))?.delete(file)
@@ -386,29 +368,65 @@ export async function generateDuoPhoto(
     right: built.right
   }
 
-  await runGenerationJob(
-    {
-      workflowFile: 'characterPhotoDuo.json',
-      nodes: DUO_PHOTO_NODE,
-      prompts: { positive: prompts.positive, negative: prompts.negative },
-      texts: { [DUO_GIRL_NODE.left]: prompts.left, [DUO_GIRL_NODE.right]: prompts.right },
-      seed,
-      destPath: getPhotoPath(playthroughId, character.charId, pngPhotoOf(file)),
-      format: 'raw',
-      label: `${character.charId} + ${friend.charId} / photo:${tier}`,
-      logContext: `seed=${seed} file=${file}`
-    },
-    options
-  )
+  await renderPhotoImage(playthroughId, character.charId, file, {
+    workflow: duoWorkflow,
+    nodes: DUO_PHOTO_NODE,
+    prompts: { positive: prompts.positive, negative: prompts.negative },
+    texts: { [DUO_GIRL_NODE.left]: prompts.left, [DUO_GIRL_NODE.right]: prompts.right },
+    seed
+  }, { schemaVersion: 1, seed, tier, ...prompts }, options)
 
-  await keepPhotoSidecar(playthroughId, character.charId, file, {
-    schemaVersion: 1,
-    seed,
-    tier,
-    ...prompts
-  })
   reservedPhotoNames.get(getPhotosPath(playthroughId, character.charId))?.delete(file)
   return file
+}
+
+/** Keeps returned image bytes and their request, removing a cancelled write before it settles. */
+async function renderPhotoImage(
+  playthroughId: string,
+  charId: string,
+  file: string,
+  request: ComfyRenderRequest,
+  sidecar: PhotoSidecar,
+  options: { signal?: AbortSignal; onProgress?: (step: string) => void }
+): Promise<void> {
+  const release = beginPhotoFile(playthroughId, charId, file)
+  try {
+    await movePhotoFiles(playthroughId)
+    const signal = options.signal ?? new AbortController().signal
+    const check = (): void => {
+      if (signal.aborted) throw appError('CANCELLED', 'Generation was cancelled.')
+    }
+    const bytes = await renderComfyImage('photo-feature', request, {
+      signal,
+      onProgress: options.onProgress
+    })
+    check()
+    const dest = getPhotoPath(playthroughId, charId, pngPhotoOf(file))
+    await mkdir(getPhotosPath(playthroughId, charId), { recursive: true })
+    check()
+    let written = false
+    try {
+      await writeAtomicBytes(dest, bytes, {
+        code: 'PHOTO_WRITE_FAILED',
+        message: 'Could not save the photo.'
+      })
+      written = true
+      check()
+      await dropPhotoTwins(dest)
+      check()
+      await keepPhotoSidecar(playthroughId, charId, file, sidecar)
+      check()
+    } catch (error) {
+      if (written && signal.aborted) {
+        await rm(dest, { force: true })
+        await rm(getPhotoPath(playthroughId, charId, photoSidecarOf(file)), { force: true })
+      }
+      check()
+      throw error
+    }
+  } finally {
+    release()
+  }
 }
 
 /** Keeps the request next to its landed picture; metadata failure leaves the picture usable. */
@@ -438,31 +456,7 @@ async function recordedPhotoInfo(
   charId: string,
   file: string
 ): Promise<PhotoSidecar | undefined> {
-  try {
-    const bytes = await readFile(getPhotoPath(playthroughId, charId, photoSidecarOf(file)))
-    const info = JSON.parse(bytes.toString('utf8'))
-    if (
-      !info ||
-      info.schemaVersion !== 1 ||
-      !Number.isSafeInteger(info.seed) ||
-      info.seed < 0 ||
-      !isPhotoTier(info.tier) ||
-      typeof info.positive !== 'string' ||
-      typeof info.negative !== 'string' ||
-      (info.left !== undefined && typeof info.left !== 'string') ||
-      (info.right !== undefined && typeof info.right !== 'string') ||
-      (info.left === undefined) !== (info.right === undefined) ||
-      (info.lora !== undefined &&
-        (!info.lora ||
-          typeof info.lora.name !== 'string' ||
-          typeof info.lora.weight !== 'number' ||
-          !Number.isFinite(info.lora.weight)))
-    )
-      return undefined
-    return info as PhotoSidecar
-  } catch {
-    return undefined
-  }
+  return findPhotoSidecar(playthroughId, charId, photoSidecarOf(file))
 }
 
 /** The recorded request, or today's prompt built from her current tags and body setting. */
@@ -520,6 +514,8 @@ export async function dropPhoto(
   assertSafePlaythroughId(playthroughId)
   assertSafeCharId(charId)
   assertPhotoFile(file)
+  // A move running now could copy the old file across after this drop: let it finish first.
+  await photoMoveSettled(playthroughId)
   try {
     if ((await photoReferences(playthroughId)).all.has(pngPhotoOf(file))) return
   } catch {
@@ -531,8 +527,10 @@ export async function dropPhoto(
 /** Removes the image formats and sidecar after saved references have been checked. */
 async function removePhotoFiles(playthroughId: string, charId: string, file: string): Promise<void> {
   const png = pngPhotoOf(file)
-  for (const name of [png, png.replace(/\.png$/, '.webp'), photoSidecarOf(file)]) {
-    await rm(getPhotoPath(playthroughId, charId, name), { force: true })
+  for (const root of [getPhotosRoot(playthroughId), legacyPhotosRoot(playthroughId)]) {
+    for (const name of [png, png.replace(/\.png$/, '.webp'), photoSidecarOf(file)]) {
+      await rm(join(root, charId, name), { force: true })
+    }
   }
 }
 
@@ -550,41 +548,6 @@ interface PhotoCleanup {
 }
 const photoCleanups = new Map<string, PhotoCleanup>()
 
-/** Reads every saved checkpoint and replay; an unreadable one refuses deletion. */
-async function photoReferences(playthroughId: string): Promise<{
-  saved: Set<string>
-  all: Set<string>
-}> {
-  const root = join(getPhotosRoot(playthroughId), '..')
-  const saved = new Set<string>()
-  const all = new Set<string>()
-  const collect = (value: unknown, target: Set<string>): void => {
-    if (!value || typeof value !== 'object') return
-    if ('file' in value && typeof value.file === 'string' && isPhotoFile(value.file)) {
-      target.add(pngPhotoOf(value.file))
-    }
-    for (const child of Object.values(value)) collect(child, target)
-  }
-  for (const name of await readdir(root)) {
-    if (!name.endsWith('.json')) continue
-    collect(JSON.parse(await readFile(join(root, name), 'utf8')), saved)
-  }
-  for (const file of saved) all.add(file)
-  let replays: string[]
-  try {
-    replays = await readdir(join(root, 'replays'))
-  } catch (error) {
-    if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error
-    replays = []
-  }
-  for (const name of replays) {
-    if (name.endsWith('.json')) {
-      collect(JSON.parse(await readFile(join(root, 'replays', name), 'utf8')), all)
-    }
-  }
-  return { saved, all }
-}
-
 /** Retries after a completed save write; uncertainty always leaves both pictures on disk. */
 export async function flushRetiredPhotos(playthroughId: string): Promise<void> {
   const cleanup = photoCleanups.get(playthroughId)
@@ -594,17 +557,20 @@ export async function flushRetiredPhotos(playthroughId: string): Promise<void> {
   cleanup.running = (async () => {
     try {
       const refs = await photoReferences(playthroughId)
-      for (const [key, photo] of cleanup.pending) {
-        if (cleanup.revision !== revision) break
-        if (
-          !refs.saved.has(pngPhotoOf(photo.newFile)) ||
-          refs.all.has(pngPhotoOf(photo.oldFile))
-        ) continue
-        if (!(await photoLanded(playthroughId, photo.charId, photo.newFile))) continue
-        if (cleanup.revision !== revision) break
-        await removePhotoFiles(playthroughId, photo.charId, photo.oldFile)
-        cleanup.pending.delete(key)
-      }
+      // One move with the references just read; the landing checks below read no saves again.
+      await afterOneMove(playthroughId, refs, async () => {
+        for (const [key, photo] of cleanup.pending) {
+          if (cleanup.revision !== revision) break
+          if (
+            !refs.saved.has(pngPhotoOf(photo.newFile)) ||
+            refs.all.has(pngPhotoOf(photo.oldFile))
+          ) continue
+          if (!(await photoLanded(playthroughId, photo.charId, photo.newFile))) continue
+          if (cleanup.revision !== revision) break
+          await removePhotoFiles(playthroughId, photo.charId, photo.oldFile)
+          cleanup.pending.delete(key)
+        }
+      })
     } catch {
       // A missing, changing or unreadable checkpoint cannot prove a file is unreferenced.
     }
@@ -655,7 +621,7 @@ export async function retirePhoto(
   if (!cleanup) {
     try {
       const watcher = watch(
-        join(getPhotosRoot(playthroughId), '..'),
+        photoPlaythroughPath(playthroughId),
         { recursive: true, persistent: false },
         (_event, file) => {
           if (!photoCheckpointChanged(file)) return

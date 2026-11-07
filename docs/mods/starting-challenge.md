@@ -83,3 +83,9 @@ Activities and skills award their full stat gains throughout this range and abov
 Personal Growth purchases work throughout this range, under the same weekly limits.
 
 See [Campus Talents](campus-talents.md#bond-points) for the full BP curve.
+
+## Legacy semester registration
+
+The legacy carry adapter registers at renderer boot, after the shared catalogue, even
+while the feature is off. See [Maestro legacy semester carry](legacy-semester-carry.md)
+for the adapter paths, retention guarantees and remaining standalone typing limitation.

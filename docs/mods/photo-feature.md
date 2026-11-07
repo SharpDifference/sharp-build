@@ -1,6 +1,6 @@
 # Photo Feature
 
-An unofficial mod for Venus University by **naudh1r**. Version **1.7.0**, for the game's 0.7.0.
+An unofficial mod for Venus University by **naudh1r**. Version **1.7.1**, for the game's 0.7.0.
 
 The girls send you photos in their DMs and post them on their feeds, with comments from the rest
 of campus. Each contact gets a gallery, and characters can get optional body details. Photos are
@@ -106,8 +106,12 @@ from-behind shots hold less well than plain ones. Pictures from below are drawn 
 
 ## Where photos are kept
 
-`data/saves/<save>/photos/<character>/`, named after her, for example `risa_chat_004.webp` or
+`data/saves/<save>/mod-data/photo-feature/<character>/`, named after her, for example `risa_chat_004.webp` or
 `risa_bunnyboard_002.webp`. They belong to that save; a continued semester copies them across.
+Older photos move here automatically when you next view them.
+
+Finished photos travel in the game's normal backup now. To restore an older backup, keep its
+`.photos.zip` beside it; Photo reads that companion automatically.
 
 ## If a photo looks wrong
 
@@ -115,9 +119,16 @@ Hover the photo and open the **info icon** in its bottom-right corner. It shows 
 negative, seed and LoRA used to draw it. Most problems are one word in her sentence the model
 drew too literally: change or remove it, then redraw. **Redraw with same seed** keeps the rest of
 the picture close to what it was, so you can see what your change did. A photo taken before 1.7.0
-shows a rebuilt prompt and no seed, so it can only be redrawn with a new one.
+shows a rebuilt prompt and no seed, so it can only be redrawn with a new one. A redraw during a scene
+is kept once the scene next saves, at its next choice or its end: quit before then, and the photo
+you had before comes back.
 
 If a photo stays PNG while WebP is on, look in `data/app.log` for a `[photo] kept ... as PNG:` line.
+
+## 1.7.1
+
+- Your photos are kept in Photo Feature's own folder now; older ones move there when you
+  next view that playthrough's photos.
 
 ## 1.7.0
 
@@ -262,6 +273,10 @@ over. That is three places:
 
 Its entry, `src/shared/modEntries/photo-feature.ts`, is `PHOTO_FEATURE_MOD` from
 `photoSwitches.ts` with the version added, so its name, text and options come from the mod.
+Body details reach the game's sprite and CG prompts through an image-prompt draft. It is
+registered once the mod catalogue has loaded, by the renderer entry and by Photo's main
+startup, since both draw prompts; registering while the catalogue loads would find the kit
+half-made.
 
 Off, nobody sends a new photo, posts get no new comments, body details are not used and likes
 are the game's own. Photos, galleries and comments already made are hidden, not deleted. Its

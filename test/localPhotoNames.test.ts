@@ -19,10 +19,16 @@ const { carryPhotos, photoLanded, reservePhotoName, storeWebpPhoto } = await imp
 )
 const { setPhotoSwitches } = await import('../src/shared/photoSwitches')
 
+const PNG = Buffer.from([137, 80, 78, 71, 13, 10, 26, 10])
+const KEPT = Buffer.concat([PNG, Buffer.from('kept')])
+
 const april = character({ charId: 'april-1', firstName: 'April' })
 
 beforeEach(async () => {
   root = await mkdtemp(join(tmpdir(), 'venus-photo-names-'))
+  for (const pid of ['100', '200', '300', '301', '400', '401', '500', '501']) {
+    await mkdir(join(root, 'data', 'saves', pid), { recursive: true })
+  }
   setPhotoSwitches({ webp: false })
 })
 
@@ -40,7 +46,7 @@ describe('reservePhotoName', () => {
   })
 
   it('counts what is on disk as well', async () => {
-    const folder = join(root, 'data', 'saves', '200', 'photos', 'april-1')
+    const folder = join(root, 'data', 'saves', '200', 'mod-data', 'photo-feature', 'april-1')
     await mkdir(folder, { recursive: true })
     await writeFile(join(folder, 'april_chat_004.png'), '')
     expect(await reservePhotoName('200', april, 'chat', ['april_chat_001.png'])).toBe(
@@ -73,7 +79,7 @@ async function exists(path: string): Promise<boolean> {
 }
 
 describe('photos saved as WebP', () => {
-  const folder = (): string => join(root, 'data', 'saves', '400', 'photos', 'april-1')
+  const folder = (): string => join(root, 'data', 'saves', '400', 'mod-data', 'photo-feature', 'april-1')
 
   beforeEach(() => setPhotoSwitches({ webp: true }))
 
@@ -113,31 +119,29 @@ describe('photos saved as WebP', () => {
 
 describe('carryPhotos', () => {
   const folderOf = (playthroughId: string, charId: string): string =>
-    join(root, 'data', 'saves', playthroughId, 'photos', charId)
+    join(root, 'data', 'saves', playthroughId, 'mod-data', 'photo-feature', charId)
 
   it('copies every girl it finds into the next semester, PNG and WebP as they are', async () => {
     await mkdir(folderOf('300', 'april-1'), { recursive: true })
     await mkdir(folderOf('300', 'risa-2'), { recursive: true })
-    await writeFile(join(folderOf('300', 'april-1'), 'april_chat_001.png'), 'a')
-    await writeFile(join(folderOf('300', 'risa-2'), 'risa_bunnyboard_001.webp'), 'r')
+    await writeFile(join(folderOf('300', 'april-1'), 'april_chat_001.png'), PNG)
+    await writeFile(join(folderOf('300', 'risa-2'), 'risa_bunnyboard_001.webp'), WEBP)
 
     await carryPhotos('300', '301')
 
-    expect(await readFile(join(folderOf('301', 'april-1'), 'april_chat_001.png'), 'utf8')).toBe('a')
-    expect(await readFile(join(folderOf('301', 'risa-2'), 'risa_bunnyboard_001.webp'), 'utf8')).toBe(
-      'r'
-    )
+    expect(await readFile(join(folderOf('301', 'april-1'), 'april_chat_001.png'))).toEqual(PNG)
+    expect(await readFile(join(folderOf('301', 'risa-2'), 'risa_bunnyboard_001.webp'))).toEqual(Buffer.from(WEBP))
   })
 
   it('leaves a picture already in the new semester as it is', async () => {
     await mkdir(folderOf('400', 'april-1'), { recursive: true })
     await mkdir(folderOf('401', 'april-1'), { recursive: true })
-    await writeFile(join(folderOf('400', 'april-1'), 'april_chat_001.png'), 'old')
-    await writeFile(join(folderOf('401', 'april-1'), 'april_chat_001.png'), 'kept')
+    await writeFile(join(folderOf('400', 'april-1'), 'april_chat_001.png'), PNG)
+    await writeFile(join(folderOf('401', 'april-1'), 'april_chat_001.png'), KEPT)
 
     await carryPhotos('400', '401')
 
-    expect(await readFile(join(folderOf('401', 'april-1'), 'april_chat_001.png'), 'utf8')).toBe('kept')
+    expect(await readFile(join(folderOf('401', 'april-1'), 'april_chat_001.png'))).toEqual(KEPT)
   })
 
   it('has nothing to do for a semester with no photos', async () => {

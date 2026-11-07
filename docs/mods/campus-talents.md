@@ -209,3 +209,9 @@ The studio is available at every rank through City Life locations; only player
 hiring requires Campus Talents, Dancer III, Good Body and Good Heart. Dancer's
 15/20/25 BP prices and existing scene capability are unchanged. Other talents and
 other City Life jobs retain their existing dependency rules. See [City Life](city-life.md).
+
+## Legacy semester registration
+
+The legacy carry adapter registers at renderer boot, after the shared catalogue, even
+while the feature is off. See [Maestro legacy semester carry](legacy-semester-carry.md)
+for the adapter paths, retention guarantees and remaining standalone typing limitation.

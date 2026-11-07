@@ -1,5 +1,10 @@
 # Character Dynamics
 
+The setup screen gets its neutral-sprite URL through `@vx/modkit/renderer`'s native
+`spriteUrl`, preserving the game's active image resolver. It no longer imports the
+character store for portraits. This is a sprite URL, not the player's reader profile image;
+roster selection, setup choices and save normalization are unchanged.
+
 One optional Venus Extracurriculars mod, with one setup screen for two independent choices:
 
 - **Starting relationship:** Ex-girlfriend, Resentful, Rival, or Antagonist. Each girl assigned a relationship requires her own explanation, up to 1,200 characters. This establishes background, not a permanent mood or a reward in stats.
@@ -135,3 +140,9 @@ Validated on the integrated 0.3.1 build:
 - All 34 traits plus a long starting explanation fit a scrollable panel with the footer visible at the supported stage sizes.
 
 UI tests used canned generation results and synthetic saves; live model behavior still needs playtesting.
+
+## Legacy semester registration
+
+The legacy carry adapter registers at renderer boot, after the shared catalogue, even
+while the feature is off. See [Maestro legacy semester carry](legacy-semester-carry.md)
+for the adapter paths, retention guarantees and remaining standalone typing limitation.

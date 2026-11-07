@@ -1,132 +1,138 @@
-import { existsSync } from 'fs'
-import { readdir, rm, readFile, stat } from 'fs/promises'
+import { tmpdir } from 'os'
+import { mkdtemp, mkdir, readdir, rm, access } from 'fs/promises'
 import { join } from 'path'
-import { BACKUP_ZIP_LIMITS, SAFE_CHAR_ID, SAFE_NUMERIC_ID } from '@vx/modkit/shared'
-import { isPhotoFile, isPhotoSidecar } from '../shared/photoFiles'
-import { getPlaythroughPath, getSavesPath } from './paths'
-import { getPhotoPath } from './photoProtocol'
 import {
-  copyInto,
-  createZip,
-  discard,
-  extractZip,
-  relPathsUnder,
-  scratchDir
-} from './services/archiveService'
-import { sniffImageFile } from '@vx/modkit/main'
+  extractZip, requiredBackupPart,
+  type BackupPart, type BackupPartLegacy
+} from '@vx/modkit/main'
+import { appError, BACKUP_ZIP_LIMITS, SAFE_CHAR_ID, SAFE_NUMERIC_ID } from '@vx/modkit/shared'
+import { isPhotoSidecar } from '../shared/photoFiles'
+import {
+  copyPhotoFile, forgetPhotoMoves, getPhotoPath, getPhotosRoot, isPhotoImage, legacyPhotosRoot, movePhotoFiles,
+  photoCharacters, photoFileRendering, photoNames, readPhotoSidecar
+} from './photoFiles'
 
-/**
- * Her DM and feed photos, kept beside a backup rather than in it.
- *
- * A restore refuses a whole backup over one file it does not know, so photos packed into the
- * build's own zip would make that backup unreadable to any build without this feature, which is
- * every official build after an update. They go in a second zip next to it instead, named after
- * it: `venus-university-backup-<date>.zip` and `venus-university-backup-<date>.photos.zip`. The
- * backup itself is the build's, byte for byte, and a restore without the second file is a
- * restore without her photos, and nothing worse.
- *
- * Inside the second zip a photo sits at `<playthroughId>/<charId>/<file>`, the same three names
- * its path under `/data/saves` is made of.
- */
+/** Photo's required share of a backup, including its older companion archives. */
 
-/** The photos zip that belongs to `backupPath`. */
-export function localPhotosBackupPath(backupPath: string): string {
-  return backupPath.replace(/(\.zip)?$/i, '.photos.zip')
+/** The companion archive older Photo versions kept beside the game's backup. */
+export function localPhotosBackupPath(backup: string): string {
+  return backup.replace(/(\.zip)?$/i, '.photos.zip')
 }
 
-/** The names of the folders under `dir` that `pattern` accepts; none where there is no `dir`. */
-async function foldersIn(dir: string, pattern: RegExp): Promise<string[]> {
-  try {
-    const entries = await readdir(dir, { withFileTypes: true })
-    return entries
-      .filter((entry) => entry.isDirectory() && pattern.test(entry.name))
-      .map((e) => e.name)
-  } catch {
-    return []
+/** Recognizes only a Photo image or sidecar under its playthrough and character. */
+function entryOf(rel: string): { pid: string; charId: string; file: string } | null {
+  const [pid, charId, file, ...rest] = rel.replaceAll('\\', '/').split('/')
+  if (rest.length || !SAFE_NUMERIC_ID.test(pid ?? '') || !SAFE_CHAR_ID.test(charId ?? '') ||
+      !(isPhotoImage(file ?? '') || isPhotoSidecar(file ?? ''))) return null
+  return { pid, charId, file }
+}
+
+/** Lists extracted regular files without following links. */
+async function filesUnder(root: string, prefix = ''): Promise<string[]> {
+  const files: string[] = []
+  for (const entry of await readdir(join(root, prefix), { withFileTypes: true })) {
+    const rel = prefix ? `${prefix}/${entry.name}` : entry.name
+    if (entry.isDirectory()) files.push(...await filesUnder(root, rel))
+    else if (entry.isFile()) files.push(rel)
+    else throw appError('PHOTO_BACKUP_INVALID', 'The photo backup contains a link or special file.')
   }
+  return files
 }
 
-/**
- * Writes every playthrough's DM and feed photos beside the backup just written to `backupPath`.
- * A photos zip already there under that name goes first, so it can never be an older one; none is
- * written where there are no photos. A failure here leaves the backup itself as it was written.
- */
-export async function exportLocalPhotos(backupPath: string): Promise<void> {
-  const target = localPhotosBackupPath(backupPath)
-  const scratch = scratchDir('local-photos')
-  try {
-    await rm(target, { force: true })
-    let count = 0
-    for (const playthroughId of await foldersIn(getSavesPath(), SAFE_NUMERIC_ID)) {
-      const photos = join(getPlaythroughPath(playthroughId), 'photos')
-      for (const charId of await foldersIn(photos, SAFE_CHAR_ID)) {
-        for (const file of await readdir(join(photos, charId))) {
-          const from = getPhotoPath(playthroughId, charId, file)
-          // Only a picture named as one of ours: the build's own photos sit beside these folders.
-          if (
-            isPhotoSidecar(file)
-              ? !(await validPhotoJson(from))
-              : !isPhotoFile(file) || !(await sniffImageFile(from))
-          ) {
-            continue
+/** Stages an older companion under Photo's own folder, with the guarded backup limits. */
+async function legacyFiles(legacy: BackupPartLegacy, stage: string): Promise<string[]> {
+  const archive = localPhotosBackupPath(legacy.archive)
+  try { await access(archive) }
+  catch (error) {
+    if ((error as NodeJS.ErrnoException).code === 'ENOENT') return []
+    throw error
+  }
+  const extracted = join(stage, '.legacy')
+  await mkdir(extracted)
+  await extractZip(archive, extracted, BACKUP_ZIP_LIMITS)
+  const files = await filesUnder(extracted)
+  for (const rel of files) {
+    const entry = entryOf(rel)
+    if (!entry) continue
+    if (isPhotoSidecar(entry.file) && !(await readPhotoSidecar(join(extracted, rel)))) continue
+    await copyPhotoFile(join(extracted, rel), join(stage, rel))
+  }
+  await rm(extracted, { recursive: true, force: true })
+  return filesUnder(stage)
+}
+
+export const photoBackupPart: BackupPart = {
+  export: async ({ scratch, playthroughIds }) => {
+    const files: string[] = []
+    for (const pid of playthroughIds) {
+      await movePhotoFiles(pid)
+      const copied = new Set<string>()
+      for (const root of [getPhotosRoot(pid), legacyPhotosRoot(pid)]) {
+        for (const charId of await photoCharacters(root)) {
+          for (const file of await photoNames(join(root, charId))) {
+            const rel = `${pid}/${charId}/${file}`
+            if (photoFileRendering(pid, charId, file)) continue
+            const source = join(root, charId, file)
+            // Old or unreadable metadata never makes a finished image optional.
+            // The new folder is read first; an older copy of the same name is never the backup's.
+            if (copied.has(rel)) continue
+            if (isPhotoSidecar(file) && !(await readPhotoSidecar(source))) continue
+            await copyPhotoFile(source, join(scratch, pid, charId, file))
+            copied.add(rel)
+            files.push(rel)
           }
-          await copyInto(from, join(scratch, playthroughId, charId, file))
-          count++
         }
       }
     }
-    if (count > 0) await createZip(scratch, target)
-  } catch (err) {
-    await rm(target, { force: true }).catch(() => {})
-    console.warn('[backup] could not write the DM and feed photos beside the backup:', err)
-  } finally {
-    await discard(scratch)
-  }
-}
-
-/**
- * Puts back the DM and feed photos kept beside the backup just restored from `backupPath`. Each
- * goes back only into a playthrough the restore brought back, and only as a picture named as one
- * of ours; anything else in the zip is left out. No photos zip there is no photos to put back.
- */
-export async function importLocalPhotos(backupPath: string): Promise<void> {
-  const source = localPhotosBackupPath(backupPath)
-  if (!existsSync(source)) return
-
-  const scratch = scratchDir('local-photos')
-  try {
-    await extractZip(source, scratch, BACKUP_ZIP_LIMITS)
-    for (const rel of await relPathsUnder(scratch)) {
-      const [playthroughId, charId, file, ...rest] = rel.split('/')
-      const ours =
-        rest.length === 0 &&
-        SAFE_NUMERIC_ID.test(playthroughId ?? '') &&
-        SAFE_CHAR_ID.test(charId ?? '') &&
-        (isPhotoFile(file ?? '') || isPhotoSidecar(file ?? '')) &&
-        existsSync(getPlaythroughPath(playthroughId)) &&
-        (isPhotoSidecar(file)
-          ? await validPhotoJson(join(scratch, rel))
-          : (await sniffImageFile(join(scratch, rel))) !== null)
-      if (!ours) {
-        console.warn(`[backup] leaving out ${rel} from the photos beside the backup`)
-        continue
+    return { json: { schemaVersion: 1 }, files }
+  },
+  prepare: async (json, files, legacy) => {
+    // Staged in the system's temporary folder, so a restore makes no global mod-data folder.
+    const stage = await mkdtemp(join(tmpdir(), 'vx-photo-restore-'))
+    try {
+      let names: string[]
+      if (json === undefined && files.list.length === 0) {
+        names = await legacyFiles(legacy, stage)
+      } else {
+        if (!json || typeof json !== 'object' || !('schemaVersion' in json) || json.schemaVersion !== 1) {
+          throw appError('PHOTO_BACKUP_INVALID', 'The photo backup format is not supported.')
+        }
+        names = []
+        for (const rel of files.list) {
+          const entry = entryOf(rel)
+          if (!entry) throw appError('PHOTO_BACKUP_INVALID', 'The photo backup has an invalid filename.')
+          const source = join(files.dir, rel)
+          if (isPhotoSidecar(entry.file) && !(await readPhotoSidecar(source))) continue
+          await copyPhotoFile(source, join(stage, entry.pid, entry.charId, entry.file))
+          names.push(rel)
+        }
       }
-      await copyInto(join(scratch, rel), getPhotoPath(playthroughId, charId, file))
+      return {
+        commit: async () => {
+          try {
+            for (const rel of names) {
+              const entry = entryOf(rel)!
+              let dest: string
+              try { dest = getPhotoPath(entry.pid, entry.charId, entry.file) }
+              catch (error) {
+                if ((error as { code?: string }).code === 'MOD_DATA_NO_PLAYTHROUGH') continue
+                throw error
+              }
+              await copyPhotoFile(join(stage, rel), dest)
+            }
+          } finally {
+            await rm(stage, { recursive: true, force: true })
+            // The restored saves folder may hold old photo folders again: the next read looks.
+            forgetPhotoMoves()
+          }
+        },
+        discard: () => rm(stage, { recursive: true, force: true })
+      }
+    } catch (error) {
+      await rm(stage, { recursive: true, force: true })
+      throw error
     }
-  } catch (err) {
-    console.warn('[backup] could not put back the DM and feed photos beside the backup:', err)
-  } finally {
-    await discard(scratch)
   }
 }
 
-/** A small JSON sidecar; its name is checked by the caller before it reaches the archive. */
-async function validPhotoJson(path: string): Promise<boolean> {
-  try {
-    if ((await stat(path)).size >= 64 * 1024) return false
-    JSON.parse(await readFile(path, 'utf8'))
-    return true
-  } catch {
-    return false
-  }
-}
+requiredBackupPart('photo-feature', photoBackupPart)

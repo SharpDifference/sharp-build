@@ -2,6 +2,7 @@
  * The bridge for the window: every type and function of core's `src/renderer` that the kit hands
  * a mod, re-exported here and nowhere else in the kit (see `shared.ts`).
  */
+export { spriteUrl } from '../../../../src/renderer/stores/characterStore'
 export type { PromptState } from '../../../../src/renderer/prompts/scenePrompt'
 export type { SlotIntroInput } from '../../../../src/renderer/prompts/slotIntroPrompt'
 export type { TextingPromptState } from '../../../../src/renderer/prompts/textingPrompt'
@@ -14,10 +15,18 @@ export type { ModalShell } from '../../../../src/renderer/components/useModalShe
 export { useModalShell, useDismissLayer } from '../../../../src/renderer/components/useModalShell'
 export type { SceneInputLayout } from '../../../../src/renderer/components/useSceneInput'
 export { useSceneInput } from '../../../../src/renderer/components/useSceneInput'
-export { modIsOn, useModOn, useModOption } from '../../../../src/renderer/stores/modsStore'
+export { modIsOn, modOptionOn, useModOn, useModOption } from '../../../../src/renderer/stores/modsStore'
 export { PostCommentAction, PostCommentsView, PostPicture } from '../../../../src/renderer/components/PostSpots'
 export { EmojiTool, SentText, useBareMessage, useEmojiTool } from '../../../../src/renderer/components/TextSpots'
 export { submitAction, takeTurnFromReply } from '../../../../src/renderer/stores/gameLoop'
+export type { SceneLineOptions } from '../../../../src/renderer/stores/sceneLines'
+export {
+  boxParts,
+  dropTransientLines,
+  reachTurn,
+  readerSaysInScene,
+  sayInScene
+} from '../../../../src/renderer/stores/sceneLines'
 export { finishSlotActivity } from '../../../../src/renderer/stores/slotActivity'
 export { fileLatePost } from '../../../../src/renderer/stores/loop/feed'
 export { Card, Locked } from '../../../../src/renderer/views/ContactPage'
@@ -86,3 +95,72 @@ export { FEED_EMOJI, FEED_EMOJI_BAG, FEED_HANDLE_BAG, FEED_HANDLE_POOL } from '.
 
 export { bunnybotSays } from '../../../../src/renderer/mods/bunnybot'
 export { invoke } from '../../../../src/renderer/mods/invoke'
+export { addMemory, addPostComments, toggleFeedLike } from '../../../../src/renderer/mods/records'
+export { saveChanges } from '../../../../src/renderer/stores/loop/saves'
+
+export { Lightbox } from '../../../../src/renderer/components/Lightbox'
+export { relationshipLines } from '../../../../src/renderer/prompts/relationship'
+export type { RelationshipMedium, RelationshipProgress } from '../../../../src/renderer/prompts/relationship'
+export { memoryLines, profileLines, spaced } from '../../../../src/renderer/prompts/scenePrompt'
+
+export {
+  noNsfwImages,
+  subscribeNoNsfwImages,
+  useNoNsfwImages,
+  imageApiConfigured,
+  subscribeImageApiConfigured,
+  useImageApiConfigured,
+  localImageSource,
+  subscribeLocalImageSource,
+  useLocalImageSource,
+  canRenderLocalImages,
+  subscribeCanRenderLocalImages,
+  phoneOpen,
+  viewingThread,
+  subscribePhoneView,
+  useViewingThread,
+  drawFeedHandles,
+  drawFeedEmoji
+} from '../../../../src/renderer/mods/readers'
+
+export {
+  character,
+  useCharacter,
+  subscribeCharacter,
+  characterInfo,
+  useCharacterInfo,
+  subscribeCharacterInfo,
+  rosterIds,
+  subscribeRosterIds,
+  useRosterIds,
+  conversation,
+  useConversation,
+  subscribeConversation,
+  feed,
+  useFeed,
+  subscribeFeed,
+  npcRelationships,
+  useNpcRelationships,
+  subscribeNpcRelationships,
+  clock,
+  useClock,
+  subscribeClock,
+  playerStats,
+  usePlayerStats,
+  subscribePlayerStats,
+  playerProfilePicture,
+  usePlayerProfilePicture,
+  subscribePlayerProfilePicture,
+  feedReadThrough,
+  useFeedReadThrough,
+  subscribeFeedReadThrough,
+  sceneActive,
+  useSceneActive,
+  subscribeSceneActive,
+  readerPromptText,
+  useReaderPromptText,
+  subscribeReaderPromptText,
+  useProfileImageUrl,
+  profileImageUrl,
+  subscribeProfileImageUrl
+} from '../../../../src/renderer/mods/gameReaders'

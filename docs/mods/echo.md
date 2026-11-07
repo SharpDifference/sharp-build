@@ -60,6 +60,26 @@ initialization; that gameplay/state migration remains separate from these screen
 
 ## Saves, backups and source map
 
+### Artwork provider controls
+
+The manager reads API credential presence through `useImageApiConfigured` and the local
+source through `useLocalImageSource` from `@vx/modkit/renderer`. It does not read the native
+settings store or receive a key/endpoint. The former follows the game's image-key fallback
+rule; it is not a connection test. The latter distinguishes managed/external ComfyUI so a
+player's external server is never offered the managed model installer. Local-art selection
+still permits rendering without an image API key; the existing artwork and cutout flow is
+unchanged. A standalone manifest must declare both renderer capabilities.
+
+### Local creature artwork rendering
+
+Echo sends its own parsed Megaten workflow to the kit's `renderComfyImage` under
+the `echo` mod id. Core owns the render queue, ComfyUI startup, checked image bytes
+and temporary-output cleanup. Echo retains its managed Python/LoRA preflight,
+prompt, cancellation signal and subsequent cutout processing. External servers
+still bypass managed-install checks. This is a partial migration: target discovery
+and managed model paths remain native dependencies, and Unheard Soul reference
+uploads retain their existing implementation. No Photo Feature dependency is added.
+
 ### Screen-hook integration
 
 Echo registers `portraitOverlay` and `photosPageSection` from its renderer mod entry. The native portrait and Photos page render the generic `ModSlot` outlets; they no longer mount Echo directly at those two locations. The portrait contribution reuses `EchoAura`, including the saved placement, opacity, floating motion, owner visibility, and replay/created-scene gates. The optional Photos contribution reuses the existing gallery and manager with the page's theme. Neither hook requires Photo Feature, and switching Echo off removes both contributions without erasing its saved data.
@@ -86,3 +106,9 @@ Current validation and remaining release checks are in [echo-validation.md](echo
 ## Fifth-pass persistence and context checks
 
 Closing the Echo manager before Save starts discards the draft. Once storage acknowledges a dispatched Save, the live Echo and next autosave retain that edit even if the manager has closed. A load/reset or different playthrough still blocks stale completion, and failed writes leave live state unchanged.
+
+## Legacy semester registration
+
+The legacy carry adapter registers at renderer boot, after the shared catalogue, even
+while the feature is off. See [Maestro legacy semester carry](legacy-semester-carry.md)
+for the adapter paths, retention guarantees and remaining standalone typing limitation.

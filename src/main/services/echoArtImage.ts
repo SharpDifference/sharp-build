@@ -1,4 +1,4 @@
-import { imageTypeOf } from '@shared/imageBytes'
+import { imageTypeOf } from '@vx/modkit/shared'
 import { openImage } from './imageFiles'
 
 export const MAX_ECHO_ART_BYTES = 20 * 1024 * 1024

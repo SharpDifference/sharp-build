@@ -5,7 +5,7 @@ import type { Character } from './types'
 /**
  * What mods add to a sprite's or a CG's prompt draft, in either process: the editor's regenerate
  * draft in the renderer and every render in main are built by the same `imagePrompt` functions,
- * so a mod registers here, from its shared entry, and both see it.
+ * so a mod registers its shared draft after the catalog loads in each process.
  */
 
 /** Which picture a draft is for: a dressed sprite, a nude one, or her CGs. */

@@ -96,7 +96,8 @@ export const MOD_FILES: Record<string, ModSet> = {
       'src/renderer/vu_styles/EmojiText.css'
     ]
   },
-  'godlike-standards': { globs: ['src/shared/romanceRequirements.ts'] },
+  // The romance registry is core's hook implementation, byte-identical on core and main.
+  'godlike-standards': { globs: [] },
   'meanwhile-conversations': {
     globs: [
       'src/shared/meanwhile*.ts',
@@ -217,7 +218,7 @@ export const MOD_FILES: Record<string, ModSet> = {
       'assets/sound/community/reckoning/**'
     ]
   },
-  'starting-challenge': { globs: ['src/shared/startingChallenge.ts'] },
+  'starting-challenge': { globs: ['src/shared/startingChallenge.ts', 'src/shared/startingChallengeCarry.ts'] },
   'story-memory': {
     globs: [
       'src/shared/storyMemory*.ts',

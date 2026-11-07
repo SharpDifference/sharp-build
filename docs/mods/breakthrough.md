@@ -1,5 +1,11 @@
 # Breakthrough
 
+The Echo ability option is read through the kit: `useModOption` keeps the panel reactive,
+and renderer `modOptionOn` checks the current value at activation. Both preserve the native
+declared default when an override is absent; the separate Echo on/off gate still applies.
+The store and panel no longer import the native mod-switches store for these reads. A
+standalone manifest declares the corresponding renderer capabilities.
+
 Breakthrough is a standalone **anytime** mod. It needs neither Story & Social nor SQLite.
 The scene's upper-right card shows a spirit bar for each present character. Choose one,
 expand the card, and at 100 spirit write what the player does and what they hope changes.
@@ -178,3 +184,9 @@ and saves; live-model narrative effectiveness is not a measured probability.
 - `src/renderer/modEntries/breakthrough.ts` loads the hooks automatically at boot.
 
 The stable IDs, defaults, dependencies, save fields and gameplay behavior are unchanged. Native character notes, scene-creator saves and calendar replays remain separate base-game features. Merge framework updates from `core` into this mod branch; resolve conflicts with `main` on a separate `integrate/breakthrough` branch.
+
+## Legacy semester registration
+
+The legacy carry adapter registers at renderer boot, after the shared catalogue, even
+while the feature is off. See [Maestro legacy semester carry](legacy-semester-carry.md)
+for the adapter paths, retention guarantees and remaining standalone typing limitation.

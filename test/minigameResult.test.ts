@@ -1,4 +1,5 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
+import { miniGamesReady } from './fixtures/miniGamesKit'
 import { useGameStore } from '../src/renderer/stores/gameStore'
 import { useTableStore } from '../src/renderer/minigames/session'
 import { fileResult } from '../src/renderer/minigames/table'
@@ -10,6 +11,7 @@ import type { PlayResult } from '../src/renderer/minigames/play'
 
 // The kit's renderer entry loads the game's stores; these tests take each name from its own module.
 vi.mock('@vx/modkit/renderer', async () => (await import('./fixtures/miniGamesKit')).miniGamesKit())
+beforeAll(miniGamesReady)
 
 vi.mock('../src/renderer/stores/gameLoop', () => ({ submitAction: vi.fn(), takeTurnFromReply: vi.fn(() => false) }))
 vi.mock('../src/renderer/stores/loop/hooks', async (importOriginal) => ({
@@ -24,7 +26,7 @@ const brief = () => useTableStore.getState().played!.brief.join('\n')
 beforeEach(() => {
   vi.clearAllMocks()
   useTableStore.getState().setPlayed(null)
-  useGameStore.setState({ awaitingInput: true, busy: false, streaming: false, pendingLines: [], sceneLog: [], currentSceneTranscript: [], charKeyToId: {}, emotions: {} })
+  useGameStore.setState({ awaitingInput: true, busy: false, streaming: false, pendingLines: [], sceneLog: [], currentSceneTranscript: [{ speaker: 'reader', text: 'Darts?' }], charKeyToId: {}, emotions: {} })
 })
 
 describe('completed game narration handoff', () => {

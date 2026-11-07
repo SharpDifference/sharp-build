@@ -1,3 +1,5 @@
+// Carry registration follows catalogue loading and runs even while switched off.
+import '../../shared/reckoningCarry'
 import { unspokenSceneBoundary } from '@shared/unspokenVoice'
 import { CHARACTER_DYNAMICS_MOD } from '@shared/characterDynamics'
 import { createElement, lazy, Suspense } from 'react'

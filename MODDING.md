@@ -1,5 +1,15 @@
 # Mods in this build
 
+### Character sprite URLs
+
+Renderer mods can import `spriteUrl(charId, sprite, version?, staged?)` from
+`@vx/modkit/renderer`. This is the native function, not a file reader. For example,
+`spriteUrl(id, 'neutral')` displays a neutral character sprite in a setup screen.
+The URL uses the game's active image resolver, including browser builds; do not construct
+`charimg://` URLs yourself. `version` busts the image cache after a regeneration and
+`staged` selects the editor's staged files. This does not check that an image exists,
+load a character, or grant file-write access. It is separate from the reader's profile image.
+
 This is how the community mods share one build: every mod's code is always in the game, and a
 switch decides whether it acts. Players turn mods on and off from **Mods** on the main menu;
 nothing is chosen at install time.
@@ -218,6 +228,33 @@ else the highest, with a line in the log. The loader deletes nothing and writes 
   standing in for an installed copy of the same id). While the game runs, a change to the folder
   reloads the window, at once off a game and on offer in one; a changed `main.js` offers a restart.
 
+In-repo mods statically import their main entry functions from `src/main/modEntries/<id>.ts`
+and list them by id in `src/main/modEntries/index.ts`. Each function synchronously returns
+`{ invoke?, protocols? }`, the exports an installed `main.js` would have. Put setup inside the
+function so the loader can catch its failures. Put the same hook and kit API declarations in
+the shared `ModDef.hooks`; `invoke` must be declared there. Existing definitions without main
+entries need no declarations. The id must already be built into `MODS`. Entries use the installed
+loader's validation and registries; a thrown exception or validation failure switches the whole
+mod off with the usual notice. Built-ins serve routes only, and an installed copy or dev folder
+cannot replace their entries.
+Safe start and a loader failure skip installed mods only: built-in mods, and their main
+entries, keep running.
+
+### Main-process enablement
+
+`await modIsOn(modId)` from `@vx/modkit/main` reads the current switches from disk
+and answers whether that mod is enabled and running this session. Declare
+`main:modIsOn`. Unknown mods, failed loads and safe-start exclusions answer false.
+The renderer's `modIsOn` returns a boolean synchronously; main's returns a Promise.
+Always `await` the main version: testing the Promise itself would always be truthy.
+A malformed/unreadable switches file rejects through the normal application error;
+it never silently enables the mod. Main has no active playthrough, so playthrough
+mods are checked against their global switch, not a particular save's enrollment.
+
+This read also refreshes the option snapshot used by `modOptionOn`. For a service
+that needs both, await `modIsOn` first, then read its option synchronously. Neither
+function grants permission to invoke another mod or cancels work already running.
+
 ### Modal controls
 
 An installed mod imports `useModalShell` and `useDismissLayer` from `@vx/modkit/renderer`,
@@ -296,6 +333,17 @@ A mod's panel draws its title and fields with the game's own components, from
 
 They are the game's components, so a mod's panel looks and behaves as a native one does and
 changes with it. Their props are the ones the game's own screens pass, typed in the kit.
+### Prompt helpers and image viewing
+
+`Lightbox({ src, onClose })` from `@vx/modkit/renderer` is the game's image viewer, with its own
+styles and motion. `relationshipLines`, `profileLines`, `memoryLines` and `spaced` are the same
+prompt helpers core uses; they take their inputs from the caller and do not read a game store.
+`RelationshipMedium` and `RelationshipProgress` describe relationship-helper inputs.
+`globalSlotOf(date, time)` is already in `@vx/modkit/shared`.
+
+A mod can declare its own id as a string constant. It does not need a core export for its id.
+For sent text, use `SentText` and `useBareMessage(text)` rather than the internal hook selector.
+
 ### Small readers
 
 A few of the game's own readers, each declared as `renderer:<name>` or `shared:<name>`:
@@ -307,6 +355,32 @@ A few of the game's own readers, each declared as `renderer:<name>` or `shared:<
   the playthrough's first slot, and graduation morning.
 - `lessNsfwText()` and `useLessNsfwText()` (`renderer`): the player has Less NSFW text on, so the
   game's own writing is toned down and a mod's should be. True until the settings are read.
+- `noNsfwImages()`, `useNoNsfwImages()` and `subscribeNoNsfwImages(onChange)` (`renderer`):
+  the game's No NSFW images flag, false until settings are read. The subscription fires only
+  when the flag changes and returns an unsubscribe function.
+- `imageApiConfigured()`, `useImageApiConfigured()` and
+  `subscribeImageApiConfigured(onChange)` (`renderer`): the selected image API has credentials
+  configured, following the native image-key fallback rule. False before settings load.
+  This is not a connectivity or account-credit check; it reveals no key or endpoint.
+- `localImageSource()`, `useLocalImageSource()` and `subscribeLocalImageSource(onChange)`
+  (`renderer`): `'managed'` or `'external'`, or null before settings load. This says which
+  source is selected, not whether it is ready or reachable. Both subscriptions fire only
+  when their own answer changes and return an unsubscribe function. Each exported value
+  has its matching `renderer:<name>` capability.
+- `canRenderLocalImages()` and `subscribeCanRenderLocalImages(onChange)` (`renderer`): core's
+  local-rendering rule. False on the web or before settings load; external ComfyUI is available
+  without a managed install, while managed ComfyUI must be ready and not deferred. The
+  subscription follows both settings and setup and fires only when availability changes.
+- `phoneOpen()`, `viewingThread()` and `useViewingThread()` (`renderer`): whether the phone is
+  open and its selected DM charId (null on its list). `subscribePhoneView(onChange)` follows
+  either value and returns an unsubscribe function; unrelated phone state does not notify.
+  A close handler can keep the previous `phoneOpen()` value and act on true becoming false.
+- `modOptionOn(modId, optionId)` (`renderer`): the non-hook option reader, with the same option
+  defaults as `useModOption`. It reads the option alone, not whether the mod is on; use existing
+  `modIsOn` for that. Unknown options are false.
+- `drawFeedHandles(count)` and `drawFeedEmoji(count)` (`renderer`): draw strings from the game's
+  persistent feed bags. These are draws, not read-only snapshots. Separate calls let a reply
+  keep one part of an identity without spending its replacement. Neither exposes the bag store.
 - `useSfxGain()` (`renderer`): the gain a mod's own sound effects play at, the player's effects
   volume as the game's mix applies it.
 - `modsOnLine()` and `buildLabel()` (`renderer`): the mods that are on, each with its version, as
@@ -577,10 +651,24 @@ not run, and writes them back on every save. Removing a mod loses nothing, and p
 finds its data where it was.
 
 **On a record.** `recordField(id, { empty, legacy, normalize })` is the same for the `ex` on a
-record inside the save: a character, a memory, a message, a conversation, a post, a project
-session. Its handle is pure: `read(record)` is the mod's value on that record, and
-`with(record, next)` is a new record holding it, without the legacy keys. Nothing in core writes
-the record back for the mod yet; that comes with each record's hook.
+record inside the save: a character, a memory, a message, a conversation, a post, a comment, a
+project session. `read(record)` is the mod's value on that record, and `with(record, next)` is a
+new record holding it, without the legacy keys; both are pure, for a record the mod has in hand,
+such as the post a `fileFeedPost` hook is filing. A record already in the game is written through
+the handle, which finds it by a `RecordRef`: one of her texts
+(`{ kind: 'message', charId, messageId }`), one of her posts (`{ kind: 'post', charId, postId }`)
+or a comment under one (`{ kind: 'comment', charId, postId, commentId }`).
+
+- `set(ref, next, { run })` puts `next` on that record as `with` would, in memory: the record's own
+  fields and every other mod's slice stay as they are, and it goes out with the next save, or now
+  with `saveChanges` (below).
+- `update(ref, change, { run })` is the same, with `change` handed the record's value as `read`
+  gives it; undefined leaves the record as it is.
+
+`run` is `currentRun()` from when the work began, for work that awaits something: the write is
+refused once that game has been left. Both answer a `Result` and never throw. A record's legacy
+keys go only as the mod writes that record, so an old key stays on every record the mod never
+writes again; `normalize` keeps reading it there. `id` and `ex` are never taken off.
 
 **New games and the next semester.** An enrollment has an `ex` of its own, and the playthrough's
 first save starts with it. At New Game+, the next semester's first save starts with what each
@@ -595,6 +683,60 @@ value is carried as it stands.
 are until each moves. A mod moves in two steps. First it declares its `saveField`, with a
 `normalize` that reads its old key from `legacy` first, and reads and writes through the handle
 from then on. Then, at move-out, it drops the merged declaration and its carry adapter.
+
+### Reading the loaded game
+
+Available since 0.8.0 from `@vx/modkit/renderer`. These readers expose data, never a store or
+its actions. Record snapshots are detached, deeply frozen copies; changing a nested array or
+object cannot change the game. Repeated reads keep the same snapshot until its native source
+changes, so they are also suitable for `useSyncExternalStore`.
+
+| Plain getter | Component hook | Subscription |
+| --- | --- | --- |
+| `character(id)` | `useCharacter(id)` | `subscribeCharacter(id, onChange)` |
+| `characterInfo(id)` | `useCharacterInfo(id)` | `subscribeCharacterInfo(id, onChange)` |
+| `rosterIds({ alumni? })` | `useRosterIds({ alumni? })` | `subscribeRosterIds(onChange, { alumni? })` |
+| `conversation(id)` | `useConversation(id)` | `subscribeConversation(id, onChange)` |
+| `feed(id)` | `useFeed(id)` | `subscribeFeed(id, onChange)` |
+| `npcRelationships()` | `useNpcRelationships()` | `subscribeNpcRelationships(onChange)` |
+| `clock()` | `useClock()` | `subscribeClock(onChange)` |
+| `playerStats()` | `usePlayerStats()` | `subscribePlayerStats(onChange)` |
+| `playerProfilePicture()` | `usePlayerProfilePicture()` | `subscribePlayerProfilePicture(onChange)` |
+| `feedReadThrough()` | `useFeedReadThrough()` | `subscribeFeedReadThrough(onChange)` |
+| `sceneActive()` | `useSceneActive()` | `subscribeSceneActive(onChange)` |
+| `readerPromptText()` | `useReaderPromptText()` | `subscribeReaderPromptText(onChange)` |
+
+Each subscription returns an unsubscribe function and fires only when its own projected value
+changes. Record subscriptions are scoped to the supplied id; another girl's record or another
+thread does not notify them. Feed order and held/future posts are preserved: use `postVisible`
+and `shownComments` for the same filtering the game applies. Roster ids are active girls by
+default; `{ alumni: true }` appends graduates, without duplicates, in their saved order.
+
+Before a playthrough loads, or after it is left, collections return `[]`, the player's picture
+returns `null`, scene ownership is false, and the other getters return `undefined`. In
+particular the clock, stats, relationship map and reader block have no default game to report.
+A missing character, state record or conversation also returns `undefined`.
+
+`feedReadThrough` reads Bunnyfeeds' old board-wide numeric read marker, where present, so it can
+seed its own mod data from older saves. It neither creates nor updates that key. Use existing
+`gameFacts`/`useGameFacts` for the playthrough id and reader's name, and `charKeyOf` to derive a
+character key. No second identity reader is needed.
+
+`profileImageUrl(id)` combines the native profile URL with its image-cache version; it returns
+`undefined` without a game or that girl. `useProfileImageUrl(id)` is the component hook and
+`subscribeProfileImageUrl(id, onChange)` the plain subscription, both following changes to that
+girl's image only. No image store is exposed.
+`sceneActive` uses core's scene-ownership predicate. Together with `clock` and existing
+`isGraduationSlot`, it replaces the selectors used to close commenting while a scene or the
+epilogue owns the phone. It is not the same question as `safePoint`.
+
+`readerPromptText` returns core's own READER block, including profile, stats, academic reputation,
+cold and relationships, rather than reconstructing or abbreviating it. Its subscription compares
+the resulting text, so unrelated state changes do not notify. It supplies no data before a game.
+
+These APIs perform no writes or saves. Changes to records, comments or memories belong to the
+scoped writers and save policy in [#259](https://github.com/venus-extracurriculars/build/pull/259).
+Reading a snapshot does not give permission to publish a replacement with a whole-store write.
 
 ### Writing at a safe point
 
@@ -629,6 +771,43 @@ never as a throw:
 | `MOD_WRITE_STALE` | A value `expect` names has moved, as the write was asked for or at its turn, or the game was left or another loaded before its turn came |
 | `MOD_WRITE_WAIT` | It is not a safe point, as the write was asked for or at its turn; try again once `safePoint()` is `'open'` |
 | `SAVE_WRITE_FAILED` | The write itself failed; where the disk gave an error of its own, that comes back instead |
+
+### Writing the game's records, and saving them now
+
+A record field's `set` and `update`, and the game's own records a mod adds to (below), change the
+game in memory. `saveChanges(id, { run })` writes the game as it stands to the autosave now,
+behind every save already on its way, for a change that should not wait for the loop's next save:
+a picture that landed, replies filed while the phone is open. It is not a safe-point write. Outside
+a scene it writes at once, whatever else is still out; in a scene it writes the reader's last turn,
+the point a reload lands on. While the scene is not at his turn (a line playing, a reply
+streaming, its ending being written) it writes nothing and answers `deferred`: the loop's own next
+save carries the change, since every save is taken from the game as it stands. It answers
+`written` once the save is on disk.
+
+A mod adds to two lists the game owns, so that everything that reads them sees what it added:
+
+- `addPostComments(id, { charId, postId }, comments, { run })` adds comments under her post, after
+  the ones there, for the mod that draws the feed's comments (`ownsPostComments`). Each comment is
+  a comment's own fields (`id`, `handle`, `emoji`, `text`, `at`) and the mod's slice in `ex`, its
+  `id` one no comment of the post has. A mod's own fields go in its slice, written with its
+  `recordField`'s `with` before the comment is added and with `set` after.
+- `addMemory(id, charId, memory, { replacing, run })` adds a memory of hers, where the prompts, her
+  affection and the memory list read memories. It is a memory's own `date`, `type` and `desc`,
+  marked as the mod's: it carries the mod's slice, an empty one where it brings none. `replacing`
+  picks which of her memories the mod marked before go in its place; no other memory is asked.
+
+`toggleFeedLike(charId, postId)` is the reader's like on her post, put on or taken off as the heart
+on a post in the game does.
+
+The record writes and the two lists answer a `Result`, and a refusal changes nothing:
+
+| Code | When |
+| --- | --- |
+| `MOD_WRITE_OFF`, `MOD_WRITE_NO_GAME`, `MOD_WRITE_FOREIGN` | As for `writeModField`; `saveChanges` also refuses a game that is over |
+| `MOD_WRITE_STALE` | `run` has been left; for `saveChanges`, also the game left before the write's turn |
+| `MOD_WRITE_GONE` | The record is not in the game, as when it was deleted; for `addMemory`, she is not |
+| `MOD_WRITE_NOT_OWNER` | `addPostComments` from a mod that does not draw the feed's comments |
+| `MOD_WRITE_INVALID` | A comment or memory that is not one: a field it does not have, a slice of another mod, a repeated id |
 
 ### Which versions a game was played with
 
@@ -793,10 +972,14 @@ a setter, and set it from `modsStore.ts` at boot and whenever a switch moves
 
 ## Sprite and CG prompt drafts
 
-`shared/imagePromptDrafts.ts` lets a shared mod entry add to a sprite's or a CG's prompt draft,
-in both processes: the editor's regenerate draft in the renderer and every render in main are
-built by the same `spriteDraft` and `cgSetDraft`. Register once at boot with
-`registerImagePromptDraft(modId, { draft, regen? })`, from `@vx/modkit/shared`.
+`registerImagePromptDraft(modId, { draft, regen? })` and its `ImagePromptDraft`,
+`ImagePromptKind` and `ImagePromptParts` types are in `@vx/modkit/shared`. The same drafts build
+both the editor's regenerate prompt in the renderer and every native render in main.
+
+Keep a shared mod entry's draft definition pure. Do not call kit values while that entry loads:
+the shared catalog and the kit can be importing one another. Register after the catalog has
+loaded, from the mod's renderer entry and its main startup path. Registering only in the renderer
+would leave native main-process renders without the draft. Re-registering an id replaces its own.
 
 - `draft(parts, { character, kind })` is handed the draft's `appearance` and `negative` tags
   and returns them with the mod's own in; `kind` is `sprite`, `nude` or `cg`. Each mod that is
@@ -1037,6 +1220,26 @@ as a decision point; over a reply's last line, that line is taken as turned; at 
 already, nothing changes. It returns `false` when none of these applies (the scene is busy, or
 nothing is waiting on the reader), and then the panel sends nothing.
 
+A panel that says something in the scene without sending a turn uses the scene's lines from
+`@vx/modkit/renderer`. `sayInScene(id, text, { charId, expression, transient })` puts the words
+on the transcript, which every later request quotes, and on the box. They are split as the
+scene's own lines are, and the reader's turn is closed until they are read. With `charId` they
+are hers, and `expression` sets her face in the outfit she has on; without, they are narration.
+It returns `false` and says nothing where the mod is off, the words are empty, she is not in the
+scene, or no scene takes lines (none is running, it is a replay, or it is ending).
+`boxParts(text)` is the same split alone, for a panel that paces each part itself.
+`readerSaysInScene(text)` puts the reader's words on the scene as an action he took, with nobody
+asked to answer. `reachTurn()` brings the scene to his turn: `takeTurnFromReply`, or, where a
+mod's own last line stands on the box with nothing behind it, the turn opened. Where no scene
+takes lines, it returns `false` and changes nothing, so it never cuts into an ending.
+
+A `transient` line is said for the moment only, such as a game's move-by-move narration.
+`dropTransientLines(id)` takes the mod's own transient lines back off the transcript, the log
+and the queue, wherever they have got to, and leaves every other line. A box showing one lands
+on the last line kept, and a gift stays on the action that handed it over. Nothing written to disk
+holds one, whether a save, a calendar replay or a Scene Creator saved scene: a reload never
+brings back a line the mod could no longer take back.
+
 A hook point is added where mods actually meet, not ahead of need. Once mods use one, it stays
 as it is: renaming it or changing what it passes breaks them. A change that is needed goes in
 as a new hook beside the old one.
@@ -1116,6 +1319,7 @@ Where a branch goes:
 - `slotSettled` receives the scene's starting state, the completed ledger and closing cast after bookkeeping, before clock advancement and the boundary save. It is synchronous so mod state is included in that save.
 - `slotStatusLines` adds lines to the slot's closing report, after what each girl took away from it, written with `memoryStatusLine` as the game writes its own. It is handed `nextSlot`, the global slot about to begin, and every mod that is on is asked, in list order.
 - `fileLatePost(post)` in `loop/feed.ts` files a post a mod wrote mid-slot, outside the slot's opening, the way the opening files its own: through `fileFeedPost`, so it can be held like any other. It leaves the slot's teaser and fill as they were drawn.
+- A post the game files that `postVisible` keeps off the feed, such as one whose picture a mod is still drawing, goes into her feed without BunnyBot's first-post nudge. The mod that shows it calls the `nudge` its `fileFeedPost` was handed. A mod can keep such a post with its own data on it this way, rather than setting `held` and filing the post itself.
 - `texts` on a ComfyUI job in `comfyService.ts` fills more prompt nodes by id, for a graph with more prompts than the positive, negative and detailer the job already fills.
 
 These hooks add to the existing API; existing hooks and their arguments are unchanged. Screens and IPC still use direct integration as documented above; a mod's save data has `saveField` (Mod data).
@@ -1154,7 +1358,8 @@ none of its own. A mod that does registers `postComments`: only one draws them a
 first that is on in `MODS` order (`postCommentsOwner`), and a mod asks `ownsPostComments(id)`
 before writing any, so two mods never both ask the slot's opening for them. Its `claims` marks the
 comments only it writes; another mod drawing comments leaves those out, whether or not it is on.
-A mod adds its own fields to `PostComment` by declaration merging. `PostCommentsView`,
+A mod keeps its own fields on a comment in its slice, and adds comments under a post that is
+already out with `addPostComments` (Mod data). `PostCommentsView`,
 `PostCommentAction` and `PostPicture` in `components/PostSpots.tsx` draw a post's spots in a
 mod's own screens too.
 

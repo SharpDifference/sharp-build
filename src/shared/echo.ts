@@ -1,5 +1,5 @@
 import { talentMemoryMultiplier } from './campusTalents'
-import type { Character, CharInfo, CharMemory, Result } from './types'
+import type { Character, CharInfo, CharMemory, Result } from '@vx/modkit/shared'
 import { ECHO_ASPECTS, LEGACY_ECHO_ASPECTS, type EchoAspect } from './echoAspects'
 import { echoProfileCues, explainEchoAspect, type EchoProfilePart, type EchoReasonExample } from './echoReasons'
 import { echoNameArtDirection, echoNameVisualCues, mythicalEchoName } from './echoNaming'

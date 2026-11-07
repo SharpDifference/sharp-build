@@ -28,7 +28,7 @@ import {
 import { bindModWrites, bindSceneFieldSaves, saveFields, writeModSlices as slicesWith } from '@vx/modkit/host/renderer'
 import { isGraduationSlot } from '../../prompts/graduation'
 import { useBunnyboardStore } from '../bunnyboardStore'
-import { PORTRAIT_SLOTS, useGameStore } from '../gameStore'
+import { PORTRAIT_SLOTS, savedSceneRecords, useGameStore } from '../gameStore'
 import { lastReaderIndexOf } from '../stageStep'
 import { sceneActiveOf, textingUnsettled } from '../textingLoop'
 import { useUiStore } from '../uiStore'
@@ -240,7 +240,8 @@ function withReaderAction(log: readonly SceneLine[], transcript: readonly SceneL
 
 /**
  * The scene as it stood *before* `lines` played, with them queued. The turn's own action is read
- * onto the log: `base` was captured before it was logged.
+ * onto the log: `base` was captured before it was logged. The transcript and its marks are the
+ * store's as a capture takes them, so they count the same lines as `base`'s log and gifts.
  */
 export function queuedScene(
   base: SceneState | null,
@@ -248,19 +249,20 @@ export function queuedScene(
   extra: Partial<SceneState> = {}
 ): SceneState {
   const game = useGameStore.getState()
+  const records = savedSceneRecords(game)
   const from = base ?? openingScene([])
   const scene: SceneState = {
     ...from,
     cast: [...game.cast],
-    transcript: [...game.currentSceneTranscript],
+    transcript: [...records.currentSceneTranscript],
     summary: game.sceneSummary,
-    sceneLog: withReaderAction(from.sceneLog, game.currentSceneTranscript),
+    sceneLog: withReaderAction(from.sceneLog, records.currentSceneTranscript),
     pendingLines: lines,
     ...extra
   }
   // Set-or-delete, like the kinds below: the marks are the store's, never the base's.
-  if (game.sceneSummaries.length > 0) {
-    scene.summaries = game.sceneSummaries.map((mark) => ({ ...mark }))
+  if (records.sceneSummaries.length > 0) {
+    scene.summaries = records.sceneSummaries.map((mark) => ({ ...mark }))
   } else delete scene.summaries
   const mods = savedModScene(game.sceneMods)
   if (mods) scene.mods = mods
@@ -711,7 +713,7 @@ const WAIT_MESSAGE = 'Wait for the scene to settle.'
 const STALE_MESSAGE = 'The game changed. Reopen this and try again.'
 
 /** A refused mod write. */
-function refused(code: string, message: string): Result<null> {
+function refused<T = null>(code: string, message: string): Result<T> {
   return { ok: false, error: appError(code, message) }
 }
 
@@ -839,6 +841,45 @@ async function saveSceneField(modId: string, keys: readonly string[], apply: () 
 }
 
 bindSceneFieldSaves({ save: saveSceneField })
+
+/**
+ * Writes what a mod changed in the game (its slices, its records, the comments and memories it
+ * added) to disk now, rather than with the loop's next save: over the autosave, behind every write
+ * already queued, at the last decision point of a scene in progress or with no scene outside one.
+ * While a scene is not at a decision point (a line playing, a reply streaming, its ending being
+ * written) nothing is written now, and the answer is `deferred`: the loop's own next save carries
+ * the change, since every save is taken from the live game. `written` once the save is on disk.
+ * Refused, writing nothing, with `MOD_WRITE_OFF`, `MOD_WRITE_NO_GAME` (none, or one that is over),
+ * `MOD_WRITE_STALE` (`run` left, or the game left before the write's turn), or the disk's own
+ * error. Never throws.
+ */
+export async function saveChanges(
+  modId: string,
+  options: { run?: object } = {}
+): Promise<Result<'written' | 'deferred'>> {
+  try {
+    if (!modIsOn(modId, loopState.record)) return refused('MOD_WRITE_OFF', 'That mod is off.')
+    const game = useGameStore.getState()
+    if (!game.playthroughId || game.activeGameOver !== null) {
+      return refused('MOD_WRITE_NO_GAME', 'There is no game to save into.')
+    }
+    if (options.run !== undefined && runStale(options.run)) return refused('MOD_WRITE_STALE', STALE_MESSAGE)
+    let scene: SceneState | null = null
+    if (sceneInProgress()) {
+      const atDecision = game.awaitingInput && !game.sceneEnding && !game.endingInFlight
+      if (!atDecision || !loopState.decisionSave) return { ok: true, data: 'deferred' }
+      scene = loopState.decisionSave
+    }
+    // Left as the answer where the write is skipped: the game was left before its turn.
+    let outcome: Result<'written' | 'deferred'> = refused('MOD_WRITE_STALE', STALE_MESSAGE)
+    await writeAutosave(scene, (result) => {
+      outcome = result.ok ? { ok: true, data: 'written' } : result
+    })
+    return outcome
+  } catch (err) {
+    return { ok: false, error: toAppError(err, 'SAVE_WRITE_FAILED') }
+  }
+}
 
 // What a mod's `writeModField` and `safePoint` reach.
 bindModWrites({

@@ -56,11 +56,6 @@ const HOOKS: readonly {
     why: 'the CSP names every scheme an image may load from; without it every photo is blocked'
   },
   {
-    file: 'src/main/services/comfyService.ts',
-    needs: ['export async function runGenerationJob'],
-    why: 'localPhotoService renders on this pipeline'
-  },
-  {
     file: 'src/renderer/stores/loop/feed.ts',
     needs: ['pickTeaser(featured.length > 0 ? featured : fresh)'],
     why: "a stranger's photo post is never the slot's teaser, and her picture is drawn for nobody"
@@ -69,11 +64,6 @@ const HOOKS: readonly {
     file: 'src/renderer/stores/feedView.ts',
     needs: ['if (!post || !postVisible(post)) continue'],
     why: 'a teaser with a picture shows before the picture exists'
-  },
-  {
-    file: 'src/main/ipc.ts',
-    needs: ['await exportLocalPhotos(filePath)', 'await importLocalPhotos(filePaths[0])'],
-    why: 'a backup leaves her DM and feed photos behind, and a restore never puts them back'
   },
   {
     file: 'src/main/imageProtocols.ts',

@@ -22,7 +22,7 @@ import {
 import { randomId } from '@shared/uuid'
 import { andList } from '@shared/sentences'
 import { formatGameDate } from '../../prompts/gameDate'
-import { blankCharInfo, useGameStore, type CreatedSceneFields } from '../gameStore'
+import { blankCharInfo, savedSceneRecords, useGameStore, type CreatedSceneFields } from '../gameStore'
 import { useUiStore } from '../uiStore'
 
 /**
@@ -155,6 +155,7 @@ export async function writeCreatedScene(name: string, ended: boolean): Promise<b
   const game = useGameStore.getState()
   const scene = game.createdScene
   if (!scene) return false
+  const records = savedSceneRecords(game)
   const record: SavedScene = {
     schemaVersion: SAVED_SCENE_SCHEMA_VERSION,
     id: randomId(),
@@ -165,8 +166,8 @@ export async function writeCreatedScene(name: string, ended: boolean): Promise<b
       const character = game.characters[entry.charId]
       return character ? fullNameOf(character) : ''
     }),
-    transcript: game.currentSceneTranscript.map((line) => ({ ...line })),
-    ...(game.sceneGifts.length > 0 ? { gifts: game.sceneGifts.map((gift) => ({ ...gift })) } : {}),
+    transcript: records.currentSceneTranscript.map((line) => ({ ...line })),
+    ...(records.sceneGifts.length > 0 ? { gifts: records.sceneGifts.map((gift) => ({ ...gift })) } : {}),
     ended
   }
   const result = await window.api.scenes.write(record)

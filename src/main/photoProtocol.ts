@@ -1,38 +1,11 @@
-import { net, protocol } from 'electron'
-import { join } from 'path'
-import { pathToFileURL } from 'url'
-import { SAFE_CHAR_ID, SAFE_NUMERIC_ID } from '@vx/modkit/shared'
+import { protocol } from 'electron'
+import { SAFE_CHAR_ID, SAFE_NUMERIC_ID, imageTypeOf } from '@vx/modkit/shared'
 import { isPhotoFile } from '../shared/photoFiles'
-import { getPlaythroughPath } from './paths'
-import { imagePath } from './services/imageFiles'
+import { readPhotoImage } from './photoFiles'
 
-/**
- * Disk-backed URLs for the pictures a character has texted the reader: the host is a constant
- * and the path is `{playthroughId}/{charId}/{file}`. The sibling of `charimg://`, kept apart
- * because these belong to one save rather than to the character — leave the playthrough and
- * they are gone with it.
- *
- * The two path helpers below would sit more naturally in `paths.ts` beside the rest of the
- * save's folders, and in the build this was ported from they did. They live here so that
- * `paths.ts` needs no edit: a feature that can be dropped in whole files is a feature whose
- * folders are its own business.
- */
 const SCHEME = 'playimg'
 
-/** `/data/saves/{playthroughId}/photos/{charId}` — the pictures she has sent in this save. */
-export function getPhotosPath(playthroughId: string, charId: string): string {
-  return join(getPhotosRoot(playthroughId), charId)
-}
-
-/** The playthrough's photo folder, one folder in it per girl who sent any. */
-export function getPhotosRoot(playthroughId: string): string {
-  return join(getPlaythroughPath(playthroughId), 'photos')
-}
-
-/** One picture on a thread; `file` is the name the message carries. */
-export function getPhotoPath(playthroughId: string, charId: string, file: string): string {
-  return join(getPhotosPath(playthroughId, charId), file)
-}
+export { getPhotoPath, getPhotosPath, getPhotosRoot } from './photoFiles'
 
 /**
  * This scheme's entry for `registerImageSchemes`, which is the only place a scheme may be
@@ -66,11 +39,13 @@ export function handlePhotoProtocol(): void {
     }
 
     // A WebP the renderer has not encoded yet, or never did, is served from its PNG.
-    const path = await imagePath(getPhotoPath(playthroughId, charId, file))
     try {
-      return await net.fetch(pathToFileURL(path).toString())
+      const bytes = await readPhotoImage(playthroughId, charId, file)
+      return new Response(bytes as BodyInit, {
+        headers: { 'Content-Type': imageTypeOf(bytes) ?? 'application/octet-stream' }
+      })
     } catch (err) {
-      console.warn(`[playimg] ${path}: ${String(err)}`)
+      console.warn(`[playimg] ${playthroughId}/${charId}/${file}: ${String(err)}`)
       return new Response('Not found', { status: 404 })
     }
   })
