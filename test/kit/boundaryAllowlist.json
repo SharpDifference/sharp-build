@@ -187,7 +187,6 @@
   "src/renderer/modEntries/starting-challenge.ts -> ../stores/gameStore",
   "src/renderer/modEntries/story-memory.ts -> ../prompts/storyMemoryPrompt",
   "src/renderer/modEntries/story-memory.ts -> ../stores/gameStore",
-  "src/renderer/modEntries/story-memory.ts -> ../stores/modsStore",
   "src/renderer/mods/venusWhisper.tsx -> ../components/BunnyboardFeatureIcons",
   "src/renderer/mods/venusWhisper.tsx -> ../stores/gameStore",
   "src/renderer/mods/venusWhisper.tsx -> ../stores/modsStore",
