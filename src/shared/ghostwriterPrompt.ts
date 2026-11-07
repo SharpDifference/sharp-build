@@ -49,6 +49,9 @@ const CONVERTER_BLOCK = [
   'If it has a summary field, write it yourself as YOUR TURN asks, counting the draft as the lines you just wrote.'
 ].join('\n')
 
+/** The fields the Mini Games mod adds to a scene reply, filled from what happens in the draft. */
+const MINI_GAME_FIELDS: readonly string[] = ['minigame', 'minigameInvite']
+
 /** The converter's system text and the user text its draft follows, cut from the scene request in the window. */
 export interface ConverterText {
   system: string
@@ -136,6 +139,20 @@ function stagingOf(schema: StructuredRequest['schema']): string {
   return blocks.join('\n\n')
 }
 
+/**
+ * The converter's instructions, ending on the mini-game fields the schema carries where it carries
+ * any, so the converter fills them from the draft rather than taking them as answered by it.
+ */
+function converterBlockOf(schema: StructuredRequest['schema']): string {
+  const properties = recordOf(schema.schema.properties) ?? {}
+  const fields = MINI_GAME_FIELDS.filter((field) => field in properties)
+  if (fields.length === 0) return CONVERTER_BLOCK
+  return [
+    CONVERTER_BLOCK,
+    `Fill the reply's ${fields.join(' and ')} ${fields.length > 1 ? 'fields' : 'field'} from what happens in the draft, as the mini-game instructions ask. A game is offered, agreed to or turned down only where the draft says so.`
+  ].join('\n')
+}
+
 /** The schema without the `vars` field Prompt Studio adds, which the converter is never told how to fill. */
 function withoutVars(schema: StructuredRequest['schema']): StructuredRequest['schema'] {
   const properties = recordOf(schema.schema.properties)
@@ -179,7 +196,7 @@ export function converterTextOf(request: StructuredRequest): ConverterText | nul
 
   const staging = stagingOf(request.schema)
   return {
-    system: [CONVERTER_PERSONA, system, ...(staging ? [staging] : []), CONVERTER_BLOCK].join('\n\n'),
+    system: [CONVERTER_PERSONA, system, ...(staging ? [staging] : []), converterBlockOf(request.schema)].join('\n\n'),
     user
   }
 }
@@ -203,7 +220,7 @@ export function converterRequestOf(
 ): StructuredRequest {
   const tail = `DRAFT\n${draft}\n\nConvert the DRAFT into the JSON reply.`
   if (!text) {
-    return { ...request, system: `${request.system}\n\n${CONVERTER_BLOCK}`, user: `${request.user}\n\n${tail}` }
+    return { ...request, system: `${request.system}\n\n${converterBlockOf(request.schema)}`, user: `${request.user}\n\n${tail}` }
   }
   // The user text is new, so an offset into the old one points at nothing.
   const { logFrom: _logFrom, ...rest } = request

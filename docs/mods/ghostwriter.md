@@ -57,7 +57,10 @@ the game sends them.
    narration instead of quoting it, the reader's in the second person, keeps the rest of the
    draft's words, splits them into lines, gives each its speaker and adds the stage directions,
    changing nothing that happens. A scene too big for the schema to list its stage directions
-   gives it no outfit suffixes. It decides whether the scene ends and writes the summary itself.
+   gives it no outfit suffixes. It decides whether the scene ends and writes the summary itself,
+   and where the reply carries Mini Games' `minigame` or `minigameInvite` field, it is told to fill
+   it from what happens in the draft: a game is offered, agreed to or turned down only where the
+   draft says so.
    Where the reply rules or the turn cannot be found in the request, as after the player edits a
    failed prompt, it is sent the whole request instead, preset and all.
 4. The converter's reply streams to the window and is sanitized there exactly as any scene
